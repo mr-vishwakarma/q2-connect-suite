@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { AnimatedSection, TiltCard, FloatingElement, GlowButton } from '@/components/ui/animated-section';
 import { 
   MapPin, 
   Phone, 
@@ -19,22 +21,22 @@ const contactInfo = [
   {
     icon: Building,
     title: 'Hostel Address',
-    lines: ['Q2 Hostel', 'University Campus', 'City, State 12345'],
+    lines: ['Q2 Hostel', 'Sector E-8 Campus', 'Patel Nagar, Bhopal', 'Madhya Pradesh – 462022'],
   },
   {
     icon: Phone,
     title: 'Phone',
-    lines: ['+91 98765 43210', '+91 12345 67890'],
+    lines: ['+91 9540369524', '+91 7033468899'],
   },
   {
     icon: Mail,
     title: 'Email',
-    lines: ['info@q2hostel.com', 'support@q2hostel.com'],
+    lines: ['karan954036@gmail.com', 'deepakgiri1333@gmail.com'],
   },
   {
     icon: Clock,
-    title: 'Office Hours',
-    lines: ['Mon - Fri: 9:00 AM - 6:00 PM', 'Sat: 10:00 AM - 2:00 PM'],
+    title: 'Office Hours (IST)',
+    lines: ['Mon – Sat: 9:00 AM – 9:00 PM', 'Sunday: 9:00 AM – 2:00 PM'],
   },
 ];
 
@@ -69,22 +71,29 @@ export default function Contact() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Navbar />
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-16 overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-gradient-to-br from-background via-card to-primary/5" />
-          <div className="absolute top-1/2 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[150px]" />
+          <FloatingElement y={25} duration={10}>
+            <div className="absolute top-1/2 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[150px]" />
+          </FloatingElement>
         </div>
 
         <div className="container mx-auto px-6 relative z-10">
-          <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm mb-8">
+          <AnimatedSection direction="up" className="max-w-3xl mx-auto text-center">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm mb-8"
+            >
               <MapPin className="w-4 h-4" />
               <span>Contact Us</span>
-            </div>
+            </motion.div>
 
             <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
               Get in Touch
@@ -93,7 +102,7 @@ export default function Contact() {
             <p className="text-xl text-muted-foreground">
               Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
             </p>
-          </div>
+          </AnimatedSection>
         </div>
       </section>
 
@@ -101,94 +110,151 @@ export default function Contact() {
       <section className="py-16">
         <div className="container mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
-            {/* Contact Info */}
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-foreground mb-8">Contact Information</h2>
-              
-              <div className="grid gap-6">
-                {contactInfo.map((info, index) => (
-                  <div
-                    key={index}
-                    className="flex gap-4 p-6 rounded-2xl bg-card border border-border/50 hover:border-primary/30 transition-all duration-300"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <info.icon className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground mb-1">{info.title}</h3>
-                      {info.lines.map((line, i) => (
-                        <p key={i} className="text-muted-foreground text-sm">{line}</p>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+            {/* Contact Info - Slides from LEFT */}
+            <AnimatedSection direction="left">
+              <div className="space-y-6">
+                <h2 className="text-3xl font-bold text-foreground mb-8">Contact Information</h2>
+                
+                <div className="grid gap-6">
+                  {contactInfo.map((info, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -50 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.1, duration: 0.5 }}
+                    >
+                      <TiltCard>
+                        <motion.div
+                          whileHover={{ 
+                            x: 10,
+                            boxShadow: '0 20px 40px hsl(var(--primary) / 0.15)'
+                          }}
+                          className="flex gap-5 p-6 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-all duration-300"
+                        >
+                          <motion.div 
+                            whileHover={{ 
+                              rotate: 360,
+                              boxShadow: '0 0 25px hsl(var(--primary) / 0.5)'
+                            }}
+                            transition={{ duration: 0.5 }}
+                            className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0"
+                          >
+                            <info.icon className="w-7 h-7 text-primary" />
+                          </motion.div>
+                          <div>
+                            <h3 className="font-bold text-foreground text-xl mb-2">{info.title}</h3>
+                            {info.lines.map((line, i) => (
+                              <p key={i} className="text-foreground text-lg font-semibold leading-relaxed">{line}</p>
+                            ))}
+                          </div>
+                        </motion.div>
+                      </TiltCard>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
-            </div>
+            </AnimatedSection>
 
-            {/* Contact Form */}
-            <div className="p-8 rounded-3xl bg-card border border-border/50">
-              <h2 className="text-2xl font-bold text-foreground mb-6">Send us a Message</h2>
-              
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-foreground">Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    type="text"
-                    placeholder="Your name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="bg-secondary border-border focus:border-primary"
-                    required
-                  />
-                </div>
+            {/* Contact Form - Slides from RIGHT */}
+            <AnimatedSection direction="right" delay={0.2}>
+              <motion.div 
+                whileHover={{ 
+                  boxShadow: '0 30px 60px hsl(var(--primary) / 0.2)',
+                  borderColor: 'hsl(var(--primary) / 0.3)'
+                }}
+                className="p-8 rounded-3xl bg-card/80 backdrop-blur-sm border border-border/50 shadow-2xl transition-all duration-500"
+              >
+                <h2 className="text-2xl font-bold text-foreground mb-6">Send us a Message</h2>
+                
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.3 }}
+                    className="space-y-2"
+                  >
+                    <Label htmlFor="name" className="text-foreground">Name</Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      type="text"
+                      placeholder="Your name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="bg-secondary border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                      required
+                    />
+                  </motion.div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-foreground">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="bg-secondary border-border focus:border-primary"
-                    required
-                  />
-                </div>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.4 }}
+                    className="space-y-2"
+                  >
+                    <Label htmlFor="email" className="text-foreground">Email</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="your.email@example.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                      className="bg-secondary border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                      required
+                    />
+                  </motion.div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="message" className="text-foreground">Message</Label>
-                  <Textarea
-                    id="message"
-                    name="message"
-                    placeholder="Your message..."
-                    value={formData.message}
-                    onChange={handleChange}
-                    className="bg-secondary border-border focus:border-primary min-h-[150px]"
-                    required
-                  />
-                </div>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.5 }}
+                    className="space-y-2"
+                  >
+                    <Label htmlFor="message" className="text-foreground">Message</Label>
+                    <Textarea
+                      id="message"
+                      name="message"
+                      placeholder="Your message..."
+                      value={formData.message}
+                      onChange={handleChange}
+                      className="bg-secondary border-border focus:border-primary focus:ring-2 focus:ring-primary/20 min-h-[150px] transition-all"
+                      required
+                    />
+                  </motion.div>
 
-                <Button 
-                  type="submit" 
-                  variant="hero" 
-                  size="lg" 
-                  className="w-full"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    'Sending...'
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Message
-                    </>
-                  )}
-                </Button>
-              </form>
-            </div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <GlowButton className="w-full">
+                      <Button 
+                        type="submit" 
+                        variant="hero" 
+                        size="lg" 
+                        className="w-full"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          'Sending...'
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            Send Message
+                          </>
+                        )}
+                      </Button>
+                    </GlowButton>
+                  </motion.div>
+                </form>
+              </motion.div>
+            </AnimatedSection>
           </div>
         </div>
       </section>
