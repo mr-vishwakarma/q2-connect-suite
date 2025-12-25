@@ -212,7 +212,7 @@ export default function MessOff() {
                   </Popover>
                 </div>
 
-                <Button type="submit" variant="hero" className="w-full" disabled={isSubmitting}>
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? 'Submitting...' : (
                     <>
                       Request Mess Off

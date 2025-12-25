@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Navbar } from '@/components/landing/Navbar';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, User, Building } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -46,38 +47,39 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center gradient-hero p-6">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse-slow" />
-      </div>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      
+      <div className="min-h-screen flex items-center justify-center pt-20 pb-12 px-6">
+        {/* Background Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" />
+          <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[150px]" />
+          <div className="absolute bottom-1/3 right-1/4 w-[400px] h-[400px] bg-info/5 rounded-full blur-[120px]" />
+        </div>
 
-      <div className="w-full max-w-md relative z-10 animate-slide-up">
-        <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </Link>
-
-        <Card className="glass-effect border-border/50">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-glow">
-              <span className="text-primary-foreground font-bold text-2xl">Q2</span>
+        <Card className="w-full max-w-md relative z-10 bg-card/80 backdrop-blur-sm border-border/50 shadow-2xl">
+          <CardHeader className="text-center pb-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/25">
+              <User className="w-8 h-8 text-primary-foreground" />
             </div>
-            <CardTitle className="text-2xl text-foreground">Welcome Back</CardTitle>
+            <CardTitle className="text-2xl text-foreground">User Login</CardTitle>
             <CardDescription className="text-muted-foreground">
-              Sign in to your student account
+              Q2 Hostel
             </CardDescription>
           </CardHeader>
+          
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground">Email</Label>
+                <Label htmlFor="email" className="text-foreground">Email / Username</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="your.email@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="bg-secondary border-border focus:border-primary"
+                  className="bg-secondary border-border focus:border-primary focus:ring-primary/20"
                   required
                 />
               </div>
@@ -91,13 +93,13 @@ export default function Login() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="bg-secondary border-border focus:border-primary pr-10"
+                    className="bg-secondary border-border focus:border-primary focus:ring-primary/20 pr-10"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -105,22 +107,18 @@ export default function Login() {
               </div>
 
               <Button type="submit" variant="hero" className="w-full" size="lg" disabled={isLoading}>
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {isLoading ? 'Signing in...' : 'Login'}
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-muted-foreground">
-              <p>Need an account?{' '}
-                <Link to="/request-registration" className="text-primary hover:underline">
-                  Request Registration
-                </Link>
+            <div className="mt-6 pt-6 border-t border-border/50 text-center text-sm text-muted-foreground">
+              <p className="flex items-center justify-center gap-2">
+                <Building className="w-4 h-4" />
+                Are you an administrator?
               </p>
-              <p className="mt-2">
-                Are you a manager?{' '}
-                <Link to="/admin-login" className="text-primary hover:underline">
-                  Admin Login
-                </Link>
-              </p>
+              <Link to="/admin-login" className="text-primary hover:underline mt-1 inline-block">
+                Admin Login
+              </Link>
             </div>
           </CardContent>
         </Card>
