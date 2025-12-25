@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Menu, X } from 'lucide-react';
 
@@ -30,10 +31,13 @@ export function Navbar() {
   }, [location.pathname]);
 
   return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+    <motion.nav
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         isScrolled
-          ? 'bg-background/95 backdrop-blur-md border-b border-border/50 shadow-lg'
+          ? 'bg-background/95 backdrop-blur-md border-b border-border/50 shadow-lg shadow-primary/5'
           : 'bg-transparent'
       }`}
     >
@@ -41,71 +45,151 @@ export function Navbar() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25 group-hover:shadow-primary/40 transition-shadow">
+            <motion.div 
+              whileHover={{ 
+                scale: 1.1,
+                boxShadow: '0 0 30px hsl(var(--primary) / 0.5)'
+              }}
+              whileTap={{ scale: 0.95 }}
+              className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25 group-hover:shadow-primary/40 transition-shadow"
+            >
               <span className="text-primary-foreground font-bold text-lg">Q2</span>
-            </div>
-            <span className="text-foreground font-semibold text-xl hidden sm:block">
+            </motion.div>
+            <motion.span 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="text-foreground font-semibold text-xl hidden sm:block"
+            >
               Q2 Management
-            </span>
+            </motion.span>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <Link
+            {navLinks.map((link, index) => (
+              <motion.div
                 key={link.path}
-                to={link.path}
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  location.pathname === link.path
-                    ? 'text-primary'
-                    : 'text-muted-foreground'
-                }`}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + index * 0.05 }}
               >
-                {link.name}
-              </Link>
+                <Link
+                  to={link.path}
+                  className={`text-sm font-medium transition-all relative group ${
+                    location.pathname === link.path
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {link.name}
+                  <motion.span 
+                    className="absolute -bottom-1 left-0 h-0.5 bg-primary"
+                    initial={{ width: 0 }}
+                    animate={{ width: location.pathname === link.path ? '100%' : 0 }}
+                    whileHover={{ width: '100%' }}
+                    transition={{ duration: 0.2 }}
+                  />
+                </Link>
+              </motion.div>
             ))}
           </div>
 
           {/* Desktop CTA */}
-          <div className="hidden lg:flex items-center gap-3">
-            <Button variant="hero" asChild>
-              <Link to="/login">Login</Link>
-            </Button>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4 }}
+            className="hidden lg:flex items-center gap-3"
+          >
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Button variant="hero" asChild>
+                <Link to="/login">Login</Link>
+              </Button>
+            </motion.div>
+          </motion.div>
 
           {/* Mobile Menu Button */}
-          <button
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="lg:hidden text-foreground p-2"
           >
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+            <AnimatePresence mode="wait">
+              {isMobileMenuOpen ? (
+                <motion.div
+                  key="close"
+                  initial={{ rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: 90, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <X className="w-6 h-6" />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="menu"
+                  initial={{ rotate: 90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: -90, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Menu className="w-6 h-6" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.button>
         </div>
 
         {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden mt-4 pb-4 border-t border-border/50 pt-4 animate-fade-in">
-            <div className="flex flex-col gap-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`text-sm font-medium transition-colors hover:text-primary py-2 ${
-                    location.pathname === link.path
-                      ? 'text-primary'
-                      : 'text-muted-foreground'
-                  }`}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="lg:hidden mt-4 pb-4 border-t border-border/50 pt-4 overflow-hidden"
+            >
+              <div className="flex flex-col gap-4">
+                {navLinks.map((link, index) => (
+                  <motion.div
+                    key={link.path}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Link
+                      to={link.path}
+                      className={`text-sm font-medium transition-colors hover:text-primary py-2 block ${
+                        location.pathname === link.path
+                          ? 'text-primary'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      {link.name}
+                    </Link>
+                  </motion.div>
+                ))}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
                 >
-                  {link.name}
-                </Link>
-              ))}
-              <Button variant="hero" asChild className="mt-2">
-                <Link to="/login">Login</Link>
-              </Button>
-            </div>
-          </div>
-        )}
+                  <Button variant="hero" asChild className="mt-2 w-full">
+                    <Link to="/login">Login</Link>
+                  </Button>
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </nav>
+    </motion.nav>
   );
 }
