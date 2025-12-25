@@ -134,7 +134,7 @@ export default function Complaints() {
                 />
               </div>
 
-              <Button type="submit" variant="hero" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Submitting...' : (
                   <>
                     Submit Complaint
