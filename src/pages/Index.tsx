@@ -3,8 +3,9 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
+import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { AnimatedSection, TiltCard, StaggerContainer, StaggerItem, FloatingElement, GlowButton } from '@/components/ui/animated-section';
-import { 
+import {
   Users, 
   UtensilsCrossed, 
   MessageSquare, 
@@ -56,6 +57,7 @@ const stats = [
 export default function Index() {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
+      <BuildingBackground showOnHome={true} />
       <Navbar />
 
       {/* Hero Section */}
