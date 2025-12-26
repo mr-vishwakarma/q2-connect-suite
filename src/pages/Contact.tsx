@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
+import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -73,11 +74,14 @@ export default function Contact() {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       <Navbar />
+      
+      {/* Building Background */}
+      <BuildingBackground showOnHome={true} />
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-16 overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-background via-card to-primary/5" />
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-card/80 to-primary/5" />
           <FloatingElement y={25} duration={10}>
             <div className="absolute top-1/2 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[150px]" />
           </FloatingElement>
@@ -107,7 +111,7 @@ export default function Contact() {
       </section>
 
       {/* Contact Section */}
-      <section className="py-16">
+      <section className="py-16 relative z-10">
         <div className="container mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
             {/* Contact Info - Slides from LEFT */}
@@ -130,7 +134,7 @@ export default function Contact() {
                             x: 10,
                             boxShadow: '0 20px 40px hsl(var(--primary) / 0.15)'
                           }}
-                          className="flex gap-5 p-6 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-all duration-300"
+                          className="flex gap-5 p-6 rounded-2xl bg-card/90 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-all duration-300"
                         >
                           <motion.div 
                             whileHover={{ 
@@ -163,7 +167,7 @@ export default function Contact() {
                   boxShadow: '0 30px 60px hsl(var(--primary) / 0.2)',
                   borderColor: 'hsl(var(--primary) / 0.3)'
                 }}
-                className="p-8 rounded-3xl bg-card/80 backdrop-blur-sm border border-border/50 shadow-2xl transition-all duration-500"
+                className="p-8 rounded-3xl bg-card/90 backdrop-blur-sm border border-border/50 shadow-2xl transition-all duration-500"
               >
                 <h2 className="text-2xl font-bold text-foreground mb-6">Send us a Message</h2>
                 

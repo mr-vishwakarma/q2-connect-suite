@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
+import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { AnimatedSection, TiltCard, StaggerContainer, StaggerItem, FloatingElement } from '@/components/ui/animated-section';
 import { 
   Target, 
@@ -48,12 +49,15 @@ export default function About() {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       <Navbar />
+      
+      {/* Building Background */}
+      <BuildingBackground showOnHome={true} />
 
       {/* Hero Section - Slides from RIGHT */}
       <section className="relative pt-32 pb-24 overflow-hidden">
         {/* Background */}
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-background via-card to-primary/5" />
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-card/80 to-primary/5" />
           <FloatingElement y={30} duration={10}>
             <div className="absolute top-1/3 left-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[150px]" />
           </FloatingElement>
@@ -112,7 +116,7 @@ export default function About() {
       </section>
 
       {/* Trust Section - Fades + Scales */}
-      <section className="py-24 bg-card/50">
+      <section className="py-24 bg-card/50 relative z-10">
         <div className="container mx-auto px-6">
           <AnimatedSection direction="scale" className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
@@ -153,7 +157,7 @@ export default function About() {
 
       {/* Team Section - Alternating slides */}
       <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 z-0">
           <FloatingElement y={-20} duration={12}>
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-info/5 rounded-full blur-[120px]" />
           </FloatingElement>
@@ -212,7 +216,7 @@ export default function About() {
       </section>
 
       {/* Values Section - Slides from RIGHT */}
-      <section className="py-24 bg-card/50">
+      <section className="py-24 bg-card/50 relative z-10">
         <div className="container mx-auto px-6">
           <AnimatedSection direction="right" className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">

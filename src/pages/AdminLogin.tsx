@@ -6,10 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Navbar } from '@/components/landing/Navbar';
+import { Footer } from '@/components/landing/Footer';
+import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Shield, User } from 'lucide-react';
-import { FloatingElement, GlowButton } from '@/components/ui/animated-section';
+import { GlowButton } from '@/components/ui/animated-section';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -45,37 +47,13 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="min-h-screen bg-background overflow-x-hidden flex flex-col">
       <Navbar />
       
-      <div className="min-h-screen flex items-center justify-center pt-20 pb-12 px-6">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1 }}
-            className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" 
-          />
-          
-          <FloatingElement y={-30} duration={8}>
-            <div className="absolute top-1/3 right-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[150px]" />
-          </FloatingElement>
-          
-          <FloatingElement y={25} duration={10}>
-            <div className="absolute bottom-1/3 left-1/4 w-[400px] h-[400px] bg-info/5 rounded-full blur-[120px]" />
-          </FloatingElement>
-
-          {/* Floating shapes */}
-          <FloatingElement y={-35} duration={7} className="absolute top-1/4 left-[20%]">
-            <div className="w-16 h-16 rounded-2xl bg-primary/15 rotate-45 blur-sm" />
-          </FloatingElement>
-          
-          <FloatingElement y={30} duration={9} className="absolute bottom-1/4 right-[15%]">
-            <div className="w-12 h-12 rounded-full bg-info/10 blur-sm" />
-          </FloatingElement>
-        </div>
-
+      {/* Building Background */}
+      <BuildingBackground showOnHome={true} />
+      
+      <div className="flex-1 flex items-center justify-center pt-20 pb-12 px-6 relative z-10">
         {/* Card - Slides from LEFT */}
         <motion.div
           initial={{ opacity: 0, x: -100 }}
@@ -89,7 +67,7 @@ export default function AdminLogin() {
             }}
             transition={{ duration: 0.3 }}
           >
-            <Card className="w-full max-w-md relative z-10 bg-card/80 backdrop-blur-xl border-primary/20 shadow-2xl shadow-primary/10">
+            <Card className="w-full max-w-md relative z-10 bg-card/90 backdrop-blur-xl border-primary/20 shadow-2xl shadow-primary/10">
               <CardHeader className="text-center pb-4">
                 <motion.div 
                   initial={{ scale: 0 }}
@@ -189,6 +167,8 @@ export default function AdminLogin() {
           </motion.div>
         </motion.div>
       </div>
+      
+      <Footer />
     </div>
   );
 }

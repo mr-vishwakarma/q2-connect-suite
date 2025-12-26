@@ -28,11 +28,11 @@ export function Footer() {
       initial={{ opacity: 0, y: 50 }}
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
       transition={{ duration: 0.7, ease: 'easeOut' }}
-      className="bg-gradient-to-b from-card to-background border-t border-border"
+      className="bg-gradient-to-b from-card to-background border-t border-border relative z-10"
     >
       <div className="container mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Left - Logo & Description */}
+          {/* Left - Logo, Description & Address */}
           <motion.div 
             initial={{ opacity: 0, x: -30 }}
             animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -30 }}
@@ -49,11 +49,20 @@ export function Footer() {
               >
                 <span className="text-primary-foreground font-bold text-lg">Q2</span>
               </motion.div>
-              <span className="text-foreground font-semibold text-xl">Q2 Management</span>
+              <span className="text-foreground font-bold text-xl">Q2 Management</span>
             </Link>
-            <p className="text-muted-foreground text-sm max-w-xs">
+            <p className="text-foreground font-bold text-base">
               Q2 Management – Smart Hostel Management System for modern hostels and student accommodations.
             </p>
+            
+            {/* Hostel Address */}
+            <div className="pt-4 space-y-1">
+              <p className="text-foreground font-semibold text-sm">Hostel Address</p>
+              <p className="text-muted-foreground text-sm">Q2 Hostel</p>
+              <p className="text-muted-foreground text-sm">Sector E-8 Campus</p>
+              <p className="text-muted-foreground text-sm">Patel Nagar, Bhopal</p>
+              <p className="text-muted-foreground text-sm">Madhya Pradesh – 462022</p>
+            </div>
           </motion.div>
 
           {/* Middle - Links */}
@@ -74,7 +83,8 @@ export function Footer() {
                 >
                   <Link
                     to={link.path}
-                    className="text-muted-foreground text-sm hover:text-primary transition-colors relative group"
+                    className="text-foreground font-bold text-sm hover:text-primary transition-colors relative group"
+                    style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}
                   >
                     {link.name}
                     <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />

@@ -59,7 +59,7 @@ export function Navbar() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-foreground font-semibold text-xl hidden sm:block"
+              className="text-foreground font-bold text-xl hidden sm:block"
             >
               Q2 Management
             </motion.span>
@@ -76,15 +76,20 @@ export function Navbar() {
               >
                 <Link
                   to={link.path}
-                  className={`text-sm font-medium transition-all relative group ${
+                  className={`text-sm font-bold transition-all relative group ${
                     location.pathname === link.path
                       ? 'text-primary'
-                      : 'text-muted-foreground hover:text-foreground'
+                      : 'text-foreground hover:text-primary'
                   }`}
+                  style={{ 
+                    textShadow: location.pathname === link.path 
+                      ? '0 0 15px hsl(var(--primary) / 0.5)' 
+                      : '0 0 10px rgba(255, 255, 255, 0.15)'
+                  }}
                 >
                   {link.name}
                   <motion.span 
-                    className="absolute -bottom-1 left-0 h-0.5 bg-primary"
+                    className="absolute -bottom-1 left-0 h-0.5 bg-primary shadow-lg shadow-primary/50"
                     initial={{ width: 0 }}
                     animate={{ width: location.pathname === link.path ? '100%' : 0 }}
                     whileHover={{ width: '100%' }}
@@ -166,11 +171,12 @@ export function Navbar() {
                   >
                     <Link
                       to={link.path}
-                      className={`text-sm font-medium transition-colors hover:text-primary py-2 block ${
+                      className={`text-sm font-bold transition-colors hover:text-primary py-2 block ${
                         location.pathname === link.path
                           ? 'text-primary'
-                          : 'text-muted-foreground'
+                          : 'text-foreground'
                       }`}
+                      style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.15)' }}
                     >
                       {link.name}
                     </Link>
