@@ -50,7 +50,8 @@ const features = [
 const stats = [
   { value: '150+', label: 'Student Management' },
   { value: '70+', label: 'Rooms' },
-  { value: '4.8', label: 'Rating – 100+ Reviews' },
+  { value: '4.8', label: 'Rating' },
+  { value: '100+', label: 'Reviews' },
 ];
 
 export default function Index() {
@@ -211,7 +212,7 @@ export default function Index() {
       {/* Stats Section */}
       <section className="py-24">
         <div className="container mx-auto px-6">
-          <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-8" staggerDelay={0.1}>
+          <StaggerContainer className="grid grid-cols-2 md:grid-cols-4 gap-8" staggerDelay={0.1}>
             {stats.map((stat, index) => (
               <StaggerItem key={index}>
                 <AnimatedSection direction="scale" delay={index * 0.1}>
@@ -221,11 +222,23 @@ export default function Index() {
                       whileInView={{ scale: 1 }}
                       viewport={{ once: true }}
                       transition={{ duration: 0.5, delay: index * 0.1, type: 'spring' }}
-                      className="text-4xl md:text-5xl font-bold text-primary mb-2"
+                      className="text-4xl md:text-5xl font-extrabold mb-2"
+                      style={{ 
+                        color: 'hsl(217 91% 40%)',
+                        textShadow: '0 0 20px hsl(217 91% 50% / 0.7), 0 0 40px hsl(217 91% 45% / 0.5), 0 0 60px hsl(217 91% 40% / 0.3)'
+                      }}
                     >
                       {stat.value}
                     </motion.div>
-                    <div className="text-foreground font-bold text-lg">{stat.label}</div>
+                    <div 
+                      className="font-bold text-lg"
+                      style={{ 
+                        color: 'hsl(217 91% 50%)',
+                        textShadow: '0 0 15px hsl(217 91% 50% / 0.5)'
+                      }}
+                    >
+                      {stat.label}
+                    </div>
                   </div>
                 </AnimatedSection>
               </StaggerItem>
