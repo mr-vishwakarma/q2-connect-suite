@@ -65,12 +65,12 @@ export default function Index() {
         {/* Animated Background Elements - Reduced darkness for building visibility */}
         <div className="absolute inset-0">
           <motion.div 
-            className="absolute inset-0 bg-gradient-to-br from-background/40 via-transparent to-primary/10"
+            className="absolute inset-0 bg-gradient-to-br from-background/20 via-transparent to-primary/5"
             animate={{ 
               background: [
-                'linear-gradient(135deg, hsl(222 47% 6% / 0.4) 0%, transparent 50%, hsl(217 91% 60% / 0.1) 100%)',
-                'linear-gradient(135deg, hsl(222 47% 6% / 0.3) 0%, transparent 40%, hsl(217 91% 60% / 0.15) 100%)',
-                'linear-gradient(135deg, hsl(222 47% 6% / 0.4) 0%, transparent 50%, hsl(217 91% 60% / 0.1) 100%)',
+                'linear-gradient(135deg, hsl(222 47% 6% / 0.2) 0%, transparent 50%, hsl(217 91% 60% / 0.05) 100%)',
+                'linear-gradient(135deg, hsl(222 47% 6% / 0.15) 0%, transparent 40%, hsl(217 91% 60% / 0.08) 100%)',
+                'linear-gradient(135deg, hsl(222 47% 6% / 0.2) 0%, transparent 50%, hsl(217 91% 60% / 0.05) 100%)',
               ]
             }}
             transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
@@ -113,14 +113,22 @@ export default function Index() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.1 }}
-              className="text-5xl md:text-7xl font-bold text-foreground mb-6 leading-tight"
+              className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight"
+              style={{ 
+                color: 'hsl(210 100% 98%)',
+                textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.9)'
+              }}
             >
-              Q2 Management
+              Q2 Hostel Management
               <motion.span 
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.7, delay: 0.3 }}
-                className="block text-primary"
+                className="block"
+                style={{ 
+                  color: 'hsl(217 91% 60%)',
+                  textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 30px hsl(217 91% 50% / 0.5)'
+                }}
               >
                 System
               </motion.span>
@@ -222,21 +230,11 @@ export default function Index() {
                       whileInView={{ scale: 1 }}
                       viewport={{ once: true }}
                       transition={{ duration: 0.5, delay: index * 0.1, type: 'spring' }}
-                      className="text-4xl md:text-5xl font-extrabold mb-2"
-                      style={{ 
-                        color: 'hsl(217 91% 40%)',
-                        textShadow: '0 0 20px hsl(217 91% 50% / 0.7), 0 0 40px hsl(217 91% 45% / 0.5), 0 0 60px hsl(217 91% 40% / 0.3)'
-                      }}
+                      className="text-4xl md:text-5xl font-extrabold mb-2 text-primary"
                     >
                       {stat.value}
                     </motion.div>
-                    <div 
-                      className="font-bold text-lg"
-                      style={{ 
-                        color: 'hsl(217 91% 50%)',
-                        textShadow: '0 0 15px hsl(217 91% 50% / 0.5)'
-                      }}
-                    >
+                    <div className="font-bold text-lg text-primary">
                       {stat.label}
                     </div>
                   </div>
