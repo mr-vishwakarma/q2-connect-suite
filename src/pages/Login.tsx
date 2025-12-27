@@ -57,7 +57,7 @@ export default function Login() {
       {/* Building Background */}
       <BuildingBackground showOnHome={true} />
       
-      <div className="flex-1 flex items-center justify-center pt-20 pb-12 px-6 relative z-10">
+      <div className="flex-1 flex items-center justify-start pl-12 md:pl-24 lg:pl-32 pt-20 pb-12 px-6 relative z-10">
         {/* Card - Slides from RIGHT */}
         <motion.div
           initial={{ opacity: 0, x: 100 }}
