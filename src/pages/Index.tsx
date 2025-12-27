@@ -48,10 +48,9 @@ const features = [
 ];
 
 const stats = [
-  { value: '500+', label: 'Students Managed' },
-  { value: '120+', label: 'Rooms' },
-  { value: '98%', label: 'Complaints Resolved' },
-  { value: '200+', label: 'Daily Users' },
+  { value: '150+', label: 'Student Management' },
+  { value: '70+', label: 'Rooms' },
+  { value: '4.8', label: 'Rating – 100+ Reviews' },
 ];
 
 export default function Index() {
@@ -62,15 +61,15 @@ export default function Index() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Animated Background Elements */}
+        {/* Animated Background Elements - Reduced darkness for building visibility */}
         <div className="absolute inset-0">
           <motion.div 
-            className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5"
+            className="absolute inset-0 bg-gradient-to-br from-background/40 via-transparent to-primary/10"
             animate={{ 
               background: [
-                'linear-gradient(135deg, hsl(222 47% 6%) 0%, hsl(222 47% 6%) 50%, hsl(217 91% 60% / 0.05) 100%)',
-                'linear-gradient(135deg, hsl(222 47% 6%) 0%, hsl(222 47% 6%) 40%, hsl(217 91% 60% / 0.1) 100%)',
-                'linear-gradient(135deg, hsl(222 47% 6%) 0%, hsl(222 47% 6%) 50%, hsl(217 91% 60% / 0.05) 100%)',
+                'linear-gradient(135deg, hsl(222 47% 6% / 0.4) 0%, transparent 50%, hsl(217 91% 60% / 0.1) 100%)',
+                'linear-gradient(135deg, hsl(222 47% 6% / 0.3) 0%, transparent 40%, hsl(217 91% 60% / 0.15) 100%)',
+                'linear-gradient(135deg, hsl(222 47% 6% / 0.4) 0%, transparent 50%, hsl(217 91% 60% / 0.1) 100%)',
               ]
             }}
             transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
@@ -176,13 +175,13 @@ export default function Index() {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-card/50">
+      <section className="py-24 bg-card/30 backdrop-blur-sm">
         <div className="container mx-auto px-6">
           <AnimatedSection direction="up" className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 drop-shadow-lg" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
               Comprehensive Hostel Management
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            <p className="text-foreground font-semibold text-lg max-w-2xl mx-auto drop-shadow-md" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.4)' }}>
               Everything you need to manage your hostel efficiently in one platform
             </p>
           </AnimatedSection>
@@ -191,7 +190,7 @@ export default function Index() {
             {features.map((feature, index) => (
               <StaggerItem key={index}>
                 <TiltCard className="h-full">
-                  <div className="p-6 rounded-2xl bg-card border border-border/50 hover:border-primary/30 transition-all duration-300 group hover:shadow-xl hover:shadow-primary/10 h-full">
+                  <div className="p-6 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-all duration-300 group hover:shadow-xl hover:shadow-primary/10 h-full">
                     <motion.div 
                       whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
                       transition={{ duration: 0.4 }}
@@ -200,7 +199,7 @@ export default function Index() {
                       <feature.icon className="w-6 h-6 text-primary" />
                     </motion.div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">{feature.title}</h3>
-                    <p className="text-muted-foreground text-sm">{feature.description}</p>
+                    <p className="text-foreground/90 font-medium text-sm">{feature.description}</p>
                   </div>
                 </TiltCard>
               </StaggerItem>
@@ -212,7 +211,7 @@ export default function Index() {
       {/* Stats Section */}
       <section className="py-24">
         <div className="container mx-auto px-6">
-          <StaggerContainer className="grid grid-cols-2 lg:grid-cols-4 gap-8" staggerDelay={0.1}>
+          <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-8" staggerDelay={0.1}>
             {stats.map((stat, index) => (
               <StaggerItem key={index}>
                 <AnimatedSection direction="scale" delay={index * 0.1}>
@@ -226,7 +225,7 @@ export default function Index() {
                     >
                       {stat.value}
                     </motion.div>
-                    <div className="text-muted-foreground">{stat.label}</div>
+                    <div className="text-foreground font-bold text-lg">{stat.label}</div>
                   </div>
                 </AnimatedSection>
               </StaggerItem>
