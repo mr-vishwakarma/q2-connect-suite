@@ -98,22 +98,14 @@ export default function Index() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.1 }}
-              className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight"
-              style={{ 
-                color: 'hsl(217 91% 35%)',
-                textShadow: '0 4px 20px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,1)'
-              }}
+              className="text-5xl md:text-7xl font-bold text-foreground mb-6 leading-tight"
             >
               Q2 Hostel Management
               <motion.span 
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.7, delay: 0.3 }}
-                className="block"
-                style={{ 
-                  color: 'hsl(217 91% 35%)',
-                  textShadow: '0 4px 20px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,1)'
-                }}
+                className="block text-foreground"
               >
                 System
               </motion.span>
