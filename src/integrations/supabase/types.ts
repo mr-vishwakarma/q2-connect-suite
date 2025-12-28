@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          hostel: Database["public"]["Enums"]["hostel_type"] | null
           id: string
           status: string | null
           user_id: string
@@ -25,6 +26,7 @@ export type Database = {
         Insert: {
           created_at?: string
           date: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           status?: string | null
           user_id: string
@@ -32,6 +34,7 @@ export type Database = {
         Update: {
           created_at?: string
           date?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           status?: string | null
           user_id?: string
@@ -42,6 +45,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string
+          hostel: Database["public"]["Enums"]["hostel_type"] | null
           id: string
           status: string | null
           title: string
@@ -51,6 +55,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           status?: string | null
           title: string
@@ -60,6 +65,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           status?: string | null
           title?: string
@@ -71,6 +77,7 @@ export type Database = {
       mess_requests: {
         Row: {
           created_at: string
+          hostel: Database["public"]["Enums"]["hostel_type"] | null
           id: string
           leaving_date: string
           return_date: string
@@ -80,6 +87,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           leaving_date: string
           return_date: string
@@ -89,6 +97,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           leaving_date?: string
           return_date?: string
@@ -103,6 +112,7 @@ export type Database = {
           created_at: string
           email: string | null
           fees: number | null
+          hostel: Database["public"]["Enums"]["hostel_type"] | null
           id: string
           name: string
           phone: string | null
@@ -116,6 +126,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           fees?: number | null
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           name: string
           phone?: string | null
@@ -129,6 +140,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           fees?: number | null
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           name?: string
           phone?: string | null
@@ -144,6 +156,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string
+          hostel: Database["public"]["Enums"]["hostel_type"] | null
           id: string
           status: string | null
           title: string
@@ -153,6 +166,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           status?: string | null
           title: string
@@ -162,6 +176,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           status?: string | null
           title?: string
@@ -203,6 +218,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "student"
+      hostel_type: "Q2" | "Q2.0" | "Q2.1"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -331,6 +347,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "student"],
+      hostel_type: ["Q2", "Q2.0", "Q2.1"],
     },
   },
 } as const
