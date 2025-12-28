@@ -115,8 +115,8 @@ export default function Index() {
               transition={{ duration: 0.7, delay: 0.1 }}
               className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight"
               style={{ 
-                color: 'hsl(210 100% 98%)',
-                textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.9)'
+                color: 'hsl(217 91% 35%)',
+                textShadow: '0 4px 20px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,1)'
               }}
             >
               Q2 Hostel Management
@@ -126,8 +126,8 @@ export default function Index() {
                 transition={{ duration: 0.7, delay: 0.3 }}
                 className="block"
                 style={{ 
-                  color: 'hsl(217 91% 60%)',
-                  textShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 30px hsl(217 91% 50% / 0.5)'
+                  color: 'hsl(217 91% 35%)',
+                  textShadow: '0 4px 20px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,1)'
                 }}
               >
                 System
@@ -230,11 +230,11 @@ export default function Index() {
                       whileInView={{ scale: 1 }}
                       viewport={{ once: true }}
                       transition={{ duration: 0.5, delay: index * 0.1, type: 'spring' }}
-                      className="text-4xl md:text-5xl font-extrabold mb-2 text-primary"
+                      className="text-4xl md:text-5xl font-extrabold mb-2 text-white"
                     >
                       {stat.value}
                     </motion.div>
-                    <div className="font-bold text-lg text-primary">
+                    <div className="font-extrabold text-lg text-white">
                       {stat.label}
                     </div>
                   </div>
