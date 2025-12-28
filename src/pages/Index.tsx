@@ -47,12 +47,6 @@ const features = [
   },
 ];
 
-const stats = [
-  { value: '150+', label: 'Student Management' },
-  { value: '70+', label: 'Rooms' },
-  { value: '4.8', label: 'Rating' },
-  { value: '100+', label: 'Reviews' },
-];
 
 export default function Index() {
   return (
@@ -99,15 +93,6 @@ export default function Index() {
 
         <div className="container mx-auto px-6 pt-32 pb-20 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm mb-8"
-            >
-              <Building className="w-4 h-4" />
-              <span>Q2 Hostel Management</span>
-            </motion.div>
 
             <motion.h1 
               initial={{ opacity: 0, y: 30 }}
@@ -217,33 +202,6 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-24">
-        <div className="container mx-auto px-6">
-          <StaggerContainer className="grid grid-cols-2 md:grid-cols-4 gap-8" staggerDelay={0.1}>
-            {stats.map((stat, index) => (
-              <StaggerItem key={index}>
-                <AnimatedSection direction="scale" delay={index * 0.1}>
-                  <div className="text-center">
-                    <motion.div 
-                      initial={{ scale: 0 }}
-                      whileInView={{ scale: 1 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5, delay: index * 0.1, type: 'spring' }}
-                      className="text-4xl md:text-5xl font-extrabold mb-2 text-white"
-                    >
-                      {stat.value}
-                    </motion.div>
-                    <div className="font-extrabold text-lg text-white">
-                      {stat.label}
-                    </div>
-                  </div>
-                </AnimatedSection>
-              </StaggerItem>
-            ))}
-          </StaggerContainer>
-        </div>
-      </section>
 
       {/* CTA Section */}
       <section className="py-24 bg-gradient-to-r from-primary/10 via-primary/5 to-info/10 relative overflow-hidden">
