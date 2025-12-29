@@ -15,27 +15,27 @@ const getVariants = (direction: AnimationDirection) => {
   switch (direction) {
     case 'left':
       return {
-        hidden: { opacity: 0, x: -100 },
+        hidden: { opacity: 0, x: -60 },
         visible: { opacity: 1, x: 0 }
       };
     case 'right':
       return {
-        hidden: { opacity: 0, x: 100 },
+        hidden: { opacity: 0, x: 60 },
         visible: { opacity: 1, x: 0 }
       };
     case 'up':
       return {
-        hidden: { opacity: 0, y: 80 },
+        hidden: { opacity: 0, y: 50 },
         visible: { opacity: 1, y: 0 }
       };
     case 'down':
       return {
-        hidden: { opacity: 0, y: -80 },
+        hidden: { opacity: 0, y: -50 },
         visible: { opacity: 1, y: 0 }
       };
     case 'scale':
       return {
-        hidden: { opacity: 0, scale: 0.8 },
+        hidden: { opacity: 0, scale: 0.9 },
         visible: { opacity: 1, scale: 1 }
       };
     case 'fade':
@@ -52,10 +52,10 @@ export function AnimatedSection({
   direction = 'up', 
   delay = 0, 
   className = '',
-  duration = 0.7 
+  duration = 0.4 
 }: AnimatedSectionProps) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, amount: 0.2 });
+  const isInView = useInView(ref, { once: true, amount: 0.15 });
   const variants = getVariants(direction);
 
   return (
@@ -67,7 +67,7 @@ export function AnimatedSection({
       transition={{ 
         duration, 
         delay, 
-        ease: [0.25, 0.46, 0.45, 0.94] 
+        ease: [0.25, 0.1, 0.25, 1] 
       }}
       className={className}
     >
@@ -106,9 +106,9 @@ interface StaggerContainerProps {
   staggerDelay?: number;
 }
 
-export function StaggerContainer({ children, className = '', staggerDelay = 0.1 }: StaggerContainerProps) {
+export function StaggerContainer({ children, className = '', staggerDelay = 0.06 }: StaggerContainerProps) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, amount: 0.2 });
+  const isInView = useInView(ref, { once: true, amount: 0.15 });
 
   return (
     <motion.div
@@ -121,7 +121,7 @@ export function StaggerContainer({ children, className = '', staggerDelay = 0.1 
           opacity: 1,
           transition: {
             staggerChildren: staggerDelay,
-            delayChildren: 0.1
+            delayChildren: 0.05
           }
         }
       }}
@@ -142,10 +142,10 @@ export function StaggerItem({ children, className = '' }: StaggerItemProps) {
   return (
     <motion.div
       variants={{
-        hidden: { opacity: 0, y: 30 },
+        hidden: { opacity: 0, y: 20 },
         visible: { opacity: 1, y: 0 }
       }}
-      transition={{ duration: 0.5, ease: 'easeOut' }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className={className}
     >
       {children}
@@ -161,7 +161,7 @@ interface FloatingElementProps {
   y?: number;
 }
 
-export function FloatingElement({ children, className = '', duration = 6, y = 20 }: FloatingElementProps) {
+export function FloatingElement({ children, className = '', duration = 4, y = 15 }: FloatingElementProps) {
   return (
     <motion.div
       animate={{ 
