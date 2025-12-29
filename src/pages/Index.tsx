@@ -115,7 +115,8 @@ export default function Index() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto"
+              className="text-xl md:text-2xl text-foreground font-bold mb-10 max-w-2xl mx-auto"
+              style={{ textShadow: '0 0 20px rgba(255, 255, 255, 0.3)' }}
             >
               Smart & Digital Hostel Management for Q2 Hostel
             </motion.p>
@@ -178,14 +179,14 @@ export default function Index() {
                 <TiltCard className="h-full">
                   <div className="p-6 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-all duration-300 group hover:shadow-xl hover:shadow-primary/10 h-full">
                     <motion.div 
-                      whileHover={{ rotate: [0, -10, 10, 0], scale: 1.1 }}
-                      transition={{ duration: 0.4 }}
+                      whileHover={{ rotate: 360, scale: 1.1 }}
+                      transition={{ duration: 0.5 }}
                       className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 group-hover:shadow-lg group-hover:shadow-primary/20 transition-all"
                     >
                       <feature.icon className="w-6 h-6 text-primary" />
                     </motion.div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">{feature.title}</h3>
-                    <p className="text-foreground/90 font-medium text-sm">{feature.description}</p>
+                    <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>{feature.description}</p>
                   </div>
                 </TiltCard>
               </StaggerItem>
@@ -209,7 +210,7 @@ export default function Index() {
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
               Ready to Get Started?
             </h2>
-            <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
+            <p className="text-foreground font-bold text-lg mb-8 max-w-2xl mx-auto" style={{ textShadow: '0 0 15px rgba(255, 255, 255, 0.25)' }}>
               Join Q2 Hostel's digital management system today
             </p>
             <motion.div 
