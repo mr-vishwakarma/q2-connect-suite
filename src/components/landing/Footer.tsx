@@ -57,11 +57,11 @@ export function Footer() {
             
             {/* Hostel Address */}
             <div className="pt-4 space-y-1">
-              <p className="text-foreground font-semibold text-sm">Hostel Address</p>
-              <p className="text-muted-foreground text-sm">Q2 Hostel</p>
-              <p className="text-muted-foreground text-sm">Sector E-8 Campus</p>
-              <p className="text-muted-foreground text-sm">Patel Nagar, Bhopal</p>
-              <p className="text-muted-foreground text-sm">Madhya Pradesh – 462022</p>
+              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Hostel Address</p>
+              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Q2 Hostel</p>
+              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Sector E-8 Campus</p>
+              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Patel Nagar, Bhopal</p>
+              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Madhya Pradesh – 462022</p>
             </div>
           </motion.div>
 
@@ -112,6 +112,7 @@ export function Footer() {
                   transition={{ delay: 0.5 + index * 0.1, type: 'spring', stiffness: 200 }}
                   whileHover={{ 
                     scale: 1.2,
+                    rotate: 360,
                     boxShadow: '0 0 25px hsl(var(--primary) / 0.5)',
                     backgroundColor: 'hsl(var(--primary) / 0.2)'
                   }}
@@ -131,7 +132,7 @@ export function Footer() {
           transition={{ delay: 0.7, duration: 0.5 }}
           className="mt-12 pt-8 border-t border-border/50 text-center"
         >
-          <p className="text-muted-foreground text-sm">
+          <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>
             © 2025 Q2 Management. All rights reserved.
           </p>
         </motion.div>

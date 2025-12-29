@@ -81,7 +81,7 @@ export default function About() {
                 Our Mission
               </h1>
 
-              <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed">
+              <p className="text-xl md:text-2xl text-foreground font-bold leading-relaxed" style={{ textShadow: '0 0 15px rgba(255, 255, 255, 0.25)' }}>
                 We empower Q2 Hostel to embrace digital transformation by simplifying hostel administration and student services.
               </p>
             </AnimatedSection>
@@ -96,14 +96,14 @@ export default function About() {
                         <div className="p-6 rounded-2xl bg-card/80 border border-border/30">
                           <Building className="w-10 h-10 text-primary mb-3" />
                           <div className="text-2xl font-bold text-foreground">Q2</div>
-                          <div className="text-sm text-muted-foreground">Hostel</div>
+                          <div className="text-sm text-foreground font-bold" style={{ textShadow: '0 0 8px rgba(255, 255, 255, 0.2)' }}>Hostel</div>
                         </div>
                       </TiltCard>
                       <TiltCard>
                         <div className="p-6 rounded-2xl bg-card/80 border border-border/30">
                           <Shield className="w-10 h-10 text-primary mb-3" />
                           <div className="text-2xl font-bold text-foreground">100%</div>
-                          <div className="text-sm text-muted-foreground">Secure</div>
+                          <div className="text-sm text-foreground font-bold" style={{ textShadow: '0 0 8px rgba(255, 255, 255, 0.2)' }}>Secure</div>
                         </div>
                       </TiltCard>
                     </div>
@@ -122,7 +122,7 @@ export default function About() {
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               Trusted by Students & Administrators
             </h2>
-            <p className="text-muted-foreground text-lg">
+            <p className="text-foreground font-bold text-lg" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.25)' }}>
               at Q2 Hostel
             </p>
           </AnimatedSection>
@@ -146,7 +146,7 @@ export default function About() {
                       <stat.icon className="w-7 h-7 text-primary" />
                     </motion.div>
                     <div className="text-3xl font-bold text-foreground mb-1">{stat.value}</div>
-                    <div className="text-muted-foreground text-sm">{stat.label}</div>
+                    <div className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 8px rgba(255, 255, 255, 0.2)' }}>{stat.label}</div>
                   </motion.div>
                 </TiltCard>
               </StaggerItem>
@@ -172,11 +172,11 @@ export default function About() {
                 <span className="block text-primary">Managed with Care.</span>
               </h2>
 
-              <p className="text-muted-foreground text-lg mb-6 leading-relaxed">
+              <p className="text-foreground font-bold text-lg mb-6 leading-relaxed" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.25)' }}>
                 Q2 Management directly improves hostel life, making administration simple and transparent for everyone involved.
               </p>
 
-              <p className="text-muted-foreground leading-relaxed">
+              <p className="text-foreground font-bold leading-relaxed" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>
                 Our system streamlines every aspect of hostel management, from room allocation to mess management, ensuring that both students and administrators can focus on what matters most – creating a comfortable and productive living environment.
               </p>
             </AnimatedSection>
@@ -201,7 +201,7 @@ export default function About() {
                             >
                               <item.icon className="w-8 h-8 text-primary mb-3" />
                             </motion.div>
-                            <div className="text-sm text-muted-foreground">{item.label}</div>
+                            <div className="text-sm text-foreground font-bold" style={{ textShadow: '0 0 8px rgba(255, 255, 255, 0.2)' }}>{item.label}</div>
                             <div className="text-lg font-semibold text-foreground">{item.value}</div>
                           </div>
                         </TiltCard>
@@ -222,7 +222,7 @@ export default function About() {
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               Our Values
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            <p className="text-foreground font-bold text-lg max-w-2xl mx-auto" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.25)' }}>
               The principles that guide everything we do at Q2 Hostel
             </p>
           </AnimatedSection>
@@ -248,7 +248,7 @@ export default function About() {
                       <value.icon className="w-7 h-7 text-primary" />
                     </motion.div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">{value.title}</h3>
-                    <p className="text-muted-foreground text-sm">{value.description}</p>
+                    <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 8px rgba(255, 255, 255, 0.2)' }}>{value.description}</p>
                   </motion.div>
                 </TiltCard>
               </StaggerItem>
