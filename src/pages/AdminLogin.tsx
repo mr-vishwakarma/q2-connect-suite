@@ -14,35 +14,41 @@ import { Eye, EyeOff, Shield, User } from 'lucide-react';
 import { GlowButton } from '@/components/ui/animated-section';
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, user, isAdmin } = useAuth();
+  const { signIn, user, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
 
+  // Navigate ONLY when loading is false AND user AND isAdmin are confirmed
   useEffect(() => {
-    if (user && isAdmin) {
-      navigate('/admin/dashboard');
-    } else if (user && !isAdmin) {
-      toast.error('You do not have admin access');
+    if (!loading && user && isAdmin) {
+      navigate('/admin/dashboard', { replace: true });
     }
-  }, [user, isAdmin, navigate]);
+  }, [user, isAdmin, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
+    if (!username || !password) {
       toast.error('Please fill in all fields');
       return;
     }
 
     setIsLoading(true);
+    
+    // Convert username to email format for Supabase Auth
+    const email = `${username.toLowerCase().trim()}@q2hostel.local`;
     const { error } = await signIn(email, password);
+    
     setIsLoading(false);
 
     if (error) {
-      toast.error(error.message || 'Failed to sign in');
+      toast.error('Please enter correct details');
+    } else {
+      toast.success('Login successful!');
+      // DO NOT navigate here - let useEffect handle it after admin check completes
     }
   };
 
@@ -96,13 +102,13 @@ export default function AdminLogin() {
                     transition={{ delay: 0.4 }}
                     className="space-y-2"
                   >
-                    <Label htmlFor="email" className="text-foreground">Admin ID / Email</Label>
+                    <Label htmlFor="username" className="text-foreground">Admin Username</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      placeholder="admin@q2hostel.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      id="username"
+                      type="text"
+                      placeholder="admin"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                       className="bg-secondary border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                       required
                     />
