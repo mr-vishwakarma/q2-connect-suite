@@ -8,9 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 function RegisterStudentContent() {
   const { user, isAdmin, loading } = useAuth();
@@ -24,7 +28,10 @@ function RegisterStudentContent() {
     room_no: '',
     fees: '',
     password: '',
+    username: '',
   });
+  const [startDate, setStartDate] = useState<Date | undefined>(new Date());
+  const [endDate, setEndDate] = useState<Date | undefined>();
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -34,12 +41,37 @@ function RegisterStudentContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.username) {
+      toast.error('User ID is required');
+      return;
+    }
+
+    if (!startDate) {
+      toast.error('Start Date is required');
+      return;
+    }
+
+    // Check if username already exists
+    const { data: existingUser } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', formData.username.toLowerCase())
+      .maybeSingle();
+
+    if (existingUser) {
+      toast.error('User ID already exists. Please choose a different one.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Create auth user
+      // Create auth user using username@q2hostel.local format for students
+      const email = formData.email || `${formData.username.toLowerCase()}@q2student.local`;
+      
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
+        email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
@@ -61,7 +93,9 @@ function RegisterStudentContent() {
             room_no: formData.room_no,
             fees: parseFloat(formData.fees) || null,
             hostel: selectedHostel,
-            start_date: new Date().toISOString().split('T')[0],
+            start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
+            valid_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
+            username: formData.username.toLowerCase(),
           })
           .eq('user_id', authData.user.id);
 
@@ -82,7 +116,10 @@ function RegisterStudentContent() {
           room_no: '',
           fees: '',
           password: '',
+          username: '',
         });
+        setStartDate(new Date());
+        setEndDate(undefined);
       }
     } catch (error: any) {
       console.error('Error registering student:', error);
@@ -133,14 +170,24 @@ function RegisterStudentContent() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground">Email</Label>
+                <Label htmlFor="username" className="text-foreground">User ID (for login)</Label>
+                <Input
+                  id="username"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  placeholder="Unique user ID"
+                  required
+                  className="bg-secondary border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-foreground">Email (optional)</Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="student@example.com"
-                  required
                   className="bg-secondary border-border"
                 />
               </div>
@@ -176,6 +223,58 @@ function RegisterStudentContent() {
                 />
               </div>
               <div className="space-y-2">
+                <Label className="text-foreground">Start Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-secondary border-border",
+                        !startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={setStartDate}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-foreground">End Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-secondary border-border",
+                        !endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="password" className="text-foreground">Password</Label>
                 <Input
                   id="password"

@@ -120,6 +120,7 @@ export type Database = {
           start_date: string | null
           updated_at: string
           user_id: string
+          username: string | null
           valid_date: string | null
         }
         Insert: {
@@ -134,6 +135,7 @@ export type Database = {
           start_date?: string | null
           updated_at?: string
           user_id: string
+          username?: string | null
           valid_date?: string | null
         }
         Update: {
@@ -148,6 +150,7 @@ export type Database = {
           start_date?: string | null
           updated_at?: string
           user_id?: string
+          username?: string | null
           valid_date?: string | null
         }
         Relationships: []
@@ -188,16 +191,19 @@ export type Database = {
       user_roles: {
         Row: {
           id: string
+          is_primary: boolean | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           id?: string
+          is_primary?: boolean | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           id?: string
+          is_primary?: boolean | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }

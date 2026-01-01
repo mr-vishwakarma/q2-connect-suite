@@ -8,9 +8,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Users, Search, Phone, Mail, Home, Trash2 } from 'lucide-react';
+import { Users, Search, Trash2, Pencil, CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -19,6 +24,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface Student {
   id: string;
@@ -29,6 +40,8 @@ interface Student {
   room_no: string;
   fees: number;
   start_date: string;
+  valid_date: string;
+  username: string;
   created_at: string;
 }
 
@@ -39,6 +52,17 @@ function AllStudentsContent() {
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    room_no: '',
+    fees: '',
+    username: '',
+  });
+  const [editStartDate, setEditStartDate] = useState<Date | undefined>();
+  const [editEndDate, setEditEndDate] = useState<Date | undefined>();
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -55,10 +79,29 @@ function AllStudentsContent() {
   const fetchStudents = async () => {
     try {
       setIsLoading(true);
+      
+      // Get all student user_ids
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'student');
+
+      if (roleError) throw roleError;
+
+      const studentUserIds = (roleData || []).map(r => r.user_id);
+
+      if (studentUserIds.length === 0) {
+        setStudents([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Get profiles for students only
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('hostel', selectedHostel)
+        .in('user_id', studentUserIds)
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -71,10 +114,78 @@ function AllStudentsContent() {
     }
   };
 
+  const openEditDialog = (student: Student) => {
+    setEditingStudent(student);
+    setEditForm({
+      name: student.name || '',
+      room_no: student.room_no || '',
+      fees: student.fees?.toString() || '',
+      username: student.username || '',
+    });
+    setEditStartDate(student.start_date ? new Date(student.start_date) : undefined);
+    setEditEndDate(student.valid_date ? new Date(student.valid_date) : undefined);
+    setIsDialogOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+
+    // Check if username is being changed and if it already exists
+    if (editForm.username.toLowerCase() !== editingStudent.username?.toLowerCase()) {
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', editForm.username.toLowerCase())
+        .neq('user_id', editingStudent.user_id)
+        .maybeSingle();
+
+      if (existingUser) {
+        toast.error('User ID already exists. Please choose a different one.');
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: editForm.name,
+          room_no: editForm.room_no,
+          fees: parseFloat(editForm.fees) || null,
+          username: editForm.username.toLowerCase(),
+          start_date: editStartDate ? format(editStartDate, 'yyyy-MM-dd') : null,
+          valid_date: editEndDate ? format(editEndDate, 'yyyy-MM-dd') : null,
+        })
+        .eq('user_id', editingStudent.user_id);
+
+      if (error) throw error;
+
+      toast.success('Student updated successfully');
+      setIsDialogOpen(false);
+      setEditingStudent(null);
+      fetchStudents();
+    } catch (error) {
+      console.error('Error updating student:', error);
+      toast.error('Failed to update student');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const deleteStudent = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this student?')) return;
 
     try {
+      // Delete role first
+      await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      // Delete profile
       const { error } = await supabase
         .from('profiles')
         .delete()
@@ -93,7 +204,8 @@ function AllStudentsContent() {
     (student) =>
       student.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.room_no?.toLowerCase().includes(searchQuery.toLowerCase())
+      student.room_no?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading || isLoading) {
@@ -138,11 +250,12 @@ function AllStudentsContent() {
             <TableHeader>
               <TableRow className="border-border hover:bg-secondary/50">
                 <TableHead className="text-foreground font-bold">Name</TableHead>
-                <TableHead className="text-foreground font-bold">Email</TableHead>
+                <TableHead className="text-foreground font-bold">User ID</TableHead>
                 <TableHead className="text-foreground font-bold">Phone</TableHead>
                 <TableHead className="text-foreground font-bold">Room</TableHead>
                 <TableHead className="text-foreground font-bold">Fees</TableHead>
-                <TableHead className="text-foreground font-bold">Joined</TableHead>
+                <TableHead className="text-foreground font-bold">Start Date</TableHead>
+                <TableHead className="text-foreground font-bold">End Date</TableHead>
                 <TableHead className="text-foreground font-bold">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -150,7 +263,7 @@ function AllStudentsContent() {
               {filteredStudents.map((student) => (
                 <TableRow key={student.id} className="border-border hover:bg-secondary/30">
                   <TableCell className="font-medium text-foreground">{student.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.email || '-'}</TableCell>
+                  <TableCell className="text-muted-foreground">{student.username || '-'}</TableCell>
                   <TableCell className="text-muted-foreground">{student.phone || '-'}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-primary border-primary/30">
@@ -163,15 +276,28 @@ function AllStudentsContent() {
                   <TableCell className="text-muted-foreground">
                     {student.start_date ? new Date(student.start_date).toLocaleDateString() : '-'}
                   </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {student.valid_date ? new Date(student.valid_date).toLocaleDateString() : '-'}
+                  </TableCell>
                   <TableCell>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => deleteStudent(student.user_id)}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => openEditDialog(student)}
+                        className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteStudent(student.user_id)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -188,6 +314,111 @@ function AllStudentsContent() {
           )}
         </Card>
       </motion.div>
+
+      {/* Edit Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Edit Student</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name" className="text-foreground">Name</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                required
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-username" className="text-foreground">User ID</Label>
+              <Input
+                id="edit-username"
+                value={editForm.username}
+                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                required
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-room" className="text-foreground">Room Number</Label>
+              <Input
+                id="edit-room"
+                value={editForm.room_no}
+                onChange={(e) => setEditForm({ ...editForm, room_no: e.target.value })}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-fees" className="text-foreground">Monthly Fees</Label>
+              <Input
+                id="edit-fees"
+                type="number"
+                value={editForm.fees}
+                onChange={(e) => setEditForm({ ...editForm, fees: e.target.value })}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">Start Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal bg-secondary border-border",
+                      !editStartDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editStartDate ? format(editStartDate, "PPP") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={editStartDate}
+                    onSelect={setEditStartDate}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">End Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal bg-secondary border-border",
+                      !editEndDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editEndDate ? format(editEndDate, "PPP") : "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={editEndDate}
+                    onSelect={setEditEndDate}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <Button type="submit" variant="hero" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

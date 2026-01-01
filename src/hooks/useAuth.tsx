@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isAdmin: boolean;
+  isPrimaryAdmin: boolean;
   profile: Profile | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
@@ -24,6 +25,7 @@ interface Profile {
   fees: number | null;
   start_date: string | null;
   valid_date: string | null;
+  username: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isPrimaryAdmin, setIsPrimaryAdmin] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const fetchProfile = async (userId: string) => {
@@ -55,15 +58,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('user_roles')
-        .select('role')
+        .select('role, is_primary')
         .eq('user_id', userId)
         .eq('role', 'admin')
         .maybeSingle();
       
       setIsAdmin(!!data && !error);
+      setIsPrimaryAdmin(!!data?.is_primary);
     } catch (err) {
       console.error('Error checking admin role:', err);
       setIsAdmin(false);
+      setIsPrimaryAdmin(false);
     }
   };
 
@@ -85,9 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             checkAdminRole(session.user.id);
           }, 0);
         } else {
-          setProfile(null);
-          setIsAdmin(false);
-        }
+        setProfile(null);
+        setIsAdmin(false);
+        setIsPrimaryAdmin(false);
+      }
         
         setLoading(false);
       }
@@ -132,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setIsAdmin(false);
+    setIsPrimaryAdmin(false);
   };
 
   return (
@@ -140,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       loading,
       isAdmin,
+      isPrimaryAdmin,
       profile,
       signIn,
       signUp,
