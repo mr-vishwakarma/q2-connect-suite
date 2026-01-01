@@ -14,7 +14,7 @@ import { Eye, EyeOff, User, Building } from 'lucide-react';
 import { GlowButton } from '@/components/ui/animated-section';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,17 +34,20 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
+    if (!userId || !password) {
       toast.error('Please fill in all fields');
       return;
     }
 
     setIsLoading(true);
+    
+    // Convert User ID to email format for student login
+    const email = `${userId.toLowerCase()}@q2student.local`;
     const { error } = await signIn(email, password);
     setIsLoading(false);
 
     if (error) {
-      toast.error(error.message || 'Failed to sign in');
+      toast.error('Invalid User ID or Password');
     } else {
       toast.success('Welcome back!');
     }
@@ -85,7 +88,7 @@ export default function Login() {
                 >
                   <User className="w-8 h-8 text-primary-foreground" />
                 </motion.div>
-                <CardTitle className="text-2xl text-foreground">User Login</CardTitle>
+                <CardTitle className="text-2xl text-foreground">Student Login</CardTitle>
                 <CardDescription className="text-muted-foreground">
                   Q2 Hostel
                 </CardDescription>
@@ -99,13 +102,13 @@ export default function Login() {
                     transition={{ delay: 0.4 }}
                     className="space-y-2"
                   >
-                    <Label htmlFor="email" className="text-foreground">Email / Username</Label>
+                    <Label htmlFor="userId" className="text-foreground">User ID</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      placeholder="your.email@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      id="userId"
+                      type="text"
+                      placeholder="Enter your User ID"
+                      value={userId}
+                      onChange={(e) => setUserId(e.target.value)}
                       className="bg-secondary border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                       required
                     />

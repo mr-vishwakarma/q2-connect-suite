@@ -20,10 +20,10 @@ import Complaints from "./pages/student/Complaints";
 import Suggestions from "./pages/student/Suggestions";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import RegisterStudent from "./pages/admin/RegisterStudent";
-import AdminAttendance from "./pages/admin/AdminAttendance";
 import AdminComplaints from "./pages/admin/AdminComplaints";
 import AdminSuggestions from "./pages/admin/AdminSuggestions";
 import AllStudents from "./pages/admin/AllStudents";
+import AdminManagement from "./pages/admin/AdminManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,10 +51,10 @@ const App = () => (
             <Route path="/student/suggestions" element={<Suggestions />} />
             <Route path="/admin/dashboard" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
             <Route path="/admin/register-student" element={<ProtectedAdminRoute><RegisterStudent /></ProtectedAdminRoute>} />
-            <Route path="/admin/attendance" element={<ProtectedAdminRoute><AdminAttendance /></ProtectedAdminRoute>} />
             <Route path="/admin/complaints" element={<ProtectedAdminRoute><AdminComplaints /></ProtectedAdminRoute>} />
             <Route path="/admin/suggestions" element={<ProtectedAdminRoute><AdminSuggestions /></ProtectedAdminRoute>} />
             <Route path="/admin/students" element={<ProtectedAdminRoute><AllStudents /></ProtectedAdminRoute>} />
+            <Route path="/admin/admin-management" element={<ProtectedAdminRoute><AdminManagement /></ProtectedAdminRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -5,22 +5,22 @@ import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
   UserPlus,
-  CalendarCheck,
   MessageSquare,
   Lightbulb,
   Users,
   LogOut,
   Home,
+  Shield,
 } from 'lucide-react';
 
 const adminLinks = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/', icon: Home, label: 'Home' },
   { to: '/admin/register-student', icon: UserPlus, label: 'Register Student' },
-  { to: '/admin/attendance', icon: CalendarCheck, label: 'Attendance' },
   { to: '/admin/complaints', icon: MessageSquare, label: 'Complaints' },
   { to: '/admin/suggestions', icon: Lightbulb, label: 'Suggestions' },
   { to: '/admin/students', icon: Users, label: 'All Students' },
+  { to: '/admin/admin-management', icon: Shield, label: 'Admin Management' },
 ];
 
 export function AdminSidebar() {
