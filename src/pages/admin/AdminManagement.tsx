@@ -36,9 +36,7 @@ interface AdminUser {
   is_primary: boolean;
 }
 
-const PRIMARY_ADMIN_NAME = 'Mr. Abhigyanam Giri';
-const PRIMARY_ADMIN_USERNAME = 'Abhi1006';
-const PRIMARY_ADMIN_CREATED = '2026-01-01T00:00:00.000Z';
+const PRIMARY_ADMIN_USERNAME = 'abhi1006';
 
 function AdminManagementContent() {
   const { user, isAdmin, loading } = useAuth();
@@ -86,7 +84,7 @@ function AdminManagementContent() {
     try {
       setIsLoading(true);
       
-      // Get all admin user_ids
+      // Get all admin user_ids with their is_primary flag
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('user_id, is_primary')
@@ -94,18 +92,8 @@ function AdminManagementContent() {
 
       if (roleError) throw roleError;
 
-      // Always start with the default primary admin
-      const defaultPrimaryAdmin: AdminUser = {
-        id: 'default-primary',
-        user_id: 'default-primary',
-        name: PRIMARY_ADMIN_NAME,
-        username: PRIMARY_ADMIN_USERNAME,
-        created_at: PRIMARY_ADMIN_CREATED,
-        is_primary: true,
-      };
-
       if (!roleData || roleData.length === 0) {
-        setAdmins([defaultPrimaryAdmin]);
+        setAdmins([]);
         setIsLoading(false);
         return;
       }
@@ -119,16 +107,19 @@ function AdminManagementContent() {
 
       if (profileError) throw profileError;
 
-      // Merge profile data with role data (all as secondary admins)
-      const adminsList: AdminUser[] = (profileData || []).map(profile => {
-        return {
-          ...profile,
-          is_primary: false, // All DB admins are secondary
-        };
-      });
+      // Create a map of user_id -> is_primary from role data
+      const primaryMap = new Map(roleData.map(r => [r.user_id, r.is_primary]));
 
-      // Always add default primary admin at the top
-      setAdmins([defaultPrimaryAdmin, ...adminsList]);
+      // Merge profile data with role data
+      const adminsList: AdminUser[] = (profileData || []).map(profile => ({
+        ...profile,
+        is_primary: primaryMap.get(profile.user_id) || false,
+      }));
+
+      // Sort: primary admins first
+      adminsList.sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+
+      setAdmins(adminsList);
     } catch (error) {
       console.error('Error fetching admins:', error);
       toast.error('Failed to fetch admins');
@@ -215,8 +206,10 @@ function AdminManagementContent() {
   };
 
   const deleteAdmin = async (userId: string) => {
-    if (!isPrimaryAdmin) {
-      toast.error('Only Primary Admin can delete admins');
+    // Check if trying to delete primary admin
+    const adminToDelete = admins.find(a => a.user_id === userId);
+    if (adminToDelete?.username?.toLowerCase() === PRIMARY_ADMIN_USERNAME) {
+      toast.error('Primary Admin cannot be deleted');
       return;
     }
 
@@ -342,7 +335,7 @@ function AdminManagementContent() {
                     {new Date(admin.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                   </TableCell>
                   <TableCell>
-                    {!admin.is_primary && admin.user_id !== 'default-primary' && (
+                    {!admin.is_primary && (
                       <Button
                         size="sm"
                         variant="ghost"

@@ -282,21 +282,21 @@ function DashboardContent() {
       </div>
 
       {/* Alerts Section */}
-      {alertStudents.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-        >
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-foreground text-lg flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
-                Alerts ({alertStudents.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 max-h-64 overflow-y-auto">
-              {alertStudents.map((student) => (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+      >
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-foreground text-lg flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Alerts ({alertStudents.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 max-h-64 overflow-y-auto">
+            {alertStudents.length > 0 ? (
+              alertStudents.map((student) => (
                 <div key={student.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
                   <div className="flex-1">
                     <p className="text-sm font-medium text-foreground">{student.name}</p>
@@ -308,11 +308,13 @@ function DashboardContent() {
                   </div>
                   {getAlertBadge(student)}
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+              ))
+            ) : (
+              <p className="text-muted-foreground text-sm text-center py-4">No alerts at this time</p>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Charts and Recent Items */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
