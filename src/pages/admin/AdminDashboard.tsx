@@ -5,11 +5,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, MessageSquare, Lightbulb, Clock } from 'lucide-react';
+import { Users, MessageSquare, Lightbulb, Clock, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';
+import { differenceInDays, parseISO } from 'date-fns';
 
 interface DashboardStats {
   totalStudents: number;
@@ -26,6 +28,16 @@ interface RecentItem {
   room_no?: string;
 }
 
+interface AlertStudent {
+  id: string;
+  name: string;
+  room_no: string | null;
+  fees: number | null;
+  valid_date: string | null;
+  daysLeft: number | null;
+  status: 'expired' | 'expiring' | 'fee_due';
+}
+
 function DashboardContent() {
   const { user, isAdmin, loading } = useAuth();
   const { selectedHostel } = useHostel();
@@ -34,6 +46,7 @@ function DashboardContent() {
   const [recentComplaints, setRecentComplaints] = useState<RecentItem[]>([]);
   const [recentSuggestions, setRecentSuggestions] = useState<RecentItem[]>([]);
   const [complaintsData, setComplaintsData] = useState<{ name: string; value: number }[]>([]);
+  const [alertStudents, setAlertStudents] = useState<AlertStudent[]>([]);
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -46,24 +59,116 @@ function DashboardContent() {
       fetchStats();
       fetchRecentItems();
       fetchComplaintsChart();
+      fetchAlertStudents();
     }
   }, [user, isAdmin, selectedHostel]);
 
   const fetchStats = async () => {
     try {
-      const [studentsRes, complaintsRes, suggestionsRes] = await Promise.all([
-        supabase.from('profiles').select('id', { count: 'exact' }).eq('hostel', selectedHostel),
+      // Get all student user_ids first
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'student');
+
+      const studentUserIds = (roleData || []).map(r => r.user_id);
+
+      // Count only students in selected hostel
+      let studentCount = 0;
+      if (studentUserIds.length > 0) {
+        const { count } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact' })
+          .eq('hostel', selectedHostel)
+          .in('user_id', studentUserIds);
+        studentCount = count || 0;
+      }
+
+      const [complaintsRes, suggestionsRes] = await Promise.all([
         supabase.from('complaints').select('id', { count: 'exact' }).eq('hostel', selectedHostel),
         supabase.from('suggestions').select('id', { count: 'exact' }).eq('hostel', selectedHostel),
       ]);
 
       setStats({
-        totalStudents: studentsRes.count || 0,
+        totalStudents: studentCount,
         totalComplaints: complaintsRes.count || 0,
         totalSuggestions: suggestionsRes.count || 0,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
+    }
+  };
+
+  const fetchAlertStudents = async () => {
+    try {
+      // Get all student user_ids
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'student');
+
+      const studentUserIds = (roleData || []).map(r => r.user_id);
+      if (studentUserIds.length === 0) {
+        setAlertStudents([]);
+        return;
+      }
+
+      // Get student profiles
+      const { data: students } = await supabase
+        .from('profiles')
+        .select('id, name, room_no, fees, valid_date')
+        .eq('hostel', selectedHostel)
+        .in('user_id', studentUserIds);
+
+      if (!students) {
+        setAlertStudents([]);
+        return;
+      }
+
+      const today = new Date();
+      const alerts: AlertStudent[] = [];
+
+      students.forEach(student => {
+        const hasFees = student.fees && student.fees > 0;
+        let daysLeft: number | null = null;
+        let status: 'expired' | 'expiring' | 'fee_due' | null = null;
+
+        if (student.valid_date) {
+          const validDate = parseISO(student.valid_date);
+          daysLeft = differenceInDays(validDate, today);
+
+          if (daysLeft < 0) {
+            status = 'expired';
+          } else if (daysLeft <= 5) {
+            status = 'expiring';
+          }
+        }
+
+        // Include if expired, expiring soon, or has fees remaining
+        if (status === 'expired' || status === 'expiring' || hasFees) {
+          alerts.push({
+            id: student.id,
+            name: student.name,
+            room_no: student.room_no,
+            fees: student.fees,
+            valid_date: student.valid_date,
+            daysLeft,
+            status: status || 'fee_due',
+          });
+        }
+      });
+
+      // Sort: expired first, then by days left
+      alerts.sort((a, b) => {
+        if (a.status === 'expired' && b.status !== 'expired') return -1;
+        if (b.status === 'expired' && a.status !== 'expired') return 1;
+        if (a.daysLeft !== null && b.daysLeft !== null) return a.daysLeft - b.daysLeft;
+        return 0;
+      });
+
+      setAlertStudents(alerts);
+    } catch (error) {
+      console.error('Error fetching alert students:', error);
     }
   };
 
@@ -126,10 +231,20 @@ function DashboardContent() {
   }
 
   const statCards = [
-    { title: 'Total Students', value: stats.totalStudents, icon: Users, color: 'text-primary' },
-    { title: 'Total Complaints', value: stats.totalComplaints, icon: MessageSquare, color: 'text-primary' },
-    { title: 'Total Suggestions', value: stats.totalSuggestions, icon: Lightbulb, color: 'text-primary' },
+    { title: 'Total Students', value: stats.totalStudents, icon: Users, color: 'text-primary', link: '/admin/students' },
+    { title: 'Total Complaints', value: stats.totalComplaints, icon: MessageSquare, color: 'text-primary', link: '/admin/complaints' },
+    { title: 'Total Suggestions', value: stats.totalSuggestions, icon: Lightbulb, color: 'text-primary', link: '/admin/suggestions' },
   ];
+
+  const getAlertBadge = (student: AlertStudent) => {
+    if (student.status === 'expired') {
+      return <Badge variant="destructive" className="text-xs">Expired</Badge>;
+    }
+    if (student.status === 'expiring') {
+      return <Badge variant="secondary" className="text-xs bg-amber-500/20 text-amber-500 border-amber-500/30">{student.daysLeft} days left</Badge>;
+    }
+    return <Badge variant="secondary" className="text-xs">Fee Due</Badge>;
+  };
 
   return (
     <div className="space-y-6">
@@ -154,15 +269,50 @@ function DashboardContent() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <Card className="bg-card border-border hover:border-primary/50 transition-all duration-300">
-              <CardContent className="p-6 text-center">
-                <p className={`text-4xl font-bold ${stat.color}`}>{stat.value}</p>
-                <p className="text-muted-foreground mt-2">{stat.title}</p>
-              </CardContent>
-            </Card>
+            <Link to={stat.link}>
+              <Card className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer">
+                <CardContent className="p-6 text-center">
+                  <p className={`text-4xl font-bold ${stat.color}`}>{stat.value}</p>
+                  <p className="text-muted-foreground mt-2">{stat.title}</p>
+                </CardContent>
+              </Card>
+            </Link>
           </motion.div>
         ))}
       </div>
+
+      {/* Alerts Section */}
+      {alertStudents.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+        >
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-foreground text-lg flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                Alerts ({alertStudents.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 max-h-64 overflow-y-auto">
+              {alertStudents.map((student) => (
+                <div key={student.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">{student.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Room: {student.room_no || 'N/A'} • 
+                      {student.fees ? ` Fee: ₹${student.fees}` : ''} • 
+                      {student.valid_date ? ` Valid till: ${new Date(student.valid_date).toLocaleDateString()}` : ' No validity set'}
+                    </p>
+                  </div>
+                  {getAlertBadge(student)}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Charts and Recent Items */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

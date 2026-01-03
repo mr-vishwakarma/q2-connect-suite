@@ -37,7 +37,8 @@ interface AdminUser {
 }
 
 const PRIMARY_ADMIN_NAME = 'Mr. Abhigyanam Giri';
-const PRIMARY_ADMIN_USERNAME = 'abhigyanam';
+const PRIMARY_ADMIN_USERNAME = 'Abhi1006';
+const PRIMARY_ADMIN_CREATED = '2026-01-01T00:00:00.000Z';
 
 function AdminManagementContent() {
   const { user, isAdmin, loading } = useAuth();
@@ -93,16 +94,18 @@ function AdminManagementContent() {
 
       if (roleError) throw roleError;
 
+      // Always start with the default primary admin
+      const defaultPrimaryAdmin: AdminUser = {
+        id: 'default-primary',
+        user_id: 'default-primary',
+        name: PRIMARY_ADMIN_NAME,
+        username: PRIMARY_ADMIN_USERNAME,
+        created_at: PRIMARY_ADMIN_CREATED,
+        is_primary: true,
+      };
+
       if (!roleData || roleData.length === 0) {
-        // No admins exist, show only the default primary admin
-        setAdmins([{
-          id: 'default-primary',
-          user_id: 'default-primary',
-          name: PRIMARY_ADMIN_NAME,
-          username: PRIMARY_ADMIN_USERNAME,
-          created_at: new Date().toISOString(),
-          is_primary: true,
-        }]);
+        setAdmins([defaultPrimaryAdmin]);
         setIsLoading(false);
         return;
       }
@@ -116,29 +119,16 @@ function AdminManagementContent() {
 
       if (profileError) throw profileError;
 
-      // Merge profile data with role data
+      // Merge profile data with role data (all as secondary admins)
       const adminsList: AdminUser[] = (profileData || []).map(profile => {
-        const roleInfo = roleData.find(r => r.user_id === profile.user_id);
         return {
           ...profile,
-          is_primary: roleInfo?.is_primary || false,
+          is_primary: false, // All DB admins are secondary
         };
       });
 
-      // Add default primary admin if not in list
-      const hasPrimaryAdmin = adminsList.some(a => a.is_primary);
-      if (!hasPrimaryAdmin) {
-        adminsList.unshift({
-          id: 'default-primary',
-          user_id: 'default-primary',
-          name: PRIMARY_ADMIN_NAME,
-          username: PRIMARY_ADMIN_USERNAME,
-          created_at: new Date().toISOString(),
-          is_primary: true,
-        });
-      }
-
-      setAdmins(adminsList);
+      // Always add default primary admin at the top
+      setAdmins([defaultPrimaryAdmin, ...adminsList]);
     } catch (error) {
       console.error('Error fetching admins:', error);
       toast.error('Failed to fetch admins');
@@ -149,13 +139,8 @@ function AdminManagementContent() {
 
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isPrimaryAdmin) {
-      toast.error('Only Primary Admin can add new admins');
-      return;
-    }
 
-    if (!formData.name || !formData.username || !formData.password) {
+    if (!formData.username || !formData.password) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -173,7 +158,7 @@ function AdminManagementContent() {
       .maybeSingle();
 
     if (existingUser) {
-      toast.error('Username already exists');
+      toast.error('User ID already exists');
       return;
     }
 
@@ -188,7 +173,7 @@ function AdminManagementContent() {
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
-          data: { name: formData.name },
+          data: { name: formData.username },
         },
       });
 
@@ -199,7 +184,7 @@ function AdminManagementContent() {
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          name: formData.name,
+          name: formData.username,
           username: formData.username.toLowerCase(),
         })
         .eq('user_id', authData.user.id);
@@ -275,61 +260,48 @@ function AdminManagementContent() {
           </div>
         </div>
         
-        {isPrimaryAdmin && (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="hero">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Add New Admin
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="hero">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Add New Admin
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">Add New Admin</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleAddAdmin} className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="admin-username" className="text-foreground">User ID</Label>
+                <Input
+                  id="admin-username"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  placeholder="Enter User ID"
+                  required
+                  className="bg-secondary border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="admin-password" className="text-foreground">Password</Label>
+                <Input
+                  id="admin-password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Create password"
+                  required
+                  minLength={6}
+                  className="bg-secondary border-border"
+                />
+              </div>
+              <Button type="submit" variant="hero" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? 'Creating...' : 'Create Admin'}
               </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-card border-border">
-              <DialogHeader>
-                <DialogTitle className="text-foreground">Add New Admin</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleAddAdmin} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="admin-name" className="text-foreground">Full Name</Label>
-                  <Input
-                    id="admin-name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter admin name"
-                    required
-                    className="bg-secondary border-border"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admin-username" className="text-foreground">Username</Label>
-                  <Input
-                    id="admin-username"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    placeholder="Enter username"
-                    required
-                    className="bg-secondary border-border"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admin-password" className="text-foreground">Password</Label>
-                  <Input
-                    id="admin-password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Create password"
-                    required
-                    minLength={6}
-                    className="bg-secondary border-border"
-                  />
-                </div>
-                <Button type="submit" variant="hero" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? 'Creating...' : 'Create Admin'}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <motion.div
@@ -342,10 +314,10 @@ function AdminManagementContent() {
               <TableRow className="border-border hover:bg-secondary/50">
                 <TableHead className="text-foreground font-bold">Admin Name</TableHead>
                 <TableHead className="text-foreground font-bold">Role</TableHead>
-                <TableHead className="text-foreground font-bold">Username</TableHead>
+                <TableHead className="text-foreground font-bold">User ID</TableHead>
                 <TableHead className="text-foreground font-bold">Status</TableHead>
-                <TableHead className="text-foreground font-bold">Created</TableHead>
-                {isPrimaryAdmin && <TableHead className="text-foreground font-bold">Actions</TableHead>}
+                <TableHead className="text-foreground font-bold">Created At</TableHead>
+                <TableHead className="text-foreground font-bold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -367,22 +339,20 @@ function AdminManagementContent() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(admin.created_at).toLocaleDateString()}
+                    {new Date(admin.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                   </TableCell>
-                  {isPrimaryAdmin && (
-                    <TableCell>
-                      {!admin.is_primary && admin.user_id !== 'default-primary' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => deleteAdmin(admin.user_id)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  )}
+                  <TableCell>
+                    {!admin.is_primary && admin.user_id !== 'default-primary' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteAdmin(admin.user_id)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
