@@ -12,7 +12,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { UserPlus, CalendarIcon } from 'lucide-react';
+import { UserPlus, CalendarIcon, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +32,7 @@ function RegisterStudentContent() {
   });
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>();
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -179,6 +180,9 @@ function RegisterStudentContent() {
                   required
                   className="bg-secondary border-border"
                 />
+                <p className="text-xs text-muted-foreground">
+                  UserID format: Firstname + Birth Year. Example: karan2002
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-foreground">Email (optional)</Label>
@@ -276,16 +280,28 @@ function RegisterStudentContent() {
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="password" className="text-foreground">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Create password"
-                  required
-                  minLength={6}
-                  className="bg-secondary border-border"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Create password"
+                    required
+                    minLength={6}
+                    className="bg-secondary border-border pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Recommended password: Firstname + first 5 digits of mobile number. Example: karan95403
+                </p>
               </div>
             </div>
 

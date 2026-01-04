@@ -1,7 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useHostel } from '@/contexts/HostelContext';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { differenceInDays, parseISO } from 'date-fns';
 import {
   LayoutDashboard,
   UserPlus,
@@ -11,6 +15,7 @@ import {
   LogOut,
   Home,
   Shield,
+  AlertTriangle,
 } from 'lucide-react';
 
 const adminLinks = [
@@ -20,12 +25,66 @@ const adminLinks = [
   { to: '/admin/complaints', icon: MessageSquare, label: 'Complaints' },
   { to: '/admin/suggestions', icon: Lightbulb, label: 'Suggestions' },
   { to: '/admin/students', icon: Users, label: 'All Students' },
+  { to: '/admin/alerts', icon: AlertTriangle, label: 'Alert' },
   { to: '/admin/admin-management', icon: Shield, label: 'Admin Management' },
 ];
 
 export function AdminSidebar() {
   const location = useLocation();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, user, isAdmin } = useAuth();
+  const { selectedHostel } = useHostel();
+  const [alertCount, setAlertCount] = useState(0);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchAlertCount();
+    }
+  }, [user, isAdmin, selectedHostel]);
+
+  const fetchAlertCount = async () => {
+    try {
+      // Get all student user_ids
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'student');
+
+      const studentUserIds = (roleData || []).map(r => r.user_id);
+      if (studentUserIds.length === 0) {
+        setAlertCount(0);
+        return;
+      }
+
+      // Get student profiles
+      const { data: students } = await supabase
+        .from('profiles')
+        .select('valid_date')
+        .eq('hostel', selectedHostel)
+        .in('user_id', studentUserIds);
+
+      if (!students) {
+        setAlertCount(0);
+        return;
+      }
+
+      const today = new Date();
+      let count = 0;
+
+      students.forEach(student => {
+        if (student.valid_date) {
+          const validDate = parseISO(student.valid_date);
+          const daysLeft = differenceInDays(validDate, today);
+          if (daysLeft <= 5) {
+            count++;
+          }
+        }
+      });
+
+      setAlertCount(count);
+    } catch (error) {
+      console.error('Error fetching alert count:', error);
+    }
+  };
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col">
@@ -50,6 +109,7 @@ export function AdminSidebar() {
       <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
         {adminLinks.map((link) => {
           const isActive = location.pathname === link.to;
+          const isAlertLink = link.to === '/admin/alerts';
           return (
             <motion.div
               key={link.to}
@@ -67,7 +127,12 @@ export function AdminSidebar() {
                 style={isActive ? { boxShadow: '0 0 20px hsl(217 91% 50% / 0.4)' } : {}}
               >
                 <link.icon className="w-5 h-5" />
-                <span>{link.label}</span>
+                <span className="flex-1">{link.label}</span>
+                {isAlertLink && alertCount > 0 && (
+                  <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-xs font-bold rounded-full bg-destructive text-destructive-foreground">
+                    {alertCount}
+                  </span>
+                )}
               </Link>
             </motion.div>
           );

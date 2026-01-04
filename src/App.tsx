@@ -24,6 +24,7 @@ import AdminComplaints from "./pages/admin/AdminComplaints";
 import AdminSuggestions from "./pages/admin/AdminSuggestions";
 import AllStudents from "./pages/admin/AllStudents";
 import AdminManagement from "./pages/admin/AdminManagement";
+import AdminAlerts from "./pages/admin/AdminAlerts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/admin/complaints" element={<ProtectedAdminRoute><AdminComplaints /></ProtectedAdminRoute>} />
             <Route path="/admin/suggestions" element={<ProtectedAdminRoute><AdminSuggestions /></ProtectedAdminRoute>} />
             <Route path="/admin/students" element={<ProtectedAdminRoute><AllStudents /></ProtectedAdminRoute>} />
+            <Route path="/admin/alerts" element={<ProtectedAdminRoute><AdminAlerts /></ProtectedAdminRoute>} />
             <Route path="/admin/admin-management" element={<ProtectedAdminRoute><AdminManagement /></ProtectedAdminRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
