@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Shield, UserPlus, Trash2 } from 'lucide-react';
+import { Shield, UserPlus, Trash2, Eye, EyeOff } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -51,6 +51,7 @@ function AdminManagementContent() {
     username: '',
     password: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -278,16 +279,25 @@ function AdminManagementContent() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="admin-password" className="text-foreground">Password</Label>
-                <Input
-                  id="admin-password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Create password"
-                  required
-                  minLength={6}
-                  className="bg-secondary border-border"
-                />
+                <div className="relative">
+                  <Input
+                    id="admin-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Create password"
+                    required
+                    minLength={6}
+                    className="bg-secondary border-border pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" variant="hero" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? 'Creating...' : 'Create Admin'}
