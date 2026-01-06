@@ -21,7 +21,9 @@ import { differenceInDays, parseISO, format } from 'date-fns';
 
 interface AlertStudent {
   id: string;
+  user_id: string;
   name: string;
+  phone: string | null;
   room_no: string | null;
   fees: number | null;
   valid_date: string | null;
@@ -54,25 +56,11 @@ function AdminAlertsContent() {
     try {
       setIsLoading(true);
       
-      // Get all student user_ids
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'student');
-
-      const studentUserIds = (roleData || []).map(r => r.user_id);
-      if (studentUserIds.length === 0) {
-        setAlertStudents([]);
-        setIsLoading(false);
-        return;
-      }
-
-      // Get student profiles
+      // Get students directly from students table
       const { data: students } = await supabase
-        .from('profiles')
-        .select('id, name, room_no, fees, valid_date, start_date, created_at')
-        .eq('hostel', selectedHostel)
-        .in('user_id', studentUserIds);
+        .from('students')
+        .select('id, user_id, name, phone, room_no, fees, valid_date, start_date, created_at')
+        .eq('hostel', selectedHostel);
 
       if (!students) {
         setAlertStudents([]);
@@ -104,7 +92,9 @@ function AdminAlertsContent() {
         if (status) {
           alerts.push({
             id: student.id,
+            user_id: student.user_id,
             name: student.name,
+            phone: student.phone,
             room_no: student.room_no,
             fees: student.fees,
             valid_date: student.valid_date,
@@ -134,15 +124,15 @@ function AdminAlertsContent() {
 
   const exportData = () => {
     const csvContent = [
-      ['Name', 'Room No', 'Fees', 'Start Date', 'Valid Till', 'Status', 'Created At'].join(','),
+      ['Name', 'Phone', 'Room No', 'Fees', 'Start Date', 'Valid Till', 'Status'].join(','),
       ...alertStudents.map(student => [
         student.name,
+        student.phone || 'N/A',
         student.room_no || 'N/A',
         student.fees ? `₹${student.fees}` : 'N/A',
         student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A',
         student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A',
         student.status === 'expired' ? 'Expired' : `${student.daysLeft} days left`,
-        format(parseISO(student.created_at), 'dd-MM-yy'),
       ].join(','))
     ].join('\n');
 
@@ -198,18 +188,19 @@ function AdminAlertsContent() {
             <TableHeader>
               <TableRow className="border-border hover:bg-secondary/50">
                 <TableHead className="text-foreground font-bold">Name</TableHead>
+                <TableHead className="text-foreground font-bold">Phone</TableHead>
                 <TableHead className="text-foreground font-bold">Room No</TableHead>
                 <TableHead className="text-foreground font-bold">Fees</TableHead>
                 <TableHead className="text-foreground font-bold">Joining Date</TableHead>
                 <TableHead className="text-foreground font-bold">Valid Till</TableHead>
                 <TableHead className="text-foreground font-bold">Status</TableHead>
-                <TableHead className="text-foreground font-bold">Created At</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {alertStudents.map((student) => (
                 <TableRow key={student.id} className="border-border hover:bg-secondary/30">
                   <TableCell className="font-medium text-foreground">{student.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{student.phone || 'N/A'}</TableCell>
                   <TableCell className="text-muted-foreground">{student.room_no || 'N/A'}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {student.fees ? `₹${student.fees}` : 'N/A'}
@@ -221,9 +212,6 @@ function AdminAlertsContent() {
                     {student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}
                   </TableCell>
                   <TableCell>{getStatusBadge(student)}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {format(parseISO(student.created_at), 'dd-MM-yy')}
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

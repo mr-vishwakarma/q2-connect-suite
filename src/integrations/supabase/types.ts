@@ -155,6 +155,51 @@ export type Database = {
         }
         Relationships: []
       }
+      students: {
+        Row: {
+          created_at: string
+          fees: number | null
+          hostel: Database["public"]["Enums"]["hostel_type"] | null
+          id: string
+          name: string
+          phone: string | null
+          room_no: string | null
+          start_date: string | null
+          updated_at: string
+          user_id: string
+          username: string
+          valid_date: string | null
+        }
+        Insert: {
+          created_at?: string
+          fees?: number | null
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
+          id?: string
+          name: string
+          phone?: string | null
+          room_no?: string | null
+          start_date?: string | null
+          updated_at?: string
+          user_id: string
+          username: string
+          valid_date?: string | null
+        }
+        Update: {
+          created_at?: string
+          fees?: number | null
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
+          id?: string
+          name?: string
+          phone?: string | null
+          room_no?: string | null
+          start_date?: string | null
+          updated_at?: string
+          user_id?: string
+          username?: string
+          valid_date?: string | null
+        }
+        Relationships: []
+      }
       suggestions: {
         Row: {
           created_at: string

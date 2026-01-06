@@ -30,7 +30,7 @@ export function Footer() {
       transition={{ duration: 0.7, ease: 'easeOut' }}
       className="bg-gradient-to-b from-card to-background border-t border-border relative z-10"
     >
-      <div className="container mx-auto px-6 py-12">
+      <div className="container mx-auto px-6 py-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Left - Logo, Description & Address */}
           <motion.div 
@@ -130,7 +130,7 @@ export function Footer() {
           initial={{ opacity: 0 }}
           animate={isInView ? { opacity: 1 } : { opacity: 0 }}
           transition={{ delay: 0.7, duration: 0.5 }}
-          className="mt-12 pt-8 border-t border-border/50 text-center"
+          className="mt-6 pt-4 border-t border-border/50 text-center"
         >
           <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>
             © 2025 Q2 Management. All rights reserved.

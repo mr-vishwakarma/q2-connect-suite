@@ -51,24 +51,11 @@ function DashboardContent() {
 
   const fetchStats = async () => {
     try {
-      // Get all student user_ids first
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'student');
-
-      const studentUserIds = (roleData || []).map(r => r.user_id);
-
-      // Count only students in selected hostel
-      let studentCount = 0;
-      if (studentUserIds.length > 0) {
-        const { count } = await supabase
-          .from('profiles')
-          .select('id', { count: 'exact' })
-          .eq('hostel', selectedHostel)
-          .in('user_id', studentUserIds);
-        studentCount = count || 0;
-      }
+      // Count students directly from students table
+      const { count: studentCount } = await supabase
+        .from('students')
+        .select('id', { count: 'exact' })
+        .eq('hostel', selectedHostel);
 
       const [complaintsRes, suggestionsRes] = await Promise.all([
         supabase.from('complaints').select('id', { count: 'exact' }).eq('hostel', selectedHostel),
@@ -76,7 +63,7 @@ function DashboardContent() {
       ]);
 
       setStats({
-        totalStudents: studentCount,
+        totalStudents: studentCount || 0,
         totalComplaints: complaintsRes.count || 0,
         totalSuggestions: suggestionsRes.count || 0,
       });

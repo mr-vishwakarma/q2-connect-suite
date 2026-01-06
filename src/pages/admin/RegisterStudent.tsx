@@ -23,7 +23,6 @@ function RegisterStudentContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
     phone: '',
     room_no: '',
     fees: '',
@@ -53,9 +52,9 @@ function RegisterStudentContent() {
       return;
     }
 
-    // Check if username already exists
+    // Check if username already exists in students table
     const { data: existingUser } = await supabase
-      .from('profiles')
+      .from('students')
       .select('username')
       .eq('username', formData.username.toLowerCase())
       .maybeSingle();
@@ -68,8 +67,8 @@ function RegisterStudentContent() {
     setIsSubmitting(true);
 
     try {
-      // Create auth user using username@q2hostel.local format for students
-      const email = formData.email || `${formData.username.toLowerCase()}@q2student.local`;
+      // Create auth user using username as email format for students
+      const email = `${formData.username.toLowerCase()}@q2student.local`;
       
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -85,22 +84,22 @@ function RegisterStudentContent() {
       if (authError) throw authError;
 
       if (authData.user) {
-        // Update profile with additional info
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
+        // Insert student data into students table
+        const { error: studentError } = await supabase
+          .from('students')
+          .insert({
+            user_id: authData.user.id,
             name: formData.name,
+            username: formData.username.toLowerCase(),
             phone: formData.phone,
             room_no: formData.room_no,
             fees: parseFloat(formData.fees) || null,
             hostel: selectedHostel,
             start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
             valid_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
-            username: formData.username.toLowerCase(),
-          })
-          .eq('user_id', authData.user.id);
+          });
 
-        if (profileError) throw profileError;
+        if (studentError) throw studentError;
 
         // Add student role
         const { error: roleError } = await supabase
@@ -112,7 +111,6 @@ function RegisterStudentContent() {
         toast.success('Student registered successfully!');
         setFormData({
           name: '',
-          email: '',
           phone: '',
           room_no: '',
           fees: '',
@@ -181,19 +179,9 @@ function RegisterStudentContent() {
                   className="bg-secondary border-border"
                 />
                 <p className="text-xs text-muted-foreground">
-                  UserID format: Firstname + Birth Year. Example: karan2002
+                  UserID Format: (Your Email set as UserID)<br />
+                  Example: karan954036@gmail.com
                 </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground">Email (optional)</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="student@example.com"
-                  className="bg-secondary border-border"
-                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-foreground">Phone Number</Label>
@@ -299,8 +287,9 @@ function RegisterStudentContent() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Recommended password: Firstname + first 5 digits of mobile number. Example: karan95403
+                <p className="text-xs font-bold text-foreground">
+                  Recommended password: FirstName + first 6 digits of mobile number<br />
+                  Example: karan954036
                 </p>
               </div>
             </div>
