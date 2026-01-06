@@ -35,7 +35,6 @@ interface Student {
   id: string;
   user_id: string;
   name: string;
-  email: string;
   phone: string;
   room_no: string;
   fees: number;
@@ -80,28 +79,11 @@ function AllStudentsContent() {
     try {
       setIsLoading(true);
       
-      // Get all student user_ids
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'student');
-
-      if (roleError) throw roleError;
-
-      const studentUserIds = (roleData || []).map(r => r.user_id);
-
-      if (studentUserIds.length === 0) {
-        setStudents([]);
-        setIsLoading(false);
-        return;
-      }
-
-      // Get profiles for students only
+      // Get students directly from students table
       const { data, error } = await supabase
-        .from('profiles')
+        .from('students')
         .select('*')
         .eq('hostel', selectedHostel)
-        .in('user_id', studentUserIds)
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -134,7 +116,7 @@ function AllStudentsContent() {
     // Check if username is being changed and if it already exists
     if (editForm.username.toLowerCase() !== editingStudent.username?.toLowerCase()) {
       const { data: existingUser } = await supabase
-        .from('profiles')
+        .from('students')
         .select('username')
         .eq('username', editForm.username.toLowerCase())
         .neq('user_id', editingStudent.user_id)
@@ -150,7 +132,7 @@ function AllStudentsContent() {
 
     try {
       const { error } = await supabase
-        .from('profiles')
+        .from('students')
         .update({
           name: editForm.name,
           room_no: editForm.room_no,
@@ -185,9 +167,9 @@ function AllStudentsContent() {
         .delete()
         .eq('user_id', userId);
 
-      // Delete profile
+      // Delete student from students table
       const { error } = await supabase
-        .from('profiles')
+        .from('students')
         .delete()
         .eq('user_id', userId);
 
@@ -203,7 +185,7 @@ function AllStudentsContent() {
   const filteredStudents = students.filter(
     (student) =>
       student.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.room_no?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -233,10 +215,10 @@ function AllStudentsContent() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search students..."
+            placeholder="Search by name, phone, or room..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-secondary border-border w-64"
+            className="pl-10 bg-secondary border-border w-72"
           />
         </div>
       </div>
