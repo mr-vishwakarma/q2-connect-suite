@@ -43,24 +43,11 @@ export function AdminSidebar() {
 
   const fetchAlertCount = async () => {
     try {
-      // Get all student user_ids
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'student');
-
-      const studentUserIds = (roleData || []).map(r => r.user_id);
-      if (studentUserIds.length === 0) {
-        setAlertCount(0);
-        return;
-      }
-
-      // Get student profiles
+      // Get students from students table for the selected hostel
       const { data: students } = await supabase
-        .from('profiles')
+        .from('students')
         .select('valid_date')
-        .eq('hostel', selectedHostel)
-        .in('user_id', studentUserIds);
+        .eq('hostel', selectedHostel);
 
       if (!students) {
         setAlertCount(0);

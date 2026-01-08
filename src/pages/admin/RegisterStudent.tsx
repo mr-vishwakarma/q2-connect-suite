@@ -296,8 +296,8 @@ function RegisterStudentContent() {
                   </button>
                 </div>
                 <p className="text-xs font-bold text-foreground">
-                  Recommended password: FirstName + first 6 digits of mobile number<br />
-                  Example: karan954036
+                  Recommended password: FirstName + @ + first 6 digits of mobile number<br />
+                  Example: karan@954036
                 </p>
               </div>
             </div>

@@ -7,9 +7,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { UtensilsCrossed, MessageSquare, Lightbulb, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+interface StudentData {
+  name: string;
+  phone: string | null;
+  room_no: string | null;
+  valid_date: string | null;
+}
+
 export default function StudentDashboard() {
-  const { user, loading, profile, isAdmin } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [stats, setStats] = useState({
     messRequests: 0,
     complaints: 0,
@@ -28,9 +36,24 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (user) {
+      fetchStudentData();
       fetchStats();
     }
   }, [user]);
+
+  const fetchStudentData = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('students')
+      .select('name, phone, room_no, valid_date')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    if (data) {
+      setStudentData(data);
+    }
+  };
 
   const fetchStats = async () => {
     if (!user) return;
@@ -64,7 +87,7 @@ export default function StudentDashboard() {
         {/* Welcome Section */}
         <div className="bg-card border border-border rounded-2xl p-6 shadow-card">
           <h2 className="text-2xl font-bold text-foreground mb-2">
-            Welcome back, {profile?.name || 'Student'}! 👋
+            Welcome back, {studentData?.name || 'Student'}! 👋
           </h2>
           <p className="text-muted-foreground">
             Here's an overview of your activity in Q2 Management System.
@@ -104,20 +127,20 @@ export default function StudentDashboard() {
             <CardContent className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Name</span>
-                <span className="text-foreground font-medium">{profile?.name || 'N/A'}</span>
+                <span className="text-foreground font-medium">{studentData?.name || 'N/A'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Room No</span>
-                <span className="text-foreground font-medium">{profile?.room_no || 'N/A'}</span>
+                <span className="text-foreground font-medium">{studentData?.room_no || 'N/A'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Phone</span>
-                <span className="text-foreground font-medium">{profile?.phone || 'N/A'}</span>
+                <span className="text-foreground font-medium">{studentData?.phone || 'N/A'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Valid Until</span>
                 <span className="text-foreground font-medium">
-                  {profile?.valid_date ? new Date(profile.valid_date).toLocaleDateString() : 'N/A'}
+                  {studentData?.valid_date ? new Date(studentData.valid_date).toLocaleDateString() : 'N/A'}
                 </span>
               </div>
             </CardContent>
