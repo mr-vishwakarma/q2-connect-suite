@@ -52,11 +52,19 @@ function RegisterStudentContent() {
       return;
     }
 
+    // Normalize username - remove @ and everything after if present, then lowercase
+    const normalizedUsername = formData.username.toLowerCase().split('@')[0].trim();
+    
+    if (!normalizedUsername) {
+      toast.error('Please enter a valid User ID');
+      return;
+    }
+
     // Check if username already exists in students table
     const { data: existingUser } = await supabase
       .from('students')
       .select('username')
-      .eq('username', formData.username.toLowerCase())
+      .eq('username', normalizedUsername)
       .maybeSingle();
 
     if (existingUser) {
@@ -67,8 +75,8 @@ function RegisterStudentContent() {
     setIsSubmitting(true);
 
     try {
-      // Create auth user using username as email format for students
-      const email = `${formData.username.toLowerCase()}@q2student.local`;
+      // Create auth user using normalized username as email format for students
+      const email = `${normalizedUsername}@q2student.local`;
       
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -90,7 +98,7 @@ function RegisterStudentContent() {
           .insert({
             user_id: authData.user.id,
             name: formData.name,
-            username: formData.username.toLowerCase(),
+            username: normalizedUsername,
             phone: formData.phone,
             room_no: formData.room_no,
             fees: parseFloat(formData.fees) || null,
