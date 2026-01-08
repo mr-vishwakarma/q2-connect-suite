@@ -20,11 +20,6 @@ interface Profile {
   user_id: string;
   name: string;
   email: string | null;
-  phone: string | null;
-  room_no: string | null;
-  fees: number | null;
-  start_date: string | null;
-  valid_date: string | null;
   username: string | null;
 }
 
