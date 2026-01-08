@@ -41,8 +41,9 @@ export default function Login() {
 
     setIsLoading(true);
     
-    // Convert User ID to email format for student login
-    const email = `${userId.toLowerCase()}@q2student.local`;
+    // Normalize User ID - remove @ and everything after if present, then convert to email format
+    const normalizedUserId = userId.toLowerCase().split('@')[0].trim();
+    const email = `${normalizedUserId}@q2student.local`;
     const { error } = await signIn(email, password);
     setIsLoading(false);
 
