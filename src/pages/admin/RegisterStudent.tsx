@@ -91,8 +91,17 @@ function RegisterStudentContent() {
         },
       });
 
-      if (error) throw error;
-      if (!data?.ok) throw new Error('Failed to register student');
+      // Edge function returns error in data.error on non-2xx
+      if (error) {
+        const errorMsg = data?.error || error?.message || 'Failed to register student';
+        throw new Error(errorMsg);
+      }
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      if (!data?.ok) {
+        throw new Error('Failed to register student');
+      }
 
       setSuccessMessage('✅ Student registered successfully');
 
