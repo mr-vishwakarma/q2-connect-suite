@@ -9,8 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface StudentData {
   name: string;
-  phone: string | null;
+  username: string;
   room_no: string | null;
+  fees: number | null;
+  start_date: string | null;
   valid_date: string | null;
 }
 
@@ -43,13 +45,13 @@ export default function StudentDashboard() {
 
   const fetchStudentData = async () => {
     if (!user) return;
-    
+
     const { data } = await supabase
       .from('students')
-      .select('name, phone, room_no, valid_date')
+      .select('name, username, room_no, fees, start_date, valid_date')
       .eq('user_id', user.id)
       .maybeSingle();
-    
+
     if (data) {
       setStudentData(data);
     }
@@ -126,21 +128,39 @@ export default function StudentDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Name</span>
+                <span className="text-muted-foreground">Full Name</span>
                 <span className="text-foreground font-medium">{studentData?.name || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">User ID</span>
+                <span className="text-foreground font-medium">{studentData?.username || 'N/A'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Room No</span>
                 <span className="text-foreground font-medium">{studentData?.room_no || 'N/A'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Phone</span>
-                <span className="text-foreground font-medium">{studentData?.phone || 'N/A'}</span>
+                <span className="text-muted-foreground">Monthly Fees</span>
+                <span className="text-foreground font-medium">
+                  {studentData?.fees != null ? `₹${studentData.fees}` : 'N/A'}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Valid Until</span>
+                <span className="text-muted-foreground">Start Date</span>
+                <span className="text-foreground font-medium">
+                  {studentData?.start_date ? new Date(studentData.start_date).toLocaleDateString() : 'N/A'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">End Date</span>
                 <span className="text-foreground font-medium">
                   {studentData?.valid_date ? new Date(studentData.valid_date).toLocaleDateString() : 'N/A'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <span className="text-foreground font-medium">
+                  {studentData?.valid_date && new Date(studentData.valid_date) < new Date() ? 'Expired' : 'Active'}
                 </span>
               </div>
             </CardContent>

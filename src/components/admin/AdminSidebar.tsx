@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,9 +39,9 @@ export function AdminSidebar() {
     if (user && isAdmin) {
       fetchAlertCount();
     }
-  }, [user, isAdmin, selectedHostel]);
+  }, [user, isAdmin, selectedHostel, fetchAlertCount]);
 
-  const fetchAlertCount = async () => {
+  const fetchAlertCount = useCallback(async () => {
     try {
       // Get students from students table for the selected hostel
       const { data: students } = await supabase
@@ -71,7 +71,29 @@ export function AdminSidebar() {
     } catch (error) {
       console.error('Error fetching alert count:', error);
     }
-  };
+  }, [selectedHostel]);
+
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+
+    const channel = supabase
+      .channel(`students-alertcount-${selectedHostel}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'students',
+          filter: `hostel=eq.${selectedHostel}`,
+        },
+        () => fetchAlertCount()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, isAdmin, selectedHostel, fetchAlertCount]);
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col">

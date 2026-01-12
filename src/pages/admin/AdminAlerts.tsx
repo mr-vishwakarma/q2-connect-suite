@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,12 +50,12 @@ function AdminAlertsContent() {
     if (user && isAdmin) {
       fetchAlertStudents();
     }
-  }, [user, isAdmin, selectedHostel]);
+  }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
 
-  const fetchAlertStudents = async () => {
+  const fetchAlertStudents = useCallback(async () => {
     try {
       setIsLoading(true);
-      
+
       // Get students directly from students table
       const { data: students } = await supabase
         .from('students')
@@ -120,7 +120,29 @@ function AdminAlertsContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedHostel]);
+
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+
+    const channel = supabase
+      .channel(`students-alerts-${selectedHostel}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'students',
+          filter: `hostel=eq.${selectedHostel}`,
+        },
+        () => fetchAlertStudents()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
 
   const exportData = () => {
     const csvContent = [

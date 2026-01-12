@@ -32,6 +32,7 @@ function RegisterStudentContent() {
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [showPassword, setShowPassword] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -41,7 +42,8 @@ function RegisterStudentContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setSuccessMessage('');
+
     if (!formData.username) {
       toast.error('User ID is required');
       return;
@@ -54,13 +56,13 @@ function RegisterStudentContent() {
 
     // Normalize username - remove @ and everything after if present, then lowercase
     const normalizedUsername = formData.username.toLowerCase().split('@')[0].trim();
-    
+
     if (!normalizedUsername) {
       toast.error('Please enter a valid User ID');
       return;
     }
 
-    // Check if username already exists in students table
+    // Fast duplicate check (admin is logged in, so this is allowed)
     const { data: existingUser } = await supabase
       .from('students')
       .select('username')
@@ -75,62 +77,38 @@ function RegisterStudentContent() {
     setIsSubmitting(true);
 
     try {
-      // Create auth user using normalized username as email format for students
-      const email = `${normalizedUsername}@q2student.local`;
-      
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            name: formData.name,
-          },
+      const { data, error } = await supabase.functions.invoke('create-student', {
+        body: {
+          name: formData.name,
+          username: normalizedUsername,
+          password: formData.password,
+          phone: formData.phone,
+          room_no: formData.room_no,
+          fees: formData.fees,
+          hostel: selectedHostel,
+          start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
+          valid_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
         },
       });
 
-      if (authError) throw authError;
+      if (error) throw error;
+      if (!data?.ok) throw new Error('Failed to register student');
 
-      if (authData.user) {
-        // Insert student data into students table
-        const { error: studentError } = await supabase
-          .from('students')
-          .insert({
-            user_id: authData.user.id,
-            name: formData.name,
-            username: normalizedUsername,
-            phone: formData.phone,
-            room_no: formData.room_no,
-            fees: parseFloat(formData.fees) || null,
-            hostel: selectedHostel,
-            start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
-            valid_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
-          });
+      setSuccessMessage('✅ Student registered successfully');
 
-        if (studentError) throw studentError;
-
-        // Add student role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: authData.user.id, role: 'student' });
-
-        if (roleError) throw roleError;
-
-        toast.success('Student registered successfully!');
-        setFormData({
-          name: '',
-          phone: '',
-          room_no: '',
-          fees: '',
-          password: '',
-          username: '',
-        });
-        setStartDate(new Date());
-        setEndDate(undefined);
-      }
+      setFormData({
+        name: '',
+        phone: '',
+        room_no: '',
+        fees: '',
+        password: '',
+        username: '',
+      });
+      setStartDate(new Date());
+      setEndDate(undefined);
     } catch (error: any) {
       console.error('Error registering student:', error);
-      toast.error(error.message || 'Failed to register student');
+      toast.error(error?.message || 'Failed to register student');
     } finally {
       setIsSubmitting(false);
     }
@@ -310,6 +288,10 @@ function RegisterStudentContent() {
             >
               {isSubmitting ? 'Registering...' : 'Register Student'}
             </Button>
+
+            {successMessage && (
+              <p className="text-sm text-primary font-medium">{successMessage}</p>
+            )}
           </form>
         </CardContent>
       </Card>
