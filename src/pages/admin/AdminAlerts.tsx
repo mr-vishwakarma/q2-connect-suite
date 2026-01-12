@@ -46,17 +46,10 @@ function AdminAlertsContent() {
     }
   }, [user, isAdmin, loading, navigate]);
 
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchAlertStudents();
-    }
-  }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
-
   const fetchAlertStudents = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      // Get students directly from students table
       const { data: students } = await supabase
         .from('students')
         .select('id, user_id, name, phone, room_no, fees, valid_date, start_date, created_at')
@@ -88,7 +81,6 @@ function AdminAlertsContent() {
           }
         }
 
-        // Include only if expired or expiring within 5 days
         if (status) {
           alerts.push({
             id: student.id,
@@ -106,7 +98,6 @@ function AdminAlertsContent() {
         }
       });
 
-      // Sort: expired first, then by days left
       alerts.sort((a, b) => {
         if (a.status === 'expired' && b.status !== 'expired') return -1;
         if (b.status === 'expired' && a.status !== 'expired') return 1;
@@ -121,6 +112,12 @@ function AdminAlertsContent() {
       setIsLoading(false);
     }
   }, [selectedHostel]);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchAlertStudents();
+    }
+  }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
 
   useEffect(() => {
     if (!user || !isAdmin) return;

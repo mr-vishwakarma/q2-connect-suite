@@ -35,15 +35,8 @@ export function AdminSidebar() {
   const { selectedHostel } = useHostel();
   const [alertCount, setAlertCount] = useState(0);
 
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchAlertCount();
-    }
-  }, [user, isAdmin, selectedHostel, fetchAlertCount]);
-
   const fetchAlertCount = useCallback(async () => {
     try {
-      // Get students from students table for the selected hostel
       const { data: students } = await supabase
         .from('students')
         .select('valid_date')
@@ -72,6 +65,12 @@ export function AdminSidebar() {
       console.error('Error fetching alert count:', error);
     }
   }, [selectedHostel]);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchAlertCount();
+    }
+  }, [user, isAdmin, selectedHostel, fetchAlertCount]);
 
   useEffect(() => {
     if (!user || !isAdmin) return;

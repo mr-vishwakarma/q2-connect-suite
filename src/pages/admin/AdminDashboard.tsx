@@ -41,17 +41,8 @@ function DashboardContent() {
     }
   }, [user, isAdmin, loading, navigate]);
 
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchStats();
-      fetchRecentItems();
-      fetchComplaintsChart();
-    }
-  }, [user, isAdmin, selectedHostel, fetchStats]);
-
   const fetchStats = useCallback(async () => {
     try {
-      // Count students directly from students table
       const { count: studentCount } = await supabase
         .from('students')
         .select('id', { count: 'exact', head: true })
@@ -71,6 +62,14 @@ function DashboardContent() {
       console.error('Error fetching stats:', error);
     }
   }, [selectedHostel]);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchStats();
+      fetchRecentItems();
+      fetchComplaintsChart();
+    }
+  }, [user, isAdmin, selectedHostel, fetchStats]);
 
   useEffect(() => {
     if (!user || !isAdmin) return;
