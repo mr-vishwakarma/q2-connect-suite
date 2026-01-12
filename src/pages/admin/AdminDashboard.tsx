@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -47,19 +47,19 @@ function DashboardContent() {
       fetchRecentItems();
       fetchComplaintsChart();
     }
-  }, [user, isAdmin, selectedHostel]);
+  }, [user, isAdmin, selectedHostel, fetchStats]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       // Count students directly from students table
       const { count: studentCount } = await supabase
         .from('students')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: true })
         .eq('hostel', selectedHostel);
 
       const [complaintsRes, suggestionsRes] = await Promise.all([
-        supabase.from('complaints').select('id', { count: 'exact' }).eq('hostel', selectedHostel),
-        supabase.from('suggestions').select('id', { count: 'exact' }).eq('hostel', selectedHostel),
+        supabase.from('complaints').select('id', { count: 'exact', head: true }).eq('hostel', selectedHostel),
+        supabase.from('suggestions').select('id', { count: 'exact', head: true }).eq('hostel', selectedHostel),
       ]);
 
       setStats({
@@ -70,7 +70,29 @@ function DashboardContent() {
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  };
+  }, [selectedHostel]);
+
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+
+    const channel = supabase
+      .channel(`students-stats-${selectedHostel}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'students',
+          filter: `hostel=eq.${selectedHostel}`,
+        },
+        () => fetchStats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, isAdmin, selectedHostel, fetchStats]);
 
   const fetchRecentItems = async () => {
     try {

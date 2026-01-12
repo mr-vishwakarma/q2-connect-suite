@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
@@ -75,10 +75,10 @@ function AllStudentsContent() {
     }
   }, [user, isAdmin, selectedHostel]);
 
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       setIsLoading(true);
-      
+
       // Get students directly from students table
       const { data, error } = await supabase
         .from('students')
@@ -94,7 +94,31 @@ function AllStudentsContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedHostel]);
+
+  useEffect(() => {
+    if (!user || !isAdmin) return;
+
+    const channel = supabase
+      .channel(`students-admin-${selectedHostel}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'students',
+          filter: `hostel=eq.${selectedHostel}`,
+        },
+        () => {
+          fetchStudents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, isAdmin, selectedHostel, fetchStudents]);
 
   const openEditDialog = (student: Student) => {
     setEditingStudent(student);
