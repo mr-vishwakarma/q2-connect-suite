@@ -24,6 +24,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
   const studentLinks = [
     { to: '/student/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/student/mess-off', icon: UtensilsCrossed, label: 'Mess Off' },
+    { to: '/student/fees', icon: CalendarCheck, label: 'Fee History' },
     { to: '/student/complaints', icon: MessageSquare, label: 'Complaints' },
     { to: '/student/suggestions', icon: Lightbulb, label: 'Suggestions' },
   ];
