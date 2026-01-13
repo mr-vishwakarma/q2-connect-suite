@@ -16,15 +16,21 @@ import {
   Home,
   Shield,
   AlertTriangle,
+  DollarSign,
+  Building2,
+  Bell,
 } from 'lucide-react';
 
 const adminLinks = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/', icon: Home, label: 'Home' },
   { to: '/admin/register-student', icon: UserPlus, label: 'Register Student' },
+  { to: '/admin/students', icon: Users, label: 'All Students' },
+  { to: '/admin/fees', icon: DollarSign, label: 'Fee Management' },
+  { to: '/admin/rooms', icon: Building2, label: 'Room Management' },
   { to: '/admin/complaints', icon: MessageSquare, label: 'Complaints' },
   { to: '/admin/suggestions', icon: Lightbulb, label: 'Suggestions' },
-  { to: '/admin/students', icon: Users, label: 'All Students' },
+  { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
   { to: '/admin/alerts', icon: AlertTriangle, label: 'Alert' },
   { to: '/admin/admin-management', icon: Shield, label: 'Admin Management' },
 ];

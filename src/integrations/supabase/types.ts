@@ -74,6 +74,53 @@ export type Database = {
         }
         Relationships: []
       }
+      fees: {
+        Row: {
+          amount: number
+          created_at: string
+          hostel: Database["public"]["Enums"]["hostel_type"] | null
+          id: string
+          month: string
+          paid_date: string | null
+          payment_mode: Database["public"]["Enums"]["payment_mode"] | null
+          status: Database["public"]["Enums"]["payment_status"] | null
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
+          id?: string
+          month: string
+          paid_date?: string | null
+          payment_mode?: Database["public"]["Enums"]["payment_mode"] | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
+          id?: string
+          month?: string
+          paid_date?: string | null
+          payment_mode?: Database["public"]["Enums"]["payment_mode"] | null
+          status?: Database["public"]["Enums"]["payment_status"] | null
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fees_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mess_requests: {
         Row: {
           created_at: string
@@ -107,6 +154,39 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          hostel: Database["public"]["Enums"]["hostel_type"] | null
+          id: string
+          is_read: boolean | null
+          message: string
+          title: string
+          type: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          title: string
+          type?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          title?: string
+          type?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -134,6 +214,39 @@ export type Database = {
           updated_at?: string
           user_id?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      rooms: {
+        Row: {
+          capacity: number
+          created_at: string
+          hostel: Database["public"]["Enums"]["hostel_type"] | null
+          id: string
+          occupied_count: number
+          room_number: string
+          status: Database["public"]["Enums"]["room_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number
+          created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
+          id?: string
+          occupied_count?: number
+          room_number: string
+          status?: Database["public"]["Enums"]["room_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number
+          created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"] | null
+          id?: string
+          occupied_count?: number
+          room_number?: string
+          status?: Database["public"]["Enums"]["room_status"] | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -252,6 +365,9 @@ export type Database = {
     Enums: {
       app_role: "admin" | "student"
       hostel_type: "Q2" | "Q2.0" | "Q2.1"
+      payment_mode: "cash" | "upi" | "bank"
+      payment_status: "paid" | "unpaid"
+      room_status: "available" | "full"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -381,6 +497,9 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "student"],
       hostel_type: ["Q2", "Q2.0", "Q2.1"],
+      payment_mode: ["cash", "upi", "bank"],
+      payment_status: ["paid", "unpaid"],
+      room_status: ["available", "full"],
     },
   },
 } as const
