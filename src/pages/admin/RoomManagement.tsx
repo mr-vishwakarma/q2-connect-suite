@@ -54,29 +54,45 @@ export default function RoomManagement() {
   const [editRoom, setEditRoom] = useState({ room_number: '', capacity: 4 });
 
   const fetchRooms = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('hostel', selectedHostel)
-      .order('room_number');
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('hostel', selectedHostel)
+        .order('room_number');
 
-    if (error) {
-      console.error('Error fetching rooms:', error);
-    } else {
-      setRooms(data || []);
+      if (error) {
+        console.error('Error fetching rooms:', error);
+        toast.error('Failed to load rooms');
+        setRooms([]);
+      } else {
+        setRooms(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setRooms([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [selectedHostel]);
 
   const fetchStudents = useCallback(async () => {
-    const { data } = await supabase
-      .from('students')
-      .select('id, name, username, room_no')
-      .eq('hostel', selectedHostel);
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('id, name, username, room_no')
+        .eq('hostel', selectedHostel);
 
-    if (data) {
-      setStudents(data);
+      if (error) {
+        console.error('Error fetching students:', error);
+        setStudents([]);
+      } else {
+        setStudents(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setStudents([]);
     }
   }, [selectedHostel]);
 
@@ -104,10 +120,11 @@ export default function RoomManagement() {
   }, [fetchRooms, fetchStudents]);
 
   useEffect(() => {
-    if (rooms.length > 0 && students.length > 0) {
+    if (rooms.length > 0 && students.length >= 0 && !loading) {
       updateRoomOccupancy();
     }
-  }, [students]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, loading]);
 
   // Real-time subscription
   useEffect(() => {

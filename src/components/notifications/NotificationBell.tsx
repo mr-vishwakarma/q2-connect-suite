@@ -29,15 +29,23 @@ export function NotificationBell() {
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
 
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-    if (data) {
-      setNotifications(data);
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        setNotifications([]);
+      } else {
+        setNotifications(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setNotifications([]);
     }
   }, [user]);
 

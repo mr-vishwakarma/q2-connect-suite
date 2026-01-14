@@ -43,33 +43,48 @@ export default function FeeHistory() {
   const fetchStudentId = useCallback(async () => {
     if (!user) return;
 
-    const { data } = await supabase
-      .from('students')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-    if (data) {
-      setStudentId(data.id);
+      if (error) {
+        console.error('Error fetching student:', error);
+        setStudentId(null);
+      } else if (data) {
+        setStudentId(data.id);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setStudentId(null);
     }
   }, [user]);
 
   const fetchFees = useCallback(async () => {
     if (!studentId) return;
 
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('fees')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false });
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('fees')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching fees:', error);
-    } else {
-      setFees(data || []);
+      if (error) {
+        console.error('Error fetching fees:', error);
+        setFees([]);
+      } else {
+        setFees(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setFees([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [studentId]);
 
   useEffect(() => {
