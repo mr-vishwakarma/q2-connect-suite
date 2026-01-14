@@ -96,10 +96,11 @@ export default function RoomManagement() {
     }
   }, [selectedHostel]);
 
-  // Update room occupancy counts based on students
-  const updateRoomOccupancy = useCallback(async () => {
-    for (const room of rooms) {
-      const studentsInRoom = students.filter(s => s.room_no === room.room_number).length;
+  // Update room occupancy counts based on students - only when students data changes
+  const updateRoomOccupancy = useCallback(async (currentRooms: Room[], currentStudents: Student[]) => {
+    let needsRefresh = false;
+    for (const room of currentRooms) {
+      const studentsInRoom = currentStudents.filter(s => s.room_no === room.room_number).length;
       if (studentsInRoom !== room.occupied_count) {
         const newStatus = studentsInRoom >= room.capacity ? 'full' : 'available';
         await supabase
@@ -109,22 +110,33 @@ export default function RoomManagement() {
             status: newStatus
           })
           .eq('id', room.id);
+        needsRefresh = true;
       }
     }
-    fetchRooms();
-  }, [rooms, students, fetchRooms]);
+    if (needsRefresh) {
+      fetchRooms();
+    }
+  }, [fetchRooms]);
 
   useEffect(() => {
     fetchRooms();
     fetchStudents();
   }, [fetchRooms, fetchStudents]);
 
+  // Track if we've already synced occupancy for this data set
+  const [occupancySynced, setOccupancySynced] = useState(false);
+
   useEffect(() => {
-    if (rooms.length > 0 && students.length >= 0 && !loading) {
-      updateRoomOccupancy();
+    if (rooms.length > 0 && !loading && !occupancySynced) {
+      updateRoomOccupancy(rooms, students);
+      setOccupancySynced(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [students, loading]);
+  }, [rooms, students, loading, occupancySynced, updateRoomOccupancy]);
+
+  // Reset sync flag when hostel changes
+  useEffect(() => {
+    setOccupancySynced(false);
+  }, [selectedHostel]);
 
   // Real-time subscription
   useEffect(() => {
