@@ -58,29 +58,45 @@ export default function Notifications() {
   });
 
   const fetchNotifications = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('hostel', selectedHostel)
-      .order('created_at', { ascending: false });
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('hostel', selectedHostel)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching notifications:', error);
-    } else {
-      setNotifications(data || []);
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        toast.error('Failed to load notifications');
+        setNotifications([]);
+      } else {
+        setNotifications(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [selectedHostel]);
 
   const fetchStudents = useCallback(async () => {
-    const { data } = await supabase
-      .from('students')
-      .select('id, name, username, user_id')
-      .eq('hostel', selectedHostel);
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('id, name, username, user_id')
+        .eq('hostel', selectedHostel);
 
-    if (data) {
-      setStudents(data);
+      if (error) {
+        console.error('Error fetching students:', error);
+        setStudents([]);
+      } else {
+        setStudents(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setStudents([]);
     }
   }, [selectedHostel]);
 

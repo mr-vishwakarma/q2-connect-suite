@@ -65,32 +65,48 @@ export default function FeeManagement() {
   const currentMonth = format(new Date(), 'MMMM yyyy');
 
   const fetchFees = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('fees')
-      .select(`
-        *,
-        students (name, username, room_no)
-      `)
-      .eq('hostel', selectedHostel)
-      .order('created_at', { ascending: false });
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('fees')
+        .select(`
+          *,
+          students!fees_student_id_fkey (name, username, room_no)
+        `)
+        .eq('hostel', selectedHostel)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching fees:', error);
-    } else {
-      setFees(data || []);
+      if (error) {
+        console.error('Error fetching fees:', error);
+        toast.error('Failed to load fee records');
+        setFees([]);
+      } else {
+        setFees(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setFees([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [selectedHostel]);
 
   const fetchStudents = useCallback(async () => {
-    const { data } = await supabase
-      .from('students')
-      .select('id, name, username, room_no, fees, start_date, valid_date')
-      .eq('hostel', selectedHostel);
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('id, name, username, room_no, fees, start_date, valid_date')
+        .eq('hostel', selectedHostel);
 
-    if (data) {
-      setStudents(data);
+      if (error) {
+        console.error('Error fetching students:', error);
+        setStudents([]);
+      } else {
+        setStudents(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setStudents([]);
     }
   }, [selectedHostel]);
 
@@ -178,10 +194,15 @@ export default function FeeManagement() {
   };
 
   const filteredFees = fees.filter(fee => {
-    const matchesSearch = 
-      fee.students?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      fee.students?.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      fee.students?.room_no?.toLowerCase().includes(searchQuery.toLowerCase());
+    const studentName = fee.students?.name?.toLowerCase() || '';
+    const studentUsername = fee.students?.username?.toLowerCase() || '';
+    const studentRoom = fee.students?.room_no?.toLowerCase() || '';
+    const query = searchQuery.toLowerCase();
+    
+    const matchesSearch = !searchQuery || 
+      studentName.includes(query) ||
+      studentUsername.includes(query) ||
+      studentRoom.includes(query);
     const matchesMonth = filterMonth === 'all' || fee.month === filterMonth;
     const matchesStatus = filterStatus === 'all' || fee.status === filterStatus;
     return matchesSearch && matchesMonth && matchesStatus;
