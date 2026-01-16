@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
-import { AlertTriangle, Download } from 'lucide-react';
+import { AlertTriangle, Download, IndianRupee } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,14 @@ import {
 } from '@/components/ui/table';
 import { differenceInDays, parseISO, format } from 'date-fns';
 
+interface Fee {
+  id: string;
+  student_id: string;
+  status: 'paid' | 'unpaid';
+  amount: number;
+  month: string;
+}
+
 interface AlertStudent {
   id: string;
   user_id: string;
@@ -31,6 +39,7 @@ interface AlertStudent {
   created_at: string;
   daysLeft: number | null;
   status: 'expired' | 'critical' | 'warning';
+  feeStatus: 'paid' | 'unpaid';
 }
 
 function AdminAlertsContent() {
@@ -50,6 +59,7 @@ function AdminAlertsContent() {
     try {
       setIsLoading(true);
 
+      // Fetch students
       const { data: students } = await supabase
         .from('students')
         .select('id, user_id, name, phone, room_no, fees, valid_date, start_date, created_at')
@@ -61,12 +71,29 @@ function AdminAlertsContent() {
         return;
       }
 
+      // Fetch fees for these students
+      const studentIds = students.map(s => s.id);
+      const { data: feesData } = await supabase
+        .from('fees')
+        .select('student_id, status')
+        .in('student_id', studentIds);
+
+      const feeStatusMap = new Map<string, 'paid' | 'unpaid'>();
+      feesData?.forEach(fee => {
+        // If any fee is unpaid, mark as unpaid
+        const current = feeStatusMap.get(fee.student_id);
+        if (!current || fee.status === 'unpaid') {
+          feeStatusMap.set(fee.student_id, fee.status as 'paid' | 'unpaid');
+        }
+      });
+
       const today = new Date();
       const alerts: AlertStudent[] = [];
 
       students.forEach(student => {
         let daysLeft: number | null = null;
         let status: 'expired' | 'critical' | 'warning' | null = null;
+        const feeStatus = feeStatusMap.get(student.id) || 'unpaid';
 
         if (student.valid_date) {
           const validDate = parseISO(student.valid_date);
@@ -81,7 +108,10 @@ function AdminAlertsContent() {
           }
         }
 
-        if (status) {
+        // Show in alerts if:
+        // 1. Expired with unpaid fees
+        // 2. Critical or warning status
+        if ((status === 'expired' && feeStatus === 'unpaid') || status === 'critical' || status === 'warning') {
           alerts.push({
             id: student.id,
             user_id: student.user_id,
@@ -93,12 +123,16 @@ function AdminAlertsContent() {
             start_date: student.start_date,
             created_at: student.created_at,
             daysLeft,
-            status,
+            status: status!,
+            feeStatus,
           });
         }
       });
 
       alerts.sort((a, b) => {
+        // Expired + unpaid first
+        if (a.status === 'expired' && a.feeStatus === 'unpaid' && !(b.status === 'expired' && b.feeStatus === 'unpaid')) return -1;
+        if (b.status === 'expired' && b.feeStatus === 'unpaid' && !(a.status === 'expired' && a.feeStatus === 'unpaid')) return 1;
         if (a.status === 'expired' && b.status !== 'expired') return -1;
         if (b.status === 'expired' && a.status !== 'expired') return 1;
         if (a.daysLeft !== null && b.daysLeft !== null) return a.daysLeft - b.daysLeft;
@@ -143,7 +177,7 @@ function AdminAlertsContent() {
 
   const exportData = () => {
     const csvContent = [
-      ['Name', 'Phone', 'Room No', 'Fees', 'Start Date', 'Valid Till', 'Status'].join(','),
+      ['Name', 'Phone', 'Room No', 'Fees', 'Start Date', 'Valid Till', 'Status', 'Fee Status'].join(','),
       ...alertStudents.map(student => [
         student.name,
         student.phone || 'N/A',
@@ -152,6 +186,7 @@ function AdminAlertsContent() {
         student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A',
         student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A',
         student.status === 'expired' ? 'Expired' : `${student.daysLeft} days left`,
+        student.feeStatus === 'paid' ? 'Paid' : 'Unpaid',
       ].join(','))
     ].join('\n');
 
@@ -164,6 +199,10 @@ function AdminAlertsContent() {
   };
 
   const getStatusBadge = (student: AlertStudent) => {
+    // Expired + Unpaid = Show "Unpaid" badge
+    if (student.status === 'expired' && student.feeStatus === 'unpaid') {
+      return <Badge variant="destructive" className="text-xs">Unpaid</Badge>;
+    }
     if (student.status === 'expired') {
       return <Badge variant="destructive" className="text-xs">Expired</Badge>;
     }
@@ -171,6 +210,13 @@ function AdminAlertsContent() {
       return <Badge className="text-xs bg-orange-500/20 text-orange-500 border-orange-500/30">{student.daysLeft} days left</Badge>;
     }
     return <Badge className="text-xs bg-amber-500/20 text-amber-500 border-amber-500/30">{student.daysLeft} days left</Badge>;
+  };
+
+  const getFeeStatusBadge = (student: AlertStudent) => {
+    if (student.feeStatus === 'paid') {
+      return <Badge variant="default" className="text-xs">Paid</Badge>;
+    }
+    return <Badge variant="destructive" className="text-xs">Unpaid</Badge>;
   };
 
   if (loading || isLoading) {
@@ -181,7 +227,7 @@ function AdminAlertsContent() {
     );
   }
 
-  const expiredCount = alertStudents.filter(s => s.status === 'expired').length;
+  const expiredUnpaidCount = alertStudents.filter(s => s.status === 'expired' && s.feeStatus === 'unpaid').length;
   const criticalCount = alertStudents.filter(s => s.status === 'critical').length;
   const warningCount = alertStudents.filter(s => s.status === 'warning').length;
 
@@ -189,8 +235,8 @@ function AdminAlertsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-primary">Alert - Expiring Soon</h2>
-          <p className="text-muted-foreground">Users with 5 days or less remaining</p>
+          <h2 className="text-2xl font-bold text-primary">Alert - Expiring Soon & Unpaid</h2>
+          <p className="text-muted-foreground">Users with expired validity + unpaid fees, or 5 days or less remaining</p>
         </div>
         <Button variant="outline" onClick={exportData} disabled={alertStudents.length === 0}>
           <Download className="w-4 h-4 mr-2" />
@@ -213,6 +259,7 @@ function AdminAlertsContent() {
                 <TableHead className="text-foreground font-bold">Joining Date</TableHead>
                 <TableHead className="text-foreground font-bold">Valid Till</TableHead>
                 <TableHead className="text-foreground font-bold">Status</TableHead>
+                <TableHead className="text-foreground font-bold">Fee Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -222,7 +269,7 @@ function AdminAlertsContent() {
                   <TableCell className="text-muted-foreground">{student.phone || 'N/A'}</TableCell>
                   <TableCell className="text-muted-foreground">{student.room_no || 'N/A'}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {student.fees ? `₹${student.fees}` : 'N/A'}
+                    {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : 'N/A'}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A'}
@@ -231,6 +278,7 @@ function AdminAlertsContent() {
                     {student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}
                   </TableCell>
                   <TableCell>{getStatusBadge(student)}</TableCell>
+                  <TableCell>{getFeeStatusBadge(student)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -253,15 +301,15 @@ function AdminAlertsContent() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-red-500"></span>
-            <span className="text-muted-foreground">Expired</span>
+            <span className="text-muted-foreground">Expired + Unpaid ({expiredUnpaidCount})</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-            <span className="text-muted-foreground">Critical (≤2 days)</span>
+            <span className="text-muted-foreground">Critical ≤2 days ({criticalCount})</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-            <span className="text-muted-foreground">Warning (3-5 days)</span>
+            <span className="text-muted-foreground">Warning 3-5 days ({warningCount})</span>
           </div>
         </div>
       </div>

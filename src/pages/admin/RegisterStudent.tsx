@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
@@ -10,21 +10,32 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { UserPlus, CalendarIcon, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, CalendarIcon, Eye, EyeOff, Home, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+
+interface Room {
+  id: string;
+  room_number: string;
+  capacity: number;
+  occupied_count: number;
+  status: 'available' | 'full';
+}
 
 function RegisterStudentContent() {
   const { user, isAdmin, loading } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('');
+  const [roomError, setRoomError] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    room_no: '',
     fees: '',
     password: '',
     username: '',
@@ -40,6 +51,58 @@ function RegisterStudentContent() {
     }
   }, [user, isAdmin, loading, navigate]);
 
+  // Fetch available rooms
+  const fetchRooms = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('hostel', selectedHostel)
+        .order('room_number');
+
+      if (error) {
+        console.error('Error fetching rooms:', error);
+        setRooms([]);
+      } else {
+        setRooms(data || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setRooms([]);
+    }
+  }, [selectedHostel]);
+
+  useEffect(() => {
+    fetchRooms();
+  }, [fetchRooms]);
+
+  // Validate room selection
+  const validateRoom = (roomId: string) => {
+    if (!roomId) {
+      setRoomError('');
+      return true;
+    }
+
+    const room = rooms.find(r => r.id === roomId);
+    if (!room) {
+      setRoomError('Room not found');
+      return false;
+    }
+
+    if (room.occupied_count >= room.capacity) {
+      setRoomError(`❌ No Capacity in Room ${room.room_number}`);
+      return false;
+    }
+
+    setRoomError('');
+    return true;
+  };
+
+  const handleRoomChange = (roomId: string) => {
+    setSelectedRoomId(roomId);
+    validateRoom(roomId);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessMessage('');
@@ -51,6 +114,12 @@ function RegisterStudentContent() {
 
     if (!startDate) {
       toast.error('Start Date is required');
+      return;
+    }
+
+    // Validate room if selected
+    if (selectedRoomId && !validateRoom(selectedRoomId)) {
+      toast.error(roomError || 'Selected room is not available');
       return;
     }
 
@@ -74,6 +143,10 @@ function RegisterStudentContent() {
       return;
     }
 
+    // Get selected room number
+    const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+    const roomNumber = selectedRoom?.room_number || '';
+
     setIsSubmitting(true);
 
     try {
@@ -83,7 +156,7 @@ function RegisterStudentContent() {
           username: normalizedUsername,
           password: formData.password,
           phone: formData.phone,
-          room_no: formData.room_no,
+          room_no: roomNumber,
           fees: formData.fees,
           hostel: selectedHostel,
           start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
@@ -103,18 +176,33 @@ function RegisterStudentContent() {
         throw new Error('Failed to register student');
       }
 
+      // Update room occupancy if room was selected
+      if (selectedRoom) {
+        const newOccupiedCount = selectedRoom.occupied_count + 1;
+        const newStatus = newOccupiedCount >= selectedRoom.capacity ? 'full' : 'available';
+        
+        await supabase
+          .from('rooms')
+          .update({ 
+            occupied_count: newOccupiedCount,
+            status: newStatus
+          })
+          .eq('id', selectedRoom.id);
+      }
+
       setSuccessMessage('✅ Student registered successfully');
 
       setFormData({
         name: '',
         phone: '',
-        room_no: '',
         fees: '',
         password: '',
         username: '',
       });
+      setSelectedRoomId('');
       setStartDate(new Date());
       setEndDate(undefined);
+      fetchRooms(); // Refresh rooms to get updated occupancy
     } catch (error: any) {
       console.error('Error registering student:', error);
       toast.error(error?.message || 'Failed to register student');
@@ -130,6 +218,8 @@ function RegisterStudentContent() {
       </div>
     );
   }
+
+  const availableRooms = rooms.filter(r => r.status === 'available');
 
   return (
     <motion.div
@@ -189,17 +279,45 @@ function RegisterStudentContent() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="room_no" className="text-foreground">Room Number</Label>
-                <Input
-                  id="room_no"
-                  value={formData.room_no}
-                  onChange={(e) => setFormData({ ...formData, room_no: e.target.value })}
-                  placeholder="e.g., 101"
-                  className="bg-secondary border-border"
-                />
+                <Label htmlFor="room_no" className="text-foreground flex items-center gap-2">
+                  <Home className="w-4 h-4" />
+                  Room Number
+                </Label>
+                <Select value={selectedRoomId} onValueChange={handleRoomChange}>
+                  <SelectTrigger className="bg-secondary border-border">
+                    <SelectValue placeholder="Select a room" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rooms.length === 0 ? (
+                      <SelectItem value="" disabled>No rooms available. Add rooms first.</SelectItem>
+                    ) : (
+                      rooms.map((room) => (
+                        <SelectItem 
+                          key={room.id} 
+                          value={room.id}
+                          disabled={room.status === 'full'}
+                        >
+                          Room {room.room_number} ({room.occupied_count}/{room.capacity}) 
+                          {room.status === 'full' ? ' - Full' : ' - Available'}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {roomError && (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {roomError}
+                  </p>
+                )}
+                {rooms.length === 0 && (
+                  <p className="text-xs text-warning">
+                    Please add rooms in Room Management before registering students.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="fees" className="text-foreground">Monthly Fees</Label>
+                <Label htmlFor="fees" className="text-foreground">Monthly Fees (₹)</Label>
                 <Input
                   id="fees"
                   type="number"
@@ -293,7 +411,7 @@ function RegisterStudentContent() {
               type="submit"
               variant="hero"
               className="w-full"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !!roomError}
             >
               {isSubmitting ? 'Registering...' : 'Register Student'}
             </Button>

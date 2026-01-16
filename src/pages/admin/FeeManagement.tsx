@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { useHostel } from '@/contexts/HostelContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,8 +22,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Search, DollarSign, Calendar, Check, Filter, Download } from 'lucide-react';
-import { format } from 'date-fns';
+import { Search, IndianRupee, Calendar, Check, Filter, Download, TrendingUp, AlertCircle, Wallet } from 'lucide-react';
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface Student {
   id: string;
@@ -47,6 +48,7 @@ interface Fee {
     name: string;
     username: string;
     room_no: string | null;
+    valid_date: string | null;
   };
 }
 
@@ -71,7 +73,7 @@ export default function FeeManagement() {
         .from('fees')
         .select(`
           *,
-          students!fees_student_id_fkey (name, username, room_no)
+          students!fees_student_id_fkey (name, username, room_no, valid_date)
         `)
         .eq('hostel', selectedHostel)
         .order('created_at', { ascending: false });
@@ -118,13 +120,16 @@ export default function FeeManagement() {
       );
 
       if (!existingFee && student.fees) {
+        // Check if student is expired and set status accordingly
+        const isExpired = student.valid_date && new Date(student.valid_date) < new Date();
+        
         await supabase.from('fees').insert({
           student_id: student.id,
           month: currentMonth,
           amount: student.fees,
-          paid_date: student.start_date,
+          paid_date: isExpired ? null : student.start_date,
           payment_mode: 'upi',
-          status: 'paid',
+          status: isExpired ? 'unpaid' : 'paid',
           hostel: selectedHostel,
         });
       }
@@ -193,34 +198,88 @@ export default function FeeManagement() {
     }
   };
 
-  const filteredFees = fees.filter(fee => {
-    const studentName = fee.students?.name?.toLowerCase() || '';
-    const studentUsername = fee.students?.username?.toLowerCase() || '';
-    const studentRoom = fee.students?.room_no?.toLowerCase() || '';
-    const query = searchQuery.toLowerCase();
-    
-    const matchesSearch = !searchQuery || 
-      studentName.includes(query) ||
-      studentUsername.includes(query) ||
-      studentRoom.includes(query);
-    const matchesMonth = filterMonth === 'all' || fee.month === filterMonth;
-    const matchesStatus = filterStatus === 'all' || fee.status === filterStatus;
-    return matchesSearch && matchesMonth && matchesStatus;
-  });
+  // Filter fees to only show students that exist in "All Students"
+  const validStudentIds = useMemo(() => new Set(students.map(s => s.id)), [students]);
 
-  const pendingCount = fees.filter(f => f.status === 'unpaid').length;
-  const paidCount = fees.filter(f => f.status === 'paid').length;
-  const totalPending = fees.filter(f => f.status === 'unpaid').reduce((sum, f) => sum + f.amount, 0);
+  const filteredFees = useMemo(() => {
+    return fees.filter(fee => {
+      // Only show fees for students that exist in All Students
+      if (!validStudentIds.has(fee.student_id)) return false;
+
+      const studentName = fee.students?.name?.toLowerCase() || '';
+      const studentUsername = fee.students?.username?.toLowerCase() || '';
+      const studentRoom = fee.students?.room_no?.toLowerCase() || '';
+      const query = searchQuery.toLowerCase();
+      
+      const matchesSearch = !searchQuery || 
+        studentName.includes(query) ||
+        studentUsername.includes(query) ||
+        studentRoom.includes(query);
+      const matchesMonth = filterMonth === 'all' || fee.month === filterMonth;
+      const matchesStatus = filterStatus === 'all' || fee.status === filterStatus;
+      return matchesSearch && matchesMonth && matchesStatus;
+    });
+  }, [fees, validStudentIds, searchQuery, filterMonth, filterStatus]);
+
+  // Calculate summary stats
+  const totalFeeAmount = useMemo(() => 
+    fees.filter(f => validStudentIds.has(f.student_id)).reduce((sum, f) => sum + f.amount, 0)
+  , [fees, validStudentIds]);
+
+  const totalPendingFee = useMemo(() => 
+    fees.filter(f => validStudentIds.has(f.student_id) && f.status === 'unpaid').reduce((sum, f) => sum + f.amount, 0)
+  , [fees, validStudentIds]);
+
+  const thisMonthCollection = useMemo(() => {
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    
+    return fees
+      .filter(f => {
+        if (!validStudentIds.has(f.student_id)) return false;
+        if (f.status !== 'paid' || !f.paid_date) return false;
+        
+        try {
+          const paidDate = parseISO(f.paid_date);
+          return isWithinInterval(paidDate, { start: monthStart, end: monthEnd });
+        } catch {
+          return false;
+        }
+      })
+      .reduce((sum, f) => sum + f.amount, 0);
+  }, [fees, validStudentIds]);
+
+  // Analytics data for chart
+  const chartData = useMemo(() => [
+    { name: 'Total Fees', amount: totalFeeAmount, fill: 'hsl(var(--primary))' },
+    { name: 'Pending Fees', amount: totalPendingFee, fill: 'hsl(var(--destructive))' },
+    { name: 'This Month', amount: thisMonthCollection, fill: 'hsl(var(--success))' },
+  ], [totalFeeAmount, totalPendingFee, thisMonthCollection]);
+
+  const pendingCount = fees.filter(f => validStudentIds.has(f.student_id) && f.status === 'unpaid').length;
+  const paidCount = fees.filter(f => validStudentIds.has(f.student_id) && f.status === 'paid').length;
+
+  // Check if student is expired with unpaid fees
+  const getStudentStatus = (fee: Fee) => {
+    if (fee.status === 'paid') return 'paid';
+    
+    const validDate = fee.students?.valid_date;
+    if (validDate && new Date(validDate) < new Date()) {
+      return 'unpaid'; // Expired + unpaid = Unpaid status
+    }
+    return 'unpaid';
+  };
 
   const exportToCSV = () => {
-    const headers = ['Student Name', 'User ID', 'Room', 'Month', 'Amount', 'Status', 'Paid Date', 'Payment Mode'];
+    const headers = ['Student Name', 'User ID', 'Room', 'Month', 'Amount (₹)', 'Status', 'Paid Date', 'Payment Mode'];
     const rows = filteredFees.map(fee => [
       fee.students?.name || '',
       fee.students?.username || '',
       fee.students?.room_no || '',
       fee.month,
       fee.amount,
-      fee.status,
+      getStudentStatus(fee),
       fee.paid_date || '',
       fee.payment_mode,
     ]);
@@ -241,17 +300,99 @@ export default function FeeManagement() {
   return (
     <AdminLayout title="Fee Management">
       <div className="space-y-6 animate-fade-in">
+        {/* Summary Cards with ₹ */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-primary/10">
+                  <Wallet className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Fee Amount</p>
+                  <p className="text-2xl font-bold text-foreground">₹{totalFeeAmount.toLocaleString('en-IN')}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-destructive/10">
+                  <AlertCircle className="w-6 h-6 text-destructive" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Pending Fee</p>
+                  <p className="text-2xl font-bold text-foreground">₹{totalPendingFee.toLocaleString('en-IN')}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-success/10">
+                  <TrendingUp className="w-6 h-6 text-success" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Collection This Month</p>
+                  <p className="text-2xl font-bold text-foreground">₹{thisMonthCollection.toLocaleString('en-IN')}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Analytics Graph */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Fee Analytics
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <YAxis 
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tickFormatter={(value) => `₹${value.toLocaleString('en-IN')}`}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Amount']}
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      color: 'hsl(var(--foreground))'
+                    }}
+                  />
+                  <Bar dataKey="amount" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 rounded-xl bg-primary/10">
-                  <DollarSign className="w-6 h-6 text-primary" />
+                  <IndianRupee className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Records</p>
-                  <p className="text-2xl font-bold text-foreground">{fees.length}</p>
+                  <p className="text-2xl font-bold text-foreground">{filteredFees.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -286,11 +427,11 @@ export default function FeeManagement() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 rounded-xl bg-destructive/10">
-                  <DollarSign className="w-6 h-6 text-destructive" />
+                  <IndianRupee className="w-6 h-6 text-destructive" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Pending</p>
-                  <p className="text-2xl font-bold text-foreground">₹{totalPending}</p>
+                  <p className="text-sm text-muted-foreground">Pending Amount</p>
+                  <p className="text-2xl font-bold text-foreground">₹{totalPendingFee.toLocaleString('en-IN')}</p>
                 </div>
               </div>
             </CardContent>
@@ -373,35 +514,38 @@ export default function FeeManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredFees.map((fee) => (
-                      <TableRow key={fee.id}>
-                        <TableCell className="font-medium">{fee.students?.name}</TableCell>
-                        <TableCell>{fee.students?.username}</TableCell>
-                        <TableCell>{fee.students?.room_no || '-'}</TableCell>
-                        <TableCell>{fee.month}</TableCell>
-                        <TableCell>₹{fee.amount}</TableCell>
-                        <TableCell>
-                          <Badge variant={fee.status === 'paid' ? 'default' : 'destructive'}>
-                            {fee.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{fee.paid_date || '-'}</TableCell>
-                        <TableCell className="capitalize">{fee.payment_mode}</TableCell>
-                        <TableCell>
-                          {fee.status === 'unpaid' && (
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setSelectedFee(fee);
-                                setShowPaymentDialog(true);
-                              }}
-                            >
-                              Mark Paid
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredFees.map((fee) => {
+                      const status = getStudentStatus(fee);
+                      return (
+                        <TableRow key={fee.id}>
+                          <TableCell className="font-medium">{fee.students?.name}</TableCell>
+                          <TableCell>{fee.students?.username}</TableCell>
+                          <TableCell>{fee.students?.room_no || '-'}</TableCell>
+                          <TableCell>{fee.month}</TableCell>
+                          <TableCell>₹{fee.amount.toLocaleString('en-IN')}</TableCell>
+                          <TableCell>
+                            <Badge variant={status === 'paid' ? 'default' : 'destructive'}>
+                              {status === 'paid' ? 'Paid' : 'Unpaid'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{fee.paid_date || '-'}</TableCell>
+                          <TableCell className="capitalize">{fee.payment_mode}</TableCell>
+                          <TableCell>
+                            {fee.status === 'unpaid' && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedFee(fee);
+                                  setShowPaymentDialog(true);
+                                }}
+                              >
+                                Mark Paid
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -423,7 +567,7 @@ export default function FeeManagement() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-1">Amount</p>
-              <p className="font-medium">₹{selectedFee?.amount}</p>
+              <p className="font-medium">₹{selectedFee?.amount?.toLocaleString('en-IN')}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-2">Payment Mode</p>

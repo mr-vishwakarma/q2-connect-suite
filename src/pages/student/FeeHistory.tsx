@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { DollarSign, Calendar, Check, AlertCircle } from 'lucide-react';
+import { IndianRupee, Calendar, Check, AlertCircle } from 'lucide-react';
 
 interface Fee {
   id: string;
@@ -142,7 +142,7 @@ export default function FeeHistory() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 rounded-xl bg-primary/10">
-                  <DollarSign className="w-6 h-6 text-primary" />
+                  <IndianRupee className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Records</p>
