@@ -344,8 +344,8 @@ export default function RoomManagement() {
                           <TableCell>{room.capacity}</TableCell>
                           <TableCell>{room.occupied_count}</TableCell>
                           <TableCell>
-                            <Badge variant={room.status === 'available' ? 'default' : 'destructive'}>
-                              {room.status}
+                            <Badge variant={room.status === 'available' ? 'default' : 'outline'} className={room.status === 'full' ? 'bg-green-500/20 text-green-500 border-green-500/30' : ''}>
+                              {room.status === 'full' ? 'Full' : 'Available'}
                             </Badge>
                           </TableCell>
                           <TableCell>
