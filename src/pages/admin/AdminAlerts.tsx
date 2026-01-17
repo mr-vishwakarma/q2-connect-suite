@@ -5,8 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
-import { AlertTriangle, Download, IndianRupee } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertTriangle, Download } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -20,11 +20,8 @@ import {
 import { differenceInDays, parseISO, format } from 'date-fns';
 
 interface Fee {
-  id: string;
   student_id: string;
   status: 'paid' | 'unpaid';
-  amount: number;
-  month: string;
 }
 
 interface AlertStudent {
@@ -36,8 +33,8 @@ interface AlertStudent {
   fees: number | null;
   valid_date: string | null;
   start_date: string | null;
-  created_at: string;
   daysLeft: number | null;
+  daysOverdue: number;
   status: 'expired' | 'critical' | 'warning';
   feeStatus: 'paid' | 'unpaid';
 }
@@ -59,32 +56,38 @@ function AdminAlertsContent() {
     try {
       setIsLoading(true);
 
-      // Fetch students
-      const { data: students } = await supabase
+      // Fetch all students from student table (single source of truth)
+      const { data: students, error: studentsError } = await supabase
         .from('students')
-        .select('id, user_id, name, phone, room_no, fees, valid_date, start_date, created_at')
+        .select('id, user_id, name, phone, room_no, fees, valid_date, start_date')
         .eq('hostel', selectedHostel);
 
-      if (!students) {
+      if (studentsError) {
+        console.error('Error fetching students:', studentsError);
         setAlertStudents([]);
         setIsLoading(false);
         return;
       }
 
-      // Fetch fees for these students
+      if (!students || students.length === 0) {
+        setAlertStudents([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch current month fees for these students
+      const currentMonth = format(new Date(), 'MMMM yyyy');
       const studentIds = students.map(s => s.id);
       const { data: feesData } = await supabase
         .from('fees')
         .select('student_id, status')
-        .in('student_id', studentIds);
+        .in('student_id', studentIds)
+        .eq('month', currentMonth);
 
+      // Create fee status map
       const feeStatusMap = new Map<string, 'paid' | 'unpaid'>();
       feesData?.forEach(fee => {
-        // If any fee is unpaid, mark as unpaid
-        const current = feeStatusMap.get(fee.student_id);
-        if (!current || fee.status === 'unpaid') {
-          feeStatusMap.set(fee.student_id, fee.status as 'paid' | 'unpaid');
-        }
+        feeStatusMap.set(fee.student_id, fee.status as 'paid' | 'unpaid');
       });
 
       const today = new Date();
@@ -92,8 +95,11 @@ function AdminAlertsContent() {
 
       students.forEach(student => {
         let daysLeft: number | null = null;
+        let daysOverdue = 0;
         let status: 'expired' | 'critical' | 'warning' | null = null;
-        const feeStatus = feeStatusMap.get(student.id) || 'unpaid';
+        
+        // Determine fee status - if no fee record exists, check if expired
+        let feeStatus: 'paid' | 'unpaid' = feeStatusMap.get(student.id) || 'unpaid';
 
         if (student.valid_date) {
           const validDate = parseISO(student.valid_date);
@@ -101,6 +107,11 @@ function AdminAlertsContent() {
 
           if (daysLeft < 0) {
             status = 'expired';
+            daysOverdue = Math.abs(daysLeft);
+            // If expired and no paid fee, mark as unpaid
+            if (!feeStatusMap.has(student.id)) {
+              feeStatus = 'unpaid';
+            }
           } else if (daysLeft <= 2) {
             status = 'critical';
           } else if (daysLeft <= 5) {
@@ -109,9 +120,10 @@ function AdminAlertsContent() {
         }
 
         // Show in alerts if:
-        // 1. Expired with unpaid fees
-        // 2. Critical or warning status
-        if ((status === 'expired' && feeStatus === 'unpaid') || status === 'critical' || status === 'warning') {
+        // 1. Status is expired (regardless of fee status)
+        // 2. Status is critical or warning
+        // 3. Has unpaid fees
+        if (status === 'expired' || status === 'critical' || status === 'warning' || feeStatus === 'unpaid') {
           alerts.push({
             id: student.id,
             user_id: student.user_id,
@@ -121,20 +133,27 @@ function AdminAlertsContent() {
             fees: student.fees,
             valid_date: student.valid_date,
             start_date: student.start_date,
-            created_at: student.created_at,
             daysLeft,
-            status: status!,
+            daysOverdue,
+            status: status || 'expired',
             feeStatus,
           });
         }
       });
 
+      // Sort: Expired + unpaid first, then by days left
       alerts.sort((a, b) => {
-        // Expired + unpaid first
-        if (a.status === 'expired' && a.feeStatus === 'unpaid' && !(b.status === 'expired' && b.feeStatus === 'unpaid')) return -1;
-        if (b.status === 'expired' && b.feeStatus === 'unpaid' && !(a.status === 'expired' && a.feeStatus === 'unpaid')) return 1;
+        // Priority 1: Expired + unpaid
+        const aExpiredUnpaid = a.status === 'expired' && a.feeStatus === 'unpaid';
+        const bExpiredUnpaid = b.status === 'expired' && b.feeStatus === 'unpaid';
+        if (aExpiredUnpaid && !bExpiredUnpaid) return -1;
+        if (bExpiredUnpaid && !aExpiredUnpaid) return 1;
+        
+        // Priority 2: Expired only
         if (a.status === 'expired' && b.status !== 'expired') return -1;
         if (b.status === 'expired' && a.status !== 'expired') return 1;
+        
+        // Priority 3: By days left
         if (a.daysLeft !== null && b.daysLeft !== null) return a.daysLeft - b.daysLeft;
         return 0;
       });
@@ -142,6 +161,7 @@ function AdminAlertsContent() {
       setAlertStudents(alerts);
     } catch (error) {
       console.error('Error fetching alert students:', error);
+      setAlertStudents([]);
     } finally {
       setIsLoading(false);
     }
@@ -153,10 +173,11 @@ function AdminAlertsContent() {
     }
   }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
 
+  // Real-time subscription
   useEffect(() => {
     if (!user || !isAdmin) return;
 
-    const channel = supabase
+    const studentsChannel = supabase
       .channel(`students-alerts-${selectedHostel}`)
       .on(
         'postgres_changes',
@@ -170,14 +191,29 @@ function AdminAlertsContent() {
       )
       .subscribe();
 
+    const feesChannel = supabase
+      .channel(`fees-alerts-${selectedHostel}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fees',
+          filter: `hostel=eq.${selectedHostel}`,
+        },
+        () => fetchAlertStudents()
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(studentsChannel);
+      supabase.removeChannel(feesChannel);
     };
   }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
 
   const exportData = () => {
     const csvContent = [
-      ['Name', 'Phone', 'Room No', 'Fees', 'Start Date', 'Valid Till', 'Status', 'Fee Status'].join(','),
+      ['Name', 'Phone', 'Room No', 'Fees', 'Start Date', 'Valid Till', 'Status', 'Days Overdue', 'Fee Status'].join(','),
       ...alertStudents.map(student => [
         student.name,
         student.phone || 'N/A',
@@ -186,6 +222,7 @@ function AdminAlertsContent() {
         student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A',
         student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A',
         student.status === 'expired' ? 'Expired' : `${student.daysLeft} days left`,
+        student.daysOverdue > 0 ? `${student.daysOverdue} days` : '-',
         student.feeStatus === 'paid' ? 'Paid' : 'Unpaid',
       ].join(','))
     ].join('\n');
@@ -199,9 +236,8 @@ function AdminAlertsContent() {
   };
 
   const getStatusBadge = (student: AlertStudent) => {
-    // Expired + Unpaid = Show "Unpaid" badge
     if (student.status === 'expired' && student.feeStatus === 'unpaid') {
-      return <Badge variant="destructive" className="text-xs">Unpaid</Badge>;
+      return <Badge variant="destructive" className="text-xs">Expired + Unpaid</Badge>;
     }
     if (student.status === 'expired') {
       return <Badge variant="destructive" className="text-xs">Expired</Badge>;
@@ -214,7 +250,7 @@ function AdminAlertsContent() {
 
   const getFeeStatusBadge = (student: AlertStudent) => {
     if (student.feeStatus === 'paid') {
-      return <Badge variant="default" className="text-xs">Paid</Badge>;
+      return <Badge className="bg-green-500/20 text-green-500 border-green-500/30 text-xs">Paid</Badge>;
     }
     return <Badge variant="destructive" className="text-xs">Unpaid</Badge>;
   };
@@ -228,6 +264,7 @@ function AdminAlertsContent() {
   }
 
   const expiredUnpaidCount = alertStudents.filter(s => s.status === 'expired' && s.feeStatus === 'unpaid').length;
+  const expiredCount = alertStudents.filter(s => s.status === 'expired').length;
   const criticalCount = alertStudents.filter(s => s.status === 'critical').length;
   const warningCount = alertStudents.filter(s => s.status === 'warning').length;
 
@@ -235,8 +272,8 @@ function AdminAlertsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-primary">Alert - Expiring Soon & Unpaid</h2>
-          <p className="text-muted-foreground">Users with expired validity + unpaid fees, or 5 days or less remaining</p>
+          <h2 className="text-2xl font-bold text-primary">Alerts - Expired & Pending Students</h2>
+          <p className="text-muted-foreground">Students with expired validity, unpaid fees, or validity expiring within 5 days</p>
         </div>
         <Button variant="outline" onClick={exportData} disabled={alertStudents.length === 0}>
           <Download className="w-4 h-4 mr-2" />
@@ -259,49 +296,63 @@ function AdminAlertsContent() {
                 <TableHead className="text-foreground font-bold">Joining Date</TableHead>
                 <TableHead className="text-foreground font-bold">Valid Till</TableHead>
                 <TableHead className="text-foreground font-bold">Status</TableHead>
+                <TableHead className="text-foreground font-bold">Days Overdue</TableHead>
                 <TableHead className="text-foreground font-bold">Fee Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {alertStudents.map((student) => (
-                <TableRow key={student.id} className="border-border hover:bg-secondary/30">
-                  <TableCell className="font-medium text-foreground">{student.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.phone || 'N/A'}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.room_no || 'N/A'}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : 'N/A'}
+              {alertStudents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-12">
+                    <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No alerts at this time. All students are up to date!</p>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(student)}</TableCell>
-                  <TableCell>{getFeeStatusBadge(student)}</TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                alertStudents.map((student) => (
+                  <TableRow key={student.id} className="border-border hover:bg-secondary/30">
+                    <TableCell className="font-medium text-foreground">{student.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{student.phone || 'N/A'}</TableCell>
+                    <TableCell className="text-muted-foreground">{student.room_no || 'N/A'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : 'N/A'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}
+                    </TableCell>
+                    <TableCell>{getStatusBadge(student)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {student.daysOverdue > 0 ? (
+                        <span className="text-destructive font-medium">{student.daysOverdue} days</span>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell>{getFeeStatusBadge(student)}</TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
-
-          {alertStudents.length === 0 && (
-            <CardContent className="py-12 text-center">
-              <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No alerts at this time</p>
-            </CardContent>
-          )}
         </Card>
       </motion.div>
 
       {/* Footer with stats */}
       <div className="flex items-center justify-between text-sm">
         <p className="text-muted-foreground">
-          Total Alert Users: <span className="text-primary font-medium">{alertStudents.length}</span>
+          Total Alert Students: <span className="text-primary font-medium">{alertStudents.length}</span>
         </p>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-red-500"></span>
             <span className="text-muted-foreground">Expired + Unpaid ({expiredUnpaidCount})</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-red-400"></span>
+            <span className="text-muted-foreground">Expired ({expiredCount})</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-orange-500"></span>

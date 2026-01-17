@@ -289,7 +289,7 @@ function RegisterStudentContent() {
                   </SelectTrigger>
                   <SelectContent>
                     {rooms.length === 0 ? (
-                      <SelectItem value="" disabled>No rooms available. Add rooms first.</SelectItem>
+                      <SelectItem value="none" disabled>No rooms available. Add rooms first.</SelectItem>
                     ) : (
                       rooms.map((room) => (
                         <SelectItem 
