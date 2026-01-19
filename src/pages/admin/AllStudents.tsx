@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Users, Search, Trash2, Pencil, CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInDays, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
   Table,
@@ -42,6 +42,23 @@ interface Student {
   valid_date: string;
   username: string;
   created_at: string;
+}
+
+// Helper function to get status based on valid_date
+function getStudentStatus(validDate: string | null): { label: string; type: 'expired' | 'warning' | 'active' } {
+  if (!validDate) return { label: 'N/A', type: 'active' };
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const valid = parseISO(validDate);
+  const daysLeft = differenceInDays(valid, today);
+  
+  if (daysLeft < 0) {
+    return { label: 'Expired', type: 'expired' };
+  } else if (daysLeft <= 5) {
+    return { label: `${daysLeft} days left`, type: 'warning' };
+  }
+  return { label: 'Active', type: 'active' };
 }
 
 function AllStudentsContent() {
@@ -262,51 +279,66 @@ function AllStudentsContent() {
                 <TableHead className="text-foreground font-bold">Fees</TableHead>
                 <TableHead className="text-foreground font-bold">Start Date</TableHead>
                 <TableHead className="text-foreground font-bold">End Date</TableHead>
+                <TableHead className="text-foreground font-bold">Status</TableHead>
                 <TableHead className="text-foreground font-bold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredStudents.map((student) => (
-                <TableRow key={student.id} className="border-border hover:bg-secondary/30">
-                  <TableCell className="font-medium text-foreground">{student.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.username || '-'}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.phone || '-'}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-primary border-primary/30">
-                      {student.room_no || 'N/A'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {student.fees ? `₹${student.fees}` : '-'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {student.start_date ? new Date(student.start_date).toLocaleDateString() : '-'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {student.valid_date ? new Date(student.valid_date).toLocaleDateString() : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => openEditDialog(student)}
-                        className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deleteStudent(student.user_id)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filteredStudents.map((student) => {
+                const status = getStudentStatus(student.valid_date);
+                return (
+                  <TableRow key={student.id} className="border-border hover:bg-secondary/30">
+                    <TableCell className="font-medium text-foreground">{student.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{student.username || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{student.phone || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-primary border-primary/30">
+                        {student.room_no || 'N/A'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : '-'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {student.start_date ? new Date(student.start_date).toLocaleDateString() : '-'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {student.valid_date ? new Date(student.valid_date).toLocaleDateString() : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {status.type === 'expired' && (
+                        <span className="text-destructive font-medium">{status.label}</span>
+                      )}
+                      {status.type === 'warning' && (
+                        <span className="text-orange-500 font-medium">{status.label}</span>
+                      )}
+                      {status.type === 'active' && (
+                        <span className="text-foreground">{status.label}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openEditDialog(student)}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deleteStudent(student.user_id)}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
 
