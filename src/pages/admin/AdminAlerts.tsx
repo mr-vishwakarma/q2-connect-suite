@@ -19,10 +19,7 @@ import {
 } from '@/components/ui/table';
 import { differenceInDays, parseISO, format } from 'date-fns';
 
-interface Fee {
-  student_id: string;
-  status: 'paid' | 'unpaid';
-}
+// Fee status is now derived from valid_date, not from fees table
 
 interface AlertStudent {
   id: string;
@@ -75,22 +72,10 @@ function AdminAlertsContent() {
         return;
       }
 
-      // Fetch current month fees for these students
-      const currentMonth = format(new Date(), 'MMMM yyyy');
-      const studentIds = students.map(s => s.id);
-      const { data: feesData } = await supabase
-        .from('fees')
-        .select('student_id, status')
-        .in('student_id', studentIds)
-        .eq('month', currentMonth);
-
-      // Create fee status map
-      const feeStatusMap = new Map<string, 'paid' | 'unpaid'>();
-      feesData?.forEach(fee => {
-        feeStatusMap.set(fee.student_id, fee.status as 'paid' | 'unpaid');
-      });
+      // Fee status is now derived from valid_date - no need to fetch fees table
 
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const alerts: AlertStudent[] = [];
 
       students.forEach(student => {
@@ -98,8 +83,9 @@ function AdminAlertsContent() {
         let daysOverdue = 0;
         let status: 'expired' | 'critical' | 'warning' | null = null;
         
-        // Determine fee status - if no fee record exists, check if expired
-        let feeStatus: 'paid' | 'unpaid' = feeStatusMap.get(student.id) || 'unpaid';
+        // CRITICAL: Fee status is determined by valid_date
+        // If expired = unpaid (regardless of any fee record)
+        let feeStatus: 'paid' | 'unpaid' = 'paid';
 
         if (student.valid_date) {
           const validDate = parseISO(student.valid_date);
@@ -108,10 +94,8 @@ function AdminAlertsContent() {
           if (daysLeft < 0) {
             status = 'expired';
             daysOverdue = Math.abs(daysLeft);
-            // If expired and no paid fee, mark as unpaid
-            if (!feeStatusMap.has(student.id)) {
-              feeStatus = 'unpaid';
-            }
+            // CRITICAL: Expired = Unpaid
+            feeStatus = 'unpaid';
           } else if (daysLeft <= 2) {
             status = 'critical';
           } else if (daysLeft <= 5) {
@@ -120,10 +104,9 @@ function AdminAlertsContent() {
         }
 
         // Show in alerts if:
-        // 1. Status is expired (regardless of fee status)
-        // 2. Status is critical or warning
-        // 3. Has unpaid fees
-        if (status === 'expired' || status === 'critical' || status === 'warning' || feeStatus === 'unpaid') {
+        // 1. Status is expired (these are automatically unpaid)
+        // 2. Status is critical or warning (expiring soon)
+        if (status === 'expired' || status === 'critical' || status === 'warning') {
           alerts.push({
             id: student.id,
             user_id: student.user_id,

@@ -158,21 +158,27 @@ export default function FeeManagement() {
   }, [selectedHostel, fetchData]);
 
   // Build combined student fee records - ONE record per student
+  // CRITICAL: Status is determined by valid_date - expired = unpaid
   const studentFeeRecords = useMemo(() => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
     return students.map(student => {
       const studentFee = fees.find(f => f.student_id === student.id);
       const isExpired = student.valid_date ? new Date(student.valid_date) < today : false;
       
-      // Determine status: if expired and no paid fee record, it's unpaid
-      let status: 'paid' | 'unpaid' = 'unpaid';
-      if (studentFee) {
+      // CRITICAL LOGIC: If valid_date is expired, status is ALWAYS unpaid
+      // This is the single source of truth for fee status
+      let status: 'paid' | 'unpaid' = 'paid';
+      
+      if (isExpired) {
+        // Expired = Unpaid (regardless of any fee record)
+        status = 'unpaid';
+      } else if (studentFee) {
+        // Not expired - use fee record status if exists
         status = studentFee.status;
-      } else if (!isExpired && student.start_date) {
-        // Not expired and has start date - consider paid
-        status = 'paid';
       }
+      // Not expired and no fee record = paid (has valid subscription)
 
       return {
         studentId: student.id,
@@ -183,7 +189,7 @@ export default function FeeManagement() {
         valid_date: student.valid_date,
         start_date: student.start_date,
         feeId: studentFee?.id || null,
-        status: isExpired && !studentFee ? 'unpaid' : status,
+        status,
         paid_date: studentFee?.paid_date || student.start_date,
         payment_mode: studentFee?.payment_mode || 'upi',
         isExpired,
