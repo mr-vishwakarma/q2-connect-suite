@@ -19,6 +19,7 @@ import {
   DollarSign,
   Building2,
   Bell,
+  CalendarCheck,
 } from 'lucide-react';
 
 const adminLinks = [
@@ -28,6 +29,7 @@ const adminLinks = [
   { to: '/admin/students', icon: Users, label: 'All Students' },
   { to: '/admin/fees', icon: DollarSign, label: 'Fee Management' },
   { to: '/admin/rooms', icon: Building2, label: 'Room Management' },
+  { to: '/admin/leave-requests', icon: CalendarCheck, label: 'Leave Requests' },
   { to: '/admin/complaints', icon: MessageSquare, label: 'Complaints' },
   { to: '/admin/suggestions', icon: Lightbulb, label: 'Suggestions' },
   { to: '/admin/notifications', icon: Bell, label: 'Notifications' },

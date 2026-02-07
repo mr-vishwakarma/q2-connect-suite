@@ -123,30 +123,36 @@ export type Database = {
       }
       mess_requests: {
         Row: {
+          admin_message: string | null
           created_at: string
           hostel: Database["public"]["Enums"]["hostel_type"] | null
           id: string
           leaving_date: string
+          reason: string | null
           return_date: string
           status: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          admin_message?: string | null
           created_at?: string
           hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           leaving_date: string
+          reason?: string | null
           return_date: string
           status?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          admin_message?: string | null
           created_at?: string
           hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           leaving_date?: string
+          reason?: string | null
           return_date?: string
           status?: string | null
           updated_at?: string

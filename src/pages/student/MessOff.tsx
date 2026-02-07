@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Calendar, Send } from 'lucide-react';
 import { format } from 'date-fns';
@@ -14,11 +15,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
-interface MessRequest {
+interface LeaveRequest {
   id: string;
   leaving_date: string;
   return_date: string;
+  reason: string | null;
   status: string;
+  admin_message: string | null;
   created_at: string;
 }
 
@@ -27,8 +30,9 @@ export default function MessOff() {
   const navigate = useNavigate();
   const [leavingDate, setLeavingDate] = useState<Date>();
   const [returnDate, setReturnDate] = useState<Date>();
+  const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [requests, setRequests] = useState<MessRequest[]>([]);
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -55,7 +59,7 @@ export default function MessOff() {
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setRequests(data);
+      setRequests(data as LeaveRequest[]);
     }
   };
 
@@ -64,6 +68,11 @@ export default function MessOff() {
     
     if (!leavingDate || !returnDate) {
       toast.error('Please select both dates');
+      return;
+    }
+
+    if (!reason.trim()) {
+      toast.error('Please provide a reason for leave');
       return;
     }
 
@@ -78,6 +87,7 @@ export default function MessOff() {
       user_id: user!.id,
       leaving_date: format(leavingDate, 'yyyy-MM-dd'),
       return_date: format(returnDate, 'yyyy-MM-dd'),
+      reason: reason.trim(),
       status: 'pending'
     });
 
@@ -86,16 +96,18 @@ export default function MessOff() {
     if (error) {
       toast.error('Failed to submit request');
     } else {
-      toast.success('Mess off request submitted!');
+      toast.success('Leave request submitted!');
       setLeavingDate(undefined);
       setReturnDate(undefined);
+      setReason('');
       fetchRequests();
     }
   };
 
   const chartData = [
     { name: 'Approved', value: requests.filter(r => r.status === 'approved').length, color: '#22c55e' },
-    { name: 'Pending', value: requests.filter(r => r.status === 'pending').length, color: '#f59e0b' },
+    { name: 'Pending', value: requests.filter(r => r.status === 'pending').length, color: '#facc15' },
+    { name: 'Returned', value: requests.filter(r => r.status === 'returned').length, color: '#3b82f6' },
     { name: 'Rejected', value: requests.filter(r => r.status === 'rejected').length, color: '#ef4444' },
   ].filter(d => d.value > 0);
 
@@ -108,7 +120,7 @@ export default function MessOff() {
   }
 
   return (
-    <DashboardLayout title="Mess Off" isAdmin={false}>
+    <DashboardLayout title="Leave Request" isAdmin={false}>
       <div className="space-y-6 animate-fade-in">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Chart */}
@@ -128,6 +140,7 @@ export default function MessOff() {
                       outerRadius={100}
                       paddingAngle={5}
                       dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
                     >
                       {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -137,10 +150,14 @@ export default function MessOff() {
                       contentStyle={{ 
                         backgroundColor: 'hsl(222 47% 10%)', 
                         border: '1px solid hsl(222 47% 18%)',
-                        borderRadius: '8px'
+                        borderRadius: '8px',
+                        color: '#ffffff',
                       }}
+                      itemStyle={{ color: '#ffffff' }}
                     />
-                    <Legend />
+                    <Legend 
+                      formatter={(value) => <span style={{ color: '#ffffff', fontWeight: 500 }}>{value}</span>}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -154,7 +171,7 @@ export default function MessOff() {
           {/* Request Form */}
           <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-foreground">Request Mess Off</CardTitle>
+              <CardTitle className="text-foreground">Request Leave</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -212,10 +229,21 @@ export default function MessOff() {
                   </Popover>
                 </div>
 
+                <div className="space-y-2">
+                  <Label className="text-foreground">Reason for Leave <span className="text-destructive">*</span></Label>
+                  <Textarea
+                    placeholder="Why are you going home?"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    className="min-h-[80px] bg-secondary border-border"
+                    required
+                  />
+                </div>
+
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? 'Submitting...' : (
                     <>
-                      Request Mess Off
+                      Request Leave
                       <Send className="w-4 h-4 ml-2" />
                     </>
                   )}
@@ -236,30 +264,44 @@ export default function MessOff() {
                 {requests.map((request) => (
                   <div
                     key={request.id}
-                    className="flex items-center justify-between p-4 rounded-xl bg-secondary"
+                    className="p-4 rounded-xl bg-secondary space-y-2"
                   >
-                    <div>
-                      <p className="text-foreground font-medium">
-                        {format(new Date(request.leaving_date), 'MMM d, yyyy')} - {format(new Date(request.return_date), 'MMM d, yyyy')}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Submitted on {format(new Date(request.created_at), 'MMM d, yyyy')}
-                      </p>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <p className="text-foreground font-medium">
+                          {format(new Date(request.leaving_date), 'MMM d, yyyy')} - {format(new Date(request.return_date), 'MMM d, yyyy')}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Submitted on {format(new Date(request.created_at), 'MMM d, yyyy')}
+                        </p>
+                      </div>
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-sm font-medium",
+                        request.status === 'approved' && "bg-green-500/20 text-green-400",
+                        request.status === 'pending' && "bg-yellow-500/20 text-yellow-400",
+                        request.status === 'returned' && "bg-blue-500/20 text-blue-400",
+                        request.status === 'rejected' && "bg-red-500/20 text-red-400"
+                      )}>
+                        {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                      </span>
                     </div>
-                    <span className={cn(
-                      "px-3 py-1 rounded-full text-sm font-medium",
-                      request.status === 'approved' && "bg-success/20 text-success",
-                      request.status === 'pending' && "bg-warning/20 text-warning",
-                      request.status === 'rejected' && "bg-destructive/20 text-destructive"
-                    )}>
-                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                    </span>
+                    {request.reason && (
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">Reason:</span> {request.reason}
+                      </p>
+                    )}
+                    {request.admin_message && (
+                      <div className="bg-primary/10 rounded-lg p-2 border border-primary/20">
+                        <p className="text-xs text-primary font-medium">Admin Message:</p>
+                        <p className="text-sm text-foreground">{request.admin_message}</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
               <p className="text-center text-muted-foreground py-8">
-                No mess off requests yet
+                No leave requests yet
               </p>
             )}
           </CardContent>
