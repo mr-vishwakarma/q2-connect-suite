@@ -30,6 +30,7 @@ import AdminAlerts from "./pages/admin/AdminAlerts";
 import FeeManagement from "./pages/admin/FeeManagement";
 import RoomManagement from "./pages/admin/RoomManagement";
 import Notifications from "./pages/admin/Notifications";
+import LeaveRequests from "./pages/admin/LeaveRequests";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -66,6 +67,7 @@ const App = () => (
               <Route path="/admin/admin-management" element={<ProtectedAdminRoute><AdminManagement /></ProtectedAdminRoute>} />
               <Route path="/admin/fees" element={<ProtectedAdminRoute><FeeManagement /></ProtectedAdminRoute>} />
               <Route path="/admin/rooms" element={<ProtectedAdminRoute><RoomManagement /></ProtectedAdminRoute>} />
+              <Route path="/admin/leave-requests" element={<ProtectedAdminRoute><LeaveRequests /></ProtectedAdminRoute>} />
               <Route path="/admin/notifications" element={<ProtectedAdminRoute><Notifications /></ProtectedAdminRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
