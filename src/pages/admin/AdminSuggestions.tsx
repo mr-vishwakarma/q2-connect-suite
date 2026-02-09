@@ -97,16 +97,16 @@ function AdminSuggestionsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h2 className="text-lg sm:text-xl font-bold text-foreground">
           All Suggestions - {selectedHostel}
         </h2>
-        <Badge variant="outline" className="text-primary border-primary">
+        <Badge variant="outline" className="text-primary border-primary w-fit">
           {suggestions.length} Total
         </Badge>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {suggestions.length > 0 ? (
           suggestions.map((suggestion, index) => (
             <motion.div
@@ -134,7 +134,7 @@ function AdminSuggestionsContent() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">{suggestion.description}</p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
                       variant="outline"

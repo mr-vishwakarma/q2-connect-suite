@@ -137,7 +137,7 @@ export default function FeeHistory() {
     <DashboardLayout title="Fee History" isAdmin={false}>
       <div className="space-y-6 animate-fade-in">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -210,7 +210,23 @@ export default function FeeHistory() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
+                {/* Mobile Card View */}
+                <div className="block sm:hidden space-y-3">
+                  {fees.map((fee) => (
+                    <div key={fee.id} className="bg-secondary/50 rounded-xl p-3 space-y-2 border border-border/50">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-foreground">{fee.month}</span>
+                        <Badge variant={fee.status === 'paid' ? 'default' : 'destructive'}>{fee.status}</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-muted-foreground text-xs">Amount:</span> <span className="text-foreground">₹{fee.amount}</span></div>
+                        <div><span className="text-muted-foreground text-xs">Mode:</span> <span className="text-foreground capitalize">{fee.payment_mode}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop Table */}
+                <Table className="hidden sm:table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Month</TableHead>
@@ -226,9 +242,7 @@ export default function FeeHistory() {
                         <TableCell className="font-medium">{fee.month}</TableCell>
                         <TableCell>₹{fee.amount}</TableCell>
                         <TableCell>
-                          <Badge variant={fee.status === 'paid' ? 'default' : 'destructive'}>
-                            {fee.status}
-                          </Badge>
+                          <Badge variant={fee.status === 'paid' ? 'default' : 'destructive'}>{fee.status}</Badge>
                         </TableCell>
                         <TableCell>{fee.paid_date || '-'}</TableCell>
                         <TableCell className="capitalize">{fee.payment_mode}</TableCell>

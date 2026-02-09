@@ -252,13 +252,13 @@ function AdminAlertsContent() {
   const warningCount = alertStudents.filter(s => s.status === 'warning').length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-primary">Alerts - Expired & Pending Students</h2>
-          <p className="text-muted-foreground">Students with expired validity, unpaid fees, or validity expiring within 5 days</p>
+          <h2 className="text-lg sm:text-2xl font-bold text-primary">Alerts - Expired & Pending Students</h2>
+          <p className="text-muted-foreground text-sm">Students with expired validity, unpaid fees, or validity expiring within 5 days</p>
         </div>
-        <Button variant="outline" onClick={exportData} disabled={alertStudents.length === 0}>
+        <Button variant="outline" onClick={exportData} disabled={alertStudents.length === 0} className="w-full sm:w-auto">
           <Download className="w-4 h-4 mr-2" />
           Export Data
         </Button>
@@ -268,82 +268,132 @@ function AdminAlertsContent() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <Card className="bg-card border-border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-secondary/50">
-                <TableHead className="text-foreground font-bold">Name</TableHead>
-                <TableHead className="text-foreground font-bold">Phone</TableHead>
-                <TableHead className="text-foreground font-bold">Room No</TableHead>
-                <TableHead className="text-foreground font-bold">Fees</TableHead>
-                <TableHead className="text-foreground font-bold">Joining Date</TableHead>
-                <TableHead className="text-foreground font-bold">Valid Till</TableHead>
-                <TableHead className="text-foreground font-bold">Status</TableHead>
-                <TableHead className="text-foreground font-bold">Days Overdue</TableHead>
-                <TableHead className="text-foreground font-bold">Fee Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {alertStudents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
-                    <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No alerts at this time. All students are up to date!</p>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                alertStudents.map((student) => (
-                  <TableRow key={student.id} className="border-border hover:bg-secondary/30">
-                    <TableCell className="font-medium text-foreground">{student.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{student.phone || 'N/A'}</TableCell>
-                    <TableCell className="text-muted-foreground">{student.room_no || 'N/A'}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : 'N/A'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(student)}</TableCell>
-                    <TableCell className="text-muted-foreground">
+        {/* Mobile Card View */}
+        <div className="block md:hidden space-y-3">
+          {alertStudents.length === 0 ? (
+            <Card className="bg-card border-border">
+              <CardContent className="py-12 text-center">
+                <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No alerts at this time. All students are up to date!</p>
+              </CardContent>
+            </Card>
+          ) : (
+            alertStudents.map((student) => (
+              <Card key={student.id} className="bg-card border-border">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-foreground">{student.name}</p>
+                      <p className="text-xs text-muted-foreground">{student.phone || 'N/A'}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      {getStatusBadge(student)}
+                      {getFeeStatusBadge(student)}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Room</p>
+                      <p className="text-foreground">{student.room_no || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Fees</p>
+                      <p className="text-foreground">{student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Valid Till</p>
+                      <p className="text-foreground text-xs">{student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Days Overdue</p>
                       {student.daysOverdue > 0 ? (
                         <span className="text-destructive font-medium">{student.daysOverdue} days</span>
                       ) : (
-                        '-'
+                        <span className="text-foreground">-</span>
                       )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <Card className="bg-card border-border overflow-hidden hidden md:block">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-secondary/50">
+                  <TableHead className="text-foreground font-bold">Name</TableHead>
+                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Phone</TableHead>
+                  <TableHead className="text-foreground font-bold">Room No</TableHead>
+                  <TableHead className="text-foreground font-bold">Fees</TableHead>
+                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Joining Date</TableHead>
+                  <TableHead className="text-foreground font-bold">Valid Till</TableHead>
+                  <TableHead className="text-foreground font-bold">Status</TableHead>
+                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Days Overdue</TableHead>
+                  <TableHead className="text-foreground font-bold">Fee Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {alertStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-12">
+                      <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No alerts at this time. All students are up to date!</p>
                     </TableCell>
-                    <TableCell>{getFeeStatusBadge(student)}</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  alertStudents.map((student) => (
+                    <TableRow key={student.id} className="border-border hover:bg-secondary/30">
+                      <TableCell className="font-medium text-foreground">{student.name}</TableCell>
+                      <TableCell className="text-muted-foreground hidden lg:table-cell">{student.phone || 'N/A'}</TableCell>
+                      <TableCell className="text-muted-foreground">{student.room_no || 'N/A'}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground hidden lg:table-cell">
+                        {student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(student)}</TableCell>
+                      <TableCell className="text-muted-foreground hidden lg:table-cell">
+                        {student.daysOverdue > 0 ? (
+                          <span className="text-destructive font-medium">{student.daysOverdue} days</span>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell>{getFeeStatusBadge(student)}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       </motion.div>
 
       {/* Footer with stats */}
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
         <p className="text-muted-foreground">
           Total Alert Students: <span className="text-primary font-medium">{alertStudents.length}</span>
         </p>
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-red-500"></span>
-            <span className="text-muted-foreground">Expired + Unpaid ({expiredUnpaidCount})</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-red-400"></span>
-            <span className="text-muted-foreground">Expired ({expiredCount})</span>
+            <span className="text-muted-foreground text-xs sm:text-sm">Expired ({expiredCount})</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-            <span className="text-muted-foreground">Critical ≤2 days ({criticalCount})</span>
+            <span className="text-muted-foreground text-xs sm:text-sm">Critical ({criticalCount})</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-            <span className="text-muted-foreground">Warning 3-5 days ({warningCount})</span>
+            <span className="text-muted-foreground text-xs sm:text-sm">Warning ({warningCount})</span>
           </div>
         </div>
       </div>

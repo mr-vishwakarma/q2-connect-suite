@@ -337,7 +337,7 @@ export default function FeeManagement() {
     <AdminLayout title="Fee Management">
       <div className="space-y-6 animate-fade-in">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -388,7 +388,7 @@ export default function FeeManagement() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[250px] w-full">
+            <div className="h-[200px] sm:h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -419,7 +419,7 @@ export default function FeeManagement() {
         </Card>
 
         {/* Stats Cards with Navigation */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -481,8 +481,8 @@ export default function FeeManagement() {
         {/* Filters */}
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex-1 min-w-[200px]">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-center">
+              <div className="flex-1 min-w-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -504,76 +504,135 @@ export default function FeeManagement() {
                   <SelectItem value="unpaid">Unpaid</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" onClick={exportToCSV}>
+              <Button variant="outline" onClick={exportToCSV} className="w-full sm:w-auto">
                 <Download className="w-4 h-4 mr-2" />
-                Export CSV
+                Export
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Fee Table */}
-        <Card className="bg-card border-border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-secondary/50">
-                <TableHead className="text-foreground font-bold">Student Name</TableHead>
-                <TableHead className="text-foreground font-bold">User ID</TableHead>
-                <TableHead className="text-foreground font-bold">Room</TableHead>
-                <TableHead className="text-foreground font-bold">Amount</TableHead>
-                <TableHead className="text-foreground font-bold">Valid Till</TableHead>
-                <TableHead className="text-foreground font-bold">Status</TableHead>
-                <TableHead className="text-foreground font-bold">Payment Mode</TableHead>
-                <TableHead className="text-foreground font-bold text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRecords.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No fee records found
-                  </TableCell>
+        {/* Fee Table - Desktop */}
+        <Card className="bg-card border-border overflow-hidden hidden md:block">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-secondary/50">
+                  <TableHead className="text-foreground font-bold">Student Name</TableHead>
+                  <TableHead className="text-foreground font-bold">User ID</TableHead>
+                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Room</TableHead>
+                  <TableHead className="text-foreground font-bold">Amount</TableHead>
+                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Valid Till</TableHead>
+                  <TableHead className="text-foreground font-bold">Status</TableHead>
+                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Payment Mode</TableHead>
+                  <TableHead className="text-foreground font-bold text-right">Action</TableHead>
                 </TableRow>
-              ) : (
-                filteredRecords.map((record) => (
-                  <TableRow key={record.studentId} className="border-border hover:bg-secondary/30">
-                    <TableCell className="font-medium text-foreground">{record.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{record.username}</TableCell>
-                    <TableCell className="text-muted-foreground">{record.room_no || 'N/A'}</TableCell>
-                    <TableCell className="text-foreground font-medium">₹{record.fees.toLocaleString('en-IN')}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {record.valid_date ? format(parseISO(record.valid_date), 'dd MMM yyyy') : 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      {record.status === 'paid' ? (
-                        <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
-                      ) : (
-                        <Badge variant="destructive">Unpaid</Badge>
-                      )}
-                      {record.isExpired && record.status === 'unpaid' && (
-                        <Badge variant="destructive" className="ml-1 text-xs">Expired</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground uppercase">{record.payment_mode}</TableCell>
-                    <TableCell className="text-right">
-                      {record.status === 'unpaid' && (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedRecord(record);
-                            setShowPaymentDialog(true);
-                          }}
-                        >
-                          Mark Paid
-                        </Button>
-                      )}
+              </TableHeader>
+              <TableBody>
+                {filteredRecords.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No fee records found
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  filteredRecords.map((record) => (
+                    <TableRow key={record.studentId} className="border-border hover:bg-secondary/30">
+                      <TableCell className="font-medium text-foreground">{record.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{record.username}</TableCell>
+                      <TableCell className="text-muted-foreground hidden lg:table-cell">{record.room_no || 'N/A'}</TableCell>
+                      <TableCell className="text-foreground font-medium">₹{record.fees.toLocaleString('en-IN')}</TableCell>
+                      <TableCell className="text-muted-foreground hidden lg:table-cell">
+                        {record.valid_date ? format(parseISO(record.valid_date), 'dd MMM yyyy') : 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        {record.status === 'paid' ? (
+                          <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
+                        ) : (
+                          <Badge variant="destructive">Unpaid</Badge>
+                        )}
+                        {record.isExpired && record.status === 'unpaid' && (
+                          <Badge variant="destructive" className="ml-1 text-xs">Expired</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground uppercase hidden lg:table-cell">{record.payment_mode}</TableCell>
+                      <TableCell className="text-right">
+                        {record.status === 'unpaid' && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedRecord(record);
+                              setShowPaymentDialog(true);
+                            }}
+                          >
+                            Mark Paid
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
+
+        {/* Fee Cards - Mobile */}
+        <div className="md:hidden space-y-3">
+          {filteredRecords.length === 0 ? (
+            <Card className="bg-card border-border">
+              <CardContent className="py-8 text-center text-muted-foreground">No fee records found</CardContent>
+            </Card>
+          ) : (
+            filteredRecords.map((record) => (
+              <Card key={record.studentId} className="bg-card border-border">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-foreground">{record.name}</p>
+                      <p className="text-xs text-muted-foreground">{record.username}</p>
+                    </div>
+                    {record.status === 'paid' ? (
+                      <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
+                    ) : (
+                      <Badge variant="destructive">Unpaid</Badge>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Amount</p>
+                      <p className="text-foreground font-medium">₹{record.fees.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Room</p>
+                      <p className="text-foreground">{record.room_no || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Valid Till</p>
+                      <p className="text-foreground text-xs">{record.valid_date ? format(parseISO(record.valid_date), 'dd MMM yyyy') : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Mode</p>
+                      <p className="text-foreground uppercase text-xs">{record.payment_mode}</p>
+                    </div>
+                  </div>
+                  {record.status === 'unpaid' && (
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setSelectedRecord(record);
+                        setShowPaymentDialog(true);
+                      }}
+                    >
+                      Mark Paid
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
 
         {/* Payment Dialog */}
         <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>

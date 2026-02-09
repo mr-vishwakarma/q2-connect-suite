@@ -37,7 +37,11 @@ const adminLinks = [
   { to: '/admin/admin-management', icon: Shield, label: 'Admin Management' },
 ];
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  onNavigate?: () => void;
+}
+
+export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
   const location = useLocation();
   const { signOut, profile, user, isAdmin } = useAuth();
   const { selectedHostel } = useHostel();
@@ -102,11 +106,15 @@ export function AdminSidebar() {
     };
   }, [user, isAdmin, selectedHostel, fetchAlertCount]);
 
+  const handleLinkClick = () => {
+    onNavigate?.();
+  };
+
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col">
       {/* Logo */}
       <div className="p-6 border-b border-border">
-        <Link to="/admin/dashboard" className="flex items-center gap-3">
+        <Link to="/admin/dashboard" className="flex items-center gap-3" onClick={handleLinkClick}>
           <motion.div 
             whileHover={{ scale: 1.05 }}
             className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg"
@@ -134,6 +142,7 @@ export function AdminSidebar() {
             >
               <Link
                 to={link.to}
+                onClick={handleLinkClick}
                 className={cn(
                   'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200',
                   isActive

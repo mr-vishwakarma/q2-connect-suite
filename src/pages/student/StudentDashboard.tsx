@@ -126,7 +126,7 @@ export default function StudentDashboard() {
         </motion.div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {statCards.map((stat, index) => {
             const Icon = stat.icon;
             return (
@@ -137,14 +137,14 @@ export default function StudentDashboard() {
                 transition={{ delay: index * 0.1 }}
               >
                 <Card className="bg-card border-border hover:border-primary/40 transition-all duration-300 group cursor-default">
-                  <CardContent className="p-5">
+                  <CardContent className="p-3 sm:p-5">
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">{stat.title}</p>
-                        <p className="text-3xl font-bold text-foreground">{stat.value}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-1">{stat.title}</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-foreground">{stat.value}</p>
                       </div>
-                      <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-glow transition-transform duration-500 group-hover:rotate-[360deg]">
-                        <Icon className="w-6 h-6 text-primary-foreground" />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl gradient-primary flex items-center justify-center shadow-glow transition-transform duration-500 group-hover:rotate-[360deg]">
+                        <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
                       </div>
                     </div>
                   </CardContent>
@@ -155,7 +155,7 @@ export default function StudentDashboard() {
         </div>
 
         {/* Profile + Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Profile */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -202,7 +202,7 @@ export default function StudentDashboard() {
                   Quick Actions
                 </CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-3">
+              <CardContent className="grid grid-cols-2 gap-2 sm:gap-3">
                 {quickActions.map((action, index) => {
                   const ActionIcon = action.icon;
                   return (

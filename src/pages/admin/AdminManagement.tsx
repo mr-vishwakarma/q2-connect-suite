@@ -242,26 +242,26 @@ function AdminManagementContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shrink-0">
             <Shield className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-foreground">Admin Management</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-foreground">Admin Management</h2>
             <p className="text-muted-foreground text-sm">{admins.length} admin(s)</p>
           </div>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="hero">
+            <Button variant="hero" className="w-full sm:w-auto">
               <UserPlus className="w-4 h-4 mr-2" />
               Add New Admin
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-card border-border">
+          <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-foreground">Add New Admin</DialogTitle>
             </DialogHeader>
@@ -311,55 +311,83 @@ function AdminManagementContent() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <Card className="bg-card border-border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-secondary/50">
-                <TableHead className="text-foreground font-bold">Admin Name</TableHead>
-                <TableHead className="text-foreground font-bold">Role</TableHead>
-                <TableHead className="text-foreground font-bold">User ID</TableHead>
-                <TableHead className="text-foreground font-bold">Status</TableHead>
-                <TableHead className="text-foreground font-bold">Created At</TableHead>
-                <TableHead className="text-foreground font-bold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {admins.map((admin) => (
-                <TableRow key={admin.id} className="border-border hover:bg-secondary/30">
-                  <TableCell className="font-medium text-foreground">{admin.name}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={admin.is_primary ? 'default' : 'secondary'}
-                      className={admin.is_primary ? 'bg-primary text-primary-foreground' : ''}
-                    >
-                      {admin.is_primary ? 'Primary Admin' : 'Secondary Admin'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{admin.username || '-'}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-green-500 border-green-500/30">
-                      Active
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(admin.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                  </TableCell>
-                  <TableCell>
-                    {!admin.is_primary && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deleteAdmin(admin.user_id)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </TableCell>
+        {/* Mobile Card View */}
+        <div className="block md:hidden space-y-3">
+          {admins.length === 0 ? (
+            <Card className="bg-card border-border">
+              <CardContent className="py-12 text-center">
+                <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No admins found</p>
+              </CardContent>
+            </Card>
+          ) : (
+            admins.map((admin) => (
+              <Card key={admin.id} className="bg-card border-border">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-foreground">{admin.name}</p>
+                      <p className="text-xs text-muted-foreground">{admin.username || '-'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={admin.is_primary ? 'default' : 'secondary'} className={admin.is_primary ? 'bg-primary text-primary-foreground text-xs' : 'text-xs'}>
+                        {admin.is_primary ? 'Primary' : 'Secondary'}
+                      </Badge>
+                      {!admin.is_primary && (
+                        <Button size="sm" variant="ghost" onClick={() => deleteAdmin(admin.user_id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8 p-0">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <Card className="bg-card border-border overflow-hidden hidden md:block">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-secondary/50">
+                  <TableHead className="text-foreground font-bold">Admin Name</TableHead>
+                  <TableHead className="text-foreground font-bold">Role</TableHead>
+                  <TableHead className="text-foreground font-bold">User ID</TableHead>
+                  <TableHead className="text-foreground font-bold">Status</TableHead>
+                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Created At</TableHead>
+                  <TableHead className="text-foreground font-bold">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {admins.map((admin) => (
+                  <TableRow key={admin.id} className="border-border hover:bg-secondary/30">
+                    <TableCell className="font-medium text-foreground">{admin.name}</TableCell>
+                    <TableCell>
+                      <Badge variant={admin.is_primary ? 'default' : 'secondary'} className={admin.is_primary ? 'bg-primary text-primary-foreground' : ''}>
+                        {admin.is_primary ? 'Primary Admin' : 'Secondary Admin'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{admin.username || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-green-500 border-green-500/30">Active</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground hidden lg:table-cell">
+                      {new Date(admin.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </TableCell>
+                    <TableCell>
+                      {!admin.is_primary && (
+                        <Button size="sm" variant="ghost" onClick={() => deleteAdmin(admin.user_id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
 
           {admins.length === 0 && (
             <CardContent className="py-12 text-center">
