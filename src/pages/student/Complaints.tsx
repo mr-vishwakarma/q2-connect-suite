@@ -134,7 +134,7 @@ export default function Complaints() {
                 />
               </div>
 
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
                 {isSubmitting ? 'Submitting...' : (
                   <>
                     Submit Complaint

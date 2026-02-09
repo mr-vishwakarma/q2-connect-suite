@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
@@ -15,7 +16,6 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Users, Search, Trash2, Pencil, CalendarIcon } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
-import { cn } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -240,26 +240,26 @@ function AllStudentsContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shrink-0">
             <Users className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-foreground">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground">
               All Students - {selectedHostel}
             </h2>
             <p className="text-muted-foreground text-sm">{filteredStudents.length} students</p>
           </div>
         </div>
-        <div className="relative">
+        <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search by name, phone, or room..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-secondary border-border w-72"
+            className="pl-10 bg-secondary border-border w-full"
           />
         </div>
       </div>
@@ -268,79 +268,151 @@ function AllStudentsContent() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <Card className="bg-card border-border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-secondary/50">
-                <TableHead className="text-foreground font-bold">Name</TableHead>
-                <TableHead className="text-foreground font-bold">User ID</TableHead>
-                <TableHead className="text-foreground font-bold">Phone</TableHead>
-                <TableHead className="text-foreground font-bold">Room</TableHead>
-                <TableHead className="text-foreground font-bold">Fees</TableHead>
-                <TableHead className="text-foreground font-bold">Start Date</TableHead>
-                <TableHead className="text-foreground font-bold">End Date</TableHead>
-                <TableHead className="text-foreground font-bold">Status</TableHead>
-                <TableHead className="text-foreground font-bold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStudents.map((student) => {
-                const status = getStudentStatus(student.valid_date);
-                return (
-                  <TableRow key={student.id} className="border-border hover:bg-secondary/30">
-                    <TableCell className="font-medium text-foreground">{student.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{student.username || '-'}</TableCell>
-                    <TableCell className="text-muted-foreground">{student.phone || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-primary border-primary/30">
-                        {student.room_no || 'N/A'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : '-'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {student.start_date ? new Date(student.start_date).toLocaleDateString() : '-'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {student.valid_date ? new Date(student.valid_date).toLocaleDateString() : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {status.type === 'expired' && (
-                        <span className="text-destructive font-medium">{status.label}</span>
-                      )}
-                      {status.type === 'warning' && (
-                        <span className="text-orange-500 font-medium">{status.label}</span>
-                      )}
-                      {status.type === 'active' && (
-                        <span className="text-foreground">{status.label}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
+        {/* Mobile Card View */}
+        <div className="block md:hidden space-y-3">
+          {filteredStudents.length === 0 ? (
+            <Card className="bg-card border-border">
+              <CardContent className="py-12 text-center">
+                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {searchQuery ? 'No students match your search' : `No students found in ${selectedHostel}`}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredStudents.map((student) => {
+              const status = getStudentStatus(student.valid_date);
+              return (
+                <Card key={student.id} className="bg-card border-border">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-semibold text-foreground">{student.name}</p>
+                        <p className="text-xs text-muted-foreground">{student.username || '-'}</p>
+                      </div>
                       <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openEditDialog(student)}
-                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
-                        >
+                        <Button size="sm" variant="ghost" onClick={() => openEditDialog(student)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 h-8 w-8 p-0">
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => deleteStudent(student.user_id)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                        >
+                        <Button size="sm" variant="ghost" onClick={() => deleteStudent(student.user_id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8 p-0">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs">Phone</p>
+                        <p className="text-foreground">{student.phone || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">Room</p>
+                        <Badge variant="outline" className="text-primary border-primary/30">{student.room_no || 'N/A'}</Badge>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">Fees</p>
+                        <p className="text-foreground">{student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">Status</p>
+                        <span className={cn(
+                          "font-medium",
+                          status.type === 'expired' && "text-destructive",
+                          status.type === 'warning' && "text-orange-500",
+                          status.type === 'active' && "text-foreground"
+                        )}>{status.label}</span>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">Start</p>
+                        <p className="text-foreground text-xs">{student.start_date ? new Date(student.start_date).toLocaleDateString() : '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">End</p>
+                        <p className="text-foreground text-xs">{student.valid_date ? new Date(student.valid_date).toLocaleDateString() : '-'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <Card className="bg-card border-border overflow-hidden hidden md:block">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-secondary/50">
+                  <TableHead className="text-foreground font-bold">Name</TableHead>
+                  <TableHead className="text-foreground font-bold">User ID</TableHead>
+                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Phone</TableHead>
+                  <TableHead className="text-foreground font-bold">Room</TableHead>
+                  <TableHead className="text-foreground font-bold">Fees</TableHead>
+                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Start Date</TableHead>
+                  <TableHead className="text-foreground font-bold">End Date</TableHead>
+                  <TableHead className="text-foreground font-bold">Status</TableHead>
+                  <TableHead className="text-foreground font-bold">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.map((student) => {
+                  const status = getStudentStatus(student.valid_date);
+                  return (
+                    <TableRow key={student.id} className="border-border hover:bg-secondary/30">
+                      <TableCell className="font-medium text-foreground">{student.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{student.username || '-'}</TableCell>
+                      <TableCell className="text-muted-foreground hidden lg:table-cell">{student.phone || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-primary border-primary/30">
+                          {student.room_no || 'N/A'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground hidden lg:table-cell">
+                        {student.start_date ? new Date(student.start_date).toLocaleDateString() : '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {student.valid_date ? new Date(student.valid_date).toLocaleDateString() : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {status.type === 'expired' && (
+                          <span className="text-destructive font-medium">{status.label}</span>
+                        )}
+                        {status.type === 'warning' && (
+                          <span className="text-orange-500 font-medium">{status.label}</span>
+                        )}
+                        {status.type === 'active' && (
+                          <span className="text-foreground">{status.label}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEditDialog(student)}
+                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => deleteStudent(student.user_id)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
 
           {filteredStudents.length === 0 && (
             <CardContent className="py-12 text-center">
@@ -355,7 +427,7 @@ function AllStudentsContent() {
 
       {/* Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-md">
+        <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground">Edit Student</DialogTitle>
           </DialogHeader>

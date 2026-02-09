@@ -158,7 +158,7 @@ function DashboardContent() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Welcome Banner */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -172,7 +172,7 @@ function DashboardContent() {
       </motion.div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
         {statCards.map((stat, index) => (
           <motion.div
             key={stat.title}
@@ -193,7 +193,7 @@ function DashboardContent() {
       </div>
 
       {/* Charts and Recent Items */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Recent Complaints */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

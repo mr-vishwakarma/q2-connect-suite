@@ -15,9 +15,10 @@ import {
 
 interface SidebarProps {
   isAdmin?: boolean;
+  onNavigate?: () => void;
 }
 
-export function Sidebar({ isAdmin = false }: SidebarProps) {
+export function Sidebar({ isAdmin = false, onNavigate }: SidebarProps) {
   const location = useLocation();
   const { signOut, profile } = useAuth();
 
@@ -41,11 +42,15 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
 
   const links = isAdmin ? adminLinks : studentLinks;
 
+  const handleLinkClick = () => {
+    onNavigate?.();
+  };
+
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
       {/* Logo */}
       <div className="p-6">
-        <Link to="/" className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3" onClick={handleLinkClick}>
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
             <span className="text-primary-foreground font-bold text-lg">Q2</span>
           </div>
@@ -57,13 +62,14 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
         {links.map((link) => {
           const isActive = location.pathname === link.to;
           return (
             <Link
               key={link.to}
               to={link.to}
+              onClick={handleLinkClick}
               className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200',
                 isActive

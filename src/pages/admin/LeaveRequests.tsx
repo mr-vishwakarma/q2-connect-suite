@@ -150,7 +150,7 @@ export default function LeaveRequests() {
     <AdminLayout title="Leave Requests">
       <div className="space-y-6 animate-fade-in">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <Card className="bg-card border-border">
             <CardContent className="p-4 text-center">
               <p className="text-3xl font-bold text-yellow-400">{pendingCount}</p>
