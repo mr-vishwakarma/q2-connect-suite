@@ -103,20 +103,22 @@ export function Footer() {
           >
             <h4 className="text-foreground font-semibold">Connect With Us</h4>
             <div className="flex gap-4">
-              {socialLinks.map((social, index) => (
+                {socialLinks.map((social, index) => (
                 <motion.a
                   key={index}
                   href={social.href}
                   initial={{ opacity: 0, scale: 0 }}
                   animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0 }}
-                  transition={{ delay: 0.5 + index * 0.1, type: 'spring', stiffness: 200 }}
+                  transition={{ delay: 0.5 + index * 0.08, type: 'spring', stiffness: 300 }}
                   whileHover={{ 
                     scale: 1.15,
                     rotate: 360,
                     boxShadow: '0 0 25px hsl(var(--primary) / 0.5)',
+                    transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] }
                   }}
                   whileTap={{ scale: 0.9 }}
-                  className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/15 transition-all duration-300"
+                  className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/15 transition-all duration-200"
+                  style={{ willChange: 'transform' }}
                 >
                   <social.icon className="w-5 h-5" />
                 </motion.a>

@@ -141,8 +141,9 @@ export default function Contact() {
                               rotate: 360,
                               boxShadow: '0 0 25px hsl(var(--primary) / 0.5)'
                             }}
-                            transition={{ duration: 0.5 }}
+                            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                             className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0"
+                            style={{ willChange: 'transform' }}
                           >
                             <info.icon className="w-7 h-7 text-primary" />
                           </motion.div>
