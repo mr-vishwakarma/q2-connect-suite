@@ -67,9 +67,10 @@ export default function OurTeam() {
                 >
                   {/* Avatar */}
                   <motion.div
-                    whileHover={{ scale: 1.1 }}
+                    whileHover={{ scale: 1.1, rotate: 360 }}
+                    transition={{ duration: 0.5 }}
                     className="w-24 h-24 mx-auto mb-4 rounded-full border-4 border-primary/50 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center group-hover:border-primary transition-colors"
-                    style={{ boxShadow: '0 0 30px hsl(217 91% 50% / 0.3)' }}
+                    style={{ boxShadow: '0 0 30px hsl(0 100% 50% / 0.2)' }}
                   >
                     <User className="w-12 h-12 text-primary/70 group-hover:text-primary transition-colors" />
                   </motion.div>
@@ -94,7 +95,7 @@ export default function OurTeam() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium transition-all hover:bg-primary/90"
-                    style={{ boxShadow: '0 0 20px hsl(217 91% 50% / 0.3)' }}
+                    style={{ boxShadow: '0 0 20px hsl(0 100% 50% / 0.3)' }}
                   >
                     View Profile
                   </motion.button>

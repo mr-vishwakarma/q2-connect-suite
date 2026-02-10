@@ -111,12 +111,12 @@ export function Footer() {
                   animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0 }}
                   transition={{ delay: 0.5 + index * 0.1, type: 'spring', stiffness: 200 }}
                   whileHover={{ 
-                    scale: 1.2,
+                    scale: 1.15,
                     rotate: 360,
                     boxShadow: '0 0 25px hsl(var(--primary) / 0.5)',
-                    backgroundColor: 'hsl(var(--primary) / 0.2)'
                   }}
-                  className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary transition-all"
+                  whileTap={{ scale: 0.9 }}
+                  className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/15 transition-all duration-300"
                 >
                   <social.icon className="w-5 h-5" />
                 </motion.a>
