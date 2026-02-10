@@ -180,8 +180,9 @@ export default function Index() {
                   <div className="p-6 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 transition-all duration-300 group hover:shadow-xl hover:shadow-primary/10 h-full">
                     <motion.div 
                       whileHover={{ rotate: 360, scale: 1.1 }}
-                      transition={{ duration: 0.5 }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                       className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 group-hover:shadow-lg group-hover:shadow-primary/20 transition-all"
+                      style={{ willChange: 'transform' }}
                     >
                       <feature.icon className="w-6 h-6 text-primary" />
                     </motion.div>

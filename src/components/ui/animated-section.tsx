@@ -15,27 +15,27 @@ const getVariants = (direction: AnimationDirection) => {
   switch (direction) {
     case 'left':
       return {
-        hidden: { opacity: 0, x: -60 },
+        hidden: { opacity: 0, x: -40 },
         visible: { opacity: 1, x: 0 }
       };
     case 'right':
       return {
-        hidden: { opacity: 0, x: 60 },
+        hidden: { opacity: 0, x: 40 },
         visible: { opacity: 1, x: 0 }
       };
     case 'up':
       return {
-        hidden: { opacity: 0, y: 50 },
+        hidden: { opacity: 0, y: 30 },
         visible: { opacity: 1, y: 0 }
       };
     case 'down':
       return {
-        hidden: { opacity: 0, y: -50 },
+        hidden: { opacity: 0, y: -30 },
         visible: { opacity: 1, y: 0 }
       };
     case 'scale':
       return {
-        hidden: { opacity: 0, scale: 0.9 },
+        hidden: { opacity: 0, scale: 0.92 },
         visible: { opacity: 1, scale: 1 }
       };
     case 'fade':
@@ -52,10 +52,10 @@ export function AnimatedSection({
   direction = 'up', 
   delay = 0, 
   className = '',
-  duration = 0.4 
+  duration = 0.3 
 }: AnimatedSectionProps) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, amount: 0.15 });
+  const isInView = useInView(ref, { once: true, amount: 0.1 });
   const variants = getVariants(direction);
 
   return (
@@ -67,9 +67,10 @@ export function AnimatedSection({
       transition={{ 
         duration, 
         delay, 
-        ease: [0.25, 0.1, 0.25, 1] 
+        ease: [0.16, 1, 0.3, 1] 
       }}
       className={className}
+      style={{ willChange: 'transform, opacity' }}
     >
       {children}
     </motion.div>
@@ -106,9 +107,9 @@ interface StaggerContainerProps {
   staggerDelay?: number;
 }
 
-export function StaggerContainer({ children, className = '', staggerDelay = 0.06 }: StaggerContainerProps) {
+export function StaggerContainer({ children, className = '', staggerDelay = 0.05 }: StaggerContainerProps) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, amount: 0.15 });
+  const isInView = useInView(ref, { once: true, amount: 0.1 });
 
   return (
     <motion.div
@@ -121,11 +122,12 @@ export function StaggerContainer({ children, className = '', staggerDelay = 0.06
           opacity: 1,
           transition: {
             staggerChildren: staggerDelay,
-            delayChildren: 0.05
+            delayChildren: 0.03
           }
         }
       }}
       className={className}
+      style={{ willChange: 'opacity' }}
     >
       {children}
     </motion.div>
@@ -142,11 +144,12 @@ export function StaggerItem({ children, className = '' }: StaggerItemProps) {
   return (
     <motion.div
       variants={{
-        hidden: { opacity: 0, y: 20 },
+        hidden: { opacity: 0, y: 15 },
         visible: { opacity: 1, y: 0 }
       }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
       className={className}
+      style={{ willChange: 'transform, opacity' }}
     >
       {children}
     </motion.div>

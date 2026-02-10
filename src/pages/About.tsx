@@ -140,8 +140,9 @@ export default function About() {
                   >
                     <motion.div 
                       whileHover={{ rotate: 360, scale: 1.1 }}
-                      transition={{ duration: 0.5 }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                       className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-primary/20 group-hover:shadow-lg group-hover:shadow-primary/30 transition-all"
+                      style={{ willChange: 'transform' }}
                     >
                       <stat.icon className="w-7 h-7 text-primary" />
                     </motion.div>
