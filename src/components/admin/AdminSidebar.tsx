@@ -118,7 +118,7 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
           <motion.div 
             whileHover={{ scale: 1.05 }}
             className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg"
-            style={{ boxShadow: '0 0 20px hsl(217 91% 50% / 0.4)' }}
+            style={{ boxShadow: '0 0 20px hsl(0 100% 50% / 0.4)' }}
           >
             <span className="text-primary-foreground font-bold text-lg">Q2</span>
           </motion.div>
@@ -149,7 +149,7 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
                     ? 'bg-primary text-primary-foreground font-medium shadow-lg'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 )}
-                style={isActive ? { boxShadow: '0 0 20px hsl(217 91% 50% / 0.4)' } : {}}
+                style={isActive ? { boxShadow: '0 0 20px hsl(0 100% 50% / 0.4)' } : {}}
               >
                 <link.icon className="w-5 h-5" />
                 <span className="flex-1">{link.label}</span>
@@ -171,7 +171,7 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="flex items-center gap-3 px-4 py-3 w-full rounded-xl bg-primary text-primary-foreground font-medium transition-colors shadow-lg hover:bg-primary/90"
-          style={{ boxShadow: '0 0 20px hsl(217 91% 50% / 0.4)' }}
+          style={{ boxShadow: '0 0 20px hsl(0 100% 50% / 0.4)' }}
         >
           <LogOut className="w-5 h-5" />
           <span>Log Out</span>
