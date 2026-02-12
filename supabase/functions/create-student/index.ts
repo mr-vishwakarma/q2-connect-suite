@@ -70,11 +70,49 @@ serve(async (req) => {
   const normalizedUsername = (body.username ?? "").toLowerCase().split("@")[0].trim();
   const password = body.password ?? "";
   const hostel = body.hostel;
+  const phone = (body.phone ?? "").trim();
 
+  // Validate name
   if (!name) return json(400, { error: "Name is required" });
+  if (name.length > 100) return json(400, { error: "Name must be less than 100 characters" });
+  if (!/^[a-zA-Z\s.\-']+$/.test(name)) return json(400, { error: "Name contains invalid characters" });
+
+  // Validate username format
   if (!normalizedUsername) return json(400, { error: "User ID is required" });
+  const usernameRegex = /^[a-z0-9._\-]{3,50}$/;
+  if (!usernameRegex.test(normalizedUsername)) {
+    return json(400, { error: "User ID must be 3-50 characters and contain only letters, numbers, dots, hyphens, or underscores" });
+  }
+
+  // Validate password
   if (!password || password.length < 6) return json(400, { error: "Password must be at least 6 characters" });
-  if (!hostel) return json(400, { error: "Hostel is required" });
+  if (password.length > 72) return json(400, { error: "Password must be less than 72 characters" });
+
+  // Validate hostel enum
+  const validHostels = ["Q2", "Q2.0", "Q2.1"];
+  if (!hostel || !validHostels.includes(hostel)) return json(400, { error: "Invalid hostel value" });
+
+  // Validate phone if provided
+  if (phone && !/^[\d\s+()-]{7,20}$/.test(phone)) {
+    return json(400, { error: "Invalid phone number format" });
+  }
+
+  // Validate dates if provided
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (body.start_date && !dateRegex.test(body.start_date)) {
+    return json(400, { error: "Invalid start date format" });
+  }
+  if (body.valid_date && !dateRegex.test(body.valid_date)) {
+    return json(400, { error: "Invalid end date format" });
+  }
+
+  // Validate fees if provided
+  if (body.fees !== undefined && body.fees !== null && body.fees !== "") {
+    const feesNum = typeof body.fees === "number" ? body.fees : Number(body.fees);
+    if (!Number.isFinite(feesNum) || feesNum < 0 || feesNum > 1000000) {
+      return json(400, { error: "Fees must be a valid number between 0 and 1,000,000" });
+    }
+  }
 
   // Prevent duplicates (students table is the source of truth)
   const { data: existingStudent, error: existingErr } = await adminClient
@@ -116,7 +154,7 @@ serve(async (req) => {
       user_id: studentAuthUserId,
       name,
       username: normalizedUsername,
-      phone: body.phone ?? null,
+      phone: phone || null,
       room_no: body.room_no ?? null,
       fees: Number.isFinite(feesValue) ? feesValue : null,
       hostel,
