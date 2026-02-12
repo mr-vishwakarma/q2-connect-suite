@@ -538,11 +538,11 @@ export default function FeeManagement() {
                 ) : (
                   filteredRecords.map((record) => (
                     <TableRow key={record.studentId} className="border-border hover:bg-secondary/30">
-                      <TableCell className="font-medium text-foreground">{record.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{record.username}</TableCell>
-                      <TableCell className="text-muted-foreground hidden lg:table-cell">{record.room_no || 'N/A'}</TableCell>
-                      <TableCell className="text-foreground font-medium">₹{record.fees.toLocaleString('en-IN')}</TableCell>
-                      <TableCell className="text-muted-foreground hidden lg:table-cell">
+                      <TableCell className="font-semibold text-foreground">{record.name}</TableCell>
+                      <TableCell className="text-foreground font-medium">{record.username}</TableCell>
+                      <TableCell className="text-foreground font-medium hidden lg:table-cell">{record.room_no || 'N/A'}</TableCell>
+                      <TableCell className="text-foreground font-bold">₹{record.fees.toLocaleString('en-IN')}</TableCell>
+                      <TableCell className="text-foreground font-medium hidden lg:table-cell">
                         {record.valid_date ? format(parseISO(record.valid_date), 'dd MMM yyyy') : 'N/A'}
                       </TableCell>
                       <TableCell>
@@ -555,7 +555,7 @@ export default function FeeManagement() {
                           <Badge variant="destructive" className="ml-1 text-xs">Expired</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground uppercase hidden lg:table-cell">{record.payment_mode}</TableCell>
+                      <TableCell className="text-foreground font-medium uppercase hidden lg:table-cell">{record.payment_mode}</TableCell>
                       <TableCell className="text-right">
                         {record.status === 'unpaid' && (
                           <Button

@@ -359,32 +359,32 @@ function AllStudentsContent() {
                   const status = getStudentStatus(student.valid_date);
                   return (
                     <TableRow key={student.id} className="border-border hover:bg-secondary/30">
-                      <TableCell className="font-medium text-foreground">{student.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{student.username || '-'}</TableCell>
-                      <TableCell className="text-muted-foreground hidden lg:table-cell">{student.phone || '-'}</TableCell>
+                      <TableCell className="font-semibold text-foreground">{student.name}</TableCell>
+                      <TableCell className="text-foreground font-medium">{student.username || '-'}</TableCell>
+                      <TableCell className="text-foreground font-medium hidden lg:table-cell">{student.phone || '-'}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-primary border-primary/30">
+                        <Badge variant="outline" className="text-primary border-primary/30 font-bold">
                           {student.room_no || 'N/A'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-foreground font-semibold">
                         {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : '-'}
                       </TableCell>
-                      <TableCell className="text-muted-foreground hidden lg:table-cell">
+                      <TableCell className="text-foreground font-medium hidden lg:table-cell">
                         {student.start_date ? new Date(student.start_date).toLocaleDateString() : '-'}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-foreground font-medium">
                         {student.valid_date ? new Date(student.valid_date).toLocaleDateString() : '-'}
                       </TableCell>
                       <TableCell>
                         {status.type === 'expired' && (
-                          <span className="text-destructive font-medium">{status.label}</span>
+                          <span className="text-[#FF4D4F] font-bold">{status.label}</span>
                         )}
                         {status.type === 'warning' && (
-                          <span className="text-orange-500 font-medium">{status.label}</span>
+                          <span className="text-[#FACC15] font-bold">{status.label}</span>
                         )}
                         {status.type === 'active' && (
-                          <span className="text-foreground">{status.label}</span>
+                          <span className="text-[#22C55E] font-bold">{status.label}</span>
                         )}
                       </TableCell>
                       <TableCell>

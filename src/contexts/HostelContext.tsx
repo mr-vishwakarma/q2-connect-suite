@@ -10,7 +10,16 @@ interface HostelContextType {
 const HostelContext = createContext<HostelContextType | undefined>(undefined);
 
 export function HostelProvider({ children }: { children: ReactNode }) {
-  const [selectedHostel, setSelectedHostel] = useState<HostelType>('Q2');
+  const [selectedHostel, setSelectedHostelState] = useState<HostelType>(() => {
+    const stored = sessionStorage.getItem('selectedHostel');
+    if (stored === 'Q2' || stored === 'Q2.0' || stored === 'Q2.1') return stored;
+    return 'Q2';
+  });
+
+  const setSelectedHostel = (hostel: HostelType) => {
+    setSelectedHostelState(hostel);
+    sessionStorage.setItem('selectedHostel', hostel);
+  };
 
   return (
     <HostelContext.Provider value={{ selectedHostel, setSelectedHostel }}>
