@@ -319,20 +319,25 @@ export default function RoomManagement() {
                 <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : rooms.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No rooms found. Add your first room.
+              <div className="text-center py-8">
+                <Home className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-3">No rooms registered in {selectedHostel}.</p>
+                <Button onClick={() => setShowAddDialog(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Room in {selectedHostel}
+                </Button>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Room Number</TableHead>
-                      <TableHead>Capacity</TableHead>
-                      <TableHead>Occupied</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Students</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableRow className="border-border hover:bg-secondary/50">
+                      <TableHead className="text-foreground font-bold">Room Number</TableHead>
+                      <TableHead className="text-foreground font-bold">Capacity</TableHead>
+                      <TableHead className="text-foreground font-bold">Occupied</TableHead>
+                      <TableHead className="text-foreground font-bold">Status</TableHead>
+                      <TableHead className="text-foreground font-bold">Students</TableHead>
+                      <TableHead className="text-foreground font-bold">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -340,9 +345,9 @@ export default function RoomManagement() {
                       const roomStudents = students.filter(s => s.room_no === room.room_number);
                       return (
                         <TableRow key={room.id}>
-                          <TableCell className="font-medium">{room.room_number}</TableCell>
-                          <TableCell>{room.capacity}</TableCell>
-                          <TableCell>{room.occupied_count}</TableCell>
+                          <TableCell className="font-semibold text-foreground">{room.room_number}</TableCell>
+                          <TableCell className="text-foreground font-medium">{room.capacity}</TableCell>
+                          <TableCell className="text-foreground font-medium">{room.occupied_count}</TableCell>
                           <TableCell>
                             <Badge variant={room.status === 'available' ? 'default' : 'outline'} className={room.status === 'full' ? 'bg-green-500/20 text-green-500 border-green-500/30' : ''}>
                               {room.status === 'full' ? 'Full' : 'Available'}
