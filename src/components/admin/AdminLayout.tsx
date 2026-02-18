@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminTopBar } from './AdminTopBar';
-import { HostelProvider } from '@/contexts/HostelContext';
+
 import { useSidebarDrawer } from '@/hooks/useSidebarDrawer';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -57,10 +57,8 @@ function AdminLayoutInner({ children, title }: AdminLayoutProps) {
 
 export function AdminLayout({ children, title }: AdminLayoutProps) {
   return (
-    <HostelProvider>
-      <AdminLayoutInner title={title}>
-        {children}
-      </AdminLayoutInner>
-    </HostelProvider>
+    <AdminLayoutInner title={title}>
+      {children}
+    </AdminLayoutInner>
   );
 }
