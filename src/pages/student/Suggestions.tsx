@@ -28,6 +28,7 @@ export default function Suggestions() {
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [studentHostel, setStudentHostel] = useState<'Q2' | 'Q2.0' | 'Q2.1' | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -41,8 +42,19 @@ export default function Suggestions() {
   useEffect(() => {
     if (user) {
       fetchSuggestions();
+      fetchStudentHostel();
     }
   }, [user]);
+
+  const fetchStudentHostel = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('students')
+      .select('hostel')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (data?.hostel) setStudentHostel(data.hostel as 'Q2' | 'Q2.0' | 'Q2.1');
+  };
 
   const fetchSuggestions = async () => {
     if (!user) return;
@@ -72,7 +84,8 @@ export default function Suggestions() {
       user_id: user!.id,
       title: title.trim(),
       description: description.trim(),
-      status: 'pending'
+      status: 'pending',
+      hostel: studentHostel
     });
 
     setIsSubmitting(false);
