@@ -14,6 +14,7 @@ interface StudentData {
   fees: number | null;
   start_date: string | null;
   valid_date: string | null;
+  hostel: string | null;
 }
 
 export default function StudentDashboard() {
@@ -48,7 +49,7 @@ export default function StudentDashboard() {
 
     const { data } = await supabase
       .from('students')
-      .select('name, username, room_no, fees, start_date, valid_date')
+      .select('name, username, room_no, fees, start_date, valid_date, hostel')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -100,6 +101,7 @@ export default function StudentDashboard() {
   const profileItems = [
     { label: 'Full Name', value: studentData?.name || 'N/A', icon: User },
     { label: 'User ID', value: studentData?.username || 'N/A', icon: Home },
+    { label: 'Hostel', value: studentData?.hostel || 'N/A', icon: Home },
     { label: 'Room No', value: studentData?.room_no || 'N/A', icon: Home },
     { label: 'Monthly Fees', value: studentData?.fees != null ? `₹${studentData.fees}` : 'N/A', icon: CreditCard },
     { label: 'Start Date', value: studentData?.start_date ? new Date(studentData.start_date).toLocaleDateString() : 'N/A', icon: Calendar },

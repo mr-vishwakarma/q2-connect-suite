@@ -33,6 +33,7 @@ export default function MessOff() {
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [studentHostel, setStudentHostel] = useState<'Q2' | 'Q2.0' | 'Q2.1' | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -46,8 +47,19 @@ export default function MessOff() {
   useEffect(() => {
     if (user) {
       fetchRequests();
+      fetchStudentHostel();
     }
   }, [user]);
+
+  const fetchStudentHostel = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('students')
+      .select('hostel')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (data?.hostel) setStudentHostel(data.hostel as 'Q2' | 'Q2.0' | 'Q2.1');
+  };
 
   const fetchRequests = async () => {
     if (!user) return;
@@ -88,7 +100,8 @@ export default function MessOff() {
       leaving_date: format(leavingDate, 'yyyy-MM-dd'),
       return_date: format(returnDate, 'yyyy-MM-dd'),
       reason: reason.trim(),
-      status: 'pending'
+      status: 'pending',
+      hostel: studentHostel
     });
 
     setIsSubmitting(false);
