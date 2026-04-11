@@ -3,6 +3,7 @@ import { AdminSidebar } from './AdminSidebar';
 import { AdminTopBar } from './AdminTopBar';
 import { useSidebarDrawer } from '@/hooks/useSidebarDrawer';
 import { AnimatePresence, motion } from 'framer-motion';
+import { SmartChatbot } from '@/components/chatbot/SmartChatbot';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -50,6 +51,7 @@ function AdminLayoutInner({ children, title }: AdminLayoutProps) {
           {children}
         </main>
       </div>
+      <SmartChatbot isAdmin />
     </div>
   );
 }
