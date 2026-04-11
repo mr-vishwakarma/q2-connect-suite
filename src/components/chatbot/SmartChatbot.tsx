@@ -223,12 +223,8 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
                       )}
                       {msg.source && (
                         <div className="flex items-center gap-1 mt-1 opacity-60">
-                          {msg.source === 'database' ? (
-                            <Database className="h-2.5 w-2.5" />
-                          ) : (
-                            <Sparkles className="h-2.5 w-2.5" />
-                          )}
-                          <span className="text-[9px]">{msg.source === 'database' ? 'Live Data' : 'AI'}</span>
+                          <Database className="h-2.5 w-2.5" />
+                          <span className="text-[9px]">Live Data</span>
                         </div>
                       )}
                     </div>
