@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { useSidebarDrawer } from '@/hooks/useSidebarDrawer';
 import { AnimatePresence, motion } from 'framer-motion';
+import { SmartChatbot } from '@/components/chatbot/SmartChatbot';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -51,6 +52,7 @@ export function DashboardLayout({ children, title, isAdmin = false }: DashboardL
           {children}
         </main>
       </div>
+      <SmartChatbot isAdmin={isAdmin} />
     </div>
   );
 }
