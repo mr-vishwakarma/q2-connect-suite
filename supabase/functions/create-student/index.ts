@@ -198,13 +198,15 @@ serve(async (req) => {
 
     if (insertErr) throw insertErr;
 
-    // 3) Assign student role
+    // 3) Assign student role (ignore if already exists)
     const { error: roleInsertErr } = await adminClient.from("user_roles").insert({
       user_id: studentAuthUserId,
       role: "student",
     });
 
-    if (roleInsertErr) throw roleInsertErr;
+    if (roleInsertErr && !String(roleInsertErr.message || "").toLowerCase().includes("duplicate")) {
+      throw roleInsertErr;
+    }
 
     return json(200, {
       ok: true,
@@ -213,8 +215,10 @@ serve(async (req) => {
       hostel,
     });
   } catch (e) {
-    // Rollback auth user if DB insert fails
-    await adminClient.auth.admin.deleteUser(studentAuthUserId);
+    // Only rollback the auth user if we created it in this request
+    if (createdNewAuthUser && studentAuthUserId) {
+      await adminClient.auth.admin.deleteUser(studentAuthUserId);
+    }
     return json(500, { error: e instanceof Error ? e.message : "Failed to register student" });
   }
 });
