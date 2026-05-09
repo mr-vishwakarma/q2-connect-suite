@@ -126,7 +126,10 @@ serve(async (req) => {
 
   const email = `${normalizedUsername}@q2student.local`;
 
-  // 1) Create auth user
+  // 1) Create auth user (or reuse if an orphaned auth user exists from a prior failed attempt)
+  let studentAuthUserId: string | null = null;
+  let createdNewAuthUser = false;
+
   const { data: createdUser, error: createUserErr } = await adminClient.auth.admin.createUser({
     email,
     password,
@@ -134,12 +137,43 @@ serve(async (req) => {
     user_metadata: { name },
   });
 
-  if (createUserErr || !createdUser.user) {
-    // Common case: already exists
-    return json(409, { error: createUserErr?.message || "Failed to create user" });
-  }
+  if (createUserErr || !createdUser?.user) {
+    const msg = (createUserErr?.message || "").toLowerCase();
+    const isDuplicate = msg.includes("already") || msg.includes("registered") || msg.includes("exists");
 
-  const studentAuthUserId = createdUser.user.id;
+    if (!isDuplicate) {
+      return json(500, { error: createUserErr?.message || "Failed to create user" });
+    }
+
+    // Find existing auth user by email (paginate defensively)
+    let foundId: string | null = null;
+    for (let page = 1; page <= 20 && !foundId; page++) {
+      const { data: list, error: listErr } = await adminClient.auth.admin.listUsers({ page, perPage: 200 });
+      if (listErr) break;
+      const match = list.users.find((u) => (u.email || "").toLowerCase() === email);
+      if (match) foundId = match.id;
+      if (!list.users.length || list.users.length < 200) break;
+    }
+
+    if (!foundId) {
+      return json(409, { error: "User ID already exists" });
+    }
+
+    // Ensure no student row already linked to this auth user
+    const { data: linked } = await adminClient
+      .from("students")
+      .select("id")
+      .eq("user_id", foundId)
+      .maybeSingle();
+    if (linked) {
+      return json(409, { error: "User ID already exists" });
+    }
+
+    studentAuthUserId = foundId;
+  } else {
+    studentAuthUserId = createdUser.user.id;
+    createdNewAuthUser = true;
+  }
 
   try {
     // 2) Insert student record
