@@ -56,14 +56,6 @@ export function Navbar() {
             >
               <span className="text-primary-foreground font-bold text-lg">Q2</span>
             </motion.div>
-            <motion.span 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              className="text-foreground font-bold text-xl hidden sm:block"
-            >
-              Q2 Management
-            </motion.span>
           </Link>
 
           {/* Desktop Navigation */}

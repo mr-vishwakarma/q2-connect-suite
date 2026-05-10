@@ -6,44 +6,44 @@ import { Footer } from '@/components/landing/Footer';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { AnimatedSection, TiltCard, StaggerContainer, StaggerItem, FloatingElement, GlowButton } from '@/components/ui/animated-section';
 import {
-  Users, 
-  UtensilsCrossed, 
-  MessageSquare, 
-  ClipboardCheck, 
-  Shield,
-  Building,
+  Video,
+  Snowflake,
+  Wifi,
+  Droplet,
+  Shirt,
+  Fingerprint,
 } from 'lucide-react';
 
 const features = [
   {
-    icon: Users,
-    title: 'Student Management',
-    description: 'Complete student database with room allocation and profile management.',
+    icon: Video,
+    title: 'CCTV Surveillance 24/7',
+    description: 'Entire hostel premises are monitored with high-quality CCTV cameras to ensure complete safety and security for all students.',
   },
   {
-    icon: UtensilsCrossed,
-    title: 'Mess Management',
-    description: 'Track mess attendance, manage mess off requests, and meal planning.',
+    icon: Snowflake,
+    title: 'AC & Comfortable Rooms',
+    description: 'Well-maintained Single, Double, and Triple Sharing AC rooms designed for comfortable and peaceful student living.',
   },
   {
-    icon: MessageSquare,
-    title: 'Complaint Handling',
-    description: 'Streamlined complaint submission and resolution tracking system.',
+    icon: Wifi,
+    title: 'High-Speed WiFi Facility',
+    description: 'Fast and reliable internet connectivity available throughout the hostel for online classes, studies, and entertainment.',
   },
   {
-    icon: ClipboardCheck,
-    title: 'Attendance Tracking',
-    description: 'Real-time attendance monitoring with detailed reports.',
+    icon: Droplet,
+    title: 'Pure Drinking Water',
+    description: 'Advanced water purifier systems provide clean, hygienic, and safe drinking water for all hostel residents.',
   },
   {
-    icon: Shield,
-    title: 'Secure Access',
-    description: 'Role-based authentication for students and administrators.',
+    icon: Shirt,
+    title: 'Washing Machine Facility',
+    description: 'Modern washing machine services available inside the hostel premises for convenient and hassle-free laundry.',
   },
   {
-    icon: Building,
-    title: 'Room Management',
-    description: 'Efficient room allocation and vacancy management system.',
+    icon: Fingerprint,
+    title: 'Biometric & Attendance Tracking',
+    description: 'Smart biometric attendance and secure entry system for better safety, monitoring, and student management.',
   },
 ];
 
@@ -100,15 +100,7 @@ export default function Index() {
               transition={{ duration: 0.7, delay: 0.1 }}
               className="text-5xl md:text-7xl font-bold text-foreground mb-6 leading-tight"
             >
-              Q2 Hostel Management
-              <motion.span 
-                initial={{ opacity: 0, x: -30 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.7, delay: 0.3 }}
-                className="block text-foreground"
-              >
-                System
-              </motion.span>
+              Q2 Group of Hostels
             </motion.h1>
 
             <motion.p 
@@ -118,7 +110,7 @@ export default function Index() {
               className="text-xl md:text-2xl text-foreground font-bold mb-10 max-w-2xl mx-auto"
               style={{ textShadow: '0 0 20px rgba(255, 255, 255, 0.3)' }}
             >
-              Smart & Digital Hostel Management for Q2 Hostel
+              Smart & Digital Hostel for Girls
             </motion.p>
 
             <motion.div 
@@ -166,10 +158,10 @@ export default function Index() {
         <div className="container mx-auto px-6">
           <AnimatedSection direction="up" className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 drop-shadow-lg" style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
-              Comprehensive Hostel Management
+              Facilities Provided by Q2 Girls Hostel
             </h2>
             <p className="text-foreground font-semibold text-lg max-w-2xl mx-auto drop-shadow-md" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.4)' }}>
-              Everything you need to manage your hostel efficiently in one platform
+              Modern amenities designed for safe, comfortable, and quality student living
             </p>
           </AnimatedSection>
 
@@ -212,7 +204,7 @@ export default function Index() {
               Ready to Get Started?
             </h2>
             <p className="text-foreground font-bold text-lg mb-8 max-w-2xl mx-auto" style={{ textShadow: '0 0 15px rgba(255, 255, 255, 0.25)' }}>
-              Join Q2 Hostel's digital management system today
+              Join Q2 Group of Hostels Today
             </p>
             <motion.div 
               className="flex flex-col sm:flex-row gap-4 justify-center"
