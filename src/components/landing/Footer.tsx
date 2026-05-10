@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
+import { Facebook, Instagram, Phone, Mail } from 'lucide-react';
 
 const footerLinks = [
   { name: 'Home', path: '/' },
@@ -13,9 +13,9 @@ const footerLinks = [
 
 const socialLinks = [
   { icon: Facebook, href: '#' },
-  { icon: Twitter, href: '#' },
   { icon: Instagram, href: '#' },
-  { icon: Linkedin, href: '#' },
+  { icon: Phone, href: 'tel:+919691160716' },
+  { icon: Mail, href: 'mailto:q2hostel@gmail.com' },
 ];
 
 export function Footer() {
@@ -49,19 +49,22 @@ export function Footer() {
               >
                 <span className="text-primary-foreground font-bold text-lg">Q2</span>
               </motion.div>
-              <span className="text-foreground font-bold text-xl">Q2 Management</span>
+              <span className="text-foreground font-bold text-xl">Q2 Group of Hostels</span>
             </Link>
             <p className="text-foreground font-bold text-base">
-              Q2 Management – Smart Hostel Management System for modern hostels and student accommodations.
+              Q2 Girls Hostel — Trusted by 150+ Families for Safe, Comfortable, and Smart Student Living.
+            </p>
+            <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>
+              Providing secure accommodation, quality facilities, and a caring environment for every student.
             </p>
             
             {/* Hostel Address */}
             <div className="pt-4 space-y-1">
               <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Hostel Address</p>
-              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Q2 Hostel</p>
-              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Sector E-8 Campus</p>
-              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Patel Nagar, Bhopal</p>
-              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Madhya Pradesh – 462022</p>
+              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Q2 Girls Hostel</p>
+              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Plot No. 8, Manak Vihar</p>
+              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Patel Nagar, Raisen Road</p>
+              <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>Bhopal – 462022</p>
             </div>
           </motion.div>
 

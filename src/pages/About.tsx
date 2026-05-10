@@ -16,9 +16,9 @@ import {
 } from 'lucide-react';
 
 const trustStats = [
-  { icon: Users, value: '100+', label: 'Students' },
-  { icon: Clock, value: '24/7', label: 'Access' },
-  { icon: Shield, value: 'Secure', label: 'Management' },
+  { icon: Users, value: '150+', label: 'Hostelers' },
+  { icon: Clock, value: '24/7', label: 'Security' },
+  { icon: Shield, value: 'Secure', label: 'Premises' },
   { icon: Zap, value: 'Faster', label: 'Operations' },
 ];
 
@@ -81,8 +81,11 @@ export default function About() {
                 Our Mission
               </h1>
 
-              <p className="text-xl md:text-2xl text-foreground font-bold leading-relaxed" style={{ textShadow: '0 0 15px rgba(255, 255, 255, 0.25)' }}>
-                We empower Q2 Hostel to embrace digital transformation by simplifying hostel administration and student services.
+              <p className="text-xl md:text-2xl text-foreground font-bold leading-relaxed mb-4" style={{ textShadow: '0 0 15px rgba(255, 255, 255, 0.25)' }}>
+                Our mission is to provide safe, comfortable, affordable, and high-quality hostel living with modern facilities, proper security, and a homely environment for every student.
+              </p>
+              <p className="text-lg text-foreground font-bold leading-relaxed" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.2)' }}>
+                Q2 Girls Hostel focuses on student comfort, safety, discipline, and quality living experience.
               </p>
             </AnimatedSection>
 
@@ -96,7 +99,7 @@ export default function About() {
                         <div className="p-6 rounded-2xl bg-card/80 border border-border/30">
                           <Building className="w-10 h-10 text-primary mb-3" />
                           <div className="text-2xl font-bold text-foreground">Q2</div>
-                          <div className="text-sm text-foreground font-bold" style={{ textShadow: '0 0 8px rgba(255, 255, 255, 0.2)' }}>Hostel</div>
+                          <div className="text-sm text-foreground font-bold" style={{ textShadow: '0 0 8px rgba(255, 255, 255, 0.2)' }}>Group of Hostels</div>
                         </div>
                       </TiltCard>
                       <TiltCard>
@@ -120,11 +123,8 @@ export default function About() {
         <div className="container mx-auto px-6">
           <AnimatedSection direction="scale" className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Trusted by Students & Administrators
+              Q2 Girls Hostel — Trusted by Students & Parents
             </h2>
-            <p className="text-foreground font-bold text-lg" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.25)' }}>
-              at Q2 Hostel
-            </p>
           </AnimatedSection>
 
           <StaggerContainer className="grid grid-cols-2 lg:grid-cols-4 gap-6" staggerDelay={0.15}>
@@ -174,11 +174,15 @@ export default function About() {
               </h2>
 
               <p className="text-foreground font-bold text-lg mb-6 leading-relaxed" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.25)' }}>
-                Q2 Management directly improves hostel life, making administration simple and transparent for everyone involved.
+                Q2 Girls Hostel is designed to provide students with a safe, peaceful, and comfortable living environment that feels like home.
+              </p>
+
+              <p className="text-foreground font-bold leading-relaxed mb-4" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>
+                We provide modern facilities including secure premises, AC rooms, WiFi, purified water, biometric security, and quality student services to ensure better hostel living experience.
               </p>
 
               <p className="text-foreground font-bold leading-relaxed" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>
-                Our system streamlines every aspect of hostel management, from room allocation to mess management, ensuring that both students and administrators can focus on what matters most – creating a comfortable and productive living environment.
+                Our focus is to create a disciplined, caring, and supportive environment where students can comfortably focus on their studies and personal growth.
               </p>
             </AnimatedSection>
 
@@ -224,7 +228,7 @@ export default function About() {
               Our Values
             </h2>
             <p className="text-foreground font-bold text-lg max-w-2xl mx-auto" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.25)' }}>
-              The principles that guide everything we do at Q2 Hostel
+              The principles that guide everything we do at Q2 Group of Hostels
             </p>
           </AnimatedSection>
 
