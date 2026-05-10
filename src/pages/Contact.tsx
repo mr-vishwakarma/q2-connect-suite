@@ -22,17 +22,17 @@ const contactInfo = [
   {
     icon: Building,
     title: 'Hostel Address',
-    lines: ['Q2 Hostel', 'Sector E-8 Campus', 'Patel Nagar, Bhopal', 'Madhya Pradesh – 462022'],
+    lines: ['Q2 Girls Hostel', 'Plot No. 8, Manak Vihar', 'Patel Nagar, Raisen Road', 'Bhopal – 462022'],
   },
   {
     icon: Phone,
     title: 'Phone',
-    lines: ['+91 9540369524', '+91 7033468899'],
+    lines: ['+91 9691160716'],
   },
   {
     icon: Mail,
     title: 'Email',
-    lines: ['karan954036@gmail.com', 'deepakgiri1333@gmail.com'],
+    lines: ['q2hostel@gmail.com'],
   },
   {
     icon: Clock,
@@ -45,6 +45,7 @@ export default function Contact() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     message: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +57,7 @@ export default function Contact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.message) {
+    if (!formData.name || !formData.email || !formData.phone || !formData.message) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -67,7 +68,7 @@ export default function Contact() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     toast.success('Message sent successfully! We\'ll get back to you soon.');
-    setFormData({ name: '', email: '', message: '' });
+    setFormData({ name: '', email: '', phone: '', message: '' });
     setIsSubmitting(false);
   };
 
@@ -200,13 +201,37 @@ export default function Contact() {
                     transition={{ delay: 0.4 }}
                     className="space-y-2"
                   >
-                    <Label htmlFor="email" className="text-foreground">Email</Label>
+                    <Label htmlFor="email" className="text-foreground">
+                      Email <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="email"
                       name="email"
                       type="email"
                       placeholder="your.email@example.com"
                       value={formData.email}
+                      onChange={handleChange}
+                      className="bg-secondary border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                      required
+                    />
+                  </motion.div>
+
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.45 }}
+                    className="space-y-2"
+                  >
+                    <Label htmlFor="phone" className="text-foreground">
+                      Phone Number <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      placeholder="Your Phone Number"
+                      value={formData.phone}
                       onChange={handleChange}
                       className="bg-secondary border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                       required

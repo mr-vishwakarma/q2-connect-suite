@@ -36,6 +36,7 @@ function RegisterStudentContent() {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    parent_phone: '',
     fees: '',
     password: '',
     username: '',
@@ -113,7 +114,7 @@ function RegisterStudentContent() {
     }
 
     if (!startDate) {
-      toast.error('Start Date is required');
+      toast.error('Joining Date is required');
       return;
     }
 
@@ -195,6 +196,7 @@ function RegisterStudentContent() {
       setFormData({
         name: '',
         phone: '',
+        parent_phone: '',
         fees: '',
         password: '',
         username: '',
@@ -279,6 +281,16 @@ function RegisterStudentContent() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="parent_phone" className="text-foreground">Parent's Mobile Number</Label>
+                <Input
+                  id="parent_phone"
+                  value={formData.parent_phone}
+                  onChange={(e) => setFormData({ ...formData, parent_phone: e.target.value })}
+                  placeholder="Enter Parent's Mobile Number"
+                  className="bg-secondary border-border"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="room_no" className="text-foreground flex items-center gap-2">
                   <Home className="w-4 h-4" />
                   Room Number
@@ -328,7 +340,7 @@ function RegisterStudentContent() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-foreground">Start Date</Label>
+                <Label className="text-foreground">Joining Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -354,7 +366,7 @@ function RegisterStudentContent() {
                 </Popover>
               </div>
               <div className="space-y-2">
-                <Label className="text-foreground">End Date</Label>
+                <Label className="text-foreground">End Date <span className="text-muted-foreground font-normal">(Optional)</span></Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
