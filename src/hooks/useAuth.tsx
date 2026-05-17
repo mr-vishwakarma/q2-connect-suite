@@ -78,31 +78,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-            checkAdminRole(session.user.id);
+          setLoading(true);
+          // Defer to avoid deadlock, then await both before clearing loading
+          setTimeout(async () => {
+            await Promise.all([
+              fetchProfile(session.user.id),
+              checkAdminRole(session.user.id),
+            ]);
+            setLoading(false);
           }, 0);
         } else {
-        setProfile(null);
-        setIsAdmin(false);
-        setIsPrimaryAdmin(false);
-      }
-        
-        setLoading(false);
+          setProfile(null);
+          setIsAdmin(false);
+          setIsPrimaryAdmin(false);
+          setLoading(false);
+        }
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
-        fetchProfile(session.user.id);
-        checkAdminRole(session.user.id);
+        await Promise.all([
+          fetchProfile(session.user.id),
+          checkAdminRole(session.user.id),
+        ]);
       }
-      
+
       setLoading(false);
     });
 
