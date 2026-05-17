@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, MessageSquare, Lightbulb, Clock } from 'lucide-react';
+import { Users, MessageSquare, Lightbulb, Clock, ListChecks } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
@@ -169,6 +169,14 @@ function DashboardContent() {
           Welcome <span className="text-primary">{user?.email?.split('@')[0] || 'Admin'}!</span>
         </h1>
         <p className="text-muted-foreground">Manager, {selectedHostel} Hostel</p>
+        <div className="mt-4 flex justify-center">
+          <Button asChild className="gap-2">
+            <Link to="/admin/leave-requests">
+              <ListChecks className="w-4 h-4" />
+              View Hostel Leave Records
+            </Link>
+          </Button>
+        </div>
       </motion.div>
 
       {/* Stats Cards */}
