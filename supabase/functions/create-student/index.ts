@@ -15,6 +15,7 @@ type CreateStudentBody = {
   username: string;
   password: string;
   phone?: string;
+  parent_phone?: string;
   room_no?: string;
   fees?: number | string;
   hostel: "Q2" | "Q2.0" | "Q2.1";
@@ -71,6 +72,7 @@ serve(async (req) => {
   const password = body.password ?? "";
   const hostel = body.hostel;
   const phone = (body.phone ?? "").trim();
+  const parentPhone = (body.parent_phone ?? "").trim();
 
   // Validate name
   if (!name) return json(400, { error: "Name is required" });
@@ -189,6 +191,7 @@ serve(async (req) => {
       name,
       username: normalizedUsername,
       phone: phone || null,
+      parent_phone: parentPhone || null,
       room_no: body.room_no ?? null,
       fees: Number.isFinite(feesValue) ? feesValue : null,
       hostel,

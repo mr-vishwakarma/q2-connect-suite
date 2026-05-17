@@ -157,6 +157,7 @@ function RegisterStudentContent() {
           username: normalizedUsername,
           password: formData.password,
           phone: formData.phone,
+          parent_phone: formData.parent_phone,
           room_no: roomNumber,
           fees: formData.fees,
           hostel: selectedHostel,
