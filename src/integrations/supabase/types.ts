@@ -124,10 +124,14 @@ export type Database = {
       mess_requests: {
         Row: {
           admin_message: string | null
+          approved_date: string | null
           created_at: string
+          document_name: string | null
+          document_url: string | null
           hostel: Database["public"]["Enums"]["hostel_type"] | null
           id: string
           leaving_date: string
+          parent_mobile: string | null
           reason: string | null
           return_date: string
           status: string | null
@@ -136,10 +140,14 @@ export type Database = {
         }
         Insert: {
           admin_message?: string | null
+          approved_date?: string | null
           created_at?: string
+          document_name?: string | null
+          document_url?: string | null
           hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           leaving_date: string
+          parent_mobile?: string | null
           reason?: string | null
           return_date: string
           status?: string | null
@@ -148,10 +156,14 @@ export type Database = {
         }
         Update: {
           admin_message?: string | null
+          approved_date?: string | null
           created_at?: string
+          document_name?: string | null
+          document_url?: string | null
           hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           leaving_date?: string
+          parent_mobile?: string | null
           reason?: string | null
           return_date?: string
           status?: string | null
@@ -263,6 +275,7 @@ export type Database = {
           hostel: Database["public"]["Enums"]["hostel_type"] | null
           id: string
           name: string
+          parent_phone: string | null
           phone: string | null
           room_no: string | null
           start_date: string | null
@@ -277,6 +290,7 @@ export type Database = {
           hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           name: string
+          parent_phone?: string | null
           phone?: string | null
           room_no?: string | null
           start_date?: string | null
@@ -291,6 +305,7 @@ export type Database = {
           hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
           name?: string
+          parent_phone?: string | null
           phone?: string | null
           room_no?: string | null
           start_date?: string | null
