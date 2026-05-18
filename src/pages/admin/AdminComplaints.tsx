@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,7 @@ interface Complaint {
   user_id: string;
 }
 
-function AdminComplaintsContent() {
+export default function AdminComplaints() {
   const { user, isAdmin, loading } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
@@ -41,7 +40,7 @@ function AdminComplaintsContent() {
 
   const fetchComplaints = async () => {
     try {
-      setIsLoading(true);
+      setIsLoading(prev => prev);
       const { data, error } = await supabase
         .from('complaints')
         .select('*')
@@ -177,13 +176,5 @@ function AdminComplaintsContent() {
         )}
       </div>
     </div>
-  );
-}
-
-export default function AdminComplaints() {
-  return (
-    <AdminLayout title="Complaints">
-      <AdminComplaintsContent />
-    </AdminLayout>
   );
 }

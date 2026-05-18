@@ -2,10 +2,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { HostelProvider } from "@/contexts/HostelContext";
 import { ProtectedAdminRoute } from "@/components/auth/ProtectedAdminRoute";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 import ScrollToTop from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import About from "./pages/About";
@@ -35,6 +36,33 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const adminTitles: Record<string, string> = {
+  "/admin/dashboard": "",
+  "/admin/register-student": "Register Student",
+  "/admin/complaints": "Complaints",
+  "/admin/suggestions": "Suggestions",
+  "/admin/students": "All Students",
+  "/admin/alerts": "Alerts",
+  "/admin/admin-management": "Admin Management",
+  "/admin/fees": "Fee Management",
+  "/admin/rooms": "Room Management",
+  "/admin/leave-requests": "Leave Requests",
+  "/admin/notifications": "Notifications",
+};
+
+function AdminShell() {
+  const location = useLocation();
+  const title = adminTitles[location.pathname] ?? "Admin Panel";
+
+  return (
+    <ProtectedAdminRoute>
+      <AdminLayout title={title}>
+        <Outlet />
+      </AdminLayout>
+    </ProtectedAdminRoute>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -58,17 +86,20 @@ const App = () => (
               <Route path="/student/complaints" element={<Complaints />} />
               <Route path="/student/suggestions" element={<Suggestions />} />
               <Route path="/student/fees" element={<FeeHistory />} />
-              <Route path="/admin/dashboard" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
-              <Route path="/admin/register-student" element={<ProtectedAdminRoute><RegisterStudent /></ProtectedAdminRoute>} />
-              <Route path="/admin/complaints" element={<ProtectedAdminRoute><AdminComplaints /></ProtectedAdminRoute>} />
-              <Route path="/admin/suggestions" element={<ProtectedAdminRoute><AdminSuggestions /></ProtectedAdminRoute>} />
-              <Route path="/admin/students" element={<ProtectedAdminRoute><AllStudents /></ProtectedAdminRoute>} />
-              <Route path="/admin/alerts" element={<ProtectedAdminRoute><AdminAlerts /></ProtectedAdminRoute>} />
-              <Route path="/admin/admin-management" element={<ProtectedAdminRoute><AdminManagement /></ProtectedAdminRoute>} />
-              <Route path="/admin/fees" element={<ProtectedAdminRoute><FeeManagement /></ProtectedAdminRoute>} />
-              <Route path="/admin/rooms" element={<ProtectedAdminRoute><RoomManagement /></ProtectedAdminRoute>} />
-              <Route path="/admin/leave-requests" element={<ProtectedAdminRoute><LeaveRequests /></ProtectedAdminRoute>} />
-              <Route path="/admin/notifications" element={<ProtectedAdminRoute><Notifications /></ProtectedAdminRoute>} />
+              <Route path="/admin" element={<AdminShell />}>
+                <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="register-student" element={<RegisterStudent />} />
+                <Route path="complaints" element={<AdminComplaints />} />
+                <Route path="suggestions" element={<AdminSuggestions />} />
+                <Route path="students" element={<AllStudents />} />
+                <Route path="alerts" element={<AdminAlerts />} />
+                <Route path="admin-management" element={<AdminManagement />} />
+                <Route path="fees" element={<FeeManagement />} />
+                <Route path="rooms" element={<RoomManagement />} />
+                <Route path="leave-requests" element={<LeaveRequests />} />
+                <Route path="notifications" element={<Notifications />} />
+              </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

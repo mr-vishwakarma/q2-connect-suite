@@ -3,7 +3,6 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,7 +60,7 @@ function getStudentStatus(validDate: string | null): { label: string; type: 'exp
   return { label: 'Active', type: 'active' };
 }
 
-function AllStudentsContent() {
+export default function AllStudents() {
   const { user, isAdmin, loading } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
@@ -94,7 +93,7 @@ function AllStudentsContent() {
 
   const fetchStudents = useCallback(async () => {
     try {
-      setIsLoading(true);
+      setIsLoading(prev => prev);
 
       // Get students directly from students table
       const { data, error } = await supabase
@@ -530,13 +529,5 @@ function AllStudentsContent() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-export default function AllStudents() {
-  return (
-    <AdminLayout title="All Students">
-      <AllStudentsContent />
-    </AdminLayout>
   );
 }

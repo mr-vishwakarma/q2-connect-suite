@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -170,11 +169,9 @@ export default function LeaveRequests() {
 
   if (loading) {
     return (
-      <AdminLayout title="Leave Requests">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-        </div>
-      </AdminLayout>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
     );
   }
 
@@ -183,8 +180,7 @@ export default function LeaveRequests() {
   const returnedCount = requests.filter(r => r.status === 'returned').length;
 
   return (
-    <AdminLayout title="Leave Requests">
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         {/* Top actions */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-md">
@@ -389,7 +385,6 @@ export default function LeaveRequests() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
-    </AdminLayout>
+    </div>
   );
 }
