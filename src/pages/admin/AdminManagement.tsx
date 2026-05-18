@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,7 +37,7 @@ interface AdminUser {
 
 const PRIMARY_ADMIN_USERNAME = 'abhi1006';
 
-function AdminManagementContent() {
+export default function AdminManagement() {
   const { user, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
   const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -398,13 +397,5 @@ function AdminManagementContent() {
         </Card>
       </motion.div>
     </div>
-  );
-}
-
-export default function AdminManagement() {
-  return (
-    <AdminLayout title="Admin Management">
-      <AdminManagementContent />
-    </AdminLayout>
   );
 }
