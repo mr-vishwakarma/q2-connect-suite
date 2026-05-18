@@ -74,14 +74,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let currentUserId: string | null = null;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          // Only refetch profile/role when the user actually changes
+          // (e.g. SIGNED_IN). Skip on TOKEN_REFRESHED / USER_UPDATED to
+          // avoid re-triggering loading spinners on every navigation.
+          if (currentUserId === session.user.id) return;
+          currentUserId = session.user.id;
+
           setLoading(true);
-          // Defer to avoid deadlock, then await both before clearing loading
           setTimeout(async () => {
             await Promise.all([
               fetchProfile(session.user.id),
@@ -90,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setLoading(false);
           }, 0);
         } else {
+          currentUserId = null;
           setProfile(null);
           setIsAdmin(false);
           setIsPrimaryAdmin(false);
@@ -103,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        currentUserId = session.user.id;
         await Promise.all([
           fetchProfile(session.user.id),
           checkAdminRole(session.user.id),
