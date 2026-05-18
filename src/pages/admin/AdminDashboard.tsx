@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Users, MessageSquare, Lightbulb, Clock, ListChecks } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,7 +25,7 @@ interface RecentItem {
   room_no?: string;
 }
 
-function DashboardContent() {
+export default function AdminDashboard() {
   const { user, isAdmin, loading } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
@@ -143,11 +142,9 @@ function DashboardContent() {
 
   if (loading) {
     return (
-      <AdminLayout title="">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </AdminLayout>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
     );
   }
 
@@ -308,13 +305,5 @@ function DashboardContent() {
         </motion.div>
       </div>
     </div>
-  );
-}
-
-export default function AdminDashboard() {
-  return (
-    <AdminLayout title="">
-      <DashboardContent />
-    </AdminLayout>
   );
 }
