@@ -315,7 +315,6 @@ export default function Notifications() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Send Notification Dialog */}
       <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
