@@ -50,7 +50,7 @@ export default function AdminAlerts() {
 
   const fetchAlertStudents = useCallback(async () => {
     try {
-      setIsLoading(prev => (alertStudents.length === 0 ? true : prev));
+      setIsLoading(prev => prev);
 
       // Fetch all students from student table (single source of truth)
       const { data: students, error: studentsError } = await supabase
