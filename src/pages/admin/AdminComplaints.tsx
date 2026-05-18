@@ -40,7 +40,7 @@ export default function AdminComplaints() {
 
   const fetchComplaints = async () => {
     try {
-      setIsLoading(prev => (complaints.length === 0 ? true : prev));
+      setIsLoading(prev => prev);
       const { data, error } = await supabase
         .from('complaints')
         .select('*')

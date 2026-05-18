@@ -40,7 +40,7 @@ export default function AdminSuggestions() {
 
   const fetchSuggestions = async () => {
     try {
-      setIsLoading(prev => (suggestions.length === 0 ? true : prev));
+      setIsLoading(prev => prev);
       const { data, error } = await supabase
         .from('suggestions')
         .select('*')

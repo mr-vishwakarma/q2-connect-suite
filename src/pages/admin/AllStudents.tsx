@@ -93,7 +93,7 @@ export default function AllStudents() {
 
   const fetchStudents = useCallback(async () => {
     try {
-      setIsLoading(prev => (students.length === 0 ? true : prev));
+      setIsLoading(prev => prev);
 
       // Get students directly from students table
       const { data, error } = await supabase
