@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { useHostel } from '@/contexts/HostelContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -201,8 +200,7 @@ export default function Notifications() {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <AdminLayout title="Notifications">
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-card border-border">
@@ -386,6 +384,6 @@ export default function Notifications() {
           </div>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+    </div>
   );
 }
