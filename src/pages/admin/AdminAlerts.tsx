@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,7 +35,7 @@ interface AlertStudent {
   feeStatus: 'paid' | 'unpaid';
 }
 
-function AdminAlertsContent() {
+export default function AdminAlerts() {
   const { user, isAdmin, loading } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
@@ -51,7 +50,7 @@ function AdminAlertsContent() {
 
   const fetchAlertStudents = useCallback(async () => {
     try {
-      setIsLoading(true);
+      setIsLoading(prev => (alertStudents.length === 0 ? true : prev));
 
       // Fetch all students from student table (single source of truth)
       const { data: students, error: studentsError } = await supabase
@@ -398,13 +397,5 @@ function AdminAlertsContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function AdminAlerts() {
-  return (
-    <AdminLayout title="Alerts">
-      <AdminAlertsContent />
-    </AdminLayout>
   );
 }
