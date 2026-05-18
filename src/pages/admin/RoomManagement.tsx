@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { useHostel } from '@/contexts/HostelContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -242,8 +241,7 @@ export default function RoomManagement() {
   const totalOccupied = rooms.reduce((sum, r) => sum + r.occupied_count, 0);
 
   return (
-    <AdminLayout title="Room Management">
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-card border-border">
@@ -504,6 +502,6 @@ export default function RoomManagement() {
           </div>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+    </div>
   );
 }
