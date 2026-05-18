@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,7 @@ interface Suggestion {
   user_id: string;
 }
 
-function AdminSuggestionsContent() {
+export default function AdminSuggestions() {
   const { user, isAdmin, loading } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
@@ -41,7 +40,7 @@ function AdminSuggestionsContent() {
 
   const fetchSuggestions = async () => {
     try {
-      setIsLoading(true);
+      setIsLoading(prev => (suggestions.length === 0 ? true : prev));
       const { data, error } = await supabase
         .from('suggestions')
         .select('*')
@@ -177,13 +176,5 @@ function AdminSuggestionsContent() {
         )}
       </div>
     </div>
-  );
-}
-
-export default function AdminSuggestions() {
-  return (
-    <AdminLayout title="Suggestions">
-      <AdminSuggestionsContent />
-    </AdminLayout>
   );
 }
