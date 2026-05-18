@@ -58,7 +58,7 @@ export default function Notifications() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(prev => prev);
       const { data, error } = await supabase
         .from('notifications')
         .select('*')

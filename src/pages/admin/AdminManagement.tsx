@@ -82,7 +82,7 @@ export default function AdminManagement() {
 
   const fetchAdmins = async () => {
     try {
-      setIsLoading(true);
+      setIsLoading(prev => prev);
       
       // Get all admin user_ids with their is_primary flag
       const { data: roleData, error: roleError } = await supabase

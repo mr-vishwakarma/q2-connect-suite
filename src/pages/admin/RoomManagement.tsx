@@ -54,7 +54,7 @@ export default function RoomManagement() {
 
   const fetchRooms = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(prev => prev);
       const { data, error } = await supabase
         .from('rooms')
         .select('*')
