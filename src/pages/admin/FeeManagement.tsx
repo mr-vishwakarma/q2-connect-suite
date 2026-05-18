@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AdminLayout } from '@/components/admin/AdminLayout';
 import { useHostel } from '@/contexts/HostelContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,7 +78,7 @@ export default function FeeManagement() {
 
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
+      setLoading(prev => prev);
       
       // Fetch students (single source of truth)
       const { data: studentsData, error: studentsError } = await supabase
@@ -325,17 +324,14 @@ export default function FeeManagement() {
 
   if (loading) {
     return (
-      <AdminLayout title="Fee Management">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </AdminLayout>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
     );
   }
 
   return (
-    <AdminLayout title="Fee Management">
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <Card className="bg-card border-border">
@@ -671,7 +667,6 @@ export default function FeeManagement() {
             )}
           </DialogContent>
         </Dialog>
-      </div>
-    </AdminLayout>
+    </div>
   );
 }
