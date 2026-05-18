@@ -111,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        currentUserId = session.user.id;
         await Promise.all([
           fetchProfile(session.user.id),
           checkAdminRole(session.user.id),
