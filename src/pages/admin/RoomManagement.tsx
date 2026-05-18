@@ -403,7 +403,6 @@ export default function RoomManagement() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Add Room Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
