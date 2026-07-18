@@ -74,15 +74,93 @@ export type Database = {
         }
         Relationships: []
       }
+      fee_payments: {
+        Row: {
+          admin_id: string | null
+          admin_name: string | null
+          amount: number
+          created_at: string
+          discount: number
+          fee_id: string
+          hostel: Database["public"]["Enums"]["hostel_type"]
+          id: string
+          late_fee: number
+          month: string
+          notes: string | null
+          payment_date: string
+          payment_mode: Database["public"]["Enums"]["payment_mode"]
+          receipt_no: string
+          security_deposit: number
+          student_id: string
+        }
+        Insert: {
+          admin_id?: string | null
+          admin_name?: string | null
+          amount: number
+          created_at?: string
+          discount?: number
+          fee_id: string
+          hostel?: Database["public"]["Enums"]["hostel_type"]
+          id?: string
+          late_fee?: number
+          month: string
+          notes?: string | null
+          payment_date?: string
+          payment_mode?: Database["public"]["Enums"]["payment_mode"]
+          receipt_no: string
+          security_deposit?: number
+          student_id: string
+        }
+        Update: {
+          admin_id?: string | null
+          admin_name?: string | null
+          amount?: number
+          created_at?: string
+          discount?: number
+          fee_id?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"]
+          id?: string
+          late_fee?: number
+          month?: string
+          notes?: string | null
+          payment_date?: string
+          payment_mode?: Database["public"]["Enums"]["payment_mode"]
+          receipt_no?: string
+          security_deposit?: number
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_payments_fee_id_fkey"
+            columns: ["fee_id"]
+            isOneToOne: false
+            referencedRelation: "fees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fees: {
         Row: {
           amount: number
           created_at: string
+          discount: number
+          due_date: string | null
           hostel: Database["public"]["Enums"]["hostel_type"] | null
           id: string
+          late_fee: number
           month: string
+          notes: string | null
+          paid_amount: number
           paid_date: string | null
           payment_mode: Database["public"]["Enums"]["payment_mode"] | null
+          receipt_no: string | null
           status: Database["public"]["Enums"]["payment_status"] | null
           student_id: string
           updated_at: string
@@ -90,11 +168,17 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string
+          discount?: number
+          due_date?: string | null
           hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
+          late_fee?: number
           month: string
+          notes?: string | null
+          paid_amount?: number
           paid_date?: string | null
           payment_mode?: Database["public"]["Enums"]["payment_mode"] | null
+          receipt_no?: string | null
           status?: Database["public"]["Enums"]["payment_status"] | null
           student_id: string
           updated_at?: string
@@ -102,11 +186,17 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          discount?: number
+          due_date?: string | null
           hostel?: Database["public"]["Enums"]["hostel_type"] | null
           id?: string
+          late_fee?: number
           month?: string
+          notes?: string | null
+          paid_amount?: number
           paid_date?: string | null
           payment_mode?: Database["public"]["Enums"]["payment_mode"] | null
+          receipt_no?: string | null
           status?: Database["public"]["Enums"]["payment_status"] | null
           student_id?: string
           updated_at?: string
@@ -268,6 +358,56 @@ export type Database = {
         }
         Relationships: []
       }
+      security_deposits: {
+        Row: {
+          amount: number
+          collected_date: string | null
+          created_at: string
+          hostel: Database["public"]["Enums"]["hostel_type"]
+          id: string
+          notes: string | null
+          payment_mode: Database["public"]["Enums"]["payment_mode"] | null
+          refund_date: string | null
+          status: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          collected_date?: string | null
+          created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"]
+          id?: string
+          notes?: string | null
+          payment_mode?: Database["public"]["Enums"]["payment_mode"] | null
+          refund_date?: string | null
+          status?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          collected_date?: string | null
+          created_at?: string
+          hostel?: Database["public"]["Enums"]["hostel_type"]
+          id?: string
+          notes?: string | null
+          payment_mode?: Database["public"]["Enums"]["payment_mode"] | null
+          refund_date?: string | null
+          status?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_deposits_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           created_at: string
@@ -375,6 +515,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_monthly_fees: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -387,7 +528,7 @@ export type Database = {
       app_role: "admin" | "student"
       hostel_type: "Q2" | "Q2.0" | "Q2.1"
       payment_mode: "cash" | "upi" | "bank"
-      payment_status: "paid" | "unpaid"
+      payment_status: "paid" | "unpaid" | "partial"
       room_status: "available" | "full"
     }
     CompositeTypes: {
@@ -519,7 +660,7 @@ export const Constants = {
       app_role: ["admin", "student"],
       hostel_type: ["Q2", "Q2.0", "Q2.1"],
       payment_mode: ["cash", "upi", "bank"],
-      payment_status: ["paid", "unpaid"],
+      payment_status: ["paid", "unpaid", "partial"],
       room_status: ["available", "full"],
     },
   },
