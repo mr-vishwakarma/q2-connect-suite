@@ -1,325 +1,319 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHostel } from '@/contexts/HostelContext';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Search, IndianRupee, Calendar, Check, Filter, Download, TrendingUp, AlertCircle, Wallet, Users } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import {
+  Search, IndianRupee, Calendar, Check, Filter, Download, TrendingUp,
+  AlertCircle, Wallet, Users, FileText, Receipt, Plus, User,
+} from 'lucide-react';
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { downloadReceipt, ReceiptData } from '@/lib/receiptPdf';
 
 interface Student {
-  id: string;
-  name: string;
-  username: string;
-  room_no: string | null;
-  fees: number | null;
-  start_date: string | null;
-  valid_date: string | null;
+  id: string; name: string; username: string; room_no: string | null;
+  fees: number | null; start_date: string | null; valid_date: string | null;
+  parent_phone?: string | null;
 }
 
 interface Fee {
-  id: string;
-  student_id: string;
-  month: string;
-  amount: number;
-  paid_date: string | null;
-  payment_mode: 'cash' | 'upi' | 'bank';
-  status: 'paid' | 'unpaid';
+  id: string; student_id: string; month: string; amount: number;
+  paid_date: string | null; payment_mode: 'cash' | 'upi' | 'bank';
+  status: 'paid' | 'unpaid' | 'partial';
+  due_date: string | null; late_fee: number; discount: number;
+  paid_amount: number; receipt_no: string | null; notes: string | null;
 }
 
-// Combined student with fee data for display
-interface StudentFeeRecord {
-  studentId: string;
-  name: string;
-  username: string;
-  room_no: string | null;
-  fees: number;
-  valid_date: string | null;
-  start_date: string | null;
-  feeId: string | null;
-  status: 'paid' | 'unpaid';
-  paid_date: string | null;
-  payment_mode: 'cash' | 'upi' | 'bank';
-  isExpired: boolean;
+interface Payment {
+  id: string; fee_id: string; student_id: string; receipt_no: string;
+  amount: number; late_fee: number; discount: number; security_deposit: number;
+  payment_mode: 'cash' | 'upi' | 'bank'; payment_date: string;
+  admin_name: string | null; month: string; notes: string | null;
 }
+
+interface Deposit {
+  id: string; student_id: string; amount: number; status: string;
+  collected_date: string | null; refund_date: string | null;
+}
+
+const LATE_FEE_PER_DAY = 20;
+
+const genReceiptNo = () =>
+  `RCPT-${format(new Date(), 'yyyyMMdd')}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
 export default function FeeManagement() {
   const { selectedHostel } = useHostel();
+  const { profile } = useAuth();
   const navigate = useNavigate();
+
   const [fees, setFees] = useState<Fee[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<StudentFeeRecord | null>(null);
-  const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'bank'>('upi');
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Payment form state
+  const [pMonth, setPMonth] = useState(format(new Date(), 'MMMM yyyy'));
+  const [pAmount, setPAmount] = useState<number>(0);
+  const [pLateFee, setPLateFee] = useState<number>(0);
+  const [pDiscount, setPDiscount] = useState<number>(0);
+  const [pDeposit, setPDeposit] = useState<number>(0);
+  const [pReceived, setPReceived] = useState<number>(0);
+  const [pMode, setPMode] = useState<'cash' | 'upi' | 'bank'>('upi');
+  const [pNotes, setPNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const currentMonth = format(new Date(), 'MMMM yyyy');
 
   const fetchData = useCallback(async () => {
     try {
-      setLoading(prev => prev);
-      
-      // Fetch students (single source of truth)
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('students')
-        .select('id, name, username, room_no, fees, start_date, valid_date')
-        .eq('hostel', selectedHostel);
-
-      if (studentsError) {
-        console.error('Error fetching students:', studentsError);
-        toast.error('Failed to load student data');
-        setStudents([]);
-      } else {
-        setStudents(studentsData || []);
-      }
-
-      // Fetch fees for current month
-      const { data: feesData, error: feesError } = await supabase
-        .from('fees')
-        .select('*')
-        .eq('hostel', selectedHostel)
-        .eq('month', currentMonth);
-
-      if (feesError) {
-        console.error('Error fetching fees:', feesError);
-        setFees([]);
-      } else {
-        setFees(feesData || []);
-      }
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      setStudents([]);
-      setFees([]);
+      const [sRes, fRes, pRes, dRes] = await Promise.all([
+        supabase.from('students').select('id,name,username,room_no,fees,start_date,valid_date,parent_phone').eq('hostel', selectedHostel),
+        supabase.from('fees').select('*').eq('hostel', selectedHostel).order('created_at', { ascending: false }),
+        supabase.from('fee_payments').select('*').eq('hostel', selectedHostel).order('payment_date', { ascending: false }),
+        supabase.from('security_deposits').select('*').eq('hostel', selectedHostel),
+      ]);
+      setStudents(sRes.data || []);
+      setFees((fRes.data || []) as Fee[]);
+      setPayments((pRes.data || []) as Payment[]);
+      setDeposits((dRes.data || []) as Deposit[]);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to load fee data');
     } finally {
       setLoading(false);
     }
-  }, [selectedHostel, currentMonth]);
+  }, [selectedHostel]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Real-time subscription for students and fees
-  useEffect(() => {
-    const studentsChannel = supabase
-      .channel(`students-fee-${selectedHostel}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'students',
-          filter: `hostel=eq.${selectedHostel}`,
-        },
-        () => fetchData()
-      )
+    const ch = supabase.channel(`fee-erp-${selectedHostel}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fees', filter: `hostel=eq.${selectedHostel}` }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fee_payments', filter: `hostel=eq.${selectedHostel}` }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'security_deposits', filter: `hostel=eq.${selectedHostel}` }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'students', filter: `hostel=eq.${selectedHostel}` }, fetchData)
       .subscribe();
-
-    const feesChannel = supabase
-      .channel(`fees-${selectedHostel}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'fees',
-          filter: `hostel=eq.${selectedHostel}`,
-        },
-        () => fetchData()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(studentsChannel);
-      supabase.removeChannel(feesChannel);
-    };
+    return () => { supabase.removeChannel(ch); };
   }, [selectedHostel, fetchData]);
 
-  // Build combined student fee records - ONE record per student
-  // CRITICAL: Status is determined by valid_date - expired = unpaid
-  const studentFeeRecords = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    return students.map(student => {
-      const studentFee = fees.find(f => f.student_id === student.id);
-      const isExpired = student.valid_date ? new Date(student.valid_date) < today : false;
-      
-      // CRITICAL LOGIC: If valid_date is expired, status is ALWAYS unpaid
-      // This is the single source of truth for fee status
-      let status: 'paid' | 'unpaid' = 'paid';
-      
-      if (isExpired) {
-        // Expired = Unpaid (regardless of any fee record)
-        status = 'unpaid';
-      } else if (studentFee) {
-        // Not expired - use fee record status if exists
-        status = studentFee.status;
-      }
-      // Not expired and no fee record = paid (has valid subscription)
-
-      return {
-        studentId: student.id,
-        name: student.name,
-        username: student.username,
-        room_no: student.room_no,
-        fees: student.fees || 0,
-        valid_date: student.valid_date,
-        start_date: student.start_date,
-        feeId: studentFee?.id || null,
-        status,
-        paid_date: studentFee?.paid_date || student.start_date,
-        payment_mode: studentFee?.payment_mode || 'upi',
-        isExpired,
-      } as StudentFeeRecord;
+  // Build the summary row per student
+  const records = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return students.map(s => {
+      const currentFee = fees.find(f => f.student_id === s.id && f.month === currentMonth);
+      const studentFees = fees.filter(f => f.student_id === s.id);
+      const isExpired = s.valid_date ? new Date(s.valid_date) < today : false;
+      const pending = studentFees
+        .filter(f => f.status !== 'paid')
+        .reduce((sum, f) => sum + Math.max(0, f.amount + (f.late_fee || 0) - (f.discount || 0) - (f.paid_amount || 0)), 0);
+      let status: 'paid' | 'unpaid' | 'partial' = 'paid';
+      if (isExpired) status = 'unpaid';
+      else if (currentFee) status = currentFee.status;
+      else if (pending > 0) status = 'unpaid';
+      return { student: s, currentFee, isExpired, pending, status };
     });
-  }, [students, fees]);
+  }, [students, fees, currentMonth]);
 
-  // Filter records
   const filteredRecords = useMemo(() => {
-    return studentFeeRecords.filter(record => {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery || 
-        record.name.toLowerCase().includes(query) ||
-        record.username.toLowerCase().includes(query) ||
-        (record.room_no?.toLowerCase().includes(query));
-      const matchesStatus = filterStatus === 'all' || record.status === filterStatus;
+    const q = searchQuery.toLowerCase();
+    return records.filter(r => {
+      const matchesSearch = !q ||
+        r.student.name.toLowerCase().includes(q) ||
+        r.student.username.toLowerCase().includes(q) ||
+        (r.student.room_no?.toLowerCase().includes(q)) ||
+        (r.student.parent_phone?.toLowerCase().includes(q));
+      const matchesStatus = filterStatus === 'all' || r.status === filterStatus;
       return matchesSearch && matchesStatus;
     });
-  }, [studentFeeRecords, searchQuery, filterStatus]);
+  }, [records, searchQuery, filterStatus]);
 
-  // Calculate stats directly from student table - ACCURATE VALUES
-  const totalFeeAmount = useMemo(() => 
-    students.reduce((sum, s) => sum + (s.fees || 0), 0)
-  , [students]);
-
-  const paidRecords = useMemo(() => 
-    studentFeeRecords.filter(r => r.status === 'paid')
-  , [studentFeeRecords]);
-
-  const unpaidRecords = useMemo(() => 
-    studentFeeRecords.filter(r => r.status === 'unpaid')
-  , [studentFeeRecords]);
-
-  const totalPendingFee = useMemo(() => 
-    unpaidRecords.reduce((sum, r) => sum + r.fees, 0)
-  , [unpaidRecords]);
-
+  // Stats
+  const totalFeeAmount = useMemo(() => students.reduce((s, x) => s + (x.fees || 0), 0), [students]);
+  const paidCount = records.filter(r => r.status === 'paid').length;
+  const unpaidCount = records.filter(r => r.status !== 'paid').length;
+  const totalPending = records.reduce((s, r) => s + r.pending, 0);
   const thisMonthCollection = useMemo(() => {
-    const now = new Date();
-    const monthStart = startOfMonth(now);
-    const monthEnd = endOfMonth(now);
-    
-    return paidRecords
-      .filter(r => {
-        if (!r.paid_date) return false;
-        try {
-          const paidDate = parseISO(r.paid_date);
-          return isWithinInterval(paidDate, { start: monthStart, end: monthEnd });
-        } catch {
-          return false;
-        }
+    const mS = startOfMonth(new Date()), mE = endOfMonth(new Date());
+    return payments
+      .filter(p => {
+        try { return isWithinInterval(parseISO(p.payment_date), { start: mS, end: mE }); }
+        catch { return false; }
       })
-      .reduce((sum, r) => sum + r.fees, 0);
-  }, [paidRecords]);
+      .reduce((s, p) => s + Number(p.amount || 0) + Number(p.security_deposit || 0), 0);
+  }, [payments]);
+  const totalDeposits = useMemo(() => deposits.reduce((s, d) => s + Number(d.amount || 0), 0), [deposits]);
 
-  // Chart data
-  const chartData = useMemo(() => [
-    { name: 'Total Fees', amount: totalFeeAmount, fill: 'hsl(var(--primary))' },
-    { name: 'Pending Fees', amount: totalPendingFee, fill: 'hsl(var(--destructive))' },
-    { name: 'This Month', amount: thisMonthCollection, fill: 'hsl(142 76% 36%)' },
-  ], [totalFeeAmount, totalPendingFee, thisMonthCollection]);
+  const chartData = [
+    { name: 'Total Fees', amount: totalFeeAmount },
+    { name: 'Pending', amount: totalPending },
+    { name: 'Collected (Month)', amount: thisMonthCollection },
+    { name: 'Deposits', amount: totalDeposits },
+  ];
 
-  const handleMarkAsPaid = async () => {
-    if (!selectedRecord) return;
+  // Open Collect Payment dialog
+  const openCollect = (s: Student) => {
+    setSelectedStudent(s);
+    const monthly = s.fees || 0;
+    setPMonth(currentMonth);
+    setPAmount(monthly);
+    // late fee auto-calc based on current month's due_date
+    const cf = fees.find(f => f.student_id === s.id && f.month === currentMonth);
+    if (cf?.due_date) {
+      const overdue = differenceInDays(new Date(), new Date(cf.due_date));
+      setPLateFee(overdue > 0 ? overdue * LATE_FEE_PER_DAY : 0);
+    } else setPLateFee(0);
+    setPDiscount(0);
+    setPDeposit(0);
+    setPReceived(monthly);
+    setPMode('upi');
+    setPNotes('');
+    setShowPaymentDialog(true);
+  };
+
+  const openProfile = (s: Student) => {
+    setSelectedStudent(s);
+    setShowProfileDialog(true);
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!selectedStudent) return;
+    if (pReceived <= 0) { toast.error('Enter amount received'); return; }
+    setSubmitting(true);
 
     try {
-      if (selectedRecord.feeId) {
-        // Update existing fee record
-        const { error } = await supabase
-          .from('fees')
-          .update({
-            status: 'paid',
-            paid_date: new Date().toISOString().split('T')[0],
-            payment_mode: paymentMode,
-          })
-          .eq('id', selectedRecord.feeId);
-
+      // Ensure a monthly fees row exists
+      let feeRow = fees.find(f => f.student_id === selectedStudent.id && f.month === pMonth);
+      if (!feeRow) {
+        const { data, error } = await supabase.from('fees').insert({
+          student_id: selectedStudent.id,
+          month: pMonth,
+          amount: pAmount,
+          late_fee: pLateFee,
+          discount: pDiscount,
+          status: 'unpaid' as const,
+          hostel: selectedHostel,
+          payment_mode: pMode,
+        }).select().single();
         if (error) throw error;
+        feeRow = data as Fee;
       } else {
-        // Create new fee record
-        const { error } = await supabase
-          .from('fees')
-          .insert({
-            student_id: selectedRecord.studentId,
-            month: currentMonth,
-            amount: selectedRecord.fees,
-            paid_date: new Date().toISOString().split('T')[0],
-            payment_mode: paymentMode,
-            status: 'paid',
-            hostel: selectedHostel,
-          });
-
-        if (error) throw error;
+        // Update late_fee / discount on the fee row so the trigger's math is correct
+        await supabase.from('fees').update({
+          late_fee: pLateFee, discount: pDiscount, amount: pAmount,
+        }).eq('id', feeRow.id);
       }
 
-      toast.success('Fee marked as paid');
+      const receipt_no = genReceiptNo();
+      const feeCore = Math.max(0, pReceived - pDeposit);
+      const { error: payErr } = await supabase.from('fee_payments').insert({
+        fee_id: feeRow.id,
+        student_id: selectedStudent.id,
+        hostel: selectedHostel,
+        receipt_no,
+        amount: feeCore,
+        late_fee: pLateFee,
+        discount: pDiscount,
+        security_deposit: pDeposit,
+        payment_mode: pMode,
+        payment_date: new Date().toISOString().split('T')[0],
+        admin_name: profile?.name || 'Admin',
+        month: pMonth,
+        notes: pNotes || null,
+      });
+      if (payErr) throw payErr;
+
+      // Security deposit tracking
+      if (pDeposit > 0) {
+        await supabase.from('security_deposits').insert({
+          student_id: selectedStudent.id,
+          hostel: selectedHostel,
+          amount: pDeposit,
+          collected_date: new Date().toISOString().split('T')[0],
+          status: 'collected',
+          payment_mode: pMode,
+        });
+      }
+
+      // Extend student valid_date if fully paid (best-effort)
+      const totalDue = pAmount + pLateFee - pDiscount;
+      if (feeCore >= totalDue && selectedStudent.valid_date) {
+        const cur = new Date(selectedStudent.valid_date);
+        cur.setMonth(cur.getMonth() + 1);
+        await supabase.from('students').update({ valid_date: cur.toISOString().split('T')[0] }).eq('id', selectedStudent.id);
+      }
+
+      // PDF Receipt
+      const receiptData: ReceiptData = {
+        receipt_no, payment_date: new Date().toISOString(),
+        student_name: selectedStudent.name, username: selectedStudent.username,
+        room_no: selectedStudent.room_no, hostel: selectedHostel, month: pMonth,
+        monthly_fee: pAmount, late_fee: pLateFee, discount: pDiscount,
+        security_deposit: pDeposit, amount_paid: pReceived, payment_mode: pMode,
+        admin_name: profile?.name, notes: pNotes,
+      };
+      downloadReceipt(receiptData);
+
+      toast.success('Payment recorded, receipt generated');
       setShowPaymentDialog(false);
-      setSelectedRecord(null);
       fetchData();
-    } catch (error) {
-      console.error('Error updating fee:', error);
-      toast.error('Failed to update fee status');
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Failed to record payment');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handlePendingClick = () => {
-    // Navigate to Alert Section when clicking on Pending
-    navigate('/admin/alerts');
+  const reissueReceipt = (p: Payment, s: Student) => {
+    const data: ReceiptData = {
+      receipt_no: p.receipt_no, payment_date: p.payment_date,
+      student_name: s.name, username: s.username, room_no: s.room_no,
+      hostel: selectedHostel, month: p.month, monthly_fee: p.amount,
+      late_fee: p.late_fee, discount: p.discount,
+      security_deposit: p.security_deposit,
+      amount_paid: Number(p.amount) + Number(p.security_deposit),
+      payment_mode: p.payment_mode, admin_name: p.admin_name, notes: p.notes,
+    };
+    downloadReceipt(data);
   };
 
-  const exportToCSV = () => {
-    const headers = ['Student Name', 'User ID', 'Room', 'Amount (₹)', 'Status', 'Paid Date', 'Payment Mode'];
-    const rows = filteredRecords.map(record => [
-      record.name,
-      record.username,
-      record.room_no || '',
-      record.fees,
-      record.status,
-      record.paid_date || '',
-      record.payment_mode,
+  const exportCSV = () => {
+    const headers = ['Name', 'User ID', 'Room', 'Monthly (₹)', 'Pending (₹)', 'Status', 'Valid Till', 'Parent Phone'];
+    const rows = filteredRecords.map(r => [
+      r.student.name, r.student.username, r.student.room_no || '',
+      r.student.fees || 0, r.pending, r.status,
+      r.student.valid_date ? format(parseISO(r.student.valid_date), 'dd MMM yyyy') : '',
+      r.student.parent_phone || '',
     ]);
-
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const csv = [headers, ...rows].map(row => row.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fees-${selectedHostel}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('Fee report exported');
+    const a = document.createElement('a'); a.href = url;
+    a.download = `fee-report-${selectedHostel}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    toast.success('Report exported');
   };
 
   if (loading) {
@@ -330,343 +324,307 @@ export default function FeeManagement() {
     );
   }
 
+  const stats = [
+    { label: 'Total Students', value: students.length, icon: Users, color: 'text-primary', bg: 'bg-primary/10' },
+    { label: 'Paid', value: paidCount, icon: Check, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { label: 'Pending', value: unpaidCount, icon: AlertCircle, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { label: 'Collection (Month)', value: `₹${thisMonthCollection.toLocaleString('en-IN')}`, icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { label: 'Total Pending ₹', value: `₹${totalPending.toLocaleString('en-IN')}`, icon: IndianRupee, color: 'text-destructive', bg: 'bg-destructive/10' },
+    { label: 'Security Deposits', value: `₹${totalDeposits.toLocaleString('en-IN')}`, icon: Wallet, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  ];
+
+  const selectedStudentPayments = selectedStudent
+    ? payments.filter(p => p.student_id === selectedStudent.id)
+    : [];
+  const selectedStudentFees = selectedStudent
+    ? fees.filter(f => f.student_id === selectedStudent.id)
+    : [];
+  const selectedStudentDeposit = selectedStudent
+    ? deposits.find(d => d.student_id === selectedStudent.id)
+    : undefined;
+
   return (
     <div className="space-y-6 animate-fade-in">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-primary/10">
-                  <Wallet className="w-6 h-6 text-primary" />
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {stats.map(s => {
+          const Icon = s.icon;
+          return (
+            <Card key={s.label} className="bg-card border-border">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${s.bg}`}><Icon className={`w-5 h-5 ${s.color}`} /></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{s.label}</p>
+                    <p className="text-lg font-bold text-foreground">{s.value}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Fee Amount</p>
-                  <p className="text-2xl font-bold text-foreground">₹{totalFeeAmount.toLocaleString('en-IN')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-destructive/10">
-                  <AlertCircle className="w-6 h-6 text-destructive" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Pending Fee</p>
-                  <p className="text-2xl font-bold text-foreground">₹{totalPendingFee.toLocaleString('en-IN')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-green-500/10">
-                  <TrendingUp className="w-6 h-6 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Collection This Month</p>
-                  <p className="text-2xl font-bold text-foreground">₹{thisMonthCollection.toLocaleString('en-IN')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
-        {/* Analytics Graph */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Fee Analytics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[200px] sm:h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                  />
-                  <YAxis 
-                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickFormatter={(value) => `₹${value.toLocaleString('en-IN')}`}
-                  />
-                  <Tooltip 
-                    formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Amount']}
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      color: 'hsl(var(--foreground))'
-                    }}
-                  />
-                  <Bar dataKey="amount" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+      {/* Chart */}
+      <Card className="bg-card border-border">
+        <CardHeader><CardTitle className="text-foreground flex items-center gap-2"><TrendingUp className="w-5 h-5" />Fee Analytics</CardTitle></CardHeader>
+        <CardContent>
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+                <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  formatter={(v: number) => [`₹${v.toLocaleString('en-IN')}`, 'Amount']}
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
+                />
+                <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Filters */}
+      <Card className="bg-card border-border">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
+            <div className="flex-1 min-w-0 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, User ID, room, or parent mobile..."
+                value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10"
+              />
             </div>
-          </CardContent>
-        </Card>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[160px]"><Filter className="w-4 h-4 mr-2" /><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="partial">Partial</SelectItem>
+                <SelectItem value="unpaid">Unpaid</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={exportCSV}><Download className="w-4 h-4 mr-2" />Export CSV</Button>
+            <Button variant="outline" onClick={() => navigate('/admin/alerts')}><AlertCircle className="w-4 h-4 mr-2" />Alerts</Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Stats Cards with Navigation */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-primary/10">
-                  <Users className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Records</p>
-                  <p className="text-2xl font-bold text-foreground">{String(students.length).padStart(2, '0')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-green-500/10">
-                  <Check className="w-6 h-6 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Paid</p>
-                  <p className="text-2xl font-bold text-foreground">{String(paidRecords.length).padStart(2, '0')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card 
-            className="bg-card border-border cursor-pointer hover:bg-secondary/50 transition-colors"
-            onClick={handlePendingClick}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-amber-500/10">
-                  <Calendar className="w-6 h-6 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending</p>
-                  <p className="text-2xl font-bold text-foreground">{String(unpaidRecords.length).padStart(2, '0')}</p>
-                  <p className="text-xs text-primary">Click to view alerts →</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-destructive/10">
-                  <IndianRupee className="w-6 h-6 text-destructive" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending Amount</p>
-                  <p className="text-2xl font-bold text-foreground">₹{totalPendingFee.toLocaleString('en-IN')}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Records */}
+      <Card className="bg-card border-border overflow-hidden hidden md:block">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border">
+                <TableHead className="text-foreground font-bold">Student</TableHead>
+                <TableHead className="text-foreground font-bold">User ID</TableHead>
+                <TableHead className="text-foreground font-bold hidden lg:table-cell">Room</TableHead>
+                <TableHead className="text-foreground font-bold">Monthly</TableHead>
+                <TableHead className="text-foreground font-bold">Pending</TableHead>
+                <TableHead className="text-foreground font-bold hidden lg:table-cell">Valid Till</TableHead>
+                <TableHead className="text-foreground font-bold">Status</TableHead>
+                <TableHead className="text-foreground font-bold text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRecords.length === 0 ? (
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No records</TableCell></TableRow>
+              ) : filteredRecords.map(r => (
+                <TableRow key={r.student.id} className="border-border hover:bg-secondary/30">
+                  <TableCell className="font-semibold text-foreground">{r.student.name}</TableCell>
+                  <TableCell className="text-foreground">{r.student.username}</TableCell>
+                  <TableCell className="text-foreground hidden lg:table-cell">{r.student.room_no || 'N/A'}</TableCell>
+                  <TableCell className="text-foreground font-bold">₹{(r.student.fees || 0).toLocaleString('en-IN')}</TableCell>
+                  <TableCell className="text-foreground font-bold">₹{r.pending.toLocaleString('en-IN')}</TableCell>
+                  <TableCell className="text-foreground hidden lg:table-cell">{r.student.valid_date ? format(parseISO(r.student.valid_date), 'dd MMM yyyy') : 'N/A'}</TableCell>
+                  <TableCell>
+                    {r.status === 'paid' ? <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
+                      : r.status === 'partial' ? <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">Partial</Badge>
+                      : <Badge variant="destructive">Unpaid</Badge>}
+                  </TableCell>
+                  <TableCell className="text-right space-x-1">
+                    <Button size="sm" variant="ghost" onClick={() => openProfile(r.student)}><User className="w-4 h-4 mr-1" />Profile</Button>
+                    <Button size="sm" onClick={() => openCollect(r.student)}><Plus className="w-4 h-4 mr-1" />Collect</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
+      </Card>
 
-        {/* Filters */}
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-center">
-              <div className="flex-1 min-w-0">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name, user ID, or room..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+      {/* Mobile */}
+      <div className="md:hidden space-y-3">
+        {filteredRecords.map(r => (
+          <Card key={r.student.id} className="bg-card border-border">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-semibold text-foreground">{r.student.name}</p>
+                  <p className="text-xs text-muted-foreground">{r.student.username} • Room {r.student.room_no || 'N/A'}</p>
+                </div>
+                {r.status === 'paid' ? <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
+                  : r.status === 'partial' ? <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">Partial</Badge>
+                  : <Badge variant="destructive">Unpaid</Badge>}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><p className="text-muted-foreground text-xs">Monthly</p><p className="text-foreground font-medium">₹{(r.student.fees || 0).toLocaleString('en-IN')}</p></div>
+                <div><p className="text-muted-foreground text-xs">Pending</p><p className="text-foreground font-medium">₹{r.pending.toLocaleString('en-IN')}</p></div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => openProfile(r.student)}><User className="w-4 h-4 mr-1" />Profile</Button>
+                <Button size="sm" className="flex-1" onClick={() => openCollect(r.student)}><Plus className="w-4 h-4 mr-1" />Collect</Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Collect Payment Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2"><Receipt className="w-5 h-5" />Collect Payment</DialogTitle>
+            <DialogDescription>Record payment and auto-generate PDF receipt</DialogDescription>
+          </DialogHeader>
+          {selectedStudent && (
+            <div className="space-y-3">
+              <div className="p-3 bg-secondary rounded-lg">
+                <p className="font-semibold text-foreground">{selectedStudent.name}</p>
+                <p className="text-xs text-muted-foreground">{selectedStudent.username} • Room {selectedStudent.room_no || 'N/A'}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Fee Month</Label>
+                  <Input value={pMonth} onChange={(e) => setPMonth(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Monthly Fee (₹)</Label>
+                  <Input type="number" value={pAmount} onChange={(e) => setPAmount(Number(e.target.value))} />
+                </div>
+                <div>
+                  <Label>Late Fee (₹)</Label>
+                  <Input type="number" value={pLateFee} onChange={(e) => setPLateFee(Number(e.target.value))} />
+                </div>
+                <div>
+                  <Label>Discount (₹)</Label>
+                  <Input type="number" value={pDiscount} onChange={(e) => setPDiscount(Number(e.target.value))} />
+                </div>
+                <div>
+                  <Label>Security Deposit (₹)</Label>
+                  <Input type="number" value={pDeposit} onChange={(e) => setPDeposit(Number(e.target.value))} />
+                </div>
+                <div>
+                  <Label>Amount Received (₹)</Label>
+                  <Input type="number" value={pReceived} onChange={(e) => setPReceived(Number(e.target.value))} />
                 </div>
               </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[150px]">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="unpaid">Unpaid</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" onClick={exportToCSV} className="w-full sm:w-auto">
-                <Download className="w-4 h-4 mr-2" />
-                Export
+              <div>
+                <Label>Payment Mode</Label>
+                <Select value={pMode} onValueChange={(v) => setPMode(v as 'cash' | 'upi' | 'bank')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="upi">UPI</SelectItem>
+                    <SelectItem value="bank">Bank Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Notes (optional)</Label>
+                <Textarea value={pNotes} onChange={(e) => setPNotes(e.target.value)} rows={2} />
+              </div>
+              <div className="p-3 bg-secondary rounded-lg text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Total Due:</span><span className="text-foreground font-medium">₹{(pAmount + pLateFee - pDiscount).toLocaleString('en-IN')}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">+ Deposit:</span><span className="text-foreground font-medium">₹{pDeposit.toLocaleString('en-IN')}</span></div>
+                <div className="flex justify-between text-primary font-bold mt-1"><span>Receiving:</span><span>₹{pReceived.toLocaleString('en-IN')}</span></div>
+              </div>
+              <Button className="w-full" onClick={handleSubmitPayment} disabled={submitting}>
+                {submitting ? 'Recording...' : <><Check className="w-4 h-4 mr-2" />Confirm & Download Receipt</>}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Fee Table - Desktop */}
-        <Card className="bg-card border-border overflow-hidden hidden md:block">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-secondary/50">
-                  <TableHead className="text-foreground font-bold">Student Name</TableHead>
-                  <TableHead className="text-foreground font-bold">User ID</TableHead>
-                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Room</TableHead>
-                  <TableHead className="text-foreground font-bold">Amount</TableHead>
-                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Valid Till</TableHead>
-                  <TableHead className="text-foreground font-bold">Status</TableHead>
-                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Payment Mode</TableHead>
-                  <TableHead className="text-foreground font-bold text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No fee records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRecords.map((record) => (
-                    <TableRow key={record.studentId} className="border-border hover:bg-secondary/30">
-                      <TableCell className="font-semibold text-foreground">{record.name}</TableCell>
-                      <TableCell className="text-foreground font-medium">{record.username}</TableCell>
-                      <TableCell className="text-foreground font-medium hidden lg:table-cell">{record.room_no || 'N/A'}</TableCell>
-                      <TableCell className="text-foreground font-bold">₹{record.fees.toLocaleString('en-IN')}</TableCell>
-                      <TableCell className="text-foreground font-medium hidden lg:table-cell">
-                        {record.valid_date ? format(parseISO(record.valid_date), 'dd MMM yyyy') : 'N/A'}
-                      </TableCell>
-                      <TableCell>
-                        {record.status === 'paid' ? (
-                          <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
-                        ) : (
-                          <Badge variant="destructive">Unpaid</Badge>
-                        )}
-                        {record.isExpired && record.status === 'unpaid' && (
-                          <Badge variant="destructive" className="ml-1 text-xs">Expired</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-foreground font-medium uppercase hidden lg:table-cell">{record.payment_mode}</TableCell>
-                      <TableCell className="text-right">
-                        {record.status === 'unpaid' && (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setSelectedRecord(record);
-                              setShowPaymentDialog(true);
-                            }}
-                          >
-                            Mark Paid
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-
-        {/* Fee Cards - Mobile */}
-        <div className="md:hidden space-y-3">
-          {filteredRecords.length === 0 ? (
-            <Card className="bg-card border-border">
-              <CardContent className="py-8 text-center text-muted-foreground">No fee records found</CardContent>
-            </Card>
-          ) : (
-            filteredRecords.map((record) => (
-              <Card key={record.studentId} className="bg-card border-border">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold text-foreground">{record.name}</p>
-                      <p className="text-xs text-muted-foreground">{record.username}</p>
-                    </div>
-                    {record.status === 'paid' ? (
-                      <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
-                    ) : (
-                      <Badge variant="destructive">Unpaid</Badge>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Amount</p>
-                      <p className="text-foreground font-medium">₹{record.fees.toLocaleString('en-IN')}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Room</p>
-                      <p className="text-foreground">{record.room_no || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Valid Till</p>
-                      <p className="text-foreground text-xs">{record.valid_date ? format(parseISO(record.valid_date), 'dd MMM yyyy') : 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Mode</p>
-                      <p className="text-foreground uppercase text-xs">{record.payment_mode}</p>
-                    </div>
-                  </div>
-                  {record.status === 'unpaid' && (
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      onClick={() => {
-                        setSelectedRecord(record);
-                        setShowPaymentDialog(true);
-                      }}
-                    >
-                      Mark Paid
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))
           )}
-        </div>
+        </DialogContent>
+      </Dialog>
 
-        {/* Payment Dialog */}
-        <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader>
-              <DialogTitle className="text-foreground">Record Payment</DialogTitle>
-            </DialogHeader>
-            {selectedRecord && (
-              <div className="space-y-4">
-                <div className="p-4 bg-secondary rounded-lg">
-                  <p className="text-sm text-muted-foreground">Student</p>
-                  <p className="text-lg font-medium text-foreground">{selectedRecord.name}</p>
+      {/* Student Profile Dialog */}
+      <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
+        <DialogContent className="bg-card border-border max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2"><FileText className="w-5 h-5" />Student Fee Profile</DialogTitle>
+          </DialogHeader>
+          {selectedStudent && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-secondary rounded-lg">
+                <div><p className="text-xs text-muted-foreground">Name</p><p className="font-medium text-foreground">{selectedStudent.name}</p></div>
+                <div><p className="text-xs text-muted-foreground">User ID</p><p className="font-medium text-foreground">{selectedStudent.username}</p></div>
+                <div><p className="text-xs text-muted-foreground">Room</p><p className="font-medium text-foreground">{selectedStudent.room_no || 'N/A'}</p></div>
+                <div><p className="text-xs text-muted-foreground">Monthly Fee</p><p className="font-medium text-foreground">₹{(selectedStudent.fees || 0).toLocaleString('en-IN')}</p></div>
+                <div><p className="text-xs text-muted-foreground">Start Date</p><p className="font-medium text-foreground">{selectedStudent.start_date ? format(parseISO(selectedStudent.start_date), 'dd MMM yyyy') : 'N/A'}</p></div>
+                <div><p className="text-xs text-muted-foreground">Valid Till</p><p className="font-medium text-foreground">{selectedStudent.valid_date ? format(parseISO(selectedStudent.valid_date), 'dd MMM yyyy') : 'N/A'}</p></div>
+                <div><p className="text-xs text-muted-foreground">Parent Mobile</p><p className="font-medium text-foreground">{selectedStudent.parent_phone || 'N/A'}</p></div>
+                <div><p className="text-xs text-muted-foreground">Deposit</p><p className="font-medium text-foreground">₹{(selectedStudentDeposit?.amount || 0).toLocaleString('en-IN')} <span className="text-xs text-muted-foreground">({selectedStudentDeposit?.status || 'none'})</span></p></div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-foreground mb-2">Monthly Fee Records</h4>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Month</TableHead><TableHead>Amount</TableHead><TableHead>Late</TableHead><TableHead>Discount</TableHead><TableHead>Paid</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {selectedStudentFees.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-4">No records</TableCell></TableRow> :
+                        selectedStudentFees.map(f => (
+                          <TableRow key={f.id}>
+                            <TableCell className="text-foreground">{f.month}</TableCell>
+                            <TableCell className="text-foreground">₹{f.amount}</TableCell>
+                            <TableCell className="text-foreground">₹{f.late_fee || 0}</TableCell>
+                            <TableCell className="text-foreground">₹{f.discount || 0}</TableCell>
+                            <TableCell className="text-foreground">₹{f.paid_amount || 0}</TableCell>
+                            <TableCell>
+                              {f.status === 'paid' ? <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
+                                : f.status === 'partial' ? <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">Partial</Badge>
+                                : <Badge variant="destructive">Unpaid</Badge>}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
                 </div>
-                <div className="p-4 bg-secondary rounded-lg">
-                  <p className="text-sm text-muted-foreground">Amount</p>
-                  <p className="text-2xl font-bold text-primary">₹{selectedRecord.fees.toLocaleString('en-IN')}</p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-foreground mb-2">Payment History</h4>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Receipt</TableHead><TableHead>Month</TableHead><TableHead>Amount</TableHead><TableHead>Mode</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {selectedStudentPayments.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-4">No payments</TableCell></TableRow> :
+                        selectedStudentPayments.map(p => (
+                          <TableRow key={p.id}>
+                            <TableCell className="text-foreground">{format(parseISO(p.payment_date), 'dd MMM yyyy')}</TableCell>
+                            <TableCell className="text-foreground font-mono text-xs">{p.receipt_no}</TableCell>
+                            <TableCell className="text-foreground">{p.month}</TableCell>
+                            <TableCell className="text-foreground">₹{Number(p.amount) + Number(p.security_deposit)}</TableCell>
+                            <TableCell className="text-foreground uppercase text-xs">{p.payment_mode}</TableCell>
+                            <TableCell><Button size="sm" variant="ghost" onClick={() => reissueReceipt(p, selectedStudent)}><Download className="w-4 h-4" /></Button></TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Payment Mode</label>
-                  <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as 'cash' | 'upi' | 'bank')}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="upi">UPI</SelectItem>
-                      <SelectItem value="bank">Bank Transfer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full" onClick={handleMarkAsPaid}>
-                  <Check className="w-4 h-4 mr-2" />
-                  Confirm Payment
+              </div>
+
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={() => { setShowProfileDialog(false); openCollect(selectedStudent); }}>
+                  <Plus className="w-4 h-4 mr-2" />Collect Payment
                 </Button>
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
