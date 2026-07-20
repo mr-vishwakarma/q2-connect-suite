@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
+import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -94,16 +95,22 @@ export default function AllStudents() {
   const fetchStudents = useCallback(async () => {
     try {
       setIsLoading(prev => prev);
-
-      // Get students directly from students table
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .eq('hostel', selectedHostel)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      setStudents(data || []);
+      const response = await api.get('/students', { params: { hostel: selectedHostel } });
+      if (response.data?.success) {
+        const mapped = response.data.data.map((s: any) => ({
+          id: s._id,
+          user_id: s.userId,
+          name: s.name,
+          phone: s.phone || '',
+          room_no: s.roomNo || '',
+          fees: s.fees || 0,
+          start_date: s.startDate || '',
+          valid_date: s.validDate || '',
+          username: s.username,
+          created_at: s.createdAt,
+        }));
+        setStudents(mapped);
+      }
     } catch (error) {
       console.error('Error fetching students:', error);
       toast.error('Failed to fetch students');
@@ -111,30 +118,6 @@ export default function AllStudents() {
       setIsLoading(false);
     }
   }, [selectedHostel]);
-
-  useEffect(() => {
-    if (!user || !isAdmin) return;
-
-    const channel = supabase
-      .channel(`students-admin-${selectedHostel}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'students',
-          filter: `hostel=eq.${selectedHostel}`,
-        },
-        () => {
-          fetchStudents();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, isAdmin, selectedHostel, fetchStudents]);
 
   const openEditDialog = (student: Student) => {
     setEditingStudent(student);
@@ -153,67 +136,35 @@ export default function AllStudents() {
     e.preventDefault();
     if (!editingStudent) return;
 
-    // Check if username is being changed and if it already exists
-    if (editForm.username.toLowerCase() !== editingStudent.username?.toLowerCase()) {
-      const { data: existingUser } = await supabase
-        .from('students')
-        .select('username')
-        .eq('username', editForm.username.toLowerCase())
-        .neq('user_id', editingStudent.user_id)
-        .maybeSingle();
-
-      if (existingUser) {
-        toast.error('User ID already exists. Please choose a different one.');
-        return;
-      }
-    }
-
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('students')
-        .update({
-          name: editForm.name,
-          room_no: editForm.room_no,
-          fees: parseFloat(editForm.fees) || null,
-          username: editForm.username.toLowerCase(),
-          start_date: editStartDate ? format(editStartDate, 'yyyy-MM-dd') : null,
-          valid_date: editEndDate ? format(editEndDate, 'yyyy-MM-dd') : null,
-        })
-        .eq('user_id', editingStudent.user_id);
-
-      if (error) throw error;
+      await api.put(`/students/${editingStudent.id}`, {
+        name: editForm.name,
+        roomNo: editForm.room_no,
+        fees: parseFloat(editForm.fees) || null,
+        username: editForm.username.toLowerCase(),
+        startDate: editStartDate ? format(editStartDate, 'yyyy-MM-dd') : null,
+        validDate: editEndDate ? format(editEndDate, 'yyyy-MM-dd') : null,
+      });
 
       toast.success('Student updated successfully');
       setIsDialogOpen(false);
       setEditingStudent(null);
       fetchStudents();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating student:', error);
-      toast.error('Failed to update student');
+      toast.error(error.response?.data?.message || 'Failed to update student');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const deleteStudent = async (userId: string) => {
+  const deleteStudent = async (studentId: string) => {
     if (!confirm('Are you sure you want to delete this student?')) return;
 
     try {
-      // Delete role first
-      await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      // Delete student from students table
-      const { error } = await supabase
-        .from('students')
-        .delete()
-        .eq('user_id', userId);
-
-      if (error) throw error;
+      await api.delete(`/students/${studentId}`);
       toast.success('Student deleted successfully');
       fetchStudents();
     } catch (error) {
@@ -232,9 +183,7 @@ export default function AllStudents() {
 
   if (loading || isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <div className="py-8"><InlineSkeletonList rows={5} /></div>
     );
   }
 
@@ -293,7 +242,7 @@ export default function AllStudents() {
                         <Button size="sm" variant="ghost" onClick={() => openEditDialog(student)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 h-8 w-8 p-0">
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => deleteStudent(student.user_id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8 p-0">
+                        <Button size="sm" variant="ghost" onClick={() => deleteStudent(student.id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8 p-0">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -399,7 +348,7 @@ export default function AllStudents() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => deleteStudent(student.user_id)}
+                            onClick={() => deleteStudent(student.id)}
                             className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                           >
                             <Trash2 className="w-4 h-4" />

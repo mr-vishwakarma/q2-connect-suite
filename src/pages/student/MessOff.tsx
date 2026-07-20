@@ -1,8 +1,9 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -18,15 +19,15 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 
 interface LeaveRequest {
   id: string;
-  leaving_date: string;
-  return_date: string;
+  leavingDate: string;
+  returnDate: string;
   reason: string | null;
   status: string;
-  admin_message: string | null;
-  created_at: string;
-  document_url: string | null;
-  document_name: string | null;
-  approved_date: string | null;
+  adminMessage: string | null;
+  createdAt: string;
+  documentUrl: string | null;
+  documentName: string | null;
+  approvedDate: string | null;
 }
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
@@ -57,23 +58,37 @@ export default function MessOff() {
   }, [user]);
 
   const fetchStudentHostel = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('students')
-      .select('hostel')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (data?.hostel) setStudentHostel(data.hostel as 'Q2' | 'Q2.0' | 'Q2.1');
+    try {
+      const response = await api.get('/students/me');
+      if (response.data?.success) {
+        setStudentHostel(response.data.data.hostel);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const fetchRequests = async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('mess_requests')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    if (!error && data) setRequests(data as LeaveRequest[]);
+    try {
+      const response = await api.get('/mess-requests');
+      if (response.data?.success) {
+        const reqs = response.data.data.map((r: any) => ({
+          id: r._id,
+          leavingDate: r.leavingDate,
+          returnDate: r.returnDate,
+          reason: r.reason,
+          status: r.status,
+          adminMessage: r.adminMessage,
+          createdAt: r.createdAt,
+          documentUrl: r.documentUrl,
+          documentName: r.documentName,
+          approvedDate: r.approvedDate,
+        }));
+        setRequests(reqs);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,35 +130,33 @@ export default function MessOff() {
     setIsSubmitting(true);
 
     try {
-      // Upload document
-      const ext = documentFile.name.split('.').pop();
-      const filePath = `${user!.id}/${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage
-        .from('leave-documents')
-        .upload(filePath, documentFile, { upsert: false });
+      let documentUrl = '';
+      let documentFileId = '';
 
-      if (uploadErr) throw uploadErr;
+      if (documentFile) {
+        const formData = new FormData();
+        formData.append('file', documentFile);
+        formData.append('folder', `/q2-connect/mess-requests/${user.id}`);
+        const uploadRes = await api.post('/upload/file', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        
+        if (uploadRes.data?.success) {
+          documentUrl = uploadRes.data.url;
+          documentFileId = uploadRes.data.fileId;
+        } else {
+          throw new Error('Failed to upload document');
+        }
+      }
 
-      // Fetch parent phone from students
-      const { data: studentData } = await supabase
-        .from('students')
-        .select('parent_phone')
-        .eq('user_id', user!.id)
-        .maybeSingle();
-
-      const { error } = await supabase.from('mess_requests').insert({
-        user_id: user!.id,
-        leaving_date: format(leavingDate, 'yyyy-MM-dd'),
-        return_date: format(returnDate, 'yyyy-MM-dd'),
+      await api.post('/mess-requests', {
+        leavingDate: format(leavingDate, 'yyyy-MM-dd'),
+        returnDate: format(returnDate, 'yyyy-MM-dd'),
         reason: reason.trim(),
-        status: 'pending',
-        hostel: studentHostel,
-        document_url: filePath,
-        document_name: documentFile.name,
-        parent_mobile: studentData?.parent_phone || null,
+        documentUrl,
+        documentName: documentFile.name,
+        documentFileId,
       });
-
-      if (error) throw error;
 
       toast.success('Leave request submitted!');
       setLeavingDate(undefined);
@@ -158,15 +171,8 @@ export default function MessOff() {
     }
   };
 
-  const viewDocument = async (path: string) => {
-    const { data, error } = await supabase.storage
-      .from('leave-documents')
-      .createSignedUrl(path, 60 * 10);
-    if (error || !data) {
-      toast.error('Could not open document');
-      return;
-    }
-    window.open(data.signedUrl, '_blank');
+  const viewDocument = async (url: string) => {
+    if (url) window.open(url, '_blank');
   };
 
   const chartData = [
@@ -179,7 +185,7 @@ export default function MessOff() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="py-8"><InlineSkeletonList rows={5} /></div>
       </div>
     );
   }
@@ -398,10 +404,10 @@ export default function MessOff() {
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div>
                         <p className="text-foreground font-medium">
-                          {format(new Date(request.leaving_date), 'MMM d, yyyy')} - {format(new Date(request.return_date), 'MMM d, yyyy')}
+                          {format(new Date(request.leavingDate), 'MMM d, yyyy')} - {format(new Date(request.returnDate), 'MMM d, yyyy')}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          Submitted on {format(new Date(request.created_at), 'MMM d, yyyy')}
+                          Submitted on {format(new Date(request.createdAt), 'MMM d, yyyy')}
                         </p>
                       </div>
                       {renderStatusBadge(request.status)}
@@ -411,21 +417,21 @@ export default function MessOff() {
                         <span className="font-medium text-foreground">Reason:</span> {request.reason}
                       </p>
                     )}
-                    {request.document_url && (
+                    {request.documentUrl && (
                       <Button
                         size="sm"
                         variant="outline"
                         className="gap-2"
-                        onClick={() => viewDocument(request.document_url!)}
+                        onClick={() => viewDocument(request.documentUrl!)}
                       >
                         <FileText className="w-3.5 h-3.5" />
                         View Document
                       </Button>
                     )}
-                    {request.admin_message && (
+                    {request.adminMessage && (
                       <div className="bg-primary/10 rounded-lg p-2 border border-primary/20">
                         <p className="text-xs text-primary font-medium">Admin Message:</p>
-                        <p className="text-sm text-foreground">{request.admin_message}</p>
+                        <p className="text-sm text-foreground">{request.adminMessage}</p>
                       </div>
                     )}
                   </div>
@@ -453,33 +459,33 @@ export default function MessOff() {
                   <div key={r.id} className="p-4 rounded-xl bg-secondary space-y-2 border border-border">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <p className="text-foreground font-medium">
-                        {format(new Date(r.leaving_date), 'MMM d, yyyy')} → {format(new Date(r.return_date), 'MMM d, yyyy')}
+                        {format(new Date(r.leavingDate), 'MMM d, yyyy')} → {format(new Date(r.returnDate), 'MMM d, yyyy')}
                       </p>
                       {renderStatusBadge(r.status)}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Applied on {format(new Date(r.created_at), 'MMM d, yyyy')}
-                      {r.approved_date && ` · Approved on ${format(new Date(r.approved_date), 'MMM d, yyyy')}`}
+                      Applied on {format(new Date(r.createdAt), 'MMM d, yyyy')}
+                      {r.approvedDate && ` · Approved on ${format(new Date(r.approvedDate), 'MMM d, yyyy')}`}
                     </div>
                     {r.reason && (
                       <p className="text-sm text-foreground">
                         <span className="text-muted-foreground">Reason:</span> {r.reason}
                       </p>
                     )}
-                    {r.document_url && (
+                    {r.documentUrl && (
                       <Button
                         size="sm"
                         variant="outline"
                         className="gap-2"
-                        onClick={() => viewDocument(r.document_url!)}
+                        onClick={() => viewDocument(r.documentUrl!)}
                       >
                         <FileText className="w-3.5 h-3.5" /> View Document
                       </Button>
                     )}
-                    {r.admin_message && (
+                    {r.adminMessage && (
                       <div className="bg-primary/10 rounded-lg p-2 border border-primary/20">
                         <p className="text-xs text-primary font-medium">Admin Message:</p>
-                        <p className="text-sm text-foreground">{r.admin_message}</p>
+                        <p className="text-sm text-foreground">{r.adminMessage}</p>
                       </div>
                     )}
                   </div>

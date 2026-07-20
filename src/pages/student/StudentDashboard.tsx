@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { DashboardSkeleton } from '@/components/ui/dashboard-skeleton';
+import { api } from '@/lib/api';
 import { CalendarCheck, MessageSquare, Lightbulb, CheckCircle, ArrowRight, User, Home, CreditCard, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -37,65 +38,40 @@ export default function StudentDashboard() {
     }
   }, [user, loading, isAdmin, navigate]);
 
+  const fetchDashboardData = async () => {
+    try {
+      const response = await api.get('/dashboard/student');
+      if (response.data?.success) {
+        setStudentData(response.data.data.student);
+        setStats(response.data.data.stats);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    }
+  };
+
   useEffect(() => {
     if (user) {
-      fetchStudentData();
-      fetchStats();
+      fetchDashboardData();
     }
   }, [user]);
 
-  const fetchStudentData = async () => {
-    if (!user) return;
-
-    const { data } = await supabase
-      .from('students')
-      .select('name, username, room_no, fees, start_date, valid_date, hostel')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (data) {
-      setStudentData(data);
-    }
-  };
-
-  const fetchStats = async () => {
-    if (!user) return;
-
-    const [leaveRes, complaintsRes, suggestionsRes, approvedRes] = await Promise.all([
-      supabase.from('mess_requests').select('id', { count: 'exact' }).eq('user_id', user.id),
-      supabase.from('complaints').select('id', { count: 'exact' }).eq('user_id', user.id),
-      supabase.from('suggestions').select('id', { count: 'exact' }).eq('user_id', user.id),
-      supabase.from('mess_requests').select('id', { count: 'exact' }).eq('user_id', user.id).eq('status', 'approved'),
-    ]);
-
-    setStats({
-      leaveRequests: leaveRes.count || 0,
-      complaints: complaintsRes.count || 0,
-      suggestions: suggestionsRes.count || 0,
-      approvedRequests: approvedRes.count || 0
-    });
-  };
-
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const statCards = [
-    { title: 'Leave Requests', value: stats.leaveRequests, icon: CalendarCheck, color: 'text-primary' },
-    { title: 'Approved', value: stats.approvedRequests, icon: CheckCircle, color: 'text-green-400' },
-    { title: 'Complaints', value: stats.complaints, icon: MessageSquare, color: 'text-yellow-400' },
-    { title: 'Suggestions', value: stats.suggestions, icon: Lightbulb, color: 'text-blue-400' },
+    { title: 'Leave Requests', value: stats.leaveRequests, icon: CalendarCheck, color: 'text-primary', bg: 'bg-primary/10 shadow-sm' },
+    { title: 'Approved', value: stats.approvedRequests, icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10 shadow-sm' },
+    { title: 'Complaints', value: stats.complaints, icon: MessageSquare, color: 'text-amber-500', bg: 'bg-amber-500/10 shadow-sm' },
+    { title: 'Suggestions', value: stats.suggestions, icon: Lightbulb, color: 'text-blue-500', bg: 'bg-blue-500/10 shadow-sm' },
   ];
 
   const quickActions = [
-    { label: 'Request Leave', icon: CalendarCheck, path: '/student/mess-off', accent: 'from-red-600 to-red-800' },
-    { label: 'File Complaint', icon: MessageSquare, path: '/student/complaints', accent: 'from-yellow-600 to-yellow-800' },
-    { label: 'Submit Suggestion', icon: Lightbulb, path: '/student/suggestions', accent: 'from-blue-600 to-blue-800' },
-    { label: 'Fee History', icon: CreditCard, path: '/student/fees', accent: 'from-green-600 to-green-800' },
+    { label: 'Request Leave', icon: CalendarCheck, path: '/student/mess-off', color: 'text-rose-500', bg: 'bg-rose-500/10 shadow-sm' },
+    { label: 'File Complaint', icon: MessageSquare, path: '/student/complaints', color: 'text-amber-500', bg: 'bg-amber-500/10 shadow-sm' },
+    { label: 'Submit Suggestion', icon: Lightbulb, path: '/student/suggestions', color: 'text-blue-500', bg: 'bg-blue-500/10 shadow-sm' },
+    { label: 'Fee History', icon: CreditCard, path: '/student/fees', color: 'text-green-500', bg: 'bg-green-500/10 shadow-sm' },
   ];
 
   const profileItems = [
@@ -138,15 +114,15 @@ export default function StudentDashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
               >
-                <Card className="bg-card border-border hover:border-primary/40 transition-all duration-300 group cursor-default">
-                  <CardContent className="p-3 sm:p-5">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-xs sm:text-sm text-muted-foreground mb-1">{stat.title}</p>
-                        <p className="text-2xl sm:text-3xl font-bold text-foreground">{stat.value}</p>
+                <Card className="hover:border-primary/50 transition-all duration-300 group cursor-default">
+                  <CardContent className="p-4 sm:p-5">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-2xl ${stat.bg} shadow-sm group-hover:shadow-md transition-shadow`}>
+                        <Icon className={`w-6 h-6 ${stat.color}`} />
                       </div>
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl gradient-primary flex items-center justify-center shadow-glow transition-transform duration-500 group-hover:rotate-[360deg]">
-                        <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
+                      <div>
+                        <p className="text-xs sm:text-sm text-muted-foreground">{stat.title}</p>
+                        <p className={`text-2xl sm:text-3xl font-bold ${stat.color}`}>{stat.value}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -219,14 +195,14 @@ export default function StudentDashboard() {
                       className="p-4 rounded-xl bg-secondary hover:bg-secondary/80 transition-all duration-300 text-left group border border-transparent hover:border-primary/30"
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center transition-transform duration-500 group-hover:rotate-[360deg]"
-                          style={{ background: `linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))` }}
-                        >
-                          <ActionIcon className="w-5 h-5 text-primary-foreground" />
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-transform duration-500 group-hover:-translate-y-1 shadow-sm group-hover:shadow-md ${action.bg}`}>
+                          <ActionIcon className={`w-5 h-5 ${action.color}`} />
                         </div>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1 group-hover:text-primary" />
+                        <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" />
                       </div>
-                      <p className="text-sm font-medium text-foreground">{action.label}</p>
+                      <p className="font-semibold text-foreground text-sm sm:text-base">
+                        {action.label}
+                      </p>
                     </motion.button>
                   );
                 })}

@@ -41,10 +41,9 @@ export default function Login() {
 
     setIsLoading(true);
     
-    // Normalize User ID - remove @ and everything after if present, then convert to email format
-    const normalizedUserId = userId.toLowerCase().split('@')[0].trim();
-    const email = `${normalizedUserId}@q2student.local`;
-    const { error } = await signIn(email, password);
+    // Send the User ID directly as username
+    const normalizedUserId = userId.trim();
+    const { error } = await signIn(normalizedUserId, password);
     setIsLoading(false);
 
     if (error) {
@@ -139,6 +138,14 @@ export default function Login() {
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
+                    </div>
+                    <div className="flex justify-end mt-1">
+                      <Link
+                        to="/forgot-password"
+                        className="text-xs text-primary hover:text-primary/80 transition-colors"
+                      >
+                        Forgot Password?
+                      </Link>
                     </div>
                   </motion.div>
 

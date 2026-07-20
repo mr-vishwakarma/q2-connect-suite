@@ -1,8 +1,10 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHostel } from '@/contexts/HostelContext';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
+import { io, Socket } from 'socket.io-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -88,16 +90,14 @@ export default function FeeManagement() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [sRes, fRes, pRes, dRes] = await Promise.all([
-        supabase.from('students').select('id,name,username,room_no,fees,start_date,valid_date,parent_phone').eq('hostel', selectedHostel),
-        supabase.from('fees').select('*').eq('hostel', selectedHostel).order('created_at', { ascending: false }),
-        supabase.from('fee_payments').select('*').eq('hostel', selectedHostel).order('payment_date', { ascending: false }),
-        supabase.from('security_deposits').select('*').eq('hostel', selectedHostel),
-      ]);
-      setStudents(sRes.data || []);
-      setFees((fRes.data || []) as Fee[]);
-      setPayments((pRes.data || []) as Payment[]);
-      setDeposits((dRes.data || []) as Deposit[]);
+      const response = await api.get('/fees/dashboard', { params: { hostel: selectedHostel } });
+      if (response.data?.success) {
+        const { students, fees, payments, deposits } = response.data.data;
+        setStudents(students || []);
+        setFees(fees || []);
+        setPayments(payments || []);
+        setDeposits(deposits || []);
+      }
     } catch (e) {
       console.error(e);
       toast.error('Failed to load fee data');
@@ -109,14 +109,16 @@ export default function FeeManagement() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
-    const ch = supabase.channel(`fee-erp-${selectedHostel}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fees', filter: `hostel=eq.${selectedHostel}` }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fee_payments', filter: `hostel=eq.${selectedHostel}` }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'security_deposits', filter: `hostel=eq.${selectedHostel}` }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'students', filter: `hostel=eq.${selectedHostel}` }, fetchData)
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [selectedHostel, fetchData]);
+    if (!profile) return;
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+      withCredentials: true,
+    });
+    
+    // Optionally listen to events to refetch data
+    // socket.on('fees-updated', fetchData);
+
+    return () => { socket.disconnect(); };
+  }, [selectedHostel, fetchData, profile]);
 
   // Build the summary row per student
   const records = useMemo(() => {
@@ -203,66 +205,21 @@ export default function FeeManagement() {
     setSubmitting(true);
 
     try {
-      // Ensure a monthly fees row exists
-      let feeRow = fees.find(f => f.student_id === selectedStudent.id && f.month === pMonth);
-      if (!feeRow) {
-        const { data, error } = await supabase.from('fees').insert({
-          student_id: selectedStudent.id,
-          month: pMonth,
-          amount: pAmount,
-          late_fee: pLateFee,
-          discount: pDiscount,
-          status: 'unpaid' as const,
-          hostel: selectedHostel,
-          payment_mode: pMode,
-        }).select().single();
-        if (error) throw error;
-        feeRow = data as Fee;
-      } else {
-        // Update late_fee / discount on the fee row so the trigger's math is correct
-        await supabase.from('fees').update({
-          late_fee: pLateFee, discount: pDiscount, amount: pAmount,
-        }).eq('id', feeRow.id);
-      }
-
       const receipt_no = genReceiptNo();
-      const feeCore = Math.max(0, pReceived - pDeposit);
-      const { error: payErr } = await supabase.from('fee_payments').insert({
-        fee_id: feeRow.id,
-        student_id: selectedStudent.id,
+      
+      await api.post('/fees/collect', {
+        studentId: selectedStudent.id,
         hostel: selectedHostel,
-        receipt_no,
-        amount: feeCore,
-        late_fee: pLateFee,
-        discount: pDiscount,
-        security_deposit: pDeposit,
-        payment_mode: pMode,
-        payment_date: new Date().toISOString().split('T')[0],
-        admin_name: profile?.name || 'Admin',
         month: pMonth,
-        notes: pNotes || null,
+        amount: pAmount,
+        lateFee: pLateFee,
+        discount: pDiscount,
+        securityDeposit: pDeposit,
+        receivedAmount: pReceived,
+        paymentMode: pMode,
+        notes: pNotes,
+        receiptNo: receipt_no
       });
-      if (payErr) throw payErr;
-
-      // Security deposit tracking
-      if (pDeposit > 0) {
-        await supabase.from('security_deposits').insert({
-          student_id: selectedStudent.id,
-          hostel: selectedHostel,
-          amount: pDeposit,
-          collected_date: new Date().toISOString().split('T')[0],
-          status: 'collected',
-          payment_mode: pMode,
-        });
-      }
-
-      // Extend student valid_date if fully paid (best-effort)
-      const totalDue = pAmount + pLateFee - pDiscount;
-      if (feeCore >= totalDue && selectedStudent.valid_date) {
-        const cur = new Date(selectedStudent.valid_date);
-        cur.setMonth(cur.getMonth() + 1);
-        await supabase.from('students').update({ valid_date: cur.toISOString().split('T')[0] }).eq('id', selectedStudent.id);
-      }
 
       // PDF Receipt
       const receiptData: ReceiptData = {
@@ -318,9 +275,7 @@ export default function FeeManagement() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <div className="py-8"><InlineSkeletonList rows={5} /></div>
     );
   }
 
@@ -350,10 +305,12 @@ export default function FeeManagement() {
         {stats.map(s => {
           const Icon = s.icon;
           return (
-            <Card key={s.label} className="bg-card border-border">
+            <Card key={s.label} className="hover:border-primary/50 transition-all duration-300 cursor-default group">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl ${s.bg}`}><Icon className={`w-5 h-5 ${s.color}`} /></div>
+                  <div className={`p-2.5 rounded-xl ${s.bg} shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:-translate-y-1`}>
+                    <Icon className={`w-5 h-5 ${s.color}`} />
+                  </div>
                   <div>
                     <p className="text-xs text-muted-foreground">{s.label}</p>
                     <p className="text-lg font-bold text-foreground">{s.value}</p>
@@ -366,20 +323,56 @@ export default function FeeManagement() {
       </div>
 
       {/* Chart */}
-      <Card className="bg-card border-border">
-        <CardHeader><CardTitle className="text-foreground flex items-center gap-2"><TrendingUp className="w-5 h-5" />Fee Analytics</CardTitle></CardHeader>
+      <Card className="hover:border-primary/50 transition-all duration-300">
+        <CardHeader>
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-primary" />
+            Fee Analytics
+          </CardTitle>
+        </CardHeader>
         <CardContent>
-          <div className="h-[220px]">
+          <div className="h-[260px] mt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-                <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  formatter={(v: number) => [`₹${v.toLocaleString('en-IN')}`, 'Amount']}
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.2}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  dy={10} 
                 />
-                <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <YAxis 
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} 
+                  tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                  axisLine={false}
+                  tickLine={false}
+                  dx={-10}
+                />
+                <Tooltip
+                  cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
+                  formatter={(v: number) => [`₹${v.toLocaleString('en-IN')}`, 'Amount']}
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))', 
+                    borderRadius: '12px',
+                    color: 'hsl(var(--foreground))',
+                    boxShadow: '0 4px 20px hsl(0 0% 0% / 0.1)'
+                  }}
+                  itemStyle={{ color: 'hsl(var(--primary))', fontWeight: 'bold' }}
+                />
+                <Bar 
+                  dataKey="amount" 
+                  fill="url(#colorAmount)" 
+                  radius={[6, 6, 0, 0]} 
+                  animationDuration={1500}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>

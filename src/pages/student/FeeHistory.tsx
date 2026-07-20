@@ -1,8 +1,10 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
+import { io } from 'socket.io-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,36 +47,59 @@ export default function FeeHistory() {
   }, [user, authLoading, isAdmin, navigate]);
 
   const fetchAll = useCallback(async () => {
-    if (!user) return;
     try {
-      const { data: s } = await supabase.from('students')
-        .select('id,name,username,room_no,fees,hostel')
-        .eq('user_id', user.id).maybeSingle();
-      if (!s) { setStudent(null); return; }
-      setStudent(s as StudentData);
-
-      const [fRes, pRes] = await Promise.all([
-        supabase.from('fees').select('*').eq('student_id', s.id).order('created_at', { ascending: false }),
-        supabase.from('fee_payments').select('*').eq('student_id', s.id).order('payment_date', { ascending: false }),
+      const [sRes, fRes, pRes] = await Promise.all([
+        api.get('/students/me'),
+        api.get('/fees'),
+        api.get('/fee-payments')
       ]);
-      setFees((fRes.data || []) as Fee[]);
-      setPayments((pRes.data || []) as Payment[]);
+
+      if (sRes.data?.success) {
+        setStudent({
+          id: sRes.data.data._id,
+          name: sRes.data.data.name,
+          username: sRes.data.data.username,
+          room_no: sRes.data.data.roomNo,
+          fees: sRes.data.data.fees,
+          hostel: sRes.data.data.hostel,
+        });
+      } else {
+        setStudent(null);
+      }
+
+      if (fRes.data?.success) {
+        setFees(fRes.data.data.map((f: any) => ({
+          id: f._id, month: f.month, amount: f.amount, paid_date: f.paidDate,
+          payment_mode: f.paymentMode, status: f.status, late_fee: f.lateFee,
+          discount: f.discount, paid_amount: f.paidAmount, due_date: f.dueDate,
+          receipt_no: f.receiptNo
+        })));
+      }
+
+      if (pRes.data?.success) {
+        setPayments(pRes.data.data.map((p: any) => ({
+          id: p._id, receipt_no: p.receiptNo, amount: p.amount, late_fee: p.lateFee,
+          discount: p.discount, security_deposit: p.securityDeposit, payment_mode: p.paymentMode,
+          payment_date: p.paymentDate, month: p.month, admin_name: p.adminName, notes: p.notes
+        })));
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => { if (user) fetchAll(); }, [user, fetchAll]);
 
   useEffect(() => {
     if (!student) return;
-    const ch = supabase.channel(`stu-fees-${student.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fees' }, fetchAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fee_payments' }, fetchAll)
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', { withCredentials: true });
+    
+    // Listen for updates if necessary
+    // socket.on('fees-updated', fetchAll);
+
+    return () => { socket.disconnect(); };
   }, [student, fetchAll]);
 
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount) + Number(p.security_deposit), 0);
@@ -97,7 +122,7 @@ export default function FeeHistory() {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="py-8"><InlineSkeletonList rows={5} /></div>
       </div>
     );
   }

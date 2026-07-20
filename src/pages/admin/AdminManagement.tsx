@@ -1,7 +1,8 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,14 +68,8 @@ export default function AdminManagement() {
 
   const checkPrimaryAdmin = async () => {
     try {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('is_primary')
-        .eq('user_id', user?.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-      
-      setIsPrimaryAdmin(!!data?.is_primary);
+      // In custom backend, check if current user is primary admin by email
+      setIsPrimaryAdmin(user?.email === 'abhi1006@q2hostel.local');
     } catch (error) {
       console.error('Error checking primary admin:', error);
     }
@@ -84,42 +79,22 @@ export default function AdminManagement() {
     try {
       setIsLoading(prev => prev);
       
-      // Get all admin user_ids with their is_primary flag
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('user_id, is_primary')
-        .eq('role', 'admin');
+      const response = await api.get('/auth/admins');
+      if (response.data?.success) {
+        // Map backend User objects to AdminUser interface
+        const adminsList: AdminUser[] = response.data.data.map((u: any) => ({
+          id: u._id,
+          user_id: u._id,
+          name: u.name,
+          username: u.username || u.name,
+          created_at: u.createdAt,
+          is_primary: u.email === 'abhi1006@q2hostel.local' || u.username === 'abhi1006'
+        }));
 
-      if (roleError) throw roleError;
-
-      if (!roleData || roleData.length === 0) {
-        setAdmins([]);
-        setIsLoading(false);
-        return;
+        // Sort: primary admins first
+        adminsList.sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+        setAdmins(adminsList);
       }
-
-      // Get profiles for all admin users
-      const adminUserIds = roleData.map(r => r.user_id);
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, user_id, name, username, created_at')
-        .in('user_id', adminUserIds);
-
-      if (profileError) throw profileError;
-
-      // Create a map of user_id -> is_primary from role data
-      const primaryMap = new Map(roleData.map(r => [r.user_id, r.is_primary]));
-
-      // Merge profile data with role data
-      const adminsList: AdminUser[] = (profileData || []).map(profile => ({
-        ...profile,
-        is_primary: primaryMap.get(profile.user_id) || false,
-      }));
-
-      // Sort: primary admins first
-      adminsList.sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
-
-      setAdmins(adminsList);
     } catch (error) {
       console.error('Error fetching admins:', error);
       toast.error('Failed to fetch admins');
@@ -141,65 +116,26 @@ export default function AdminManagement() {
       return;
     }
 
-    // Check if username already exists
-    const { data: existingUser } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('username', formData.username.toLowerCase())
-      .maybeSingle();
-
-    if (existingUser) {
-      toast.error('User ID already exists');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
       const email = `${formData.username.toLowerCase()}@q2hostel.local`;
       
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const response = await api.post('/auth/register-admin', {
+        name: formData.username,
         email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: { name: formData.username },
-        },
+        password: formData.password
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user');
-
-      // Update profile with username
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          name: formData.username,
-          username: formData.username.toLowerCase(),
-        })
-        .eq('user_id', authData.user.id);
-
-      if (profileError) throw profileError;
-
-      // Add admin role (secondary)
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: 'admin',
-          is_primary: false,
-        });
-
-      if (roleError) throw roleError;
-
-      toast.success('Admin created successfully!');
-      setFormData({ name: '', username: '', password: '' });
-      setIsDialogOpen(false);
-      fetchAdmins();
+      if (response.data?.success) {
+        toast.success('Admin created successfully!');
+        setFormData({ name: '', username: '', password: '' });
+        setIsDialogOpen(false);
+        fetchAdmins();
+      }
     } catch (error: any) {
       console.error('Error creating admin:', error);
-      toast.error(error.message || 'Failed to create admin');
+      toast.error(error.response?.data?.message || error.message || 'Failed to create admin');
     } finally {
       setIsSubmitting(false);
     }
@@ -208,7 +144,7 @@ export default function AdminManagement() {
   const deleteAdmin = async (userId: string) => {
     // Check if trying to delete primary admin
     const adminToDelete = admins.find(a => a.user_id === userId);
-    if (adminToDelete?.username?.toLowerCase() === PRIMARY_ADMIN_USERNAME) {
+    if (adminToDelete?.username?.toLowerCase() === PRIMARY_ADMIN_USERNAME || adminToDelete?.is_primary) {
       toast.error('Primary Admin cannot be deleted');
       return;
     }
@@ -216,27 +152,18 @@ export default function AdminManagement() {
     if (!confirm('Are you sure you want to delete this admin?')) return;
 
     try {
-      // Delete role first
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      if (roleError) throw roleError;
-
+      await api.delete(`/auth/admins/${userId}`);
       toast.success('Admin deleted successfully');
       fetchAdmins();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting admin:', error);
-      toast.error('Failed to delete admin');
+      toast.error(error.response?.data?.message || 'Failed to delete admin');
     }
   };
 
   if (loading || isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <div className="py-8"><InlineSkeletonList rows={5} /></div>
     );
   }
 

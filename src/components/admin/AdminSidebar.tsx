@@ -1,11 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
+import { parseISO, differenceInDays } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
-import { differenceInDays, parseISO } from 'date-fns';
 import {
   LayoutDashboard,
   UserPlus,
@@ -16,10 +16,12 @@ import {
   Home,
   Shield,
   AlertTriangle,
-  DollarSign,
   Building2,
   Bell,
   CalendarCheck,
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
 } from 'lucide-react';
 
 const adminLinks = [
@@ -39,9 +41,11 @@ const adminLinks = [
 
 interface AdminSidebarProps {
   onNavigate?: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
+export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }: AdminSidebarProps) {
   const location = useLocation();
   const { signOut, profile, user, isAdmin } = useAuth();
   const { selectedHostel } = useHostel();
@@ -49,10 +53,10 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
 
   const fetchAlertCount = useCallback(async () => {
     try {
-      const { data: students } = await supabase
-        .from('students')
-        .select('valid_date')
-        .eq('hostel', selectedHostel);
+      const response = await api.get('/students', {
+        params: { hostel: selectedHostel }
+      });
+      const students = response.data?.data;
 
       if (!students) {
         setAlertCount(0);
@@ -62,9 +66,9 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
       const today = new Date();
       let count = 0;
 
-      students.forEach(student => {
-        if (student.valid_date) {
-          const validDate = parseISO(student.valid_date);
+      students.forEach((student: any) => {
+        if (student.validDate) {
+          const validDate = parseISO(student.validDate);
           const daysLeft = differenceInDays(validDate, today);
           if (daysLeft <= 5) {
             count++;
@@ -84,49 +88,37 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
     }
   }, [user, isAdmin, selectedHostel, fetchAlertCount]);
 
-  useEffect(() => {
-    if (!user || !isAdmin) return;
-
-    const channel = supabase
-      .channel(`students-alertcount-${selectedHostel}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'students',
-          filter: `hostel=eq.${selectedHostel}`,
-        },
-        () => fetchAlertCount()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, isAdmin, selectedHostel, fetchAlertCount]);
-
   const handleLinkClick = () => {
     onNavigate?.();
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex flex-col">
+    <aside className={cn("fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300", isCollapsed ? "w-20" : "w-64")}>
       {/* Logo */}
-      <div className="p-6 border-b border-border">
-        <Link to="/admin/dashboard" className="flex items-center gap-3" onClick={handleLinkClick}>
-          <motion.div 
-            whileHover={{ scale: 1.05 }}
-            className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-lg"
-            style={{ boxShadow: '0 0 20px hsl(0 100% 50% / 0.4)' }}
+      <div className="p-6 relative">
+        <Link to="/admin/dashboard" className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
+          <motion.div
+            whileHover={{ rotate: 180 }}
+            transition={{ duration: 0.3 }}
+            className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow shrink-0"
           >
             <span className="text-primary-foreground font-bold text-lg">Q2</span>
           </motion.div>
-          <div>
-            <span className="text-foreground font-bold block">Dashboard</span>
-            <span className="text-xs text-muted-foreground">Admin Panel</span>
-          </div>
+          {!isCollapsed && (
+            <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }} className="overflow-hidden whitespace-nowrap">
+              <span className="text-foreground font-bold block">Dashboard</span>
+              <span className="text-xs text-muted-foreground">Admin Panel</span>
+            </motion.div>
+          )}
         </Link>
+        {onToggleCollapse && (
+          <button 
+            onClick={onToggleCollapse}
+            className="absolute -right-3 top-8 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -144,19 +136,33 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
                 to={link.to}
                 onClick={handleLinkClick}
                 className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200',
+                  'flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative',
+                  isCollapsed ? 'justify-center' : 'gap-3',
                   isActive
                     ? 'bg-primary text-primary-foreground font-medium shadow-lg'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 )}
                 style={isActive ? { boxShadow: '0 0 20px hsl(0 100% 50% / 0.4)' } : {}}
               >
-                <link.icon className="w-5 h-5" />
-                <span className="flex-1">{link.label}</span>
-                {isAlertLink && alertCount > 0 && (
-                  <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-xs font-bold rounded-full bg-destructive text-destructive-foreground">
+                <link.icon className="w-5 h-5 shrink-0" />
+                {!isCollapsed && <span className="flex-1 whitespace-nowrap">{link.label}</span>}
+                
+                {/* Tooltip for collapsed state */}
+                {isCollapsed && (
+                  <div className="absolute left-full ml-4 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
+                    {link.label}
+                  </div>
+                )}
+                
+                {isAlertLink && alertCount > 0 && !isCollapsed && (
+                  <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-xs font-bold rounded-full bg-destructive text-destructive-foreground shrink-0">
                     {alertCount}
                   </span>
+                )}
+                
+                {/* Red dot indicator when collapsed */}
+                {isAlertLink && alertCount > 0 && isCollapsed && (
+                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-destructive" />
                 )}
               </Link>
             </motion.div>

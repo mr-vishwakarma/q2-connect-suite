@@ -1,10 +1,24 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { api, getSocket, disconnectSocket } from '@/lib/api';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  username?: string;
+  role: 'admin' | 'student';
+}
+
+export interface Profile {
+  id: string;
+  user_id: string;
+  name: string;
+  email: string | null;
+  username: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
   isAdmin: boolean;
   isPrimaryAdmin: boolean;
@@ -15,146 +29,241 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
 }
 
-interface Profile {
-  id: string;
-  user_id: string;
-  name: string;
-  email: string | null;
-  username: string | null;
-}
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isPrimaryAdmin, setIsPrimaryAdmin] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      if (data && !error) {
-        setProfile(data);
+      const response = await api.get('/auth/me');
+      if (response.data?.success) {
+        const { user: userData, student } = response.data;
+        
+        const mappedUser: User = {
+          id: userData._id,
+          name: userData.name,
+          email: userData.email,
+          username: userData.username,
+          role: userData.role,
+        };
+
+        setUser(mappedUser);
+        setIsAdmin(userData.role === 'admin');
+        setIsPrimaryAdmin(userData.role === 'admin');
+
+        if (student) {
+          setProfile({
+            id: student._id,
+            user_id: userData._id,
+            name: student.name,
+            email: student.email,
+            username: student.username,
+          });
+        } else {
+          setProfile({
+            id: userData._id,
+            user_id: userData._id,
+            name: userData.name,
+            email: userData.email,
+            username: userData.username,
+          });
+        }
+
+        // Connect Socket.io client
+        try {
+          const socket = getSocket();
+          socket.connect();
+          if (userData.role === 'student' && student) {
+            socket.emit('join:hostel', student.hostel);
+          }
+        } catch (socketErr) {
+          console.warn('Socket connection failed, offline capability active:', socketErr);
+        }
       }
     } catch (err) {
       console.error('Error fetching profile:', err);
-    }
-  };
-
-  const checkAdminRole = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role, is_primary')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle();
-      
-      setIsAdmin(!!data && !error);
-      setIsPrimaryAdmin(!!data?.is_primary);
-    } catch (err) {
-      console.error('Error checking admin role:', err);
+      // Clean up if invalid/expired tokens
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      setUser(null);
+      setProfile(null);
       setIsAdmin(false);
       setIsPrimaryAdmin(false);
+      disconnectSocket();
     }
   };
 
   const refreshProfile = async () => {
-    if (user) {
-      await fetchProfile(user.id);
+    if (localStorage.getItem('accessToken')) {
+      await fetchProfile();
     }
   };
 
   useEffect(() => {
-    let currentUserId: string | null = null;
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          // Only refetch profile/role when the user actually changes
-          // (e.g. SIGNED_IN). Skip on TOKEN_REFRESHED / USER_UPDATED to
-          // avoid re-triggering loading spinners on every navigation.
-          if (currentUserId === session.user.id) return;
-          currentUserId = session.user.id;
-
-          setLoading(true);
-          setTimeout(async () => {
-            await Promise.all([
-              fetchProfile(session.user.id),
-              checkAdminRole(session.user.id),
-            ]);
-            setLoading(false);
-          }, 0);
-        } else {
-          currentUserId = null;
-          setProfile(null);
-          setIsAdmin(false);
-          setIsPrimaryAdmin(false);
-          setLoading(false);
-        }
+    const initAuth = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        await fetchProfile();
       }
-    );
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        currentUserId = session.user.id;
-        await Promise.all([
-          fetchProfile(session.user.id),
-          checkAdminRole(session.user.id),
-        ]);
-      }
-
       setLoading(false);
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    initAuth();
+
+    // Listen for unauthorized events from axios interceptor
+    const handleUnauthorized = () => {
+      setUser(null);
+      setProfile(null);
+      setIsAdmin(false);
+      setIsPrimaryAdmin(false);
+      disconnectSocket();
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error as Error | null };
+  const signIn = async (identifier: string, password: string) => {
+    try {
+      let response;
+      if (identifier.endsWith('@q2hostel.local')) {
+        // Admin login — send as email
+        response = await api.post('/auth/admin/login', { email: identifier, password });
+      } else {
+        // Student login — send as username (could be plain username or email)
+        response = await api.post('/auth/login', { username: identifier, password });
+      }
+
+      if (response.data?.success) {
+        const { accessToken, refreshToken, user: userData, student } = response.data;
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+
+        const mappedUser: User = {
+          id: userData._id,
+          name: userData.name,
+          email: userData.email,
+          username: userData.username,
+          role: userData.role,
+        };
+
+        setUser(mappedUser);
+        setIsAdmin(userData.role === 'admin');
+        setIsPrimaryAdmin(userData.role === 'admin');
+
+        if (student) {
+          setProfile({
+            id: student._id,
+            user_id: userData._id,
+            name: student.name,
+            email: student.email,
+            username: student.username,
+          });
+        } else {
+          setProfile({
+            id: userData._id,
+            user_id: userData._id,
+            name: userData.name,
+            email: userData.email,
+            username: userData.username,
+          });
+        }
+
+        // Connect Socket
+        try {
+          const socket = getSocket();
+          socket.connect();
+          if (userData.role === 'student' && student) {
+            socket.emit('join:hostel', student.hostel);
+          }
+        } catch (socketErr) {
+          console.warn('Socket connection failed:', socketErr);
+        }
+
+        return { error: null };
+      }
+      return { error: new Error('Login failed') };
+    } catch (err: any) {
+      console.error(err);
+      return { error: new Error(err.response?.data?.message || err.message || 'Login failed') };
+    }
   };
 
   const signUp = async (email: string, password: string, name: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: { name }
+    try {
+      const response = await api.post('/auth/register-admin', {
+        name,
+        email,
+        password,
+      });
+
+      if (response.data?.success) {
+        const { accessToken, refreshToken, user: userData } = response.data;
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', refreshToken);
+
+        const mappedUser: User = {
+          id: userData._id,
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
+        };
+
+        setUser(mappedUser);
+        setIsAdmin(userData.role === 'admin');
+        setIsPrimaryAdmin(userData.role === 'admin');
+        setProfile({
+          id: userData._id,
+          user_id: userData._id,
+          name: userData.name,
+          email: userData.email,
+          username: null,
+        });
+
+        // Connect Socket
+        try {
+          const socket = getSocket();
+          socket.connect();
+        } catch (socketErr) {
+          console.warn('Socket connection failed:', socketErr);
+        }
+
+        return { error: null };
       }
-    });
-    return { error: error as Error | null };
+      return { error: new Error('Signup failed') };
+    } catch (err: any) {
+      console.error(err);
+      return { error: new Error(err.response?.data?.message || err.message || 'Signup failed') };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setProfile(null);
-    setIsAdmin(false);
-    setIsPrimaryAdmin(false);
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      await api.post('/auth/logout', { refreshToken });
+    } catch (err) {
+      console.error('Logout error (non-fatal):', err);
+    } finally {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      setUser(null);
+      setProfile(null);
+      setIsAdmin(false);
+      setIsPrimaryAdmin(false);
+      disconnectSocket();
+    }
   };
 
   return (
     <AuthContext.Provider value={{
       user,
-      session,
       loading,
       isAdmin,
       isPrimaryAdmin,

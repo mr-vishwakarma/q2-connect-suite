@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useHostel } from '@/contexts/HostelContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -54,22 +55,20 @@ export default function RoomManagement() {
 
   const fetchRooms = useCallback(async () => {
     try {
-      setLoading(prev => prev);
-      const { data, error } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('hostel', selectedHostel)
-        .order('room_number');
-
-      if (error) {
-        console.error('Error fetching rooms:', error);
-        toast.error('Failed to load rooms');
-        setRooms([]);
-      } else {
-        setRooms(data || []);
+      const response = await api.get('/rooms', { params: { hostel: selectedHostel } });
+      if (response.data?.success) {
+        const mapped = response.data.data.map((r: any) => ({
+          id: r._id,
+          room_number: r.roomNumber,
+          capacity: r.capacity,
+          occupied_count: r.occupiedCount,
+          status: r.status,
+        }));
+        setRooms(mapped);
       }
     } catch (err) {
-      console.error('Unexpected error:', err);
+      console.error('Error fetching rooms:', err);
+      toast.error('Failed to load rooms');
       setRooms([]);
     } finally {
       setLoading(false);
@@ -78,85 +77,26 @@ export default function RoomManagement() {
 
   const fetchStudents = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('id, name, username, room_no')
-        .eq('hostel', selectedHostel);
-
-      if (error) {
-        console.error('Error fetching students:', error);
-        setStudents([]);
-      } else {
-        setStudents(data || []);
+      const response = await api.get('/students', { params: { hostel: selectedHostel } });
+      if (response.data?.success) {
+        const mapped = response.data.data.map((s: any) => ({
+          id: s._id,
+          name: s.name,
+          username: s.username,
+          room_no: s.roomNo,
+        }));
+        setStudents(mapped);
       }
     } catch (err) {
-      console.error('Unexpected error:', err);
+      console.error('Error fetching students:', err);
       setStudents([]);
     }
   }, [selectedHostel]);
-
-  // Update room occupancy counts based on students - only when students data changes
-  const updateRoomOccupancy = useCallback(async (currentRooms: Room[], currentStudents: Student[]) => {
-    let needsRefresh = false;
-    for (const room of currentRooms) {
-      const studentsInRoom = currentStudents.filter(s => s.room_no === room.room_number).length;
-      if (studentsInRoom !== room.occupied_count) {
-        const newStatus = studentsInRoom >= room.capacity ? 'full' : 'available';
-        await supabase
-          .from('rooms')
-          .update({ 
-            occupied_count: studentsInRoom,
-            status: newStatus
-          })
-          .eq('id', room.id);
-        needsRefresh = true;
-      }
-    }
-    if (needsRefresh) {
-      fetchRooms();
-    }
-  }, [fetchRooms]);
 
   useEffect(() => {
     fetchRooms();
     fetchStudents();
   }, [fetchRooms, fetchStudents]);
-
-  // Track if we've already synced occupancy for this data set
-  const [occupancySynced, setOccupancySynced] = useState(false);
-
-  useEffect(() => {
-    if (rooms.length > 0 && !loading && !occupancySynced) {
-      updateRoomOccupancy(rooms, students);
-      setOccupancySynced(true);
-    }
-  }, [rooms, students, loading, occupancySynced, updateRoomOccupancy]);
-
-  // Reset sync flag when hostel changes
-  useEffect(() => {
-    setOccupancySynced(false);
-  }, [selectedHostel]);
-
-  // Real-time subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel(`rooms-${selectedHostel}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'rooms',
-          filter: `hostel=eq.${selectedHostel}`,
-        },
-        () => fetchRooms()
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedHostel, fetchRooms]);
 
   const handleAddRoom = async () => {
     if (!newRoom.room_number) {
@@ -164,74 +104,67 @@ export default function RoomManagement() {
       return;
     }
 
-    const { error } = await supabase.from('rooms').insert({
-      room_number: newRoom.room_number,
-      capacity: newRoom.capacity,
-      hostel: selectedHostel,
-    });
+    try {
+      await api.post('/rooms', {
+        roomNumber: newRoom.room_number,
+        capacity: newRoom.capacity,
+        hostel: selectedHostel,
+      });
 
-    if (error) {
-      if (error.code === '23505') {
-        toast.error('Room number already exists');
-      } else {
-        toast.error('Failed to add room');
-      }
-    } else {
       toast.success('Room added successfully');
       setShowAddDialog(false);
       setNewRoom({ room_number: '', capacity: 4 });
       fetchRooms();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to add room');
     }
   };
 
   const handleEditRoom = async () => {
     if (!selectedRoom || !editRoom.room_number) return;
 
-    const { error } = await supabase
-      .from('rooms')
-      .update({
-        room_number: editRoom.room_number,
+    try {
+      await api.put(`/rooms/${selectedRoom.id}`, {
+        roomNumber: editRoom.room_number,
         capacity: editRoom.capacity,
-      })
-      .eq('id', selectedRoom.id);
+      });
 
-    if (error) {
-      toast.error('Failed to update room');
-    } else {
       toast.success('Room updated successfully');
       setShowEditDialog(false);
       fetchRooms();
+    } catch (error) {
+      toast.error('Failed to update room');
     }
   };
 
   const handleDeleteRoom = async (roomId: string) => {
     if (!confirm('Are you sure you want to delete this room?')) return;
 
-    const { error } = await supabase.from('rooms').delete().eq('id', roomId);
-
-    if (error) {
-      toast.error('Failed to delete room');
-    } else {
+    try {
+      await api.delete(`/rooms/${roomId}`);
       toast.success('Room deleted successfully');
       fetchRooms();
+    } catch (error) {
+      toast.error('Failed to delete room');
     }
   };
 
   const handleAssignStudent = async () => {
     if (!selectedRoom || !selectedStudent) return;
 
-    const { error } = await supabase
-      .from('students')
-      .update({ room_no: selectedRoom.room_number })
-      .eq('id', selectedStudent);
+    try {
+      await api.put(`/students/${selectedStudent}`, { 
+        roomNo: selectedRoom.room_number,
+        hostel: selectedHostel
+      });
 
-    if (error) {
-      toast.error('Failed to assign student');
-    } else {
       toast.success('Student assigned to room');
       setShowAssignDialog(false);
       setSelectedStudent('');
       fetchStudents();
+      fetchRooms();
+    } catch (error) {
+      toast.error('Failed to assign student');
     }
   };
 
@@ -313,8 +246,8 @@ export default function RoomManagement() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="py-8">
+                <InlineSkeletonList rows={5} />
               </div>
             ) : rooms.length === 0 ? (
               <div className="text-center py-8">

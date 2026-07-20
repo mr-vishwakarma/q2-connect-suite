@@ -1,8 +1,9 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,14 +42,18 @@ export default function AdminSuggestions() {
   const fetchSuggestions = async () => {
     try {
       setIsLoading(prev => prev);
-      const { data, error } = await supabase
-        .from('suggestions')
-        .select('*')
-        .eq('hostel', selectedHostel)
-        .order('created_at', { ascending: false });
+      const { data } = await api.get('/suggestions', { params: { hostel: selectedHostel } });
+      
+      const mappedSuggestions = (data?.data || []).map((s: any) => ({
+        id: s._id,
+        title: s.title,
+        description: s.description,
+        status: s.status,
+        created_at: s.createdAt,
+        user_id: s.userId
+      }));
 
-      if (error) throw error;
-      setSuggestions(data || []);
+      setSuggestions(mappedSuggestions);
     } catch (error) {
       console.error('Error fetching suggestions:', error);
       toast.error('Failed to fetch suggestions');
@@ -59,12 +64,7 @@ export default function AdminSuggestions() {
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      const { error } = await supabase
-        .from('suggestions')
-        .update({ status })
-        .eq('id', id);
-
-      if (error) throw error;
+      await api.put(`/suggestions/${id}`, { status });
       toast.success(`Suggestion marked as ${status}`);
       fetchSuggestions();
     } catch (error) {
@@ -88,9 +88,7 @@ export default function AdminSuggestions() {
 
   if (loading || isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <div className="py-8"><InlineSkeletonList rows={5} /></div>
     );
   }
 

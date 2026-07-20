@@ -1,8 +1,9 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,7 @@ function RegisterStudentContent() {
   const [roomError, setRoomError] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
+    email: '',
     phone: '',
     parent_phone: '',
     fees: '',
@@ -45,6 +47,13 @@ function RegisterStudentContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Auto-generate temp password when name or phone changes
+  const generateTempPassword = (name: string, phone: string) => {
+    const firstName = name.split(' ')[0] || 'User';
+    const phonePart = phone.replace(/\D/g, '').slice(0, 6) || '123456';
+    return `${firstName}@${phonePart}`;
+  };
+
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
       navigate('/admin-login');
@@ -54,20 +63,19 @@ function RegisterStudentContent() {
   // Fetch available rooms
   const fetchRooms = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('rooms')
-        .select('*')
-        .eq('hostel', selectedHostel)
-        .order('room_number');
-
-      if (error) {
-        console.error('Error fetching rooms:', error);
-        setRooms([]);
-      } else {
-        setRooms(data || []);
+      const response = await api.get('/rooms', { params: { hostel: selectedHostel } });
+      if (response.data?.success) {
+        const mapped = response.data.data.map((r: any) => ({
+          id: r._id,
+          room_number: r.roomNumber,
+          capacity: r.capacity,
+          occupied_count: r.occupiedCount,
+          status: r.status,
+        }));
+        setRooms(mapped);
       }
     } catch (err) {
-      console.error('Unexpected error:', err);
+      console.error('Error fetching rooms:', err);
       setRooms([]);
     }
   }, [selectedHostel]);
@@ -131,83 +139,48 @@ function RegisterStudentContent() {
       return;
     }
 
-    // Fast duplicate check (admin is logged in, so this is allowed)
-    const { data: existingUser } = await supabase
-      .from('students')
-      .select('username')
-      .eq('username', normalizedUsername)
-      .maybeSingle();
-
-    if (existingUser) {
-      toast.error('User ID already exists. Please choose a different one.');
-      return;
-    }
-
     // Get selected room number
     const selectedRoom = rooms.find(r => r.id === selectedRoomId);
     const roomNumber = selectedRoom?.room_number || '';
 
+    // Use formData.email for email
+    const email = formData.email.toLowerCase().trim();
+
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-student', {
-        body: {
-          name: formData.name,
-          username: normalizedUsername,
-          password: formData.password,
-          phone: formData.phone,
-          parent_phone: formData.parent_phone,
-          room_no: roomNumber,
-          fees: formData.fees,
-          hostel: selectedHostel,
-          start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
-          valid_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
-        },
+      const response = await api.post('/students', {
+        name: formData.name,
+        username: normalizedUsername,
+        password: formData.password,
+        phone: formData.phone,
+        parentPhone: formData.parent_phone,
+        roomNo: roomNumber,
+        fees: formData.fees ? parseFloat(formData.fees) : 0,
+        hostel: selectedHostel,
+        startDate: startDate ? format(startDate, 'yyyy-MM-dd') : null,
+        validDate: endDate ? format(endDate, 'yyyy-MM-dd') : null,
+        email: email,
       });
 
-      // Edge function returns error in data.error on non-2xx
-      if (error) {
-        const errorMsg = data?.error || error?.message || 'Failed to register student';
-        throw new Error(errorMsg);
+      if (response.data?.success) {
+        setSuccessMessage('✅ Student registered successfully');
+        setFormData({
+          name: '',
+          phone: '',
+          parent_phone: '',
+          fees: '',
+          password: '',
+          username: '',
+        });
+        setSelectedRoomId('');
+        setStartDate(new Date());
+        setEndDate(undefined);
+        fetchRooms(); // Refresh rooms to get updated occupancy
       }
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-      if (!data?.ok) {
-        throw new Error('Failed to register student');
-      }
-
-      // Update room occupancy if room was selected
-      if (selectedRoom) {
-        const newOccupiedCount = selectedRoom.occupied_count + 1;
-        const newStatus = newOccupiedCount >= selectedRoom.capacity ? 'full' : 'available';
-        
-        await supabase
-          .from('rooms')
-          .update({ 
-            occupied_count: newOccupiedCount,
-            status: newStatus
-          })
-          .eq('id', selectedRoom.id);
-      }
-
-      setSuccessMessage('✅ Student registered successfully');
-
-      setFormData({
-        name: '',
-        phone: '',
-        parent_phone: '',
-        fees: '',
-        password: '',
-        username: '',
-      });
-      setSelectedRoomId('');
-      setStartDate(new Date());
-      setEndDate(undefined);
-      fetchRooms(); // Refresh rooms to get updated occupancy
     } catch (error: any) {
       console.error('Error registering student:', error);
-      toast.error(error?.message || 'Failed to register student');
+      toast.error(error.response?.data?.message || 'Failed to register student');
     } finally {
       setIsSubmitting(false);
     }
@@ -215,9 +188,7 @@ function RegisterStudentContent() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <div className="py-8"><InlineSkeletonList rows={5} /></div>
     );
   }
 
@@ -256,26 +227,41 @@ function RegisterStudentContent() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="email" className="text-foreground">Student Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="student@example.com"
+                  required
+                  className="bg-secondary border-border"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="username" className="text-foreground">User ID (for login)</Label>
                 <Input
                   id="username"
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  placeholder="Unique user ID"
+                  placeholder="Unique user ID (e.g. karan123)"
                   required
                   className="bg-secondary border-border"
                 />
-                <p className="text-xs text-muted-foreground">
-                  UserID Format: (Your Email set as UserID)<br />
-                  Example: karan954036@gmail.com
-                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-foreground">Phone Number</Label>
                 <Input
                   id="phone"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => {
+                    const newPhone = e.target.value;
+                    setFormData({ 
+                      ...formData, 
+                      phone: newPhone,
+                      password: generateTempPassword(formData.name, newPhone)
+                    });
+                  }}
                   placeholder="+91 XXXXXXXXXX"
                   className="bg-secondary border-border"
                 />
@@ -392,17 +378,16 @@ function RegisterStudentContent() {
                 </Popover>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="password" className="text-foreground">Password</Label>
+                <Label htmlFor="password" className="text-foreground">Temporary Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Create password"
+                    readOnly
+                    placeholder="Auto-generated temporary password"
                     required
-                    minLength={6}
-                    className="bg-secondary border-border pr-10"
+                    className="bg-secondary/50 border-border pr-10 cursor-not-allowed text-muted-foreground"
                   />
                   <button
                     type="button"
@@ -412,9 +397,8 @@ function RegisterStudentContent() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs font-bold text-foreground">
-                  Recommended password: FirstName + @ + first 6 digits of mobile number<br />
-                  Example: karan@954036
+                <p className="text-xs text-muted-foreground">
+                  This temporary password will be emailed to the student. They will be prompted to reset it.
                 </p>
               </div>
             </div>

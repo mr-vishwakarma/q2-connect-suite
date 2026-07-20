@@ -22,6 +22,10 @@ export function useIsTablet() {
 
 export function useSidebarDrawer() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar-collapsed') === 'true';
+  });
+  
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const location = useLocation();
@@ -34,10 +38,20 @@ export function useSidebarDrawer() {
     }
   }, [location.pathname, shouldOverlay]);
 
+  const toggleCollapse = () => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebar-collapsed', String(next));
+      return next;
+    });
+  };
+
   return {
     isOpen,
     setIsOpen,
     toggle: () => setIsOpen(prev => !prev),
+    isCollapsed,
+    toggleCollapse,
     shouldOverlay,
     isMobile,
     isTablet,

@@ -4,7 +4,7 @@ import { MessageCircle, X, Send, Mic, MicOff, Bot, User, Sparkles, Database } fr
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import ReactMarkdown from 'react-markdown';
@@ -75,22 +75,20 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('chat', {
-        body: {
-          message: userMsg.content,
-          hostel: selectedHostel,
-          isAdmin,
-          userId: user.id,
-        },
+      const response = await api.post('/chat', {
+        message: userMsg.content,
+        hostel: selectedHostel,
+        isAdmin,
+        userId: user.id,
       });
 
-      if (error) throw error;
+      const data = response.data;
 
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.response || data.error || 'Sorry, something went wrong.',
-        source: data.source,
+        content: data.reply || data.message || 'Sorry, something went wrong.',
+        source: data.source || 'ai',
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botMsg]);

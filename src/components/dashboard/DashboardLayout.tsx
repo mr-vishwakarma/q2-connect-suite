@@ -12,13 +12,15 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, title, isAdmin = false }: DashboardLayoutProps) {
-  const { isOpen, setIsOpen, toggle, shouldOverlay } = useSidebarDrawer();
+  const { isOpen, setIsOpen, toggle, shouldOverlay, isCollapsed, toggleCollapse } = useSidebarDrawer();
 
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
       {!shouldOverlay && (
-        <Sidebar isAdmin={isAdmin} />
+        <div className={`fixed left-0 top-0 h-screen transition-all duration-300 z-30 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+          <Sidebar isAdmin={isAdmin} isCollapsed={isCollapsed} onToggleCollapse={toggleCollapse} />
+        </div>
       )}
 
       {/* Mobile/Tablet Overlay */}
@@ -40,13 +42,13 @@ export function DashboardLayout({ children, title, isAdmin = false }: DashboardL
               transition={{ type: 'spring', bounce: 0.15, duration: 0.4 }}
               className="fixed left-0 top-0 h-screen w-64 z-50"
             >
-              <Sidebar isAdmin={isAdmin} onNavigate={() => setIsOpen(false)} />
+              <Sidebar isAdmin={isAdmin} onNavigate={() => setIsOpen(false)} isCollapsed={false} />
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
-      <div className={shouldOverlay ? '' : 'ml-64'}>
+      <div className={`transition-all duration-300 ${shouldOverlay ? '' : isCollapsed ? 'ml-20' : 'ml-64'}`}>
         <TopBar title={title} onMenuToggle={toggle} showMenu={shouldOverlay} />
         <main className="p-3 sm:p-4 md:p-6">
           {children}

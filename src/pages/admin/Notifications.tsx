@@ -1,6 +1,9 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useEffect, useState, useCallback } from 'react';
 import { useHostel } from '@/contexts/HostelContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/lib/api';
+import { io } from 'socket.io-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -45,6 +48,7 @@ interface Student {
 
 export default function Notifications() {
   const { selectedHostel } = useHostel();
+  const { user, isAdmin } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,22 +62,23 @@ export default function Notifications() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      setLoading(prev => prev);
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('hostel', selectedHostel)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching notifications:', error);
-        toast.error('Failed to load notifications');
-        setNotifications([]);
-      } else {
-        setNotifications(data || []);
+      setLoading(true);
+      const response = await api.get('/notifications', { params: { hostel: selectedHostel } });
+      if (response.data?.success) {
+        const formatted = response.data.data.map((n: any) => ({
+          id: n._id,
+          user_id: n.userId?._id,
+          hostel: n.hostel,
+          title: n.title,
+          message: n.message,
+          type: n.type,
+          is_read: n.isRead,
+          created_at: n.createdAt,
+        }));
+        setNotifications(formatted);
       }
-    } catch (err) {
-      console.error('Unexpected error:', err);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -82,17 +87,8 @@ export default function Notifications() {
 
   const fetchStudents = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('id, name, username, user_id')
-        .eq('hostel', selectedHostel);
-
-      if (error) {
-        console.error('Error fetching students:', error);
-        setStudents([]);
-      } else {
-        setStudents(data || []);
-      }
+      const response = await api.get('/students', { params: { hostel: selectedHostel } });
+      setStudents(response.data?.data || []);
     } catch (err) {
       console.error('Unexpected error:', err);
       setStudents([]);
@@ -100,30 +96,21 @@ export default function Notifications() {
   }, [selectedHostel]);
 
   useEffect(() => {
-    fetchNotifications();
-    fetchStudents();
-  }, [fetchNotifications, fetchStudents]);
+    if (user && isAdmin) {
+      fetchNotifications();
+      fetchStudents();
+    }
+  }, [user, isAdmin, selectedHostel, fetchNotifications, fetchStudents]);
 
-  // Real-time subscription
+  // Real-time updates
   useEffect(() => {
-    const channel = supabase
-      .channel(`notifications-${selectedHostel}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `hostel=eq.${selectedHostel}`,
-        },
-        () => fetchNotifications()
-      )
-      .subscribe();
+    if (!user || !isAdmin) return;
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', { withCredentials: true });
+    
+    socket.on('notifications-updated', fetchNotifications);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedHostel, fetchNotifications]);
+    return () => { socket.disconnect(); };
+  }, [user, isAdmin, selectedHostel, fetchNotifications]);
 
   const handleSendNotification = async () => {
     if (!newNotification.title || !newNotification.message) {
@@ -131,43 +118,33 @@ export default function Notifications() {
       return;
     }
 
-    const targetStudents = newNotification.recipient === 'all'
-      ? students
-      : students.filter(s => s.id === newNotification.recipient);
+    try {
+      await api.post('/notifications/broadcast', {
+        title: newNotification.title,
+        message: newNotification.message,
+        type: newNotification.type,
+        hostel: selectedHostel,
+        recipient: newNotification.recipient
+      });
 
-    if (targetStudents.length === 0) {
-      toast.error('No students to notify');
-      return;
-    }
-
-    const notificationRecords = targetStudents.map(student => ({
-      user_id: student.user_id,
-      title: newNotification.title,
-      message: newNotification.message,
-      type: newNotification.type,
-      hostel: selectedHostel,
-    }));
-
-    const { error } = await supabase.from('notifications').insert(notificationRecords);
-
-    if (error) {
-      toast.error('Failed to send notifications');
-    } else {
-      toast.success(`Notification sent to ${targetStudents.length} student(s)`);
+      toast.success('Notification sent successfully');
       setShowSendDialog(false);
       setNewNotification({ title: '', message: '', type: 'info', recipient: 'all' });
       fetchNotifications();
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      toast.error('Failed to send notification');
     }
   };
 
   const handleDeleteNotification = async (id: string) => {
-    const { error } = await supabase.from('notifications').delete().eq('id', id);
-
-    if (error) {
-      toast.error('Failed to delete notification');
-    } else {
+    try {
+      await api.delete(`/notifications/${id}`);
+      setNotifications(prev => prev.filter(n => n.id !== id));
       toast.success('Notification deleted');
-      fetchNotifications();
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      toast.error('Failed to delete notification');
     }
   };
 
@@ -259,9 +236,7 @@ export default function Notifications() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              </div>
+              <div className="py-8"><InlineSkeletonList rows={5} /></div>
             ) : notifications.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No notifications sent yet

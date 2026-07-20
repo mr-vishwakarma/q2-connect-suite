@@ -9,7 +9,7 @@ import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Eye, EyeOff, ShieldPlus, AlertCircle } from 'lucide-react';
 import { GlowButton } from '@/components/ui/animated-section';
@@ -22,23 +22,18 @@ export default function RegisterAdmin() {
   const [isLoading, setIsLoading] = useState(false);
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, signUp } = useAuth();
   const navigate = useNavigate();
 
   // Check if admin already exists
   useEffect(() => {
     const checkAdminExists = async () => {
       try {
-        const { count, error } = await supabase
-          .from('user_roles')
-          .select('*', { count: 'exact', head: true })
-          .eq('role', 'admin');
-        
-        if (error) {
-          console.error('Error checking admin:', error);
-          setAdminExists(true); // Assume admin exists on error for security
+        const response = await api.get('/auth/admin-exists');
+        if (response.data?.success) {
+          setAdminExists(response.data.exists);
         } else {
-          setAdminExists((count ?? 0) > 0);
+          setAdminExists(true);
         }
       } catch (err) {
         console.error('Error:', err);
@@ -82,34 +77,10 @@ export default function RegisterAdmin() {
       // Create admin user with username@q2hostel.local email format
       const email = `${username.toLowerCase().trim()}@q2hostel.local`;
       
-      const { data: authData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name: username },
-          emailRedirectTo: `${window.location.origin}/`
-        }
-      });
+      const { error: signUpError } = await signUp(email, password, username);
 
       if (signUpError) {
         toast.error(signUpError.message);
-        setIsLoading(false);
-        return;
-      }
-
-      if (!authData.user) {
-        toast.error('Failed to create admin account');
-        setIsLoading(false);
-        return;
-      }
-
-      // Insert admin role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: authData.user.id, role: 'admin' });
-
-      if (roleError) {
-        toast.error('Failed to assign admin role: ' + roleError.message);
         setIsLoading(false);
         return;
       }

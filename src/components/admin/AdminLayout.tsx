@@ -11,13 +11,15 @@ interface AdminLayoutProps {
 }
 
 function AdminLayoutInner({ children, title }: AdminLayoutProps) {
-  const { isOpen, setIsOpen, toggle, shouldOverlay } = useSidebarDrawer();
+  const { isOpen, setIsOpen, toggle, isCollapsed, toggleCollapse, shouldOverlay } = useSidebarDrawer();
 
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
       {!shouldOverlay && (
-        <AdminSidebar />
+        <div className={`fixed left-0 top-0 h-screen transition-all duration-300 z-30 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+          <AdminSidebar isCollapsed={isCollapsed} onToggleCollapse={toggleCollapse} />
+        </div>
       )}
 
       {/* Mobile/Tablet Overlay */}
@@ -39,13 +41,13 @@ function AdminLayoutInner({ children, title }: AdminLayoutProps) {
               transition={{ type: 'spring', bounce: 0.15, duration: 0.4 }}
               className="fixed left-0 top-0 h-screen w-64 z-50"
             >
-              <AdminSidebar onNavigate={() => setIsOpen(false)} />
+              <AdminSidebar onNavigate={() => setIsOpen(false)} isCollapsed={false} />
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
-      <div className={shouldOverlay ? '' : 'ml-64'}>
+      <div className={`transition-all duration-300 ${shouldOverlay ? '' : isCollapsed ? 'ml-20' : 'ml-64'}`}>
         <AdminTopBar title={title} onMenuToggle={toggle} showMenu={shouldOverlay} />
         <main className="p-3 sm:p-4 md:p-6">
           {children}

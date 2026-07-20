@@ -1,9 +1,11 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
+import { io, Socket } from 'socket.io-client';
 import { AlertTriangle, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,24 +54,26 @@ export default function AdminAlerts() {
     try {
       setIsLoading(prev => prev);
 
-      // Fetch all students from student table (single source of truth)
-      const { data: students, error: studentsError } = await supabase
-        .from('students')
-        .select('id, user_id, name, phone, room_no, fees, valid_date, start_date')
-        .eq('hostel', selectedHostel);
-
-      if (studentsError) {
-        console.error('Error fetching students:', studentsError);
-        setAlertStudents([]);
-        setIsLoading(false);
-        return;
-      }
+      const response = await api.get('/students', { params: { hostel: selectedHostel } });
+      const students = response.data?.success ? response.data.data : [];
 
       if (!students || students.length === 0) {
         setAlertStudents([]);
         setIsLoading(false);
         return;
       }
+      
+      // Map API fields to the expected frontend fields
+      const mappedStudents = students.map((s: any) => ({
+        id: s._id,
+        user_id: s.userId,
+        name: s.name,
+        phone: s.phone,
+        room_no: s.roomNo,
+        fees: s.fees,
+        valid_date: s.validDate,
+        start_date: s.startDate
+      }));
 
       // Fee status is now derived from valid_date - no need to fetch fees table
 
@@ -77,7 +81,7 @@ export default function AdminAlerts() {
       today.setHours(0, 0, 0, 0);
       const alerts: AlertStudent[] = [];
 
-      students.forEach(student => {
+      mappedStudents.forEach(student => {
         let daysLeft: number | null = null;
         let daysOverdue = 0;
         let status: 'expired' | 'critical' | 'warning' | null = null;
@@ -159,37 +163,14 @@ export default function AdminAlerts() {
   useEffect(() => {
     if (!user || !isAdmin) return;
 
-    const studentsChannel = supabase
-      .channel(`students-alerts-${selectedHostel}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'students',
-          filter: `hostel=eq.${selectedHostel}`,
-        },
-        () => fetchAlertStudents()
-      )
-      .subscribe();
-
-    const feesChannel = supabase
-      .channel(`fees-alerts-${selectedHostel}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'fees',
-          filter: `hostel=eq.${selectedHostel}`,
-        },
-        () => fetchAlertStudents()
-      )
-      .subscribe();
+    const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+      withCredentials: true,
+    });
+    
+    // newSocket.on('student-updated', fetchAlertStudents);
 
     return () => {
-      supabase.removeChannel(studentsChannel);
-      supabase.removeChannel(feesChannel);
+      newSocket.disconnect();
     };
   }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
 
@@ -239,9 +220,7 @@ export default function AdminAlerts() {
 
   if (loading || isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <div className="py-8"><InlineSkeletonList rows={5} /></div>
     );
   }
 

@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Menu, X } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navLinks = [
   { name: 'Home', path: '/' },
@@ -100,6 +101,7 @@ export function Navbar() {
             transition={{ delay: 0.4 }}
             className="hidden lg:flex items-center gap-3"
           >
+            <ThemeToggle />
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -110,14 +112,16 @@ export function Navbar() {
             </motion.div>
           </motion.div>
 
-          {/* Mobile Menu Button */}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden text-foreground p-2"
-          >
-            <AnimatePresence mode="wait">
+          {/* Mobile Controls */}
+          <div className="lg:hidden flex items-center gap-2">
+            <ThemeToggle />
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="text-foreground p-2"
+            >
+              <AnimatePresence mode="wait">
               {isMobileMenuOpen ? (
                 <motion.div
                   key="close"
@@ -140,7 +144,8 @@ export function Navbar() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.button>
+            </motion.button>
+          </div>
         </div>
 
         {/* Mobile Menu */}

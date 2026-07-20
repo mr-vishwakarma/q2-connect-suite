@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { api, getSocket } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -30,18 +30,17 @@ export function NotificationBell() {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) {
-        console.error('Error fetching notifications:', error);
-        setNotifications([]);
-      } else {
-        setNotifications(data || []);
+      const response = await api.get('/notifications');
+      if (response.data?.success) {
+        const mapped = response.data.data.map((n: any) => ({
+          id: n._id,
+          title: n.title,
+          message: n.message,
+          type: n.type || 'info',
+          is_read: n.isRead,
+          created_at: n.createdAt,
+        }));
+        setNotifications(mapped);
       }
     } catch (err) {
       console.error('Unexpected error:', err);
@@ -53,48 +52,49 @@ export function NotificationBell() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Real-time subscription
+  // Real-time subscription using Socket.io
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase
-      .channel(`notifications-user-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => fetchNotifications()
-      )
-      .subscribe();
+    const socket = getSocket();
+    
+    const handleNewNotification = (notification: any) => {
+      const newNotif: Notification = {
+        id: notification._id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type || 'info',
+        is_read: notification.isRead,
+        created_at: notification.createdAt,
+      };
+      setNotifications(prev => [newNotif, ...prev]);
+    };
+
+    socket.on('notification', handleNewNotification);
 
     return () => {
-      supabase.removeChannel(channel);
+      socket.off('notification', handleNewNotification);
     };
-  }, [user, fetchNotifications]);
+  }, [user]);
 
   const markAsRead = async (id: string) => {
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', id);
-    
-    fetchNotifications();
+    try {
+      await api.put(`/notifications/${id}/read`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Error marking read:', err);
+    }
   };
 
   const markAllAsRead = async () => {
     if (!user) return;
     
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false);
-    
-    fetchNotifications();
+    try {
+      await api.put('/notifications/read-all');
+      fetchNotifications();
+    } catch (err) {
+      console.error('Error marking all read:', err);
+    }
   };
 
   const getTypeIcon = (type: string) => {

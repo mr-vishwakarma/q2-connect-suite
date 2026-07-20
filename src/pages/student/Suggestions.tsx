@@ -1,8 +1,9 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,7 @@ interface Suggestion {
   title: string;
   description: string;
   status: string;
-  created_at: string;
+  createdAt: string;
 }
 
 export default function Suggestions() {
@@ -47,26 +48,30 @@ export default function Suggestions() {
   }, [user]);
 
   const fetchStudentHostel = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('students')
-      .select('hostel')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (data?.hostel) setStudentHostel(data.hostel as 'Q2' | 'Q2.0' | 'Q2.1');
+    try {
+      const response = await api.get('/students/me');
+      if (response.data?.success) {
+        setStudentHostel(response.data.data.hostel);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const fetchSuggestions = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('suggestions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setSuggestions(data);
+    try {
+      const response = await api.get('/suggestions');
+      if (response.data?.success) {
+        setSuggestions(response.data.data.map((c: any) => ({
+          id: c._id,
+          title: c.title,
+          description: c.description,
+          status: c.status,
+          createdAt: c.createdAt,
+        })));
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -78,32 +83,27 @@ export default function Suggestions() {
       return;
     }
 
-    setIsSubmitting(true);
-    
-    const { error } = await supabase.from('suggestions').insert({
-      user_id: user!.id,
-      title: title.trim(),
-      description: description.trim(),
-      status: 'pending',
-      hostel: studentHostel
-    });
-
-    setIsSubmitting(false);
-
-    if (error) {
-      toast.error('Failed to submit suggestion');
-    } else {
+    try {
+      await api.post('/suggestions', {
+        title: title.trim(),
+        description: description.trim(),
+        hostel: studentHostel
+      });
       toast.success('Suggestion submitted successfully!');
       setTitle('');
       setDescription('');
       fetchSuggestions();
+    } catch (error) {
+      toast.error('Failed to submit suggestion');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="py-8"><InlineSkeletonList rows={5} /></div>
       </div>
     );
   }
@@ -185,7 +185,7 @@ export default function Suggestions() {
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">{suggestion.description}</p>
                     <p className="text-xs text-muted-foreground">
-                      Submitted on {format(new Date(suggestion.created_at), 'MMM d, yyyy')}
+                      Submitted on {format(new Date(suggestion.createdAt), 'MMM d, yyyy')}
                     </p>
                   </div>
                 ))}

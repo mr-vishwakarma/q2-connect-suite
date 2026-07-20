@@ -1,8 +1,10 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
+import { io } from 'socket.io-client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,14 +28,15 @@ interface LeaveRequest {
   admin_message: string | null;
   created_at: string;
   hostel: string | null;
-  document_url: string | null;
-  document_name: string | null;
-  parent_mobile: string | null;
-  approved_date: string | null;
-  student_name?: string;
-  room_no?: string;
+  documentUrl?: string | null;
+  documentName?: string | null;
+  documentFileId?: string | null;
+  parentMobile?: string | null;
+  approvedDate?: string | null;
+  studentName?: string;
+  roomNo?: string;
   username?: string;
-  student_parent_phone?: string | null;
+  parentPhone?: string | null;
 }
 
 export default function LeaveRequests() {
@@ -52,31 +55,29 @@ export default function LeaveRequests() {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const { data: messData, error } = await supabase
-        .from('mess_requests')
-        .select('*')
-        .eq('hostel', selectedHostel)
-        .order('created_at', { ascending: false });
-
-      if (error || !messData) return;
-
-      const userIds = [...new Set(messData.map(r => r.user_id))];
-      const { data: students } = await supabase
-        .from('students')
-        .select('user_id, name, room_no, username, parent_phone')
-        .in('user_id', userIds);
-
-      const studentMap = new Map(students?.map(s => [s.user_id, s]) || []);
-
-      const enriched: LeaveRequest[] = messData.map(r => ({
-        ...r,
-        student_name: studentMap.get(r.user_id)?.name || 'Unknown',
-        room_no: studentMap.get(r.user_id)?.room_no || 'N/A',
-        username: studentMap.get(r.user_id)?.username,
-        student_parent_phone: studentMap.get(r.user_id)?.parent_phone || null,
-      }));
-
-      setRequests(enriched);
+      const response = await api.get('/mess-requests', { params: { hostel: selectedHostel } });
+      if (response.data?.success) {
+        const reqs = response.data.data.map((r: any) => ({
+          id: r._id,
+          user_id: r.userId?._id,
+          leaving_date: r.leavingDate,
+          return_date: r.returnDate,
+          reason: r.reason,
+          status: r.status,
+          admin_message: r.adminMessage,
+          created_at: r.createdAt,
+          hostel: r.hostel,
+          documentUrl: r.documentUrl,
+          documentName: r.documentName,
+          parentMobile: r.parentMobile,
+          approvedDate: r.approvedDate,
+          studentName: r.studentId?.name || r.userId?.name || 'Unknown',
+          roomNo: r.studentId?.roomNo || 'N/A',
+          username: r.userId?.username,
+          parentPhone: r.studentId?.parentPhone || null,
+        }));
+        setRequests(reqs);
+      }
     } catch (e) {
       console.error('Error fetching leave requests:', e);
     }
@@ -88,25 +89,20 @@ export default function LeaveRequests() {
 
   useEffect(() => {
     if (!user || !isAdmin) return;
-    const channel = supabase
-      .channel(`leave-requests-${selectedHostel}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mess_requests' }, () => fetchRequests())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', { withCredentials: true });
+    
+    // Optionally listen to events to refetch data
+    // socket.on('mess-requests-updated', fetchRequests);
+
+    return () => { socket.disconnect(); };
   }, [user, isAdmin, selectedHostel, fetchRequests]);
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     setUpdatingId(id);
     const message = adminMessages[id] || null;
-    const payload: Record<string, unknown> = { status: newStatus, admin_message: message };
-    if (newStatus === 'approved') payload.approved_date = new Date().toISOString();
-
-    const { error } = await supabase.from('mess_requests').update(payload).eq('id', id);
-    setUpdatingId(null);
-
-    if (error) {
-      toast.error('Failed to update request');
-    } else {
+    
+    try {
+      await api.put(`/mess-requests/${id}`, { status: newStatus, adminMessage: message });
       toast.success(`Request marked as ${newStatus}`);
       setAdminMessages(prev => {
         const next = { ...prev };
@@ -114,34 +110,33 @@ export default function LeaveRequests() {
         return next;
       });
       fetchRequests();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update request');
+    } finally {
+      setUpdatingId(null);
     }
   };
 
-  const viewDocument = async (path: string) => {
-    const { data, error } = await supabase.storage
-      .from('leave-documents')
-      .createSignedUrl(path, 60 * 10);
-    if (error || !data) {
-      toast.error('Could not open document');
-      return;
-    }
-    window.open(data.signedUrl, '_blank');
+  const viewDocument = async (url: string) => {
+    if (url) window.open(url, '_blank');
   };
 
-  const downloadDocument = async (path: string, name?: string | null) => {
-    const { data, error } = await supabase.storage
-      .from('leave-documents')
-      .download(path);
-    if (error || !data) {
+  const downloadDocument = async (url: string, name?: string | null) => {
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = name || 'leave-document';
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Failed to download document:', error);
       toast.error('Could not download document');
-      return;
     }
-    const url = URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name || path.split('/').pop() || 'leave-document';
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const getStatusBadge = (status: string | null) => {
@@ -161,7 +156,7 @@ export default function LeaveRequests() {
     const q = search.trim().toLowerCase();
     if (!q) return requests;
     return requests.filter(r =>
-      (r.student_name || '').toLowerCase().includes(q) ||
+      (r.studentName || '').toLowerCase().includes(q) ||
       (r.username || '').toLowerCase().includes(q) ||
       (r.user_id || '').toLowerCase().includes(q)
     );
@@ -169,9 +164,7 @@ export default function LeaveRequests() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
+      <div className="py-8"><InlineSkeletonList rows={5} /></div>
     );
   }
 
@@ -237,10 +230,10 @@ export default function LeaveRequests() {
                       <div className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-primary" />
-                          <span className="text-foreground font-semibold">{request.student_name}</span>
+                          <span className="text-foreground font-semibold">{request.studentName}</span>
                         </div>
                         <span className="text-muted-foreground text-sm flex items-center gap-1">
-                          <Home className="w-3.5 h-3.5" /> Room {request.room_no}
+                          <Home className="w-3.5 h-3.5" /> Room {request.roomNo}
                         </span>
                         <span className="text-muted-foreground text-sm">Hostel: {request.hostel}</span>
                         {getStatusBadge(request.status)}
@@ -255,16 +248,16 @@ export default function LeaveRequests() {
                           <Calendar className="w-3.5 h-3.5" />
                           <span>Return: {format(new Date(request.return_date), 'MMM d, yyyy')}</span>
                         </div>
-                        {request.approved_date && (
+                        {request.approvedDate && (
                           <div className="flex items-center gap-1.5 text-green-400">
                             <CheckCircle className="w-3.5 h-3.5" />
-                            <span>Approved: {format(new Date(request.approved_date), 'MMM d, yyyy')}</span>
+                            <span>Approved: {format(new Date(request.approvedDate), 'MMM d, yyyy')}</span>
                           </div>
                         )}
-                        {(request.parent_mobile || request.student_parent_phone) && (
+                        {(request.parentMobile || request.parentPhone) && (
                           <div className="flex items-center gap-1.5">
                             <Phone className="w-3.5 h-3.5" />
-                            <span>Parent: {request.parent_mobile || request.student_parent_phone}</span>
+                            <span>Parent: {request.parentMobile || request.parentPhone}</span>
                           </div>
                         )}
                       </div>
@@ -276,16 +269,16 @@ export default function LeaveRequests() {
                         </div>
                       )}
 
-                      {request.document_url && (
+                      {request.documentUrl && (
                         <div className="flex flex-wrap gap-2">
-                          <Button size="sm" variant="outline" className="gap-2" onClick={() => viewDocument(request.document_url!)}>
+                          <Button size="sm" variant="outline" className="gap-2" onClick={() => viewDocument(request.documentUrl!)}>
                             <Eye className="w-3.5 h-3.5" /> View Document
                           </Button>
-                          <Button size="sm" variant="outline" className="gap-2" onClick={() => downloadDocument(request.document_url!, request.document_name)}>
+                          <Button size="sm" variant="outline" className="gap-2" onClick={() => downloadDocument(request.documentUrl!, request.documentName)}>
                             <FileText className="w-3.5 h-3.5" /> Download
                           </Button>
-                          {request.document_name && (
-                            <span className="text-xs text-muted-foreground self-center">{request.document_name}</span>
+                          {request.documentName && (
+                            <span className="text-xs text-muted-foreground self-center">{request.documentName}</span>
                           )}
                         </div>
                       )}
@@ -357,24 +350,24 @@ export default function LeaveRequests() {
                 requests.map((r) => (
                   <div key={r.id} className="p-4 rounded-xl bg-secondary border border-border space-y-2">
                     <div className="flex flex-wrap items-center gap-3">
-                      <span className="font-semibold text-foreground">{r.student_name}</span>
-                      <span className="text-xs text-muted-foreground">Room {r.room_no}</span>
+                      <span className="font-semibold text-foreground">{r.studentName}</span>
+                      <span className="text-xs text-muted-foreground">Room {r.roomNo}</span>
                       <span className="text-xs text-muted-foreground">Hostel: {r.hostel}</span>
                       {getStatusBadge(r.status)}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs text-muted-foreground">
                       <span>Leaving: {format(new Date(r.leaving_date), 'MMM d, yyyy')}</span>
                       <span>Return: {format(new Date(r.return_date), 'MMM d, yyyy')}</span>
-                      <span>Approved: {r.approved_date ? format(new Date(r.approved_date), 'MMM d, yyyy') : '—'}</span>
-                      <span>Parent: {r.parent_mobile || r.student_parent_phone || '—'}</span>
+                      <span>Approved: {r.approvedDate ? format(new Date(r.approvedDate), 'MMM d, yyyy') : '—'}</span>
+                      <span>Parent: {r.parentMobile || r.parentPhone || '—'}</span>
                     </div>
                     {r.reason && <p className="text-sm text-foreground"><span className="text-muted-foreground">Reason:</span> {r.reason}</p>}
-                    {r.document_url && (
+                    {r.documentUrl && (
                       <div className="flex gap-2 flex-wrap">
-                        <Button size="sm" variant="outline" className="gap-2" onClick={() => viewDocument(r.document_url!)}>
+                        <Button size="sm" variant="outline" className="gap-2" onClick={() => viewDocument(r.documentUrl!)}>
                           <Eye className="w-3.5 h-3.5" /> View
                         </Button>
-                        <Button size="sm" variant="outline" className="gap-2" onClick={() => downloadDocument(r.document_url!, r.document_name)}>
+                        <Button size="sm" variant="outline" className="gap-2" onClick={() => downloadDocument(r.documentUrl!, r.documentName)}>
                           <FileText className="w-3.5 h-3.5" /> Download
                         </Button>
                       </div>

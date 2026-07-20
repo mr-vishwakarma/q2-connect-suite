@@ -1,3 +1,4 @@
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { MessageSquare, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { MessageSquare, CheckCircle, Clock, XCircle, FileDown, FileSpreadsheet } from 'lucide-react';
+import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
 
 interface Complaint {
   id: string;
@@ -88,9 +90,7 @@ export default function AdminComplaints() {
 
   if (loading || isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <div className="py-8"><InlineSkeletonList rows={5} /></div>
     );
   }
 
