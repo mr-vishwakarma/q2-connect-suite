@@ -24,9 +24,25 @@ connectDB();
 
 const app = express();
 
-// CORS
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:8080',
+  'http://localhost:5173',
+  'https://q2-connect-suite.vercel.app',
+  'https://dist-eight-kappa-11.vercel.app'
+];
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 
