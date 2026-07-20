@@ -23,7 +23,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isPrimaryAdmin: boolean;
   profile: Profile | null;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string, isAdminLogin?: boolean) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -130,16 +130,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = async (identifier: string, password: string) => {
+  const signIn = async (identifier: string, password: string, isAdminLogin: boolean = false) => {
     try {
       let response;
-      if (identifier.endsWith('@q2hostel.local')) {
-        // Admin login — send as email
-        response = await api.post('/auth/admin/login', { email: identifier, password });
-      } else {
-        // Student login — send as username (could be plain username or email)
-        response = await api.post('/auth/login', { username: identifier, password });
-      }
+      response = await api.post(
+        isAdminLogin ? '/auth/admin/login' : '/auth/login',
+        { email: identifier, username: identifier, password }
+      );
 
       if (response.data?.success) {
         const { accessToken, refreshToken, user: userData, student } = response.data;

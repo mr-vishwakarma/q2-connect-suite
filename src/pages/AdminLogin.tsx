@@ -38,9 +38,8 @@ export default function AdminLogin() {
 
     setIsLoading(true);
     
-    // Convert username to email format for Supabase Auth
-    const email = `${username.toLowerCase().trim()}@q2hostel.local`;
-    const { error } = await signIn(email, password);
+    const normalizedUsername = username.trim();
+    const { error } = await signIn(normalizedUsername, password, true);
     
     setIsLoading(false);
 
