@@ -85,24 +85,29 @@ httpServer.listen(PORT, () => {
   // Initialize cron jobs
   initCronJobs();
 
-  // Seed admin automatically on startup
+  // Seed admin automatically on startup using environment variables
   const User = require('./models/User');
-  User.findOne({ email: 'abhi1006@q2connect.com' }).then(admin => {
-    if (!admin) {
-      console.log('⏳ Seeding admin user automatically...');
-      new User({
-        name: 'Abhi',
-        email: 'abhi1006@q2connect.com',
-        username: 'Abhi1006',
-        password: 'q2@6XZZ2U28',
-        role: 'admin',
-        hostels: ['Q2', 'Q2.0', 'Q2.1']
-      }).save().then(() => console.log('✅ Admin user seeded successfully!'))
-      .catch(err => console.error('❌ Error seeding admin:', err));
-    } else {
-      console.log('✅ Admin user already exists.');
-    }
-  }).catch(err => console.error('❌ Error checking admin:', err));
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  
+  if (adminEmail && adminPassword) {
+    User.findOne({ email: adminEmail }).then(admin => {
+      if (!admin) {
+        console.log('⏳ Seeding admin user automatically...');
+        new User({
+          name: 'Admin',
+          email: adminEmail,
+          username: adminEmail.split('@')[0],
+          password: adminPassword,
+          role: 'admin',
+          hostels: ['Q2', 'Q2.0', 'Q2.1']
+        }).save().then(() => console.log('✅ Admin user seeded successfully!'))
+        .catch(err => console.error('❌ Error seeding admin:', err));
+      } else {
+        console.log('✅ Admin user already exists.');
+      }
+    }).catch(err => console.error('❌ Error checking admin:', err));
+  }
 });
 
 module.exports = app;
