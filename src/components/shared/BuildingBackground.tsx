@@ -24,8 +24,13 @@ function BuildingPlane({ onAnimationComplete }: BuildingPlaneProps) {
   const startY = viewport.height + 5;
   const endY = 0;
   
+  const timeRef = useRef(0);
+  
   useFrame((state, delta) => {
     if (!meshRef.current) return;
+    
+    // Accumulate time manually to avoid deprecated THREE.Clock warning
+    timeRef.current += delta;
     
     if (animationProgress < 1) {
       // Smooth easing for gravity-like fall with slow-down at end
@@ -56,8 +61,7 @@ function BuildingPlane({ onAnimationComplete }: BuildingPlaneProps) {
       }
     } else {
       // Subtle breathing animation after settling
-      const time = state.clock.getElapsedTime();
-      meshRef.current.position.y = endY + Math.sin(time * 0.5) * 0.02;
+      meshRef.current.position.y = endY + Math.sin(timeRef.current * 0.5) * 0.02;
     }
   });
 
@@ -110,13 +114,15 @@ function Lighting() {
 
 function GlowEffect() {
   const meshRef = useRef<Mesh>(null);
+  const timeRef = useRef(0);
   
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!meshRef.current) return;
-    const time = state.clock.getElapsedTime();
+    timeRef.current += delta;
+    
     // Subtle pulsing glow
     const material = meshRef.current.material as MeshStandardMaterial;
-    material.opacity = 0.15 + Math.sin(time * 0.8) * 0.05;
+    material.opacity = 0.15 + Math.sin(timeRef.current * 0.8) * 0.05;
   });
 
   return (
