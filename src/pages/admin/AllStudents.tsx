@@ -166,11 +166,13 @@ export default function AllStudents() {
     try {
       await api.delete(`/students/${studentId}`);
       toast.success('Student deleted successfully');
+      // Optimistically remove from UI state — no refetch needed
       setStudents((prev) => prev.filter((s) => s.id !== studentId));
-      fetchStudents();
     } catch (error) {
       console.error('Error deleting student:', error);
       toast.error('Failed to delete student');
+      // Refetch only on failure to restore correct state
+      fetchStudents();
     }
   };
 
