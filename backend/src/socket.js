@@ -10,7 +10,19 @@ const User = require('./models/User');
 const initSocket = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const isAllowed = 
+          origin.startsWith('http://localhost') ||
+          origin.endsWith('.vercel.app') ||
+          (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL);
+
+        if (isAllowed) {
+          callback(null, origin);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },
