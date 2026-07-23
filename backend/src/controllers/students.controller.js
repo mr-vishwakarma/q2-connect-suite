@@ -185,22 +185,25 @@ const updateStudent = async (req, res) => {
 // @access  Admin
 const deleteStudent = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
-
-    // Decrement room occupancy
-    if (student.roomNo && student.hostel) {
-      await Room.findOneAndUpdate(
-        { roomNumber: student.roomNo, hostel: student.hostel },
-        { $inc: { occupiedCount: -1 } }
-      );
+    let student = await Student.findById(req.params.id);
+    if (!student) {
+      student = await Student.findOne({ userId: req.params.id });
     }
 
-    // Permanently remove User and Student records
-    if (student.userId) {
-      await User.findByIdAndDelete(student.userId);
+    if (student) {
+      if (student.roomNo && student.hostel) {
+        await Room.findOneAndUpdate(
+          { roomNumber: student.roomNo, hostel: student.hostel },
+          { $inc: { occupiedCount: -1 } }
+        );
+      }
+      if (student.userId) {
+        await User.findByIdAndDelete(student.userId);
+      }
+      await Student.findByIdAndDelete(student._id);
+    } else {
+      await User.findByIdAndDelete(req.params.id);
     }
-    await Student.findByIdAndDelete(req.params.id);
 
     return res.status(200).json({ success: true, message: 'Student deleted successfully' });
   } catch (error) {

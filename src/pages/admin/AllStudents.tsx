@@ -95,7 +95,7 @@ export default function AllStudents() {
   const fetchStudents = useCallback(async () => {
     try {
       setIsLoading(prev => prev);
-      const response = await api.get('/students', { params: { hostel: selectedHostel } });
+      const response = await api.get('/students', { params: { hostel: selectedHostel, _t: Date.now() } });
       if (response.data?.success) {
         const mapped = response.data.data.map((s: any) => ({
           id: s._id,
