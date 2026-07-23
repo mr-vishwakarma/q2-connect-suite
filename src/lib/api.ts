@@ -104,6 +104,7 @@ export const getSocket = (): Socket => {
   const token = localStorage.getItem('accessToken');
   socket = io(SOCKET_URL, {
     auth: { token },
+    transports: ['websocket', 'polling'],
     autoConnect: false,
   });
 
