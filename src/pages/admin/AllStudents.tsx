@@ -1,5 +1,5 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -68,6 +68,7 @@ export default function AllStudents() {
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const deletedIdsRef = useRef<Set<string>>(new Set());
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -97,18 +98,20 @@ export default function AllStudents() {
       setIsLoading(prev => prev);
       const response = await api.get('/students', { params: { hostel: selectedHostel, _t: Date.now() } });
       if (response.data?.success) {
-        const mapped = response.data.data.map((s: any) => ({
-          id: s._id,
-          user_id: s.userId,
-          name: s.name,
-          phone: s.phone || '',
-          room_no: s.roomNo || '',
-          fees: s.fees || 0,
-          start_date: s.startDate || '',
-          valid_date: s.validDate || '',
-          username: s.username,
-          created_at: s.createdAt,
-        }));
+        const mapped = response.data.data
+          .filter((s: any) => !deletedIdsRef.current.has(s._id))
+          .map((s: any) => ({
+            id: s._id,
+            user_id: s.userId,
+            name: s.name,
+            phone: s.phone || '',
+            room_no: s.roomNo || '',
+            fees: s.fees || 0,
+            start_date: s.startDate || '',
+            valid_date: s.validDate || '',
+            username: s.username,
+            created_at: s.createdAt,
+          }));
         setStudents(mapped);
       }
     } catch (error) {
@@ -164,14 +167,17 @@ export default function AllStudents() {
     if (!confirm('Are you sure you want to delete this student?')) return;
 
     try {
+      // Track this ID so it never comes back from any future fetch
+      deletedIdsRef.current.add(studentId);
+      // Immediately remove from UI
+      setStudents((prev) => prev.filter((s) => s.id !== studentId));
       await api.delete(`/students/${studentId}`);
       toast.success('Student deleted successfully');
-      // Optimistically remove from UI state — no refetch needed
-      setStudents((prev) => prev.filter((s) => s.id !== studentId));
     } catch (error) {
       console.error('Error deleting student:', error);
       toast.error('Failed to delete student');
-      // Refetch only on failure to restore correct state
+      // Undo: allow it back and refetch real state
+      deletedIdsRef.current.delete(studentId);
       fetchStudents();
     }
   };
