@@ -11,7 +11,7 @@ const { sendStudentCredentials } = require('../utils/email');
 const getAllStudents = async (req, res) => {
   try {
     const { hostel, search, page = 1, limit = 50 } = req.query;
-    const query = {};
+    const query = { isActive: { $ne: false } };
     if (hostel) query.hostel = hostel;
     if (search) {
       query.$or = [
@@ -196,11 +196,13 @@ const deleteStudent = async (req, res) => {
       );
     }
 
-    // Deactivate user (soft delete)
-    await User.findByIdAndUpdate(student.userId, { isActive: false });
-    await Student.findByIdAndUpdate(req.params.id, { isActive: false });
+    // Permanently remove User and Student records
+    if (student.userId) {
+      await User.findByIdAndDelete(student.userId);
+    }
+    await Student.findByIdAndDelete(req.params.id);
 
-    return res.status(200).json({ success: true, message: 'Student deactivated successfully' });
+    return res.status(200).json({ success: true, message: 'Student deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

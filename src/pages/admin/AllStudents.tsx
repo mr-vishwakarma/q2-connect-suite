@@ -166,6 +166,7 @@ export default function AllStudents() {
     try {
       await api.delete(`/students/${studentId}`);
       toast.success('Student deleted successfully');
+      setStudents((prev) => prev.filter((s) => s.id !== studentId));
       fetchStudents();
     } catch (error) {
       console.error('Error deleting student:', error);
