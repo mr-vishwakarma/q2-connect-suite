@@ -24,21 +24,18 @@ connectDB();
 
 const app = express();
 
-// CORS configuration
-const allowedOrigins = [
-  'http://localhost:8080',
-  'http://localhost:5173',
-  'https://q2-connect-suite.vercel.app',
-  'https://dist-eight-kappa-11.vercel.app'
-];
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
-
+// CORS configuration - allow all Vercel domains and local environments
 app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = 
+      origin.startsWith('http://localhost') ||
+      origin.endsWith('.vercel.app') ||
+      (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL);
+
+    if (isAllowed) {
+      callback(null, origin);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
