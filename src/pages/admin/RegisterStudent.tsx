@@ -167,6 +167,7 @@ function RegisterStudentContent() {
         setSuccessMessage('✅ Student registered successfully');
         setFormData({
           name: '',
+          email: '',
           phone: '',
           parent_phone: '',
           fees: '',

@@ -10,5 +10,16 @@ console.warn = (...args: any[]) => {
   }
   originalWarn.apply(console, args);
 };
+// In production builds, suppress verbose diagnostic logging so internal error
+// details (stack traces, payloads, backend responses) are not exposed in the
+// browser console. User-facing messages are surfaced via toasts instead.
+if (import.meta.env.PROD) {
+  const noop = () => {};
+  console.error = noop;
+  console.warn = noop;
+  console.debug = noop;
+  console.info = noop;
+  console.log = noop;
+}
 
 createRoot(document.getElementById("root")!).render(<App />);

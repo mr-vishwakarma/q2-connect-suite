@@ -31,6 +31,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// SECURITY NOTE: `isAdmin` / `isPrimaryAdmin` below are UX-only hints used to show
+// or hide UI. They are never the source of truth for authorization. All access is
+// enforced server-side by row-level security policies (via the has_role() helper)
+// and by JWT + role checks inside edge functions.
+
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);

@@ -4,10 +4,29 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
+  /^https:\/\/q2-hostel\.lovable\.app$/,
+  /^https:\/\/[a-z0-9-]+\.lovable\.app$/,
+  /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/,
+  /^http:\/\/localhost(:\d+)?$/,
+];
+
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("Origin") ?? "";
+  const allowed = ALLOWED_ORIGIN_PATTERNS.some((re) => re.test(origin));
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : "null",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+let corsHeaders: Record<string, string> = {
+  "Access-Control-Allow-Origin": "null",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Vary": "Origin",
 };
 
 type CreateStudentBody = {
@@ -31,6 +50,7 @@ function json(status: number, body: unknown) {
 }
 
 serve(async (req) => {
+  corsHeaders = corsHeadersFor(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "Method not allowed" });
 
