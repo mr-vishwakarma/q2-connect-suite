@@ -32,6 +32,9 @@ app.use(cors({
     const isAllowed = 
       origin.startsWith('http://localhost') ||
       origin.endsWith('.vercel.app') ||
+      origin.endsWith('.lovable.app') ||
+      origin.endsWith('.lovableproject.com') ||
+      origin.endsWith('.onrender.com') ||
       (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL);
 
     if (isAllowed) {

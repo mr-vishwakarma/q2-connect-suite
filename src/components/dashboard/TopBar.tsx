@@ -2,7 +2,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { Search, Menu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface TopBarProps {
   title: string;
@@ -36,7 +35,6 @@ export function TopBar({ title, onMenuToggle, showMenu }: TopBarProps) {
           />
         </div>
 
-        <ThemeToggle />
         <NotificationBell />
 
         <div className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-border">
