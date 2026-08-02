@@ -8,7 +8,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { HostelProvider } from "@/contexts/HostelContext";
 import { ProtectedAdminRoute } from "@/components/auth/ProtectedAdminRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
-import { ThemeProvider } from "@/components/theme-provider";
 import ScrollToTop from "@/components/ScrollToTop";
 const Index = lazy(() => import("./pages/Index"));
 const About = lazy(() => import("./pages/About"));
@@ -68,7 +67,6 @@ function AdminShell() {
 }
 
 const App = () => (
-  <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
       <AuthProvider>
@@ -126,7 +124,6 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
-  </ThemeProvider>
 );
 
 export default App;

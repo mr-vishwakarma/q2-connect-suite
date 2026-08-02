@@ -15,6 +15,8 @@ const initSocket = (httpServer) => {
         const isAllowed = 
           origin.startsWith('http://localhost') ||
           origin.endsWith('.vercel.app') ||
+          origin.endsWith('.lovable.app') ||
+          origin.endsWith('.lovableproject.com') ||
           (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL);
 
         if (isAllowed) {
