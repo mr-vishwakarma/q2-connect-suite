@@ -50,6 +50,7 @@ function json(status: number, body: unknown) {
 }
 
 serve(async (req) => {
+  corsHeaders = corsHeadersFor(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "Method not allowed" });
 
