@@ -106,21 +106,6 @@ const createStudent = async (req, res) => {
       );
     }
 
-    // Generate a reset token for their first login
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetPasswordExpires = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days for initial setup
-    await user.save({ validateBeforeSave: false });
-
-    // Send credentials email with reset link
-    try {
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
-      const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
-      await sendStudentCredentials({ to: email, name, username, password, resetLink });
-    } catch (emailErr) {
-      console.error('Email send failed (non-fatal):', emailErr.message);
-    }
-
     // Create welcome notification
     await Notification.create({
       userId: user._id,
@@ -130,7 +115,11 @@ const createStudent = async (req, res) => {
       type: 'success',
     });
 
-    return res.status(201).json({ success: true, data: { user: user.toJSON(), student } });
+    return res.status(201).json({
+      success: true,
+      message: 'Student registered successfully',
+      data: { user: user.toJSON(), student }
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

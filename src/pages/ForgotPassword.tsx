@@ -48,9 +48,12 @@ export default function ForgotPassword() {
                 <Mail className="w-8 h-8 text-primary" />
               </div>
               <h2 className="text-2xl font-bold text-foreground mb-2">Check Your Email</h2>
-              <p className="text-muted-foreground mb-6">
-                If an account exists with {email}, we've sent instructions to reset your password.
+              <p className="text-muted-foreground mb-4">
+                If an account exists with <strong>{email}</strong>, we've sent instructions to reset your password.
               </p>
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-xs text-amber-600 dark:text-amber-400 mb-6">
+                💡 <strong>Important:</strong> Please check your <strong>Spam / Junk</strong> folder if you don't see the email in your main inbox within a few minutes.
+              </div>
               <Button onClick={() => navigate('/login')} className="w-full">
                 Return to Login
               </Button>
@@ -78,7 +81,7 @@ export default function ForgotPassword() {
             Forgot Password
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Enter your email to receive a password reset link.
+            Enter your Email Address or User ID to receive a password reset link.
           </p>
         </motion.div>
 
@@ -92,17 +95,17 @@ export default function ForgotPassword() {
             <CardContent className="pt-6">
               <form className="space-y-5" onSubmit={handleSubmit}>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">Email Address or User ID</Label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Mail className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <Input
                       id="email"
-                      type="email"
+                      type="text"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="student@example.com"
+                      placeholder="student@example.com or shyam12"
                       required
                       className="pl-10 bg-secondary border-border"
                     />

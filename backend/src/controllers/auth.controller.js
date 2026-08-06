@@ -257,14 +257,20 @@ const deleteAdmin = async (req, res) => {
 const requestPasswordReset = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+    if (!email) return res.status(400).json({ success: false, message: 'Email or User ID is required' });
 
-    // Look for user by email (could be student real email or admin email)
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const searchKey = email.toLowerCase().trim();
+    // Look for user by email or username (student User ID or email)
+    const user = await User.findOne({
+      $or: [
+        { email: searchKey },
+        { username: searchKey }
+      ]
+    });
     
-    // We always return success to avoid leaking which emails exist
-    if (!user) {
-      return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+    // We always return success to avoid leaking which accounts exist
+    if (!user || !user.email) {
+      return res.status(200).json({ success: true, message: 'If an account exists with that detail, a reset link has been sent to the registered email.' });
     }
 
     // Generate token

@@ -45,13 +45,15 @@ function RegisterStudentContent() {
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [showPassword, setShowPassword] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [lastCreated, setLastCreated] = useState<{ name: string; username: string; email: string; pass: string } | null>(null);
 
-  // Auto-generate temp password when name or phone changes
-  const generateTempPassword = (name: string, phone: string) => {
-    const firstName = name.split(' ')[0] || 'User';
-    const phonePart = phone.replace(/\D/g, '').slice(0, 6) || '123456';
-    return `${firstName}@${phonePart}`;
+  // Auto-generate temp password
+  const handleAutoGeneratePassword = () => {
+    const firstName = formData.name.split(' ')[0] || 'Student';
+    const phonePart = formData.phone.replace(/\D/g, '').slice(-4) || '1234';
+    const generated = `${firstName}@${phonePart}`;
+    setFormData(prev => ({ ...prev, password: generated }));
+    toast.info(`Generated password: ${generated}`);
   };
 
   useEffect(() => {
@@ -113,7 +115,7 @@ function RegisterStudentContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSuccessMessage('');
+    setLastCreated(null);
 
     if (!formData.username) {
       toast.error('User ID is required');
@@ -164,7 +166,14 @@ function RegisterStudentContent() {
       });
 
       if (response.data?.success) {
-        setSuccessMessage('✅ Student registered successfully');
+        toast.success(`Student ${formData.name} registered successfully!`);
+        setLastCreated({
+          name: formData.name,
+          username: normalizedUsername,
+          email: email,
+          pass: formData.password,
+        });
+
         setFormData({
           name: '',
           email: '',
@@ -255,14 +264,7 @@ function RegisterStudentContent() {
                 <Input
                   id="phone"
                   value={formData.phone}
-                  onChange={(e) => {
-                    const newPhone = e.target.value;
-                    setFormData({ 
-                      ...formData, 
-                      phone: newPhone,
-                      password: generateTempPassword(formData.name, newPhone)
-                    });
-                  }}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="+91 XXXXXXXXXX"
                   className="bg-secondary border-border"
                 />
@@ -379,16 +381,25 @@ function RegisterStudentContent() {
                 </Popover>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="password" className="text-foreground">Temporary Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-foreground">Password (for Student Login)</Label>
+                  <button
+                    type="button"
+                    onClick={handleAutoGeneratePassword}
+                    className="text-xs text-primary hover:underline font-medium"
+                  >
+                    Auto-Generate
+                  </button>
+                </div>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
-                    readOnly
-                    placeholder="Auto-generated temporary password"
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Enter or generate password"
                     required
-                    className="bg-secondary/50 border-border pr-10 cursor-not-allowed text-muted-foreground"
+                    className="bg-secondary border-border pr-10"
                   />
                   <button
                     type="button"
@@ -399,7 +410,7 @@ function RegisterStudentContent() {
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  This temporary password will be emailed to the student. They will be prompted to reset it.
+                  The student will use their <strong>User ID</strong> (or Email) and this <strong>Password</strong> to log in directly.
                 </p>
               </div>
             </div>
@@ -413,8 +424,33 @@ function RegisterStudentContent() {
               {isSubmitting ? 'Registering...' : 'Register Student'}
             </Button>
 
-            {successMessage && (
-              <p className="text-sm text-primary font-medium">{successMessage}</p>
+            {lastCreated && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mt-6 p-4 rounded-xl border border-primary/30 bg-primary/10 space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                    ✅ Student Registered Successfully!
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`User ID: ${lastCreated.username}\nEmail: ${lastCreated.email}\nPassword: ${lastCreated.pass}`);
+                      toast.success('Credentials copied to clipboard!');
+                    }}
+                    className="text-xs bg-primary text-primary-foreground px-2.5 py-1 rounded-md hover:bg-primary/90 transition-colors"
+                  >
+                    Copy Credentials
+                  </button>
+                </div>
+                <div className="text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono">
+                  <div><span className="font-sans font-medium text-foreground">User ID:</span> {lastCreated.username}</div>
+                  <div><span className="font-sans font-medium text-foreground">Email:</span> {lastCreated.email}</div>
+                  <div><span className="font-sans font-medium text-foreground">Password:</span> {lastCreated.pass}</div>
+                </div>
+              </motion.div>
             )}
           </form>
         </CardContent>
