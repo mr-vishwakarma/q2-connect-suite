@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useIsMobile } from './use-mobile';
 
@@ -30,17 +30,22 @@ export function useSidebarDrawer() {
   const isTablet = useIsTablet();
   const location = useLocation();
   const shouldOverlay = isMobile || isTablet;
-  const prevPathRef = useRef(location.pathname);
+  const hasMountedRef = useRef(false);
 
-  // Auto-close ONLY when route actually changes
+  // Close sidebar on every route change (skip initial mount)
   useEffect(() => {
-    if (prevPathRef.current !== location.pathname) {
-      prevPathRef.current = location.pathname;
-      if (shouldOverlay) {
-        setIsOpen(false);
-      }
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+    if (shouldOverlay) {
+      setIsOpen(false);
     }
   }, [location.pathname, shouldOverlay]);
+
+  const closeSidebar = useCallback(() => {
+    setIsOpen(false);
+  }, []);
 
   const toggleCollapse = () => {
     setIsCollapsed(prev => {
@@ -54,6 +59,7 @@ export function useSidebarDrawer() {
     isOpen,
     setIsOpen,
     toggle: () => setIsOpen(prev => !prev),
+    closeSidebar,
     isCollapsed,
     toggleCollapse,
     shouldOverlay,

@@ -11,7 +11,7 @@ interface AdminLayoutProps {
 }
 
 function AdminLayoutInner({ children, title }: AdminLayoutProps) {
-  const { isOpen, setIsOpen, toggle, isCollapsed, toggleCollapse, shouldOverlay } = useSidebarDrawer();
+  const { isOpen, setIsOpen, toggle, closeSidebar, isCollapsed, toggleCollapse, shouldOverlay } = useSidebarDrawer();
 
   return (
     <div className="min-h-screen bg-background">
@@ -32,7 +32,7 @@ function AdminLayoutInner({ children, title }: AdminLayoutProps) {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
-              onClick={() => setIsOpen(false)}
+              onClick={closeSidebar}
             />
             <motion.div
               initial={{ x: '-100%' }}
@@ -41,7 +41,7 @@ function AdminLayoutInner({ children, title }: AdminLayoutProps) {
               transition={{ type: 'spring', bounce: 0.15, duration: 0.4 }}
               className="fixed left-0 top-0 h-screen w-64 z-50"
             >
-              <AdminSidebar onNavigate={() => setIsOpen(false)} isCollapsed={false} />
+              <AdminSidebar onNavigate={closeSidebar} isCollapsed={false} />
             </motion.div>
           </>
         )}

@@ -12,7 +12,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, title, isAdmin = false }: DashboardLayoutProps) {
-  const { isOpen, setIsOpen, toggle, shouldOverlay, isCollapsed, toggleCollapse } = useSidebarDrawer();
+  const { isOpen, setIsOpen, toggle, closeSidebar, shouldOverlay, isCollapsed, toggleCollapse } = useSidebarDrawer();
 
   return (
     <div className="min-h-screen bg-background">
@@ -33,7 +33,7 @@ export function DashboardLayout({ children, title, isAdmin = false }: DashboardL
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
-              onClick={() => setIsOpen(false)}
+              onClick={closeSidebar}
             />
             <motion.div
               initial={{ x: '-100%' }}
@@ -42,7 +42,7 @@ export function DashboardLayout({ children, title, isAdmin = false }: DashboardL
               transition={{ type: 'spring', bounce: 0.15, duration: 0.4 }}
               className="fixed left-0 top-0 h-screen w-64 z-50"
             >
-              <Sidebar isAdmin={isAdmin} onNavigate={() => setIsOpen(false)} isCollapsed={false} />
+              <Sidebar isAdmin={isAdmin} onNavigate={closeSidebar} isCollapsed={false} />
             </motion.div>
           </>
         )}
