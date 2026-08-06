@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useIsMobile } from './use-mobile';
 
@@ -30,11 +30,15 @@ export function useSidebarDrawer() {
   const isTablet = useIsTablet();
   const location = useLocation();
   const shouldOverlay = isMobile || isTablet;
+  const prevPathRef = useRef(location.pathname);
 
-  // Auto-close on route change (mobile/tablet)
+  // Auto-close ONLY when route actually changes
   useEffect(() => {
-    if (shouldOverlay) {
-      setIsOpen(false);
+    if (prevPathRef.current !== location.pathname) {
+      prevPathRef.current = location.pathname;
+      if (shouldOverlay) {
+        setIsOpen(false);
+      }
     }
   }, [location.pathname, shouldOverlay]);
 

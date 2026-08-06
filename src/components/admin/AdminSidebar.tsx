@@ -91,10 +91,6 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
     onNavigate?.();
   };
 
-  useEffect(() => {
-    onNavigate?.();
-  }, [location.pathname]);
-
   return (
     <aside className={cn("fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300", isCollapsed ? "w-20" : "w-64")}>
       {/* Logo & Mobile Close */}
