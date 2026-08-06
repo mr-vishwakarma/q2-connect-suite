@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   DollarSign,
+  X,
 } from 'lucide-react';
 
 const adminLinks = [
@@ -113,10 +114,10 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
         {onNavigate && (
           <button
             onClick={handleLinkClick}
-            className="lg:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             aria-label="Close sidebar"
           >
-            <LogOut className="w-5 h-5 rotate-180" />
+            <X className="w-5 h-5" />
           </button>
         )}
         {onToggleCollapse && (

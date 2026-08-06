@@ -15,6 +15,7 @@ import {
   ChefHat,
   ChevronLeft,
   ChevronRight,
+  X,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -55,7 +56,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
   return (
     <aside className={cn("fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300", isCollapsed ? "w-20" : "w-64")}>
       {/* Logo */}
-      <div className="p-6 relative">
+      <div className="p-6 relative flex items-center justify-between">
         <Link to={isAdmin ? "/admin/dashboard" : "/student/dashboard"} className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow shrink-0">
             <span className="text-primary-foreground font-bold text-lg">Q2</span>
@@ -67,6 +68,15 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
             </motion.div>
           )}
         </Link>
+        {onNavigate && (
+          <button
+            onClick={handleLinkClick}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            aria-label="Close sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
         {onToggleCollapse && (
           <button 
             onClick={onToggleCollapse}

@@ -1,4 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import { HostelSelector } from './HostelSelector';
 import { Bell, Settings, Menu } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -11,6 +12,7 @@ interface AdminTopBarProps {
 
 export function AdminTopBar({ title, onMenuToggle, showMenu }: AdminTopBarProps) {
   const { profile } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <header className="h-14 sm:h-16 bg-card border-b border-border flex items-center justify-between px-3 sm:px-6 sticky top-0 z-30">
@@ -39,6 +41,7 @@ export function AdminTopBar({ title, onMenuToggle, showMenu }: AdminTopBarProps)
           <Settings className="w-5 h-5" />
         </motion.button>
         <motion.button 
+          onClick={() => navigate('/admin/notifications')}
           whileHover={{ scale: 1.1 }}
           className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
         >
