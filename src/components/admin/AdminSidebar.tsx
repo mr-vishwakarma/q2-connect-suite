@@ -91,10 +91,14 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
     onNavigate?.();
   };
 
+  useEffect(() => {
+    onNavigate?.();
+  }, [location.pathname]);
+
   return (
     <aside className={cn("fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300", isCollapsed ? "w-20" : "w-64")}>
-      {/* Logo */}
-      <div className="p-6 relative">
+      {/* Logo & Mobile Close */}
+      <div className="p-6 relative flex items-center justify-between">
         <Link to="/admin/dashboard" className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
           <motion.div
             whileHover={{ rotate: 180 }}
@@ -110,10 +114,19 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
             </motion.div>
           )}
         </Link>
+        {onNavigate && (
+          <button
+            onClick={handleLinkClick}
+            className="lg:hidden p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            aria-label="Close sidebar"
+          >
+            <LogOut className="w-5 h-5 rotate-180" />
+          </button>
+        )}
         {onToggleCollapse && (
           <button 
             onClick={onToggleCollapse}
-            className="absolute -right-3 top-8 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="absolute -right-3 top-8 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors hidden lg:block"
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
@@ -130,6 +143,7 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
               key={link.to}
               whileHover={{ x: 4 }}
               transition={{ duration: 0.2 }}
+              onClick={handleLinkClick}
             >
               <Link
                 to={link.to}
@@ -172,7 +186,10 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
       {/* Logout Button */}
       <div className="p-4 border-t border-border">
         <motion.button
-          onClick={signOut}
+          onClick={() => {
+            handleLinkClick();
+            signOut();
+          }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="flex items-center gap-3 px-4 py-3 w-full rounded-xl bg-primary text-primary-foreground font-medium transition-colors shadow-lg hover:bg-primary/90"

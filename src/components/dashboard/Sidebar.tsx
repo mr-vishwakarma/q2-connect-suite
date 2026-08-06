@@ -51,11 +51,15 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
     onNavigate?.();
   };
 
+  useEffect(() => {
+    onNavigate?.();
+  }, [location.pathname]);
+
   return (
     <aside className={cn("fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300", isCollapsed ? "w-20" : "w-64")}>
       {/* Logo */}
       <div className="p-6 relative">
-        <Link to="/" className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
+        <Link to={isAdmin ? "/admin/dashboard" : "/student/dashboard"} className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow shrink-0">
             <span className="text-primary-foreground font-bold text-lg">Q2</span>
           </div>
@@ -69,7 +73,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
         {onToggleCollapse && (
           <button 
             onClick={onToggleCollapse}
-            className="absolute -right-3 top-8 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="absolute -right-3 top-8 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors hidden lg:block"
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
@@ -85,6 +89,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
               key={link.to}
               whileHover={{ x: 4 }}
               transition={{ duration: 0.2 }}
+              onClick={handleLinkClick}
             >
               <Link
                 to={link.to}
@@ -134,7 +139,10 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
         </div>
         
         <button
-          onClick={signOut}
+          onClick={() => {
+            handleLinkClick();
+            signOut();
+          }}
           className={cn("flex items-center mt-2 w-full rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors group relative", isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3")}
         >
           <LogOut className="w-5 h-5 shrink-0" />
