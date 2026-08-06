@@ -24,9 +24,9 @@ export default function Login() {
   useEffect(() => {
     if (user) {
       if (isAdmin) {
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard', { replace: true });
       } else {
-        navigate('/student/dashboard');
+        navigate('/student/dashboard', { replace: true });
       }
     }
   }, [user, isAdmin, navigate]);
