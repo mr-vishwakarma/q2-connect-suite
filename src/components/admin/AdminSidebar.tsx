@@ -26,7 +26,6 @@ import {
 
 const adminLinks = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/', icon: Home, label: 'Home' },
   { to: '/admin/register-student', icon: UserPlus, label: 'Register Student' },
   { to: '/admin/students', icon: Users, label: 'All Students' },
   { to: '/admin/fees', icon: DollarSign, label: 'Fee Management' },

@@ -4,11 +4,23 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { HostelProvider } from "@/contexts/HostelContext";
 import { ProtectedAdminRoute } from "@/components/auth/ProtectedAdminRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import ScrollToTop from "@/components/ScrollToTop";
+
+function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAdmin, loading } = useAuth();
+
+  if (loading) return null;
+
+  if (user) {
+    return <Navigate to={isAdmin ? "/admin/dashboard" : "/student/dashboard"} replace />;
+  }
+
+  return <>{children}</>;
+}
 const Index = lazy(() => import("./pages/Index"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
@@ -86,15 +98,15 @@ const App = () => (
               </div>
             }>
             <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/our-team" element={<OurTeam />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/admin-login" element={<AdminLogin />} />
-              <Route path="/register-admin" element={<RegisterAdmin />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/" element={<PublicOnlyRoute><Index /></PublicOnlyRoute>} />
+              <Route path="/about" element={<PublicOnlyRoute><About /></PublicOnlyRoute>} />
+              <Route path="/contact" element={<PublicOnlyRoute><Contact /></PublicOnlyRoute>} />
+              <Route path="/our-team" element={<PublicOnlyRoute><OurTeam /></PublicOnlyRoute>} />
+              <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+              <Route path="/admin-login" element={<PublicOnlyRoute><AdminLogin /></PublicOnlyRoute>} />
+              <Route path="/register-admin" element={<PublicOnlyRoute><RegisterAdmin /></PublicOnlyRoute>} />
+              <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
+              <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
               <Route path="/unauthorized" element={<Unauthorized />} />
               <Route path="/student/dashboard" element={<StudentDashboard />} />
               <Route path="/student/mess-off" element={<MessOff />} />
