@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Fee = require('../models/Fee');
 const FeePayment = require('../models/FeePayment');
 const SecurityDeposit = require('../models/SecurityDeposit');
@@ -234,45 +235,59 @@ const getFeePayments = async (req, res) => {
 // @desc    Record a fee payment (handles fees, fee_payments, security_deposits, and students table)
 // @route   POST /api/fees/collect
 const collectPayment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const {
       studentId, hostel, month, amount, lateFee, discount, securityDeposit,
-      receivedAmount, paymentMode, notes, receiptNo
+      receivedAmount, paymentMode, notes, receiptNo, receiptUrl
     } = req.body;
 
     if (!studentId || !month || !receivedAmount || !paymentMode || !receiptNo) {
+      await session.abortTransaction();
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    const student = await Student.findById(studentId);
+    const student = await Student.findById(studentId).session(session);
     if (!student) {
+      await session.abortTransaction();
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
     const actualHostel = student.hostel || hostel;
 
     // 1. Ensure a monthly fees row exists
-    let feeRow = await Fee.findOne({ studentId, month, hostel: actualHostel });
+    let feeRow = await Fee.findOne({ studentId, month, hostel: actualHostel }).session(session);
+    
+    if (feeRow && feeRow.status === 'paid') {
+      await session.abortTransaction();
+      return res.status(400).json({ success: false, message: 'Fee for this month is already fully paid' });
+    }
+
     if (!feeRow) {
-      feeRow = await Fee.create({
+      const newFees = await Fee.create([{
         studentId, hostel: actualHostel, month, amount, lateFee, discount,
         status: 'unpaid', paymentMode
-      });
+      }], { session });
+      feeRow = newFees[0];
     } else {
       feeRow = await Fee.findByIdAndUpdate(
         feeRow._id,
         { lateFee, discount, amount },
-        { new: true }
+        { new: true, session }
       );
     }
 
     const feeCore = Math.max(0, receivedAmount - securityDeposit);
+    const totalDue = amount + lateFee - discount;
 
     // 2. Create the fee payment record
-    const payment = await FeePayment.create({
+    const payments = await FeePayment.create([{
       feeId: feeRow._id,
       studentId,
       hostel: actualHostel,
       receiptNo,
+      receiptUrl,
       amount: feeCore,
       lateFee,
       discount,
@@ -283,41 +298,45 @@ const collectPayment = async (req, res) => {
       adminName: req.user.name,
       month,
       notes: notes || null,
-    });
+    }], { session });
+    const payment = payments[0];
 
     // 3. Security deposit tracking
     if (securityDeposit > 0) {
-      await SecurityDeposit.create({
+      await SecurityDeposit.create([{
         studentId,
         hostel: actualHostel,
         amount: securityDeposit,
         collectedDate: new Date(),
         status: 'collected',
         paymentMode,
-      });
+      }], { session });
     }
 
     // 4. Extend student validDate if fully paid (best-effort)
-    const totalDue = amount + lateFee - discount;
     if (feeCore >= totalDue) {
-      const student = await Student.findById(studentId);
       if (student && student.validDate) {
         const cur = new Date(student.validDate);
         cur.setMonth(cur.getMonth() + 1);
-        await Student.findByIdAndUpdate(studentId, { validDate: cur });
+        await Student.findByIdAndUpdate(studentId, { validDate: cur }, { session });
       }
     }
 
     // 5. Update Fee status to paid if fully paid
     const newPaidAmount = (feeRow.paidAmount || 0) + feeCore;
     if (newPaidAmount >= totalDue) {
-      await Fee.findByIdAndUpdate(feeRow._id, { status: 'paid', paidAmount: newPaidAmount, paidDate: new Date() });
+      await Fee.findByIdAndUpdate(feeRow._id, { status: 'paid', paidAmount: newPaidAmount, paidDate: new Date() }, { session });
     } else if (newPaidAmount > 0) {
-      await Fee.findByIdAndUpdate(feeRow._id, { status: 'partial', paidAmount: newPaidAmount, paidDate: new Date() });
+      await Fee.findByIdAndUpdate(feeRow._id, { status: 'partial', paidAmount: newPaidAmount, paidDate: new Date() }, { session });
     }
+
+    await session.commitTransaction();
+    session.endSession();
 
     return res.status(201).json({ success: true, data: payment });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error('Error in collectPayment:', error);
     return res.status(500).json({ success: false, message: error.message });
   }

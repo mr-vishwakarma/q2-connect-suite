@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays, addMonths, subMonths } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import * as XLSX from 'xlsx';
 
 const generateMonthOptions = () => {
   const options = [];
@@ -35,7 +36,7 @@ const generateMonthOptions = () => {
   return options;
 };
 const MONTH_OPTIONS = generateMonthOptions();
-import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptData } from '@/lib/receiptPdf';
+import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptData, getHistoryReceiptBlob } from '@/lib/receiptPdf';
 
 interface Student {
   id: string; name: string; username: string; room_no: string | null;
@@ -219,23 +220,8 @@ export default function FeeManagement() {
     try {
       const receipt_no = genReceiptNo();
       
-      await api.post('/fees/collect', {
-        studentId: selectedStudent.id,
-        hostel: selectedHostel,
-        month: pMonth,
-        amount: pAmount,
-        lateFee: pLateFee,
-        discount: pDiscount,
-        securityDeposit: pDeposit,
-        receivedAmount: pReceived,
-        paymentMode: pMode,
-        notes: pNotes,
-        receiptNo: receipt_no
-      });
-
-      // PDF Receipt
+      // 1. Prepare history data for the PDF
       const studentPayments = [...payments.filter(p => p.student_id === selectedStudent.id)];
-      // Add the current one to the history since we haven't fetched it yet
       studentPayments.unshift({
         id: 'new',
         fee_id: '',
@@ -259,9 +245,39 @@ export default function FeeManagement() {
         hostel: selectedHostel,
         payments: studentPayments
       };
+
+      // 2. Generate PDF Blob and upload to ImageKit
+      const pdfBlob = getHistoryReceiptBlob(receiptData);
+      const formData = new FormData();
+      formData.append('file', pdfBlob, `receipt-${receipt_no}.pdf`);
+      formData.append('folder', `/q2-connect/receipts/students/${selectedStudent.username}`);
+
+      const uploadRes = await api.post('/upload/file', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      const receiptUrl = uploadRes.data?.url || null;
+
+      // 3. Collect payment with receiptUrl
+      await api.post('/fees/collect', {
+        studentId: selectedStudent.id,
+        hostel: selectedHostel,
+        month: pMonth,
+        amount: pAmount,
+        lateFee: pLateFee,
+        discount: pDiscount,
+        securityDeposit: pDeposit,
+        receivedAmount: pReceived,
+        paymentMode: pMode,
+        notes: pNotes,
+        receiptNo: receipt_no,
+        receiptUrl
+      });
+
+      // 4. Download locally for the admin right away
       downloadHistoryReceipt(receiptData);
 
-      toast.success('Payment recorded, receipt generated');
+      toast.success('Payment recorded, receipt saved and generated');
       setShowPaymentDialog(false);
       fetchData();
     } catch (e: unknown) {
@@ -285,7 +301,7 @@ export default function FeeManagement() {
     downloadHistoryReceipt(data);
   };
 
-  const exportCSV = () => {
+  const exportXLS = () => {
     const headers = ['Name', 'User ID', 'Room', 'Monthly (₹)', 'Pending (₹)', 'Status', 'Valid Till', 'Parent Phone'];
     const rows = filteredRecords.map(r => [
       r.student.name, r.student.username, r.student.room_no || '',
@@ -293,13 +309,13 @@ export default function FeeManagement() {
       r.student.valid_date ? format(parseISO(r.student.valid_date), 'dd MMM yyyy') : '',
       r.student.parent_phone || '',
     ]);
-    const csv = [headers, ...rows].map(row => row.map(v => `"${v}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url;
-    a.download = `fee-report-${selectedHostel}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click(); URL.revokeObjectURL(url);
-    toast.success('Report exported');
+    
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Fee Records');
+    
+    XLSX.writeFile(workbook, `fee-report-${selectedHostel}-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast.success('Report exported to Excel');
   };
 
   if (loading) {
@@ -428,7 +444,7 @@ export default function FeeManagement() {
                 <SelectItem value="unpaid">Unpaid</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={exportCSV}><Download className="w-4 h-4 mr-2" />Export CSV</Button>
+            <Button variant="outline" onClick={exportXLS}><Download className="w-4 h-4 mr-2" />Export XLS</Button>
             <Button variant="outline" onClick={() => navigate('/admin/alerts')}><AlertCircle className="w-4 h-4 mr-2" />Alerts</Button>
           </div>
         </CardContent>

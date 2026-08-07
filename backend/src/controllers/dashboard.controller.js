@@ -83,7 +83,7 @@ exports.getStudentDashboard = async (req, res) => {
     const MessRequest = require('../models/MessRequest');
 
     const [studentData, leaveRequests, complaints, suggestions, approvedRequests] = await Promise.all([
-      Student.findOne({ userId }),
+      Student.findOne({ userId }).select('name username roomNo fees startDate validDate hostel'),
       MessRequest.countDocuments({ userId }),
       Complaint.countDocuments({ userId }),
       Suggestion.countDocuments({ userId }),

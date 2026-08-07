@@ -26,6 +26,7 @@ interface Payment {
   id: string; receipt_no: string; amount: number; late_fee: number; discount: number;
   security_deposit: number; payment_mode: 'cash' | 'upi' | 'bank';
   payment_date: string; month: string; admin_name: string | null; notes: string | null;
+  receiptUrl: string | null;
 }
 
 interface StudentData {
@@ -80,7 +81,8 @@ export default function FeeHistory() {
         setPayments(pRes.data.data.map((p: any) => ({
           id: p._id, receipt_no: p.receiptNo, amount: p.amount, late_fee: p.lateFee,
           discount: p.discount, security_deposit: p.securityDeposit, payment_mode: p.paymentMode,
-          payment_date: p.paymentDate, month: p.month, admin_name: p.adminName, notes: p.notes
+          payment_date: p.paymentDate, month: p.month, admin_name: p.adminName, notes: p.notes,
+          receiptUrl: p.receiptUrl || null
         })));
       }
     } catch (e) {
@@ -107,6 +109,11 @@ export default function FeeHistory() {
   const lastPayment = payments[0];
 
   const downloadFor = (p: Payment) => {
+    if (p.receiptUrl) {
+      window.open(p.receiptUrl, '_blank');
+      return;
+    }
+    
     if (!student) return;
     const d: ReceiptData = {
       receipt_no: p.receipt_no, payment_date: p.payment_date,

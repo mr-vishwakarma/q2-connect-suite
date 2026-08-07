@@ -1,5 +1,5 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
@@ -40,29 +40,19 @@ export default function Complaints() {
     }
   }, [user, loading, isAdmin, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchComplaints();
-      fetchStudentHostel();
-    }
-  }, [user]);
-
-  const fetchStudentHostel = async () => {
+  const fetchAll = useCallback(async () => {
     try {
-      const response = await api.get('/students/me');
-      if (response.data?.success) {
-        setStudentHostel(response.data.data.hostel);
+      const [studentRes, complaintsRes] = await Promise.all([
+        api.get('/students/me'),
+        api.get('/complaints')
+      ]);
+
+      if (studentRes.data?.success) {
+        setStudentHostel(studentRes.data.data.hostel);
       }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchComplaints = async () => {
-    try {
-      const response = await api.get('/complaints');
-      if (response.data?.success) {
-        setComplaints(response.data.data.map((c: any) => ({
+      
+      if (complaintsRes.data?.success) {
+        setComplaints(complaintsRes.data.data.map((c: any) => ({
           id: c._id,
           title: c.title,
           description: c.description,
@@ -70,10 +60,17 @@ export default function Complaints() {
           createdAt: c.createdAt,
         })));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      toast.error(e.response?.data?.message || 'Failed to fetch complaints');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchAll();
+    }
+  }, [user, fetchAll]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +89,7 @@ export default function Complaints() {
       toast.success('Complaint submitted successfully!');
       setTitle('');
       setDescription('');
-      fetchComplaints();
+      fetchAll();
     } catch (error) {
       toast.error('Failed to submit complaint');
     } finally {

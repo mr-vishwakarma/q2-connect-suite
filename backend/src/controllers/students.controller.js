@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const Room = require('../models/Room');
@@ -68,30 +69,36 @@ const getStudent = async (req, res) => {
 // @route   POST /api/students
 // @access  Admin
 const createStudent = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     const { name, username, email, phone, parentPhone, roomNo, hostel, fees, startDate, validDate, password, initialFeePaid } = req.body;
 
     if (!name || !username || !email || !password) {
+      await session.abortTransaction();
       return res.status(400).json({ success: false, message: 'name, username, email, password are required' });
     }
 
     // Check for existing user/username
-    const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username }] });
+    const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username }] }).session(session);
     if (existingUser) {
+      await session.abortTransaction();
       return res.status(409).json({ success: false, message: 'Email or username already exists' });
     }
 
     // Create User account
-    const user = await User.create({
+    const users = await User.create([{
       name,
       email: email.toLowerCase(),
       username,
       password,
       role: 'student',
-    });
+    }], { session });
+    const user = users[0];
 
     // Create Student profile
-    const student = await Student.create({
+    const students = await Student.create([{
       userId: user._id,
       name,
       username,
@@ -103,17 +110,19 @@ const createStudent = async (req, res) => {
       fees: fees || 0,
       startDate,
       validDate,
-    });
+    }], { session });
+    const student = students[0];
 
     // Link student to user
     user.studentId = student._id;
-    await user.save({ validateBeforeSave: false });
+    await user.save({ validateBeforeSave: false, session });
 
     // Update room occupancy if room assigned
     if (roomNo && hostel) {
       await Room.findOneAndUpdate(
         { roomNumber: roomNo, hostel },
-        { $inc: { occupiedCount: 1 } }
+        { $inc: { occupiedCount: 1 } },
+        { session }
       );
     }
 
@@ -128,65 +137,61 @@ const createStudent = async (req, res) => {
       if (initialFeePaid) {
         const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
-        try {
-          const feeRecord = await Fee.create({
-            studentId: student._id,
-            hostel,
-            month,
-            amount: fees,
-            paidAmount: fees,
-            status: 'paid',
-            paidDate: now,
-            paymentMode: 'cash',
-            receiptNo,
-          });
+        const feeRecords = await Fee.create([{
+          studentId: student._id,
+          hostel,
+          month,
+          amount: fees,
+          paidAmount: fees,
+          status: 'paid',
+          paidDate: now,
+          paymentMode: 'cash',
+          receiptNo,
+        }], { session });
+        const feeRecord = feeRecords[0];
 
-          await FeePayment.create({
-            feeId: feeRecord._id,
-            studentId: student._id,
-            hostel,
-            receiptNo,
-            amount: fees,
-            lateFee: 0,
-            discount: 0,
-            securityDeposit: 0,
-            paymentMode: 'cash',
-            paymentDate: now,
-            adminId: req.user._id,
-            adminName: req.user.name,
-            month,
-            notes: 'Initial fee paid at registration',
-          });
-        } catch (feeErr) {
-          console.error('Error creating initial paid fee records:', feeErr);
-        }
+        await FeePayment.create([{
+          feeId: feeRecord._id,
+          studentId: student._id,
+          hostel,
+          receiptNo,
+          amount: fees,
+          lateFee: 0,
+          discount: 0,
+          securityDeposit: 0,
+          paymentMode: 'cash',
+          paymentDate: now,
+          adminId: req.user._id,
+          adminName: req.user.name,
+          month,
+          notes: 'Initial fee paid at registration',
+        }], { session });
       } else {
         // Create UNPAID Fee record so status shows Unpaid and pending balance reflects monthly fee
-        try {
-          const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
-          await Fee.create({
-            studentId: student._id,
-            hostel,
-            month,
-            amount: fees,
-            paidAmount: 0,
-            status: 'unpaid',
-            dueDate,
-          });
-        } catch (feeErr) {
-          console.error('Error creating initial unpaid fee record:', feeErr);
-        }
+        const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
+        await Fee.create([{
+          studentId: student._id,
+          hostel,
+          month,
+          amount: fees,
+          paidAmount: 0,
+          status: 'unpaid',
+          dueDate,
+        }], { session });
       }
     }
 
     // Create welcome notification
-    await Notification.create({
+    await Notification.create([{
       userId: user._id,
       hostel,
       title: 'Welcome to Q2 Connect Suite!',
       message: `Hello ${name}, your account has been set up. Welcome to ${hostel} hostel.`,
       type: 'success',
-    });
+    }], { session });
+
+    await session.commitTransaction();
+    session.endSession();
 
     return res.status(201).json({
       success: true,
@@ -194,6 +199,8 @@ const createStudent = async (req, res) => {
       data: { user: user.toJSON(), student }
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -202,10 +209,16 @@ const createStudent = async (req, res) => {
 // @route   PUT /api/students/:id
 // @access  Admin
 const updateStudent = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { name, phone, parentPhone, roomNo, hostel, fees, startDate, validDate } = req.body;
-    const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+    const student = await Student.findById(req.params.id).session(session);
+    if (!student) {
+      await session.abortTransaction();
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
 
     // Handle room change: update occupancy
     const oldRoom = student.roomNo;
@@ -215,29 +228,35 @@ const updateStudent = async (req, res) => {
       if (oldRoom && oldHostel) {
         await Room.findOneAndUpdate(
           { roomNumber: oldRoom, hostel: oldHostel },
-          { $inc: { occupiedCount: -1 } }
+          { $inc: { occupiedCount: -1 } },
+          { session }
         );
       }
       // Increment new room
       await Room.findOneAndUpdate(
         { roomNumber: roomNo, hostel },
-        { $inc: { occupiedCount: 1 } }
+        { $inc: { occupiedCount: 1 } },
+        { session }
       );
     }
 
     const updated = await Student.findByIdAndUpdate(
       req.params.id,
       { name, phone, parentPhone, roomNo, hostel, fees, startDate, validDate },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true, session }
     );
 
     // Also update name on User record
     if (name) {
-      await User.findByIdAndUpdate(student.userId, { name });
+      await User.findByIdAndUpdate(student.userId, { name }, { session });
     }
 
+    await session.commitTransaction();
+    session.endSession();
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -246,29 +265,37 @@ const updateStudent = async (req, res) => {
 // @route   DELETE /api/students/:id
 // @access  Admin
 const deleteStudent = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    let student = await Student.findById(req.params.id);
+    let student = await Student.findById(req.params.id).session(session);
     if (!student) {
-      student = await Student.findOne({ userId: req.params.id });
+      student = await Student.findOne({ userId: req.params.id }).session(session);
     }
 
     if (student) {
       if (student.roomNo && student.hostel) {
         await Room.findOneAndUpdate(
           { roomNumber: student.roomNo, hostel: student.hostel },
-          { $inc: { occupiedCount: -1 } }
+          { $inc: { occupiedCount: -1 } },
+          { session }
         );
       }
       if (student.userId) {
-        await User.findByIdAndDelete(student.userId);
+        await User.findByIdAndDelete(student.userId, { session });
       }
-      await Student.findByIdAndDelete(student._id);
+      await Student.findByIdAndDelete(student._id, { session });
     } else {
-      await User.findByIdAndDelete(req.params.id);
+      await User.findByIdAndDelete(req.params.id, { session });
     }
 
+    await session.commitTransaction();
+    session.endSession();
     return res.status(200).json({ success: true, message: 'Student deleted successfully' });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     return res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -15,6 +15,7 @@ const feePaymentSchema = new mongoose.Schema(
     paymentMode: { type: String, enum: ['cash', 'upi', 'bank'], required: true },
     paymentDate: { type: Date, default: Date.now },
     receiptNo: { type: String, required: true },
+    receiptUrl: { type: String },
     notes: { type: String },
   },
   { timestamps: true }

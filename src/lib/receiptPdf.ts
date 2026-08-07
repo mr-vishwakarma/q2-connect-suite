@@ -135,7 +135,7 @@ export interface HistoryReceiptData {
   }>;
 }
 
-export function downloadHistoryReceipt(data: HistoryReceiptData) {
+export function generateHistoryReceipt(data: HistoryReceiptData): jsPDF {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   let y = 40;
@@ -209,5 +209,15 @@ export function downloadHistoryReceipt(data: HistoryReceiptData) {
   doc.setTextColor(120, 120, 120);
   doc.text('This is a system-generated history report from Q2 Group of Hostels.', 40, y);
 
+  return doc;
+}
+
+export function downloadHistoryReceipt(data: HistoryReceiptData) {
+  const doc = generateHistoryReceipt(data);
   doc.save(`History-${data.username}-${Date.now()}.pdf`);
+}
+
+export function getHistoryReceiptBlob(data: HistoryReceiptData): Blob {
+  const doc = generateHistoryReceipt(data);
+  return doc.output('blob');
 }

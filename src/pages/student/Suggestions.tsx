@@ -40,40 +40,37 @@ export default function Suggestions() {
     }
   }, [user, loading, isAdmin, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchSuggestions();
-      fetchStudentHostel();
-    }
-  }, [user]);
-
-  const fetchStudentHostel = async () => {
+  const fetchAll = useCallback(async () => {
     try {
-      const response = await api.get('/students/me');
-      if (response.data?.success) {
-        setStudentHostel(response.data.data.hostel);
+      const [studentRes, suggestionsRes] = await Promise.all([
+        api.get('/students/me'),
+        api.get('/suggestions')
+      ]);
+
+      if (studentRes.data?.success) {
+        setStudentHostel(studentRes.data.data.hostel);
       }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchSuggestions = async () => {
-    try {
-      const response = await api.get('/suggestions');
-      if (response.data?.success) {
-        setSuggestions(response.data.data.map((c: any) => ({
-          id: c._id,
-          title: c.title,
-          description: c.description,
-          status: c.status,
-          createdAt: c.createdAt,
+      
+      if (suggestionsRes.data?.success) {
+        setSuggestions(suggestionsRes.data.data.map((s: any) => ({
+          id: s._id,
+          title: s.title,
+          description: s.description,
+          status: s.status,
+          createdAt: s.createdAt,
         })));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      toast.error(e.response?.data?.message || 'Failed to fetch suggestions');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchAll();
+    }
+  }, [user, fetchAll]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +89,7 @@ export default function Suggestions() {
       toast.success('Suggestion submitted successfully!');
       setTitle('');
       setDescription('');
-      fetchSuggestions();
+      fetchAll();
     } catch (error) {
       toast.error('Failed to submit suggestion');
     } finally {

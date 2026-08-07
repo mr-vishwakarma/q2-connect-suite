@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
@@ -7,6 +7,7 @@ import { DashboardSkeleton } from '@/components/ui/dashboard-skeleton';
 import { api } from '@/lib/api';
 import { CalendarCheck, MessageSquare, Lightbulb, CheckCircle, ArrowRight, User, Home, CreditCard, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 interface StudentData {
   name: string;
@@ -38,23 +39,24 @@ export default function StudentDashboard() {
     }
   }, [user, loading, isAdmin, navigate]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       const response = await api.get('/dashboard/student');
       if (response.data?.success) {
         setStudentData(response.data.data.student);
         setStats(response.data.data.stats);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch dashboard data:', error);
+      toast.error(error.response?.data?.message || 'Failed to load dashboard data');
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (user) {
       fetchDashboardData();
     }
-  }, [user]);
+  }, [user, fetchDashboardData]);
 
   if (loading) {
     return <DashboardSkeleton />;

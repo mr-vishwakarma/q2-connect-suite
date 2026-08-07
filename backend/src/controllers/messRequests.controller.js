@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const MessRequest = require('../models/MessRequest');
 const Student = require('../models/Student');
 const Notification = require('../models/Notification');
@@ -55,26 +56,35 @@ const createMessRequest = async (req, res) => {
 };
 
 const updateMessRequest = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     const { status, adminMessage } = req.body;
     const messReq = await MessRequest.findByIdAndUpdate(
       req.params.id,
       { status, adminMessage, ...(status !== 'pending' ? { approvedDate: new Date() } : {}) },
-      { new: true }
+      { new: true, session }
     ).populate('userId', 'name email');
 
-    if (!messReq) return res.status(404).json({ success: false, message: 'Request not found' });
+    if (!messReq) {
+      await session.abortTransaction();
+      return res.status(404).json({ success: false, message: 'Request not found' });
+    }
 
     // Notify student
-    await Notification.create({
+    await Notification.create([{
       userId: messReq.userId._id,
       hostel: messReq.hostel,
       title: `Mess Off Request ${status === 'approved' ? 'Approved' : 'Rejected'}`,
       message: adminMessage || `Your mess off request has been ${status}.`,
       type: status === 'approved' ? 'success' : 'error',
-    });
+    }], { session });
 
-    // Send email
+    await session.commitTransaction();
+    session.endSession();
+
+    // Send email (outside transaction)
     try {
       await sendMessRequestUpdate({
         to: messReq.userId.email,
@@ -90,6 +100,8 @@ const updateMessRequest = async (req, res) => {
 
     return res.status(200).json({ success: true, data: messReq });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     return res.status(500).json({ success: false, message: error.message });
   }
 };

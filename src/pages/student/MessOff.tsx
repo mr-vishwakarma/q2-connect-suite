@@ -1,5 +1,5 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,29 +50,19 @@ export default function MessOff() {
     if (!loading && isAdmin) navigate('/admin/dashboard');
   }, [user, loading, isAdmin, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchRequests();
-      fetchStudentHostel();
-    }
-  }, [user]);
-
-  const fetchStudentHostel = async () => {
+  const fetchAll = useCallback(async () => {
     try {
-      const response = await api.get('/students/me');
-      if (response.data?.success) {
-        setStudentHostel(response.data.data.hostel);
+      const [studentRes, requestsRes] = await Promise.all([
+        api.get('/students/me'),
+        api.get('/mess-requests')
+      ]);
+
+      if (studentRes.data?.success) {
+        setStudentHostel(studentRes.data.data.hostel);
       }
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
-  const fetchRequests = async () => {
-    try {
-      const response = await api.get('/mess-requests');
-      if (response.data?.success) {
-        const reqs = response.data.data.map((r: any) => ({
+      if (requestsRes.data?.success) {
+        const reqs = requestsRes.data.data.map((r: any) => ({
           id: r._id,
           leavingDate: r.leavingDate,
           returnDate: r.returnDate,
@@ -86,10 +76,17 @@ export default function MessOff() {
         }));
         setRequests(reqs);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      toast.error(e.response?.data?.message || 'Failed to fetch data');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchAll();
+    }
+  }, [user, fetchAll]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -163,7 +160,7 @@ export default function MessOff() {
       setReturnDate(undefined);
       setReason('');
       setDocumentFile(null);
-      fetchRequests();
+      fetchAll();
     } catch (err: any) {
       toast.error(err?.message || 'Failed to submit request');
     } finally {
