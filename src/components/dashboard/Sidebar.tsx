@@ -31,6 +31,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
 
   const studentLinks = [
     { to: '/student/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/student/profile', icon: User, label: 'My Profile' },
     { to: '/student/mess-off', icon: UtensilsCrossed, label: 'Leave Request' },
     { to: '/student/fees', icon: CalendarCheck, label: 'Fee History' },
     { to: '/student/complaints', icon: MessageSquare, label: 'Complaints' },
@@ -58,9 +59,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
       {/* Logo */}
       <div className="p-6 relative flex items-center justify-between">
         <Link to={isAdmin ? "/admin/dashboard" : "/student/dashboard"} className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow shrink-0">
-            <span className="text-primary-foreground font-bold text-lg">Q2</span>
-          </div>
+          <img src="/favicon.png" alt="Q2 Logo" className="w-10 h-10 object-contain shrink-0" />
           {!isCollapsed && (
             <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }} className="overflow-hidden whitespace-nowrap">
               <span className="text-sidebar-foreground font-semibold block">Q2 Management</span>
