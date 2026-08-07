@@ -24,9 +24,9 @@ export function StatCard({ title, value, icon: Icon, color, bg, link, index = 0,
           <div className={`${isSm ? 'p-2' : 'p-2.5 sm:p-3'} rounded-xl sm:rounded-2xl ${bg} shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:-translate-y-1`}>
             <Icon className={`${isSm ? 'w-4 h-4 sm:w-5 sm:h-5' : 'w-5 h-5 sm:w-6 sm:h-6'} ${color}`} />
           </div>
-          <div className="overflow-hidden">
+          <div className="flex-1 min-w-0">
             <p className={`text-xs ${!isSm && 'sm:text-sm'} text-muted-foreground whitespace-nowrap truncate`}>{title}</p>
-            <p className={`${isSm ? 'text-base sm:text-lg lg:text-xl' : 'text-lg sm:text-3xl'} font-bold truncate ${color === 'text-foreground' || color === 'text-primary' ? 'text-foreground' : color}`}>{value}</p>
+            <p className={`${isSm ? 'text-sm sm:text-base lg:text-lg' : 'text-lg sm:text-3xl'} font-bold truncate ${color === 'text-foreground' || color === 'text-primary' ? 'text-foreground' : color}`}>{value}</p>
           </div>
         </div>
       </CardContent>
