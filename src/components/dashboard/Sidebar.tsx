@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Lightbulb,
   LogOut,
+  User,
   UserPlus,
   Users,
   CalendarCheck,
