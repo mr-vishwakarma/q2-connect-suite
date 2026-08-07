@@ -11,19 +11,22 @@ interface StatCardProps {
   bg: string; // e.g., 'bg-primary/10'
   link?: string;
   index?: number;
+  size?: 'sm' | 'default';
 }
 
-export function StatCard({ title, value, icon: Icon, color, bg, link, index = 0 }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, color, bg, link, index = 0, size = 'default' }: StatCardProps) {
+  const isSm = size === 'sm';
+  
   const CardContentWrapper = (
     <Card className="hover:border-primary/50 transition-all duration-300 cursor-pointer group h-full">
-      <CardContent className="p-4 sm:p-6 flex flex-col justify-center h-full">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl ${bg} shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:-translate-y-1`}>
-            <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${color}`} />
+      <CardContent className={isSm ? "p-3 sm:p-4 flex flex-col justify-center h-full" : "p-4 sm:p-6 flex flex-col justify-center h-full"}>
+        <div className={`flex items-center ${isSm ? 'gap-2 sm:gap-3' : 'gap-3 sm:gap-4'}`}>
+          <div className={`${isSm ? 'p-2' : 'p-2.5 sm:p-3'} rounded-xl sm:rounded-2xl ${bg} shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:-translate-y-1`}>
+            <Icon className={`${isSm ? 'w-4 h-4 sm:w-5 sm:h-5' : 'w-5 h-5 sm:w-6 sm:h-6'} ${color}`} />
           </div>
-          <div>
-            <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">{title}</p>
-            <p className={`text-lg sm:text-3xl font-bold ${color === 'text-foreground' || color === 'text-primary' ? 'text-foreground' : color}`}>{value}</p>
+          <div className="overflow-hidden">
+            <p className={`text-xs ${!isSm && 'sm:text-sm'} text-muted-foreground whitespace-nowrap truncate`}>{title}</p>
+            <p className={`${isSm ? 'text-base sm:text-lg lg:text-xl' : 'text-lg sm:text-3xl'} font-bold truncate ${color === 'text-foreground' || color === 'text-primary' ? 'text-foreground' : color}`}>{value}</p>
           </div>
         </div>
       </CardContent>

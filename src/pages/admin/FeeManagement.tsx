@@ -305,20 +305,64 @@ export default function FeeManagement() {
   };
 
   const exportXLS = () => {
-    const headers = ['Name', 'User ID', 'Room', 'Monthly (₹)', 'Pending (₹)', 'Status', 'Valid Till', 'Parent Phone'];
-    const rows = filteredRecords.map(r => [
-      r.student.name, r.student.username, r.student.room_no || '',
-      r.student.fees || 0, r.pending, r.status,
-      r.student.valid_date ? format(parseISO(r.student.valid_date), 'dd MMM yyyy') : '',
-      r.student.parent_phone || '',
-    ]);
+    // 1. Extract all unique months from the payments data to create dynamic columns
+    const uniqueMonths = Array.from(new Set(payments.map(p => p.month))).filter(Boolean);
+    uniqueMonths.sort((a, b) => new Date(`1 ${a}`).getTime() - new Date(`1 ${b}`).getTime());
+
+    // 2. Build headers
+    const headers = [
+      'Name', 
+      'User ID', 
+      'Room', 
+      'Monthly Fee (₹)', 
+      'Pending Due (₹)', 
+      'Total Paid Till Date (₹)', 
+      'Security Deposit (₹)',
+      'Status', 
+      'Valid Till', 
+      'Parent Phone',
+      ...uniqueMonths
+    ];
+
+    // 3. Map rows
+    const rows = filteredRecords.map(r => {
+      const studentPayments = payments.filter(p => p.student_id === r.student.id);
+      const totalPaid = studentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      
+      const studentDeposit = deposits.find(d => d.student_id === r.student.id);
+      const depositAmount = studentDeposit ? Number(studentDeposit.amount) : 0;
+
+      const rowData = [
+        r.student.name,
+        r.student.username,
+        r.student.room_no || '',
+        r.student.fees || 0,
+        r.pending,
+        totalPaid,
+        depositAmount,
+        r.status,
+        r.student.valid_date ? format(parseISO(r.student.valid_date), 'dd MMM yyyy') : '',
+        r.student.parent_phone || '',
+      ];
+
+      // Append payment amount for each specific month
+      uniqueMonths.forEach(month => {
+        // A student could have multiple payments for a single month, sum them up
+        const monthTotal = studentPayments
+          .filter(p => p.month === month)
+          .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        rowData.push(monthTotal || 0);
+      });
+
+      return rowData;
+    });
     
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Fee Records');
     
     XLSX.writeFile(workbook, `fee-report-${selectedHostel}-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-    toast.success('Report exported to Excel');
+    toast.success('Report exported to Excel with monthly details');
   };
 
   if (loading) {
@@ -359,6 +403,7 @@ export default function FeeManagement() {
             color={s.color}
             bg={s.bg}
             index={index}
+            size="sm"
           />
         ))}
       </div>
