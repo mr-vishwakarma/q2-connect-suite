@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHostel } from '@/contexts/HostelContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useDebounce } from '@/hooks/useDebounce';
 import { api } from '@/lib/api';
 import { io, Socket } from 'socket.io-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -138,8 +139,10 @@ export default function FeeManagement() {
     });
   }, [students, fees, currentMonth]);
 
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
   const filteredRecords = useMemo(() => {
-    const q = searchQuery.toLowerCase();
+    const q = debouncedSearchQuery.toLowerCase();
     return records.filter(r => {
       const matchesSearch = !q ||
         r.student.name.toLowerCase().includes(q) ||
@@ -149,7 +152,7 @@ export default function FeeManagement() {
       const matchesStatus = filterStatus === 'all' || r.status === filterStatus;
       return matchesSearch && matchesStatus;
     });
-  }, [records, searchQuery, filterStatus]);
+  }, [records, debouncedSearchQuery, filterStatus]);
 
   // Stats
   const totalFeeAmount = useMemo(() => students.reduce((s, x) => s + (x.fees || 0), 0), [students]);

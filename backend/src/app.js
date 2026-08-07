@@ -5,6 +5,7 @@ const cors = require('cors');
 const connectDB = require('./config/db');
 const initSocket = require('./socket');
 const { initCronJobs } = require('./utils/cronJobs');
+const compression = require('compression');
 
 // Route imports
 const authRoutes = require('./routes/auth.routes');
@@ -23,6 +24,9 @@ const dashboardRoutes = require('./routes/dashboard.routes');
 connectDB();
 
 const app = express();
+
+// Compress all responses
+app.use(compression());
 
 // CORS configuration - allow all Vercel domains and local environments
 app.use(cors({

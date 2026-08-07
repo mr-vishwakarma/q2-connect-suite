@@ -13,6 +13,7 @@ const roomSchema = new mongoose.Schema(
 
 // Compound unique index: room number must be unique within a hostel
 roomSchema.index({ roomNumber: 1, hostel: 1 }, { unique: true });
+roomSchema.index({ hostel: 1 });
 
 // Auto-update status based on occupancy
 roomSchema.pre('save', function (next) {

@@ -16,9 +16,9 @@ const getFeeManagementDashboard = async (req, res) => {
         .populate('userId', 'role isActive admin')
         .select('_id userId name phone roomNo fees startDate validDate username parentPhone')
         .lean(),
-      Fee.find(filter).sort({ createdAt: -1 }).lean(),
-      FeePayment.find(filter).sort({ paymentDate: -1 }).lean(),
-      SecurityDeposit.find(filter).lean(),
+      Fee.find(filter).select('-createdAt -updatedAt -__v').sort({ createdAt: -1 }).lean(),
+      FeePayment.find(filter).select('-createdAt -updatedAt -__v').sort({ paymentDate: -1 }).lean(),
+      SecurityDeposit.find(filter).select('-createdAt -updatedAt -__v').lean(),
     ]);
 
     // Exclude any student records linked to admin users
@@ -244,11 +244,17 @@ const collectPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+    const actualHostel = student.hostel || hostel;
+
     // 1. Ensure a monthly fees row exists
-    let feeRow = await Fee.findOne({ studentId, month, hostel });
+    let feeRow = await Fee.findOne({ studentId, month, hostel: actualHostel });
     if (!feeRow) {
       feeRow = await Fee.create({
-        studentId, hostel, month, amount, lateFee, discount,
+        studentId, hostel: actualHostel, month, amount, lateFee, discount,
         status: 'unpaid', paymentMode
       });
     } else {
@@ -265,7 +271,7 @@ const collectPayment = async (req, res) => {
     const payment = await FeePayment.create({
       feeId: feeRow._id,
       studentId,
-      hostel,
+      hostel: actualHostel,
       receiptNo,
       amount: feeCore,
       lateFee,
@@ -283,7 +289,7 @@ const collectPayment = async (req, res) => {
     if (securityDeposit > 0) {
       await SecurityDeposit.create({
         studentId,
-        hostel,
+        hostel: actualHostel,
         amount: securityDeposit,
         collectedDate: new Date(),
         status: 'collected',

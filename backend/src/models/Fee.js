@@ -21,5 +21,6 @@ const feeSchema = new mongoose.Schema(
 
 // Unique: one fee record per student per month
 feeSchema.index({ studentId: 1, month: 1 }, { unique: true });
+feeSchema.index({ hostel: 1 });
 
 module.exports = mongoose.model('Fee', feeSchema);

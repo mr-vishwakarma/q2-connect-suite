@@ -20,4 +20,8 @@ const feePaymentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+feePaymentSchema.index({ studentId: 1 });
+feePaymentSchema.index({ hostel: 1 });
+feePaymentSchema.index({ paymentDate: -1 });
+
 module.exports = mongoose.model('FeePayment', feePaymentSchema);
