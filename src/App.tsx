@@ -1,4 +1,5 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
+import { SplashScreen } from '@/components/ui/splash-screen';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -78,11 +79,15 @@ function AdminShell() {
   );
 }
 
-const App = () => (
+const App = () => {
+  const [showSplash, setShowSplash] = useState(true);
+
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
       <AuthProvider>
         <HostelProvider>
+          {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -136,6 +141,7 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
