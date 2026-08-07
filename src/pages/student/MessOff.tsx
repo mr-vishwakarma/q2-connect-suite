@@ -53,40 +53,39 @@ export default function MessOff() {
   const fetchAll = useCallback(async () => {
     try {
       const [studentRes, requestsRes] = await Promise.all([
-        api.get('/students/me'),
+        api.get('/students/me').catch(e => e.response),
         api.get('/mess-requests')
       ]);
 
-      if (studentRes.data?.success) {
+      if (studentRes?.data?.success) {
         setStudentHostel(studentRes.data.data.hostel);
       }
-
-      if (requestsRes.data?.success) {
-        const reqs = requestsRes.data.data.map((r: any) => ({
+      
+      if (requestsRes?.data?.success) {
+        setRequests(requestsRes.data.data.map((r: any) => ({
           id: r._id,
           leavingDate: r.leavingDate,
           returnDate: r.returnDate,
           reason: r.reason,
           status: r.status,
           adminMessage: r.adminMessage,
-          createdAt: r.createdAt,
           documentUrl: r.documentUrl,
           documentName: r.documentName,
-          approvedDate: r.approvedDate,
-        }));
-        setRequests(reqs);
+          createdAt: r.createdAt,
+          approvedDate: r.approvedDate
+        })));
       }
     } catch (e: any) {
       console.error(e);
-      toast.error(e.response?.data?.message || 'Failed to fetch data');
+      toast.error(e.response?.data?.message || 'Failed to fetch mess requests');
     }
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && !isAdmin) {
       fetchAll();
     }
-  }, [user, fetchAll]);
+  }, [user, isAdmin, fetchAll]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

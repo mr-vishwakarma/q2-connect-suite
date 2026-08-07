@@ -43,15 +43,15 @@ export default function Complaints() {
   const fetchAll = useCallback(async () => {
     try {
       const [studentRes, complaintsRes] = await Promise.all([
-        api.get('/students/me'),
+        api.get('/students/me').catch(e => e.response),
         api.get('/complaints')
       ]);
 
-      if (studentRes.data?.success) {
+      if (studentRes?.data?.success) {
         setStudentHostel(studentRes.data.data.hostel);
       }
       
-      if (complaintsRes.data?.success) {
+      if (complaintsRes?.data?.success) {
         setComplaints(complaintsRes.data.data.map((c: any) => ({
           id: c._id,
           title: c.title,
@@ -67,10 +67,10 @@ export default function Complaints() {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && !isAdmin) {
       fetchAll();
     }
-  }, [user, fetchAll]);
+  }, [user, isAdmin, fetchAll]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

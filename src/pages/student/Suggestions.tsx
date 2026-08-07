@@ -43,15 +43,15 @@ export default function Suggestions() {
   const fetchAll = useCallback(async () => {
     try {
       const [studentRes, suggestionsRes] = await Promise.all([
-        api.get('/students/me'),
+        api.get('/students/me').catch(e => e.response),
         api.get('/suggestions')
       ]);
 
-      if (studentRes.data?.success) {
+      if (studentRes?.data?.success) {
         setStudentHostel(studentRes.data.data.hostel);
       }
       
-      if (suggestionsRes.data?.success) {
+      if (suggestionsRes?.data?.success) {
         setSuggestions(suggestionsRes.data.data.map((s: any) => ({
           id: s._id,
           title: s.title,
@@ -67,10 +67,10 @@ export default function Suggestions() {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && !isAdmin) {
       fetchAll();
     }
-  }, [user, fetchAll]);
+  }, [user, isAdmin, fetchAll]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
