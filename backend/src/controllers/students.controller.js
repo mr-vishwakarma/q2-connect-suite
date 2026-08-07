@@ -51,7 +51,13 @@ const getAllStudents = async (req, res) => {
 // @access  Admin or the student themselves
 const getStudent = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id);
+    let student;
+    if (req.params.id === 'me') {
+      student = await Student.findOne({ userId: req.user._id });
+    } else {
+      student = await Student.findById(req.params.id);
+    }
+    
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
 
     // Students can only see their own profile
