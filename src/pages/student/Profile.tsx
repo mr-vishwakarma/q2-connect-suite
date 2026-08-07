@@ -34,19 +34,19 @@ export default function Profile() {
 
   const fetchProfile = async () => {
     try {
-      const response = await api.get('/students/me');
-      const student = response.data.data;
+      const response = await api.get('/auth/me');
+      const { user, student } = response.data;
       
       setFormData({
-        name: student.name || '',
-        username: student.username || '',
-        email: student.email || '',
-        phone: student.phone || '',
-        parentPhone: student.parentPhone || '',
-        address: student.address || '',
-        dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
-        profilePhoto: student.profilePhoto || '',
-        profilePhotoFileId: student.profilePhotoFileId || '',
+        name: student?.name || user?.name || '',
+        username: user?.username || '',
+        email: user?.email || '',
+        phone: student?.phone || '',
+        parentPhone: student?.parentPhone || '',
+        address: student?.address || '',
+        dob: student?.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
+        profilePhoto: student?.profilePhoto || '',
+        profilePhotoFileId: student?.profilePhotoFileId || '',
       });
     } catch (error) {
       toast.error('Failed to load profile');
@@ -86,9 +86,7 @@ export default function Profile() {
     data.append('file', file);
 
     try {
-      const response = await api.post('/upload/file', data, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const response = await api.post('/upload/file', data);
       
       const { url, fileId } = response.data;
       
