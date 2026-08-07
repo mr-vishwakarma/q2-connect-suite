@@ -7,11 +7,10 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-    if (allowed.includes(file.mimetype)) {
+    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
       cb(null, true);
     } else {
-      cb(new Error('Only JPEG, PNG, WEBP images and PDFs are allowed'), false);
+      cb(new Error('Only images and PDFs are allowed'), false);
     }
   },
 });
@@ -24,6 +23,7 @@ const getUploadAuth = (req, res) => {
     const authParams = imagekit.getAuthenticationParameters();
     return res.status(200).json({ success: true, ...authParams });
   } catch (error) {
+    console.error('ImageKit auth error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -51,7 +51,7 @@ const uploadFile = async (req, res) => {
     }
 
     const result = await imagekit.upload({
-      file: req.file.buffer.toString('base64'),
+      file: req.file.buffer,
       fileName,
       folder,
       useUniqueFileName: true,
@@ -65,6 +65,7 @@ const uploadFile = async (req, res) => {
       size: result.size,
     });
   } catch (error) {
+    console.error('ImageKit upload file error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

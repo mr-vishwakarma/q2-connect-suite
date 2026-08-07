@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             name: student.name,
             email: student.email,
             username: student.username,
+            profilePhoto: student.profilePhoto,
           });
         } else {
           setProfile({
@@ -78,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             name: userData.name,
             email: userData.email,
             username: userData.username,
+            profilePhoto: userData.profilePhoto,
           });
         }
 
@@ -169,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             name: student.name,
             email: student.email,
             username: student.username,
+            profilePhoto: student.profilePhoto,
           });
         } else {
           setProfile({
@@ -177,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             name: userData.name,
             email: userData.email,
             username: userData.username,
+            profilePhoto: userData.profilePhoto,
           });
         }
 
@@ -229,6 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: userData.name,
           email: userData.email,
           username: null,
+          profilePhoto: userData.profilePhoto,
         });
 
         // Connect Socket

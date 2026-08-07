@@ -10,7 +10,7 @@ import { Loader2, Camera, User, Mail, Phone, Home, Calendar } from 'lucide-react
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Profile() {
-  const { profile: authProfile } = useAuth();
+  const { profile: authProfile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -64,6 +64,7 @@ export default function Profile() {
     setSaving(true);
     try {
       await api.put('/students/profile', formData);
+      await refreshProfile();
       toast.success('Profile updated successfully');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to update profile');
@@ -76,8 +77,8 @@ export default function Profile() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size should be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size should be less than 10MB');
       return;
     }
 
@@ -94,6 +95,7 @@ export default function Profile() {
       
       // Auto-save the photo update
       await api.put('/students/profile', { ...formData, profilePhoto: url, profilePhotoFileId: fileId });
+      await refreshProfile();
       toast.success('Profile photo updated!');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to upload photo');
