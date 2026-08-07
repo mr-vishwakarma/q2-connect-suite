@@ -78,7 +78,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
           </button>
         )}
         {onToggleCollapse && (
-          <button 
+          <button
             onClick={onToggleCollapse}
             className="absolute -right-3 top-8 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors hidden lg:block"
           >
@@ -112,7 +112,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
               >
                 <link.icon className="w-5 h-5 shrink-0" />
                 {!isCollapsed && <span className="flex-1 whitespace-nowrap">{link.label}</span>}
-                
+
                 {/* Tooltip for collapsed state */}
                 {isCollapsed && (
                   <div className="absolute left-full ml-4 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
@@ -144,7 +144,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
             </div>
           )}
         </div>
-        
+
         <button
           onClick={() => {
             handleLinkClick();

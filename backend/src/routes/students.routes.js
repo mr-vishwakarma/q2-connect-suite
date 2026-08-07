@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth.middleware');
 const { adminOnly, adminOrWarden } = require('../middleware/admin.middleware');
-const { getAllStudents, getStudent, createStudent, updateStudent, deleteStudent } = require('../controllers/students.controller');
+const { getAllStudents, getStudent, createStudent, updateStudent, deleteStudent, updateOwnProfile } = require('../controllers/students.controller');
 
 router.use(protect);
 
+router.put('/profile', updateOwnProfile); // student updating own profile
 router.get('/', adminOrWarden, getAllStudents);
 router.post('/', adminOnly, createStudent);
 router.get('/:id', getStudent); // admin or own student

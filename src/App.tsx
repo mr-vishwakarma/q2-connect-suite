@@ -32,6 +32,7 @@ const OurTeam = lazy(() => import("./pages/OurTeam"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword.tsx"));
 const StudentDashboard = lazy(() => import("./pages/student/StudentDashboard"));
+const Profile = lazy(() => import("./pages/student/Profile"));
 const MessOff = lazy(() => import("./pages/student/MessOff"));
 const Complaints = lazy(() => import("./pages/student/Complaints"));
 const Suggestions = lazy(() => import("./pages/student/Suggestions"));
@@ -109,6 +110,7 @@ const App = () => (
               <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
               <Route path="/unauthorized" element={<Unauthorized />} />
               <Route path="/student/dashboard" element={<StudentDashboard />} />
+              <Route path="/student/profile" element={<Profile />} />
               <Route path="/student/mess-off" element={<MessOff />} />
               <Route path="/student/complaints" element={<Complaints />} />
               <Route path="/student/suggestions" element={<Suggestions />} />

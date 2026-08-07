@@ -13,6 +13,8 @@ const studentSchema = new mongoose.Schema(
     fees: { type: Number, default: 0 },
     startDate: { type: Date },
     validDate: { type: Date },
+    address: { type: String, trim: true },
+    dob: { type: Date },
     profilePhoto: { type: String }, // ImageKit URL
     profilePhotoFileId: { type: String }, // ImageKit fileId for deletion
     isActive: { type: Boolean, default: true },

@@ -306,4 +306,43 @@ const deleteStudent = async (req, res) => {
   }
 };
 
-module.exports = { getAllStudents, getStudent, createStudent, updateStudent, deleteStudent };
+// @desc    Update student's own profile
+// @route   PUT /api/students/profile
+// @access  Student
+const updateOwnProfile = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { name, phone, parentPhone, address, dob, profilePhoto, profilePhotoFileId } = req.body;
+    
+    // Find the student record associated with the logged-in user
+    const student = await Student.findOne({ userId: req.user._id }).session(session);
+    
+    if (!student) {
+      await session.abortTransaction();
+      return res.status(404).json({ success: false, message: 'Student profile not found' });
+    }
+
+    const updated = await Student.findByIdAndUpdate(
+      student._id,
+      { name, phone, parentPhone, address, dob, profilePhoto, profilePhotoFileId },
+      { new: true, runValidators: true, session }
+    );
+
+    // Also update name on User record
+    if (name) {
+      await User.findByIdAndUpdate(req.user._id, { name }, { session });
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+    return res.status(200).json({ success: true, data: updated });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { getAllStudents, getStudent, createStudent, updateStudent, deleteStudent, updateOwnProfile };
