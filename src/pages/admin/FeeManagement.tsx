@@ -1,4 +1,7 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
+import { StatCard } from '@/components/ui/stat-card';
+import { CollectPaymentDialog } from './components/CollectPaymentDialog';
+import { StudentProfileHistory } from './components/StudentProfileHistory';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHostel } from '@/contexts/HostelContext';
@@ -347,24 +350,17 @@ export default function FeeManagement() {
     <div className="space-y-6 animate-fade-in">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {stats.map(s => {
-          const Icon = s.icon;
-          return (
-            <Card key={s.label} className="hover:border-primary/50 transition-all duration-300 cursor-default group">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl ${s.bg} shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:-translate-y-1`}>
-                    <Icon className={`w-5 h-5 ${s.color}`} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">{s.label}</p>
-                    <p className="text-lg font-bold text-foreground">{s.value}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+        {stats.map((s, index) => (
+          <StatCard
+            key={s.label}
+            title={s.label}
+            value={s.value}
+            icon={s.icon}
+            color={s.color}
+            bg={s.bg}
+            index={index}
+          />
+        ))}
       </div>
 
       {/* Chart */}
@@ -527,155 +523,42 @@ export default function FeeManagement() {
       </div>
 
       {/* Collect Payment Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-foreground flex items-center gap-2"><Receipt className="w-5 h-5" />Collect Payment</DialogTitle>
-            <DialogDescription>Record payment and auto-generate PDF receipt</DialogDescription>
-          </DialogHeader>
-          {selectedStudent && (
-            <div className="space-y-3">
-              <div className="p-3 bg-secondary rounded-lg">
-                <p className="font-semibold text-foreground">{selectedStudent.name}</p>
-                <p className="text-xs text-muted-foreground">{selectedStudent.username} • Room {selectedStudent.room_no || 'N/A'}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Fee Month</Label>
-                  <Select value={pMonth} onValueChange={setPMonth}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {MONTH_OPTIONS.map(m => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Monthly Fee (₹)</Label>
-                  <Input type="number" value={pAmount} onChange={(e) => setPAmount(Number(e.target.value))} />
-                </div>
-                <div>
-                  <Label>Late Fee (₹)</Label>
-                  <Input type="number" value={pLateFee} onChange={(e) => setPLateFee(Number(e.target.value))} />
-                </div>
-                <div>
-                  <Label>Discount (₹)</Label>
-                  <Input type="number" value={pDiscount} onChange={(e) => setPDiscount(Number(e.target.value))} />
-                </div>
-                <div>
-                  <Label>Security Deposit (₹)</Label>
-                  <Input type="number" value={pDeposit} onChange={(e) => setPDeposit(Number(e.target.value))} />
-                </div>
-                <div>
-                  <Label>Amount Received (₹)</Label>
-                  <Input type="number" value={pReceived} onChange={(e) => setPReceived(Number(e.target.value))} />
-                </div>
-              </div>
-              <div>
-                <Label>Payment Mode</Label>
-                <Select value={pMode} onValueChange={(v) => setPMode(v as 'cash' | 'upi' | 'bank')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="upi">UPI</SelectItem>
-                    <SelectItem value="bank">Bank Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Notes (optional)</Label>
-                <Textarea value={pNotes} onChange={(e) => setPNotes(e.target.value)} rows={2} />
-              </div>
-              <div className="p-3 bg-secondary rounded-lg text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Total Due:</span><span className="text-foreground font-medium">₹{(pAmount + pLateFee - pDiscount).toLocaleString('en-IN')}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">+ Deposit:</span><span className="text-foreground font-medium">₹{pDeposit.toLocaleString('en-IN')}</span></div>
-                <div className="flex justify-between text-primary font-bold mt-1"><span>Receiving:</span><span>₹{pReceived.toLocaleString('en-IN')}</span></div>
-              </div>
-              <Button className="w-full" onClick={handleSubmitPayment} disabled={submitting}>
-                {submitting ? 'Recording...' : <><Check className="w-4 h-4 mr-2" />Confirm & Download Receipt</>}
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <CollectPaymentDialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+        selectedStudent={selectedStudent}
+        pMonth={pMonth}
+        setPMonth={setPMonth}
+        monthOptions={MONTH_OPTIONS}
+        pAmount={pAmount}
+        setPAmount={setPAmount}
+        pLateFee={pLateFee}
+        setPLateFee={setPLateFee}
+        pDiscount={pDiscount}
+        setPDiscount={setPDiscount}
+        pDeposit={pDeposit}
+        setPDeposit={setPDeposit}
+        pReceived={pReceived}
+        setPReceived={setPReceived}
+        pMode={pMode}
+        setPMode={setPMode}
+        pNotes={pNotes}
+        setPNotes={setPNotes}
+        onSubmit={handleSubmitPayment}
+        submitting={submitting}
+      />
 
       {/* Student Profile Dialog */}
-      <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
-        <DialogContent className="bg-card border-border max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-foreground flex items-center gap-2"><FileText className="w-5 h-5" />Student Fee Profile</DialogTitle>
-          </DialogHeader>
-          {selectedStudent && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-secondary rounded-lg">
-                <div><p className="text-xs text-muted-foreground">Name</p><p className="font-medium text-foreground">{selectedStudent.name}</p></div>
-                <div><p className="text-xs text-muted-foreground">User ID</p><p className="font-medium text-foreground">{selectedStudent.username}</p></div>
-                <div><p className="text-xs text-muted-foreground">Room</p><p className="font-medium text-foreground">{selectedStudent.room_no || 'N/A'}</p></div>
-                <div><p className="text-xs text-muted-foreground">Monthly Fee</p><p className="font-medium text-foreground">₹{(selectedStudent.fees || 0).toLocaleString('en-IN')}</p></div>
-                <div><p className="text-xs text-muted-foreground">Start Date</p><p className="font-medium text-foreground">{selectedStudent.start_date ? format(parseISO(selectedStudent.start_date), 'dd MMM yyyy') : 'N/A'}</p></div>
-                <div><p className="text-xs text-muted-foreground">Valid Till</p><p className="font-medium text-foreground">{selectedStudent.valid_date ? format(parseISO(selectedStudent.valid_date), 'dd MMM yyyy') : 'N/A'}</p></div>
-                <div><p className="text-xs text-muted-foreground">Parent Mobile</p><p className="font-medium text-foreground">{selectedStudent.parent_phone || 'N/A'}</p></div>
-                <div><p className="text-xs text-muted-foreground">Deposit</p><p className="font-medium text-foreground">₹{(selectedStudentDeposit?.amount || 0).toLocaleString('en-IN')} <span className="text-xs text-muted-foreground">({selectedStudentDeposit?.status || 'none'})</span></p></div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-bold text-foreground mb-2">Monthly Fee Records</h4>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Month</TableHead><TableHead>Amount</TableHead><TableHead>Late</TableHead><TableHead>Discount</TableHead><TableHead>Paid</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {selectedStudentFees.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-4">No records</TableCell></TableRow> :
-                        selectedStudentFees.map(f => (
-                          <TableRow key={f.id}>
-                            <TableCell className="text-foreground">{f.month}</TableCell>
-                            <TableCell className="text-foreground">₹{f.amount}</TableCell>
-                            <TableCell className="text-foreground">₹{f.late_fee || 0}</TableCell>
-                            <TableCell className="text-foreground">₹{f.discount || 0}</TableCell>
-                            <TableCell className="text-foreground">₹{f.paid_amount || 0}</TableCell>
-                            <TableCell>
-                              {f.status === 'paid' ? <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
-                                : f.status === 'partial' ? <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">Partial</Badge>
-                                : <Badge variant="destructive">Unpaid</Badge>}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-bold text-foreground mb-2">Payment History</h4>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Receipt</TableHead><TableHead>Month</TableHead><TableHead>Amount</TableHead><TableHead>Mode</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {selectedStudentPayments.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-4">No payments</TableCell></TableRow> :
-                        selectedStudentPayments.map(p => (
-                          <TableRow key={p.id}>
-                            <TableCell className="text-foreground">{format(parseISO(p.payment_date), 'dd MMM yyyy')}</TableCell>
-                            <TableCell className="text-foreground font-mono text-xs">{p.receipt_no}</TableCell>
-                            <TableCell className="text-foreground">{p.month}</TableCell>
-                            <TableCell className="text-foreground">₹{Number(p.amount) + Number(p.security_deposit)}</TableCell>
-                            <TableCell className="text-foreground uppercase text-xs">{p.payment_mode}</TableCell>
-                            <TableCell><Button size="sm" variant="ghost" onClick={() => downloadHistoryForStudent(selectedStudent)}><Download className="w-4 h-4" /></Button></TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button className="flex-1" onClick={() => { setShowProfileDialog(false); openCollect(selectedStudent); }}>
-                  <Plus className="w-4 h-4 mr-2" />Collect Payment
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <StudentProfileHistory
+        open={showProfileDialog}
+        onOpenChange={setShowProfileDialog}
+        selectedStudent={selectedStudent}
+        selectedStudentDeposit={selectedStudentDeposit}
+        selectedStudentFees={selectedStudentFees}
+        selectedStudentPayments={selectedStudentPayments}
+        downloadHistoryForStudent={downloadHistoryForStudent}
+        openCollect={openCollect}
+      />
     </div>
   );
 }

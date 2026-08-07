@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
+import { StatCard } from '@/components/ui/stat-card';
 import { DashboardSkeleton } from '@/components/ui/dashboard-skeleton';
 import { api } from '@/lib/api';
 import { Users, MessageSquare, Lightbulb, Clock, ListChecks } from 'lucide-react';
@@ -120,33 +121,18 @@ export default function AdminDashboard() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-        {statCards.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <motion.div
-              key={stat.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Link to={stat.link}>
-                <Card className="hover:border-primary/50 transition-all duration-300 cursor-pointer group">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-2xl ${stat.bg} shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:-translate-y-1`}>
-                        <Icon className={`w-6 h-6 ${stat.color}`} />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">{stat.title}</p>
-                        <p className={`text-3xl font-bold ${stat.color}`}>{stat.value}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            </motion.div>
-          );
-        })}
+        {statCards.map((stat, index) => (
+          <StatCard
+            key={stat.title}
+            title={stat.title}
+            value={stat.value}
+            icon={stat.icon}
+            color={stat.color}
+            bg={stat.bg}
+            link={stat.link}
+            index={index}
+          />
+        ))}
       </div>
 
       {/* Charts and Recent Items */}

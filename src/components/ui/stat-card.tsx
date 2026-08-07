@@ -1,0 +1,53 @@
+import { LucideIcon } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  icon: LucideIcon;
+  color: string; // e.g., 'text-primary'
+  bg: string; // e.g., 'bg-primary/10'
+  link?: string;
+  index?: number;
+}
+
+export function StatCard({ title, value, icon: Icon, color, bg, link, index = 0 }: StatCardProps) {
+  const CardContentWrapper = (
+    <Card className="hover:border-primary/50 transition-all duration-300 cursor-pointer group h-full">
+      <CardContent className="p-4 sm:p-6 flex flex-col justify-center h-full">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl ${bg} shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:-translate-y-1`}>
+            <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${color}`} />
+          </div>
+          <div>
+            <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">{title}</p>
+            <p className={`text-lg sm:text-3xl font-bold ${color === 'text-foreground' || color === 'text-primary' ? 'text-foreground' : color}`}>{value}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const AnimatedWrapper = (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 }}
+      className="h-full"
+    >
+      {CardContentWrapper}
+    </motion.div>
+  );
+
+  if (link) {
+    return (
+      <Link to={link} className="block h-full cursor-pointer">
+        {AnimatedWrapper}
+      </Link>
+    );
+  }
+
+  return AnimatedWrapper;
+}

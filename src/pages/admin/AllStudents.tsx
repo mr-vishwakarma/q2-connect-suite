@@ -1,4 +1,5 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
+import { EditStudentDialog } from './components/EditStudentDialog';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -382,110 +383,18 @@ export default function AllStudents() {
         </Card>
       </motion.div>
 
-      {/* Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Edit Student</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name" className="text-foreground">Name</Label>
-              <Input
-                id="edit-name"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                required
-                className="bg-secondary border-border"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-username" className="text-foreground">User ID</Label>
-              <Input
-                id="edit-username"
-                value={editForm.username}
-                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                required
-                className="bg-secondary border-border"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-room" className="text-foreground">Room Number</Label>
-              <Input
-                id="edit-room"
-                value={editForm.room_no}
-                onChange={(e) => setEditForm({ ...editForm, room_no: e.target.value })}
-                className="bg-secondary border-border"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-fees" className="text-foreground">Monthly Fees</Label>
-              <Input
-                id="edit-fees"
-                type="number"
-                value={editForm.fees}
-                onChange={(e) => setEditForm({ ...editForm, fees: e.target.value })}
-                className="bg-secondary border-border"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-foreground">Start Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal bg-secondary border-border",
-                      !editStartDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {editStartDate ? format(editStartDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={editStartDate}
-                    onSelect={setEditStartDate}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-foreground">End Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal bg-secondary border-border",
-                      !editEndDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {editEndDate ? format(editEndDate, "PPP") : "Select date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={editEndDate}
-                    onSelect={setEditEndDate}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <Button type="submit" variant="hero" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EditStudentDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        editStartDate={editStartDate}
+        setEditStartDate={setEditStartDate}
+        editEndDate={editEndDate}
+        setEditEndDate={setEditEndDate}
+        onSubmit={handleEditSubmit}
+        submitting={isSubmitting}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { DashboardSkeleton } from '@/components/ui/dashboard-skeleton';
+import { StatCard } from '@/components/ui/stat-card';
 import { api } from '@/lib/api';
 import { CalendarCheck, MessageSquare, Lightbulb, CheckCircle, ArrowRight, User, Home, CreditCard, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -107,31 +108,17 @@ export default function StudentDashboard() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {statCards.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <motion.div
-                key={stat.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card className="hover:border-primary/50 transition-all duration-300 group cursor-default">
-                  <CardContent className="p-4 sm:p-5">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-2xl ${stat.bg} shadow-sm group-hover:shadow-md transition-shadow`}>
-                        <Icon className={`w-6 h-6 ${stat.color}`} />
-                      </div>
-                      <div>
-                        <p className="text-xs sm:text-sm text-muted-foreground">{stat.title}</p>
-                        <p className={`text-2xl sm:text-3xl font-bold ${stat.color}`}>{stat.value}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            );
-          })}
+        {statCards.map((stat, index) => (
+          <StatCard
+            key={stat.title}
+            title={stat.title}
+            value={stat.value}
+            icon={stat.icon}
+            color={stat.color}
+            bg={stat.bg}
+            index={index}
+          />
+        ))}
         </div>
 
         {/* Profile + Quick Actions */}
