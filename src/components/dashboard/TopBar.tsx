@@ -38,10 +38,14 @@ export function TopBar({ title, onMenuToggle, showMenu }: TopBarProps) {
         <NotificationBell />
 
         <div className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-border">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full gradient-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-medium text-xs sm:text-sm">
-              {profile?.name?.charAt(0).toUpperCase() || 'U'}
-            </span>
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full gradient-primary flex items-center justify-center overflow-hidden">
+            {profile?.profilePhoto ? (
+              <img src={profile.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-primary-foreground font-medium text-xs sm:text-sm">
+                {profile?.name?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            )}
           </div>
           <div className="hidden sm:block">
             <p className="text-sm font-medium text-foreground">{profile?.name || 'User'}</p>

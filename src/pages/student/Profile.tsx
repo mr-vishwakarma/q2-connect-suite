@@ -90,7 +90,7 @@ export default function Profile() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       
-      const { url, fileId } = response.data.data;
+      const { url, fileId } = response.data;
       
       setFormData(prev => ({ ...prev, profilePhoto: url, profilePhotoFileId: fileId }));
       

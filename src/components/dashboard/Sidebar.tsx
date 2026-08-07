@@ -60,7 +60,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
       {/* Logo */}
       <div className="p-6 relative flex items-center justify-between">
         <Link to={isAdmin ? "/admin/dashboard" : "/student/dashboard"} className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
-          <img src="/favicon.png" alt="Q2 Logo" className="w-10 h-10 object-contain shrink-0" />
+          <img src="/favicon.png" alt="Q2 Logo" className="w-20 h-20 object-contain shrink-0" />
           {!isCollapsed && (
             <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }} className="overflow-hidden whitespace-nowrap">
               <span className="text-sidebar-foreground font-semibold block">Q2 Management</span>
@@ -128,10 +128,14 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
       {/* User section */}
       <div className="p-4 border-t border-sidebar-border">
         <div className={cn("flex items-center rounded-xl bg-sidebar-accent/30", isCollapsed ? "justify-center p-2" : "gap-3 px-4 py-3")}>
-          <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center shrink-0">
-            <span className="text-primary-foreground font-medium text-sm">
-              {profile?.name?.charAt(0).toUpperCase() || 'U'}
-            </span>
+          <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center shrink-0 overflow-hidden">
+            {profile?.profilePhoto ? (
+              <img src={profile.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-primary-foreground font-medium text-sm">
+                {profile?.name?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            )}
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0 overflow-hidden whitespace-nowrap">
