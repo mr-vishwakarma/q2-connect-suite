@@ -24,9 +24,18 @@ import {
   Search, IndianRupee, Calendar, Check, Filter, Download, TrendingUp,
   AlertCircle, Wallet, Users, FileText, Receipt, Plus, User, Printer,
 } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays, addMonths, subMonths } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { downloadReceipt, ReceiptData } from '@/lib/receiptPdf';
+
+const generateMonthOptions = () => {
+  const options = [];
+  for (let i = -3; i <= 6; i++) {
+    options.push(format(addMonths(new Date(), i), 'MMMM yyyy'));
+  }
+  return options;
+};
+const MONTH_OPTIONS = generateMonthOptions();
+import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptData } from '@/lib/receiptPdf';
 
 interface Student {
   id: string; name: string; username: string; room_no: string | null;
@@ -225,15 +234,32 @@ export default function FeeManagement() {
       });
 
       // PDF Receipt
-      const receiptData: ReceiptData = {
-        receipt_no, payment_date: new Date().toISOString(),
-        student_name: selectedStudent.name, username: selectedStudent.username,
-        room_no: selectedStudent.room_no, hostel: selectedHostel, month: pMonth,
-        monthly_fee: pAmount, late_fee: pLateFee, discount: pDiscount,
-        security_deposit: pDeposit, amount_paid: pReceived, payment_mode: pMode,
-        admin_name: profile?.name, notes: pNotes,
+      const studentPayments = [...payments.filter(p => p.student_id === selectedStudent.id)];
+      // Add the current one to the history since we haven't fetched it yet
+      studentPayments.unshift({
+        id: 'new',
+        fee_id: '',
+        student_id: selectedStudent.id,
+        receipt_no,
+        payment_date: new Date().toISOString(),
+        month: pMonth,
+        amount: pReceived,
+        payment_mode: pMode,
+        admin_name: profile?.name || '',
+        notes: pNotes,
+        late_fee: pLateFee,
+        discount: pDiscount,
+        security_deposit: pDeposit,
+      });
+      
+      const receiptData: HistoryReceiptData = {
+        student_name: selectedStudent.name,
+        username: selectedStudent.username,
+        room_no: selectedStudent.room_no,
+        hostel: selectedHostel,
+        payments: studentPayments
       };
-      downloadReceipt(receiptData);
+      downloadHistoryReceipt(receiptData);
 
       toast.success('Payment recorded, receipt generated');
       setShowPaymentDialog(false);
@@ -246,26 +272,17 @@ export default function FeeManagement() {
     }
   };
 
-  const reissueReceipt = (p: Payment, s: Student) => {
-    const data: ReceiptData = {
-      receipt_no: p.receipt_no, payment_date: p.payment_date,
-      student_name: s.name, username: s.username, room_no: s.room_no,
-      hostel: selectedHostel, month: p.month, monthly_fee: p.amount,
-      late_fee: p.late_fee, discount: p.discount,
-      security_deposit: p.security_deposit,
-      amount_paid: Number(p.amount) + Number(p.security_deposit),
-      payment_mode: p.payment_mode, admin_name: p.admin_name, notes: p.notes,
-    };
-    downloadReceipt(data);
-  };
-
-  const downloadLatestReceiptForStudent = (s: Student) => {
+  const downloadHistoryForStudent = (s: Student) => {
     const studentPayments = payments.filter(p => p.student_id === s.id);
     if (studentPayments.length === 0) {
       toast.error(`No payment receipts found for ${s.name}`);
       return;
     }
-    reissueReceipt(studentPayments[0], s);
+    const data: HistoryReceiptData = {
+      student_name: s.name, username: s.username, room_no: s.room_no,
+      hostel: selectedHostel, payments: studentPayments
+    };
+    downloadHistoryReceipt(data);
   };
 
   const exportCSV = () => {
@@ -450,7 +467,7 @@ export default function FeeManagement() {
                       : <Badge variant="destructive">Unpaid</Badge>}
                   </TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button size="sm" variant="ghost" title="Download Receipt" onClick={() => downloadLatestReceiptForStudent(r.student)}>
+                    <Button size="sm" variant="ghost" title="Download Receipt" onClick={() => downloadHistoryForStudent(r.student)}>
                       <Printer className="w-4 h-4 mr-1 text-primary" />
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => openProfile(r.student)}><User className="w-4 h-4 mr-1" />Profile</Button>
@@ -482,7 +499,7 @@ export default function FeeManagement() {
                 <div><p className="text-muted-foreground text-xs">Pending</p><p className="text-foreground font-medium">₹{r.pending.toLocaleString('en-IN')}</p></div>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => downloadLatestReceiptForStudent(r.student)}>
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => downloadHistoryForStudent(r.student)}>
                   <Printer className="w-4 h-4 mr-1 text-primary" />Receipt
                 </Button>
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => openProfile(r.student)}><User className="w-4 h-4 mr-1" />Profile</Button>
@@ -509,7 +526,14 @@ export default function FeeManagement() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Fee Month</Label>
-                  <Input value={pMonth} onChange={(e) => setPMonth(e.target.value)} />
+                  <Select value={pMonth} onValueChange={setPMonth}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MONTH_OPTIONS.map(m => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Monthly Fee (₹)</Label>
@@ -619,7 +643,7 @@ export default function FeeManagement() {
                             <TableCell className="text-foreground">{p.month}</TableCell>
                             <TableCell className="text-foreground">₹{Number(p.amount) + Number(p.security_deposit)}</TableCell>
                             <TableCell className="text-foreground uppercase text-xs">{p.payment_mode}</TableCell>
-                            <TableCell><Button size="sm" variant="ghost" onClick={() => reissueReceipt(p, selectedStudent)}><Download className="w-4 h-4" /></Button></TableCell>
+                            <TableCell><Button size="sm" variant="ghost" onClick={() => downloadHistoryForStudent(selectedStudent)}><Download className="w-4 h-4" /></Button></TableCell>
                           </TableRow>
                         ))}
                     </TableBody>

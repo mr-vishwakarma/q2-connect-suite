@@ -118,3 +118,96 @@ export function downloadReceipt(r: ReceiptData) {
   const doc = generateReceiptPDF(r);
   doc.save(`Receipt-${r.receipt_no}.pdf`);
 }
+
+import autoTable from 'jspdf-autotable';
+
+export interface HistoryReceiptData {
+  student_name: string;
+  username: string;
+  room_no: string | null;
+  hostel: string;
+  payments: Array<{
+    payment_date: string;
+    month: string;
+    amount: number;
+    payment_mode: string;
+    receipt_no: string;
+  }>;
+}
+
+export function downloadHistoryReceipt(data: HistoryReceiptData) {
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  let y = 40;
+
+  // Header
+  doc.setFillColor(15, 23, 42);
+  doc.rect(0, 0, W, 80, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text('Q2 Group of Hostels', 40, 40);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(HOSTEL_ADDR, 40, 58);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PAYMENT HISTORY', W - 40, 40, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, W - 40, 58, { align: 'right' });
+
+  y = 110;
+  doc.setTextColor(20, 20, 20);
+  doc.setFontSize(10);
+
+  const row = (l: string, v: string) => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(l, 40, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(v, 180, y);
+    y += 18;
+  };
+
+  row('Student Name:', data.student_name);
+  row('User ID:', data.username);
+  row('Room No:', data.room_no || 'N/A');
+  row('Hostel:', data.hostel);
+
+  y += 20;
+  
+  const totalPaid = data.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Date', 'Receipt No.', 'Fee Month', 'Mode', 'Amount Paid']],
+    body: data.payments.map(p => [
+      new Date(p.payment_date).toLocaleDateString('en-IN'),
+      p.receipt_no,
+      p.month,
+      p.payment_mode.toUpperCase(),
+      `Rs. ${p.amount.toLocaleString('en-IN')}`
+    ]),
+    theme: 'grid',
+    headStyles: { fillColor: [15, 23, 42] },
+    margin: { top: 40, left: 40, right: 40 },
+  });
+
+  // @ts-ignore
+  y = doc.lastAutoTable.finalY + 30;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('Total Amount Paid:', 40, y);
+  doc.text(`Rs. ${totalPaid.toLocaleString('en-IN')}`, W - 40, y, { align: 'right' });
+
+  y = doc.internal.pageSize.getHeight() - 60;
+  doc.setDrawColor(200);
+  doc.line(40, y, W - 40, y);
+  y += 18;
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text('This is a system-generated history report from Q2 Group of Hostels.', 40, y);
+
+  doc.save(`History-${data.username}-${Date.now()}.pdf`);
+}

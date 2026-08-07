@@ -309,10 +309,11 @@ const collectPayment = async (req, res) => {
     }
 
     // 5. Update Fee status to paid if fully paid
-    if (feeCore >= totalDue) {
-      await Fee.findByIdAndUpdate(feeRow._id, { status: 'paid', paidAmount: feeCore, paidDate: new Date() });
-    } else if (feeCore > 0) {
-      await Fee.findByIdAndUpdate(feeRow._id, { status: 'partial', paidAmount: feeCore, paidDate: new Date() });
+    const newPaidAmount = (feeRow.paidAmount || 0) + feeCore;
+    if (newPaidAmount >= totalDue) {
+      await Fee.findByIdAndUpdate(feeRow._id, { status: 'paid', paidAmount: newPaidAmount, paidDate: new Date() });
+    } else if (newPaidAmount > 0) {
+      await Fee.findByIdAndUpdate(feeRow._id, { status: 'partial', paidAmount: newPaidAmount, paidDate: new Date() });
     }
 
     return res.status(201).json({ success: true, data: payment });
