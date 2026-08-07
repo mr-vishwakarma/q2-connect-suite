@@ -58,7 +58,7 @@ const getStudent = async (req, res) => {
 // @access  Admin
 const createStudent = async (req, res) => {
   try {
-    const { name, username, email, phone, parentPhone, roomNo, hostel, fees, startDate, validDate, password } = req.body;
+    const { name, username, email, phone, parentPhone, roomNo, hostel, fees, startDate, validDate, password, initialFeePaid } = req.body;
 
     if (!name || !username || !email || !password) {
       return res.status(400).json({ success: false, message: 'name, username, email, password are required' });
@@ -104,6 +104,49 @@ const createStudent = async (req, res) => {
         { roomNumber: roomNo, hostel },
         { $inc: { occupiedCount: 1 } }
       );
+    }
+
+    // If initial fee is marked as paid, create Fee + FeePayment records
+    if (initialFeePaid && fees && fees > 0) {
+      const Fee = require('../models/Fee');
+      const FeePayment = require('../models/FeePayment');
+      const now = new Date();
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+
+      try {
+        const feeRecord = await Fee.create({
+          studentId: student._id,
+          hostel,
+          month,
+          amount: fees,
+          paidAmount: fees,
+          status: 'paid',
+          paidDate: now,
+          paymentMode: 'cash',
+          receiptNo,
+        });
+
+        await FeePayment.create({
+          feeId: feeRecord._id,
+          studentId: student._id,
+          hostel,
+          receiptNo,
+          amount: fees,
+          lateFee: 0,
+          discount: 0,
+          securityDeposit: 0,
+          paymentMode: 'cash',
+          paymentDate: now,
+          adminId: req.user._id,
+          adminName: req.user.name,
+          month,
+          notes: 'Initial fee paid at registration',
+        });
+      } catch (feeErr) {
+        console.error('Error creating initial fee records:', feeErr);
+        // Don't fail student creation if fee creation fails
+      }
     }
 
     // Create welcome notification

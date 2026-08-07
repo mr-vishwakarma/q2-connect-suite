@@ -21,7 +21,7 @@ import {
 import { toast } from 'sonner';
 import {
   Search, IndianRupee, Calendar, Check, Filter, Download, TrendingUp,
-  AlertCircle, Wallet, Users, FileText, Receipt, Plus, User,
+  AlertCircle, Wallet, Users, FileText, Receipt, Plus, User, Printer,
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -256,6 +256,15 @@ export default function FeeManagement() {
     downloadReceipt(data);
   };
 
+  const downloadLatestReceiptForStudent = (s: Student) => {
+    const studentPayments = payments.filter(p => p.student_id === s.id);
+    if (studentPayments.length === 0) {
+      toast.error(`No payment receipts found for ${s.name}`);
+      return;
+    }
+    reissueReceipt(studentPayments[0], s);
+  };
+
   const exportCSV = () => {
     const headers = ['Name', 'User ID', 'Room', 'Monthly (₹)', 'Pending (₹)', 'Status', 'Valid Till', 'Parent Phone'];
     const rows = filteredRecords.map(r => [
@@ -438,6 +447,9 @@ export default function FeeManagement() {
                       : <Badge variant="destructive">Unpaid</Badge>}
                   </TableCell>
                   <TableCell className="text-right space-x-1">
+                    <Button size="sm" variant="ghost" title="Download Receipt" onClick={() => downloadLatestReceiptForStudent(r.student)}>
+                      <Printer className="w-4 h-4 mr-1 text-primary" />
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => openProfile(r.student)}><User className="w-4 h-4 mr-1" />Profile</Button>
                     <Button size="sm" onClick={() => openCollect(r.student)}><Plus className="w-4 h-4 mr-1" />Collect</Button>
                   </TableCell>
@@ -467,6 +479,9 @@ export default function FeeManagement() {
                 <div><p className="text-muted-foreground text-xs">Pending</p><p className="text-foreground font-medium">₹{r.pending.toLocaleString('en-IN')}</p></div>
               </div>
               <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => downloadLatestReceiptForStudent(r.student)}>
+                  <Printer className="w-4 h-4 mr-1 text-primary" />Receipt
+                </Button>
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => openProfile(r.student)}><User className="w-4 h-4 mr-1" />Profile</Button>
                 <Button size="sm" className="flex-1" onClick={() => openCollect(r.student)}><Plus className="w-4 h-4 mr-1" />Collect</Button>
               </div>

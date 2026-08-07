@@ -3,22 +3,22 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { MessageSquare, CheckCircle, Clock, XCircle, FileDown, FileSpreadsheet } from 'lucide-react';
-import { exportToPDF, exportToExcel } from '@/utils/exportUtils';
+import { MessageSquare, CheckCircle, Clock, XCircle } from 'lucide-react';
 
 interface Complaint {
   id: string;
   title: string;
   description: string;
   status: string;
-  created_at: string;
-  user_id: string;
+  createdAt: string;
+  userId: { name?: string; username?: string } | string;
+  studentId: { name?: string; roomNo?: string } | string | null;
 }
 
 export default function AdminComplaints() {
@@ -42,15 +42,21 @@ export default function AdminComplaints() {
 
   const fetchComplaints = async () => {
     try {
-      setIsLoading(prev => prev);
-      const { data, error } = await supabase
-        .from('complaints')
-        .select('*')
-        .eq('hostel', selectedHostel)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setComplaints(data || []);
+      const response = await api.get('/complaints', {
+        params: { hostel: selectedHostel }
+      });
+      if (response.data?.success) {
+        const mapped = response.data.data.map((c: any) => ({
+          id: c._id,
+          title: c.title,
+          description: c.description,
+          status: c.status || 'pending',
+          createdAt: c.createdAt,
+          userId: c.userId,
+          studentId: c.studentId,
+        }));
+        setComplaints(mapped);
+      }
     } catch (error) {
       console.error('Error fetching complaints:', error);
       toast.error('Failed to fetch complaints');
@@ -61,18 +67,19 @@ export default function AdminComplaints() {
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      const { error } = await supabase
-        .from('complaints')
-        .update({ status })
-        .eq('id', id);
-
-      if (error) throw error;
+      await api.put(`/complaints/${id}`, { status });
       toast.success(`Complaint marked as ${status}`);
       fetchComplaints();
     } catch (error) {
       console.error('Error updating complaint:', error);
       toast.error('Failed to update complaint');
     }
+  };
+
+  const getStudentName = (c: Complaint) => {
+    if (c.userId && typeof c.userId === 'object' && c.userId.name) return c.userId.name;
+    if (c.studentId && typeof c.studentId === 'object' && c.studentId.name) return c.studentId.name;
+    return 'Unknown';
   };
 
   const getStatusBadge = (status: string) => {
@@ -124,11 +131,11 @@ export default function AdminComplaints() {
                       <div>
                         <CardTitle className="text-foreground text-lg">{complaint.title}</CardTitle>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(complaint.created_at).toLocaleString()}
+                          By {getStudentName(complaint)} • {new Date(complaint.createdAt).toLocaleString()}
                         </p>
                       </div>
                     </div>
-                    {getStatusBadge(complaint.status || 'pending')}
+                    {getStatusBadge(complaint.status)}
                   </div>
                 </CardHeader>
                 <CardContent>

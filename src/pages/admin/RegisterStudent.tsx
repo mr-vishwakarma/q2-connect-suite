@@ -45,6 +45,7 @@ function RegisterStudentContent() {
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [showPassword, setShowPassword] = useState(false);
+  const [initialFeePaid, setInitialFeePaid] = useState(false);
   const [lastCreated, setLastCreated] = useState<{ name: string; username: string; email: string; pass: string } | null>(null);
 
   // Auto-generate temp password
@@ -163,6 +164,7 @@ function RegisterStudentContent() {
         startDate: startDate ? format(startDate, 'yyyy-MM-dd') : null,
         validDate: endDate ? format(endDate, 'yyyy-MM-dd') : null,
         email: email,
+        initialFeePaid: initialFeePaid,
       });
 
       if (response.data?.success) {
@@ -186,6 +188,7 @@ function RegisterStudentContent() {
         setSelectedRoomId('');
         setStartDate(new Date());
         setEndDate(undefined);
+        setInitialFeePaid(false);
         fetchRooms(); // Refresh rooms to get updated occupancy
       }
     } catch (error: any) {
@@ -328,6 +331,36 @@ function RegisterStudentContent() {
                   className="bg-secondary border-border"
                 />
               </div>
+              {formData.fees && parseFloat(formData.fees) > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-foreground">Initial Fee Status</Label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setInitialFeePaid(!initialFeePaid)}
+                      className={cn(
+                        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background',
+                        initialFeePaid ? 'bg-green-500' : 'bg-muted'
+                      )}
+                      role="switch"
+                      aria-checked={initialFeePaid}
+                    >
+                      <span
+                        className={cn(
+                          'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                          initialFeePaid ? 'translate-x-5' : 'translate-x-0'
+                        )}
+                      />
+                    </button>
+                    <span className={cn('text-sm font-medium', initialFeePaid ? 'text-green-500' : 'text-muted-foreground')}>
+                      {initialFeePaid ? 'Paid' : 'Unpaid'}
+                    </span>
+                  </div>
+                  {initialFeePaid && (
+                    <p className="text-xs text-green-500/70">A fee receipt for the current month will be created automatically.</p>
+                  )}
+                </div>
+              )}
               <div className="space-y-2">
                 <Label className="text-foreground">Joining Date</Label>
                 <Popover>
