@@ -23,12 +23,12 @@ const getAllStudents = async (req, res) => {
     }
 
     const allStudents = await Student.find(query)
-      .populate('userId', 'role isActive')
+      .populate('userId', 'role isActive admin')
       .sort({ createdAt: -1 })
       .lean();
 
-    // Exclude any records where linked User has role === 'admin' or isActive === false
-    const validStudents = allStudents.filter(s => s.userId && s.userId.role !== 'admin' && s.userId.isActive !== false);
+    // Exclude any records where linked User has role === 'admin', admin === true, or isActive === false
+    const validStudents = allStudents.filter(s => s.userId && s.userId.role !== 'admin' && s.userId.admin !== true && s.userId.isActive !== false);
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const paginatedStudents = validStudents.slice(skip, skip + parseInt(limit));
@@ -122,7 +122,8 @@ const createStudent = async (req, res) => {
       const Fee = require('../models/Fee');
       const FeePayment = require('../models/FeePayment');
       const now = new Date();
-      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const month = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
 
       if (initialFeePaid) {
         const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;

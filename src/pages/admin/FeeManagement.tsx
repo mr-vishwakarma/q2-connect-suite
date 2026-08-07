@@ -39,6 +39,213 @@ interface Fee {
   status: 'paid' | 'unpaid' | 'partial';
   due_date: string | null; late_fee: number; discount: number;
   paid_amount: number; receipt_no: string | null; notes: string | null;
+}
+
+interface Payment {
+  id: string; fee_id: string; student_id: string; receipt_no: string;
+  amount: number; late_fee: number; discount: number; security_deposit: number;
+  payment_mode: 'cash' | 'upi' | 'bank'; payment_date: string;
+  admin_name: string | null; month: string; notes: string | null;
+}
+
+interface Deposit {
+  id: string; student_id: string; amount: number; status: string;
+  collected_date: string | null; refund_date: string | null;
+}
+
+const LATE_FEE_PER_DAY = 20;
+
+const genReceiptNo = () =>
+  `RCPT-${format(new Date(), 'yyyyMMdd')}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+export default function FeeManagement() {
+  const { selectedHostel } = useHostel();
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+
+  const [fees, setFees] = useState<Fee[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Payment form state
+  const [pMonth, setPMonth] = useState(format(new Date(), 'MMMM yyyy'));
+  const [pAmount, setPAmount] = useState<number>(0);
+  const [pLateFee, setPLateFee] = useState<number>(0);
+  const [pDiscount, setPDiscount] = useState<number>(0);
+  const [pDeposit, setPDeposit] = useState<number>(0);
+  const [pReceived, setPReceived] = useState<number>(0);
+  const [pMode, setPMode] = useState<'cash' | 'upi' | 'bank'>('upi');
+  const [pNotes, setPNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const currentMonth = format(new Date(), 'MMMM yyyy');
+
+  const fetchData = useCallback(async () => {
+    try {
+      const response = await api.get('/fees/dashboard', { params: { hostel: selectedHostel } });
+      if (response.data?.success) {
+        const { students, fees, payments, deposits } = response.data.data;
+        setStudents(students || []);
+        setFees(fees || []);
+        setPayments(payments || []);
+        setDeposits(deposits || []);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to load fee data');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedHostel]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!profile) return;
+    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
+      withCredentials: true,
+    });
+    
+    // Optionally listen to events to refetch data
+    // socket.on('fees-updated', fetchData);
+
+    return () => { socket.disconnect(); };
+  }, [selectedHostel, fetchData, profile]);
+
+  // Build the summary row per student
+  const records = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return students.map(s => {
+      const currentFee = fees.find(f => f.student_id === s.id && f.month === currentMonth);
+      const studentFees = fees.filter(f => f.student_id === s.id);
+      const isExpired = s.valid_date ? new Date(s.valid_date) < today : false;
+      const pending = studentFees
+        .filter(f => f.status !== 'paid')
+        .reduce((sum, f) => sum + Math.max(0, f.amount + (f.late_fee || 0) - (f.discount || 0) - (f.paid_amount || 0)), 0);
+      let status: 'paid' | 'unpaid' | 'partial' = 'unpaid';
+      if (isExpired) status = 'unpaid';
+      else if (currentFee) status = currentFee.status;
+      else if (pending > 0) status = 'unpaid';
+      return { student: s, currentFee, isExpired, pending, status };
+    });
+  }, [students, fees, currentMonth]);
+
+  const filteredRecords = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return records.filter(r => {
+      const matchesSearch = !q ||
+        r.student.name.toLowerCase().includes(q) ||
+        r.student.username.toLowerCase().includes(q) ||
+        (r.student.room_no?.toLowerCase().includes(q)) ||
+        (r.student.parent_phone?.toLowerCase().includes(q));
+      const matchesStatus = filterStatus === 'all' || r.status === filterStatus;
+      return matchesSearch && matchesStatus;
+    });
+  }, [records, searchQuery, filterStatus]);
+
+  // Stats
+  const totalFeeAmount = useMemo(() => students.reduce((s, x) => s + (x.fees || 0), 0), [students]);
+  const paidCount = records.filter(r => r.status === 'paid').length;
+  const unpaidCount = records.filter(r => r.status !== 'paid').length;
+  const totalPending = records.reduce((s, r) => s + r.pending, 0);
+  const thisMonthCollection = useMemo(() => {
+    const mS = startOfMonth(new Date()), mE = endOfMonth(new Date());
+    return payments
+      .filter(p => {
+        try { return isWithinInterval(parseISO(p.payment_date), { start: mS, end: mE }); }
+        catch { return false; }
+      })
+      .reduce((s, p) => s + Number(p.amount || 0) + Number(p.security_deposit || 0), 0);
+  }, [payments]);
+  const totalDeposits = useMemo(() => deposits.reduce((s, d) => s + Number(d.amount || 0), 0), [deposits]);
+
+  const chartData = [
+    { name: 'Total Fees', amount: totalFeeAmount },
+    { name: 'Pending', amount: totalPending },
+    { name: 'Collected (Month)', amount: thisMonthCollection },
+    { name: 'Deposits', amount: totalDeposits },
+  ];
+
+  // Open Collect Payment dialog
+  const openCollect = (s: Student) => {
+    setSelectedStudent(s);
+    const monthly = s.fees || 0;
+    setPMonth(currentMonth);
+    setPAmount(monthly);
+    // late fee auto-calc based on current month's due_date
+    const cf = fees.find(f => f.student_id === s.id && f.month === currentMonth);
+    if (cf?.due_date) {
+      const overdue = differenceInDays(new Date(), new Date(cf.due_date));
+      setPLateFee(overdue > 0 ? overdue * LATE_FEE_PER_DAY : 0);
+    } else setPLateFee(0);
+    setPDiscount(0);
+    setPDeposit(0);
+    setPReceived(monthly);
+    setPMode('upi');
+    setPNotes('');
+    setShowPaymentDialog(true);
+  };
+
+  const openProfile = (s: Student) => {
+    setSelectedStudent(s);
+    setShowProfileDialog(true);
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!selectedStudent) return;
+    if (pReceived <= 0) { toast.error('Enter amount received'); return; }
+    setSubmitting(true);
+
+    try {
+      const receipt_no = genReceiptNo();
+      
+      await api.post('/fees/collect', {
+        studentId: selectedStudent.id,
+        hostel: selectedHostel,
+        month: pMonth,
+        amount: pAmount,
+        lateFee: pLateFee,
+        discount: pDiscount,
+        securityDeposit: pDeposit,
+        receivedAmount: pReceived,
+        paymentMode: pMode,
+        notes: pNotes,
+        receiptNo: receipt_no
+      });
+
+      // PDF Receipt
+      const receiptData: ReceiptData = {
+        receipt_no, payment_date: new Date().toISOString(),
+        student_name: selectedStudent.name, username: selectedStudent.username,
+        room_no: selectedStudent.room_no, hostel: selectedHostel, month: pMonth,
+        monthly_fee: pAmount, late_fee: pLateFee, discount: pDiscount,
+        security_deposit: pDeposit, amount_paid: pReceived, payment_mode: pMode,
+        admin_name: profile?.name, notes: pNotes,
+      };
+      downloadReceipt(receiptData);
+
+      toast.success('Payment recorded, receipt generated');
+      setShowPaymentDialog(false);
+      fetchData();
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Failed to record payment');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const reissueReceipt = (p: Payment, s: Student) => {
+    const data: ReceiptData = {
+      receipt_no: p.receipt_no, payment_date: p.payment_date,
       student_name: s.name, username: s.username, room_no: s.room_no,
       hostel: selectedHostel, month: p.month, monthly_fee: p.amount,
       late_fee: p.late_fee, discount: p.discount,

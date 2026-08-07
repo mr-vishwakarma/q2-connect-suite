@@ -13,7 +13,7 @@ const getFeeManagementDashboard = async (req, res) => {
 
     const [rawStudents, fees, payments, deposits] = await Promise.all([
       Student.find(filter)
-        .populate('userId', 'role isActive')
+        .populate('userId', 'role isActive admin')
         .select('_id userId name phone roomNo fees startDate validDate username parentPhone')
         .lean(),
       Fee.find(filter).sort({ createdAt: -1 }).lean(),
@@ -22,7 +22,7 @@ const getFeeManagementDashboard = async (req, res) => {
     ]);
 
     // Exclude any student records linked to admin users
-    const validStudents = rawStudents.filter(s => s.userId && s.userId.role !== 'admin' && s.userId.isActive !== false);
+    const validStudents = rawStudents.filter(s => s.userId && s.userId.role !== 'admin' && s.userId.admin !== true && s.userId.isActive !== false);
 
     // Map Mongoose _id to id and userId to user_id to match frontend expectations
     const mappedStudents = validStudents.map(s => ({
