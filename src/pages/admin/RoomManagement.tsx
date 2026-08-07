@@ -176,55 +176,55 @@ export default function RoomManagement() {
   return (
     <div className="space-y-6 animate-fade-in">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-primary/10">
-                  <Home className="w-6 h-6 text-primary" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-2 sm:p-3 rounded-xl bg-primary/10 shrink-0">
+                  <Home className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Rooms</p>
-                  <p className="text-2xl font-bold text-foreground">{rooms.length}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Total Rooms</p>
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">{rooms.length}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-success/10">
-                  <Home className="w-6 h-6 text-success" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-2 sm:p-3 rounded-xl bg-success/10 shrink-0">
+                  <Home className="w-5 h-5 sm:w-6 sm:h-6 text-success" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Available</p>
-                  <p className="text-2xl font-bold text-foreground">{availableRooms.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-warning/10">
-                  <Users className="w-6 h-6 text-warning" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Occupancy</p>
-                  <p className="text-2xl font-bold text-foreground">{totalOccupied}/{totalCapacity}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Available</p>
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">{availableRooms.length}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-destructive/10">
-                  <UserPlus className="w-6 h-6 text-destructive" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-2 sm:p-3 rounded-xl bg-warning/10 shrink-0">
+                  <Users className="w-5 h-5 sm:w-6 sm:h-6 text-warning" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Unassigned</p>
-                  <p className="text-2xl font-bold text-foreground">{unassignedStudents.length}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Occupancy</p>
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">{totalOccupied}/{totalCapacity}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-2 sm:p-3 rounded-xl bg-destructive/10 shrink-0">
+                  <UserPlus className="w-5 h-5 sm:w-6 sm:h-6 text-destructive" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Unassigned</p>
+                  <p className="text-lg sm:text-2xl font-bold text-foreground">{unassignedStudents.length}</p>
                 </div>
               </div>
             </CardContent>

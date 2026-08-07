@@ -120,7 +120,7 @@ export default function AdminDashboard() {
       </motion.div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {statCards.map((stat, index) => (
           <StatCard
             key={stat.title}
@@ -136,37 +136,44 @@ export default function AdminDashboard() {
       </div>
 
       {/* Charts and Recent Items */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {/* Recent Complaints */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
+          className="col-span-1"
         >
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-foreground text-lg">New Complaints</CardTitle>
+          <Card className="h-full flex flex-col group card-container">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-foreground text-sm sm:text-lg">New Complaints</CardTitle>
+              <button onClick={(e) => {
+                const card = e.currentTarget.closest('.card-container');
+                if (card) { document.fullscreenElement ? document.exitFullscreen() : card.requestFullscreen(); }
+              }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-secondary rounded">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+              </button>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 flex-1 overflow-auto">
               {recentComplaints.length > 0 ? (
                 recentComplaints.map((item) => (
-                  <div key={item._id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-secondary/50 transition-colors group cursor-pointer border border-transparent hover:border-border/50">
-                    <div className="p-2 rounded-lg bg-secondary group-hover:bg-background transition-colors">
-                      <Clock className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <div key={item._id} className="flex items-start gap-3 p-2 sm:p-3 rounded-xl hover:bg-secondary/50 transition-colors group/item cursor-pointer border border-transparent hover:border-border/50">
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-secondary group-hover/item:bg-background transition-colors shrink-0">
+                      <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{item.title}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-foreground group-hover/item:text-primary transition-colors truncate">{item.title}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
                         {new Date(item.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-muted-foreground text-sm p-3">No recent complaints</p>
+                <p className="text-muted-foreground text-xs sm:text-sm p-3">No recent complaints</p>
               )}
-              <Button variant="outline" className="w-full mt-4" asChild>
-                <Link to="/admin/complaints">Manage Complaints</Link>
+              <Button variant="outline" className="w-full mt-auto text-xs sm:text-sm h-8 sm:h-10" asChild>
+                <Link to="/admin/complaints">Manage</Link>
               </Button>
             </CardContent>
           </Card>
@@ -177,25 +184,33 @@ export default function AdminDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
+          className="col-span-1"
         >
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-foreground text-lg flex items-center gap-2">
+          <Card className="h-full flex flex-col group card-container">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-foreground text-sm sm:text-lg flex items-center gap-1 sm:gap-2">
                 <span className="text-primary">→</span> Daily Complaints
               </CardTitle>
+              <button onClick={(e) => {
+                const card = e.currentTarget.closest('.card-container');
+                if (card) { document.fullscreenElement ? document.exitFullscreen() : card.requestFullscreen(); }
+              }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-secondary rounded">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+              </button>
             </CardHeader>
-            <CardContent>
-              <div className="h-40">
+            <CardContent className="flex-1 min-h-[150px]">
+              <div className="h-full min-h-[150px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={complaintsData}>
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} tickMargin={5} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} width={25} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
-                        color: 'hsl(var(--card-foreground))'
+                        color: 'hsl(var(--card-foreground))',
+                        fontSize: '12px'
                       }}
                     />
                     <Line
@@ -217,23 +232,30 @@ export default function AdminDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45 }}
+          className="col-span-1"
         >
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-foreground text-lg flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" /> Student Distribution
+          <Card className="h-full flex flex-col group card-container">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-foreground text-sm sm:text-lg flex items-center gap-1 sm:gap-2">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" /> Distribution
               </CardTitle>
+              <button onClick={(e) => {
+                const card = e.currentTarget.closest('.card-container');
+                if (card) { document.fullscreenElement ? document.exitFullscreen() : card.requestFullscreen(); }
+              }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-secondary rounded">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+              </button>
             </CardHeader>
-            <CardContent>
-              <div className="h-40">
+            <CardContent className="flex-1 min-h-[150px]">
+              <div className="h-full min-h-[150px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={studentDistribution.length ? studentDistribution : [{ name: 'No Data', value: 1 }]}
                       cx="50%"
                       cy="50%"
-                      innerRadius={40}
-                      outerRadius={60}
+                      innerRadius={30}
+                      outerRadius={50}
                       paddingAngle={5}
                       dataKey="value"
                     >
@@ -246,7 +268,8 @@ export default function AdminDashboard() {
                         backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
-                        color: 'hsl(var(--card-foreground))'
+                        color: 'hsl(var(--card-foreground))',
+                        fontSize: '12px'
                       }}
                     />
                   </PieChart>
@@ -261,31 +284,38 @@ export default function AdminDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
+          className="col-span-1"
         >
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-foreground text-lg">New Suggestions</CardTitle>
+          <Card className="h-full flex flex-col group card-container">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-foreground text-sm sm:text-lg">New Suggestions</CardTitle>
+              <button onClick={(e) => {
+                const card = e.currentTarget.closest('.card-container');
+                if (card) { document.fullscreenElement ? document.exitFullscreen() : card.requestFullscreen(); }
+              }} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-secondary rounded">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+              </button>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 flex-1 overflow-auto">
               {recentSuggestions.length > 0 ? (
                 recentSuggestions.map((item) => (
-                  <div key={item._id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-secondary/50 transition-colors group cursor-pointer border border-transparent hover:border-border/50">
-                    <div className="p-2 rounded-lg bg-secondary group-hover:bg-background transition-colors">
-                      <Clock className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <div key={item._id} className="flex items-start gap-3 p-2 sm:p-3 rounded-xl hover:bg-secondary/50 transition-colors group/item cursor-pointer border border-transparent hover:border-border/50">
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-secondary group-hover/item:bg-background transition-colors shrink-0">
+                      <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{item.title}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-foreground group-hover/item:text-primary transition-colors truncate">{item.title}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
                         {new Date(item.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-muted-foreground text-sm p-3">No recent suggestions</p>
+                <p className="text-muted-foreground text-xs sm:text-sm p-3">No recent suggestions</p>
               )}
-              <Button variant="outline" className="w-full mt-4" asChild>
-                <Link to="/admin/suggestions">Manage Suggestions</Link>
+              <Button variant="outline" className="w-full mt-auto text-xs sm:text-sm h-8 sm:h-10" asChild>
+                <Link to="/admin/suggestions">Manage</Link>
               </Button>
             </CardContent>
           </Card>

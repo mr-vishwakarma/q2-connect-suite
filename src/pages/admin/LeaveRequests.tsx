@@ -192,23 +192,23 @@ export default function LeaveRequests() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <Card className="bg-card border-border">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-yellow-400">{pendingCount}</p>
-              <p className="text-muted-foreground text-sm mt-1">Pending</p>
+            <CardContent className="p-2 sm:p-4 text-center">
+              <p className="text-xl sm:text-3xl font-bold text-yellow-400">{pendingCount}</p>
+              <p className="text-muted-foreground text-xs sm:text-sm mt-1">Pending</p>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-green-400">{approvedCount}</p>
-              <p className="text-muted-foreground text-sm mt-1">Approved</p>
+            <CardContent className="p-2 sm:p-4 text-center">
+              <p className="text-xl sm:text-3xl font-bold text-green-400">{approvedCount}</p>
+              <p className="text-muted-foreground text-xs sm:text-sm mt-1">Approved</p>
             </CardContent>
           </Card>
           <Card className="bg-card border-border">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-blue-400">{returnedCount}</p>
-              <p className="text-muted-foreground text-sm mt-1">Returned</p>
+            <CardContent className="p-2 sm:p-4 text-center">
+              <p className="text-xl sm:text-3xl font-bold text-blue-400">{returnedCount}</p>
+              <p className="text-muted-foreground text-xs sm:text-sm mt-1">Returned</p>
             </CardContent>
           </Card>
         </div>
