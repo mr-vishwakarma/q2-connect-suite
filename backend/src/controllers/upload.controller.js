@@ -50,8 +50,8 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    const result = await imagekit.upload({
-      file: req.file.buffer,
+    const result = await imagekit.files.upload({
+      file: req.file.buffer.toString('base64'),
       fileName,
       folder,
       useUniqueFileName: true,
