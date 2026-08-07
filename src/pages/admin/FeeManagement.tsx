@@ -39,42 +39,6 @@ interface Fee {
   status: 'paid' | 'unpaid' | 'partial';
   due_date: string | null; late_fee: number; discount: number;
   paid_amount: number; receipt_no: string | null; notes: string | null;
-        month: pMonth,
-        amount: pAmount,
-        lateFee: pLateFee,
-        discount: pDiscount,
-        securityDeposit: pDeposit,
-        receivedAmount: pReceived,
-        paymentMode: pMode,
-        notes: pNotes,
-        receiptNo: receipt_no
-      });
-
-      // PDF Receipt
-      const receiptData: ReceiptData = {
-        receipt_no, payment_date: new Date().toISOString(),
-        student_name: selectedStudent.name, username: selectedStudent.username,
-        room_no: selectedStudent.room_no, hostel: selectedHostel, month: pMonth,
-        monthly_fee: pAmount, late_fee: pLateFee, discount: pDiscount,
-        security_deposit: pDeposit, amount_paid: pReceived, payment_mode: pMode,
-        admin_name: profile?.name, notes: pNotes,
-      };
-      downloadReceipt(receiptData);
-
-      toast.success('Payment recorded, receipt generated');
-      setShowPaymentDialog(false);
-      fetchData();
-    } catch (e: unknown) {
-      console.error(e);
-      toast.error(e instanceof Error ? e.message : 'Failed to record payment');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const reissueReceipt = (p: Payment, s: Student) => {
-    const data: ReceiptData = {
-      receipt_no: p.receipt_no, payment_date: p.payment_date,
       student_name: s.name, username: s.username, room_no: s.room_no,
       hostel: selectedHostel, month: p.month, monthly_fee: p.amount,
       late_fee: p.late_fee, discount: p.discount,
