@@ -9,9 +9,12 @@ exports.getAdminDashboard = async (req, res) => {
     // Filter by hostel if provided, else fetch for all hostels
     const filter = hostel && hostel !== 'All' ? { hostel } : {};
 
-    // Parallel counts
-    const [totalStudents, totalComplaints, totalSuggestions] = await Promise.all([
-      Student.countDocuments(filter),
+    // Fetch all student records populated with user role
+    const rawStudents = await Student.find(filter).populate('userId', 'role isActive').lean();
+    const totalStudents = rawStudents.filter(s => s.userId && s.userId.role !== 'admin' && s.userId.isActive !== false).length;
+
+    // Parallel counts for complaints and suggestions
+    const [totalComplaints, totalSuggestions] = await Promise.all([
       Complaint.countDocuments(filter),
       Suggestion.countDocuments(filter)
     ]);

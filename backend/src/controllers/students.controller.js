@@ -22,13 +22,24 @@ const getAllStudents = async (req, res) => {
       ];
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [students, total] = await Promise.all([
-      Student.find(query).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)),
-      Student.countDocuments(query),
-    ]);
+    const allStudents = await Student.find(query)
+      .populate('userId', 'role isActive')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return res.status(200).json({ success: true, data: students, total, page: parseInt(page), limit: parseInt(limit) });
+    // Exclude any records where linked User has role === 'admin' or isActive === false
+    const validStudents = allStudents.filter(s => s.userId && s.userId.role !== 'admin' && s.userId.isActive !== false);
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedStudents = validStudents.slice(skip, skip + parseInt(limit));
+
+    return res.status(200).json({
+      success: true,
+      data: paginatedStudents,
+      total: validStudents.length,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -106,46 +117,64 @@ const createStudent = async (req, res) => {
       );
     }
 
-    // If initial fee is marked as paid, create Fee + FeePayment records
-    if (initialFeePaid && fees && fees > 0) {
+    // Handle initial Fee creation for current month
+    if (fees && fees > 0) {
       const Fee = require('../models/Fee');
       const FeePayment = require('../models/FeePayment');
       const now = new Date();
       const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
-      try {
-        const feeRecord = await Fee.create({
-          studentId: student._id,
-          hostel,
-          month,
-          amount: fees,
-          paidAmount: fees,
-          status: 'paid',
-          paidDate: now,
-          paymentMode: 'cash',
-          receiptNo,
-        });
+      if (initialFeePaid) {
+        const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
-        await FeePayment.create({
-          feeId: feeRecord._id,
-          studentId: student._id,
-          hostel,
-          receiptNo,
-          amount: fees,
-          lateFee: 0,
-          discount: 0,
-          securityDeposit: 0,
-          paymentMode: 'cash',
-          paymentDate: now,
-          adminId: req.user._id,
-          adminName: req.user.name,
-          month,
-          notes: 'Initial fee paid at registration',
-        });
-      } catch (feeErr) {
-        console.error('Error creating initial fee records:', feeErr);
-        // Don't fail student creation if fee creation fails
+        try {
+          const feeRecord = await Fee.create({
+            studentId: student._id,
+            hostel,
+            month,
+            amount: fees,
+            paidAmount: fees,
+            status: 'paid',
+            paidDate: now,
+            paymentMode: 'cash',
+            receiptNo,
+          });
+
+          await FeePayment.create({
+            feeId: feeRecord._id,
+            studentId: student._id,
+            hostel,
+            receiptNo,
+            amount: fees,
+            lateFee: 0,
+            discount: 0,
+            securityDeposit: 0,
+            paymentMode: 'cash',
+            paymentDate: now,
+            adminId: req.user._id,
+            adminName: req.user.name,
+            month,
+            notes: 'Initial fee paid at registration',
+          });
+        } catch (feeErr) {
+          console.error('Error creating initial paid fee records:', feeErr);
+        }
+      } else {
+        // Create UNPAID Fee record so status shows Unpaid and pending balance reflects monthly fee
+        try {
+          const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
+          await Fee.create({
+            studentId: student._id,
+            hostel,
+            month,
+            amount: fees,
+            paidAmount: 0,
+            status: 'unpaid',
+            dueDate,
+          });
+        } catch (feeErr) {
+          console.error('Error creating initial unpaid fee record:', feeErr);
+        }
       }
     }
 
