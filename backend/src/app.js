@@ -6,6 +6,10 @@ const connectDB = require('./config/db');
 const initSocket = require('./socket');
 const { initCronJobs } = require('./utils/cronJobs');
 const compression = require('compression');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
 
 // Route imports
 const authRoutes = require('./routes/auth.routes');
@@ -29,6 +33,17 @@ const app = express();
 
 // Compress all responses
 app.use(compression());
+
+// Set security HTTP headers
+app.use(helmet());
+
+// Global rate limiting (1000 requests per 15 minutes to prevent DoS)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes.' }
+});
+app.use('/api', limiter);
 
 // CORS configuration - allow all Vercel domains and local environments
 app.use(cors({
@@ -58,6 +73,12 @@ app.use(requestLogger);
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Data sanitization against XSS
+app.use(xss());
 
 // Anti-caching header middleware for dynamic API routes
 app.use('/api', (req, res, next) => {
