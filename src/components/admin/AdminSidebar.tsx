@@ -125,7 +125,7 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
         {onToggleCollapse && (
           <button 
             onClick={onToggleCollapse}
-            className="absolute -right-3 top-8 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors hidden lg:block"
+            className="absolute -right-3 top-8 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
