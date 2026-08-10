@@ -51,7 +51,15 @@ const Notifications = lazy(() => import("./pages/admin/Notifications"));
 const LeaveRequests = lazy(() => import("./pages/admin/LeaveRequests"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Prevents refetching when switching tabs or focusing the window
+      staleTime: 1000 * 60 * 5,    // Data is considered fresh for 5 minutes (avoids duplicate fetches within this time)
+      retry: 1,                    // Only retry failed requests once instead of the default 3 times
+    },
+  },
+});
 
 const adminTitles: Record<string, string> = {
   "/admin/dashboard": "",
