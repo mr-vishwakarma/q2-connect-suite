@@ -29,7 +29,7 @@ export function useSidebarDrawer() {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const location = useLocation();
-  const shouldOverlay = isMobile || isTablet;
+  const shouldOverlay = false; // Always use persistent sidebar even on mobile/tablet
   const hasMountedRef = useRef(false);
 
   // Close sidebar on every route change (skip initial mount)
