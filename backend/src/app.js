@@ -19,6 +19,8 @@ const notificationsRoutes = require('./routes/notifications.routes');
 const uploadRoutes = require('./routes/upload.routes');
 const chatRoutes = require('./routes/chat.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const analyticsRoutes = require('./routes/analytics.routes');
+const { requestLogger } = require('./middleware/requestLogger.middleware');
 
 // Connect to MongoDB
 connectDB();
@@ -50,6 +52,9 @@ app.use(cors({
   credentials: true,
 }));
 
+// Analytics Logger Middleware
+app.use(requestLogger);
+
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -79,6 +84,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -45,9 +45,9 @@ export function Footer() {
                   scale: 1.1,
                   boxShadow: '0 0 30px hsl(var(--primary) / 0.5)'
                 }}
-                className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25"
+                className="w-12 h-12 flex items-center justify-center overflow-hidden"
               >
-                <span className="text-primary-foreground font-bold text-lg">Q2</span>
+                <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain" />
               </motion.div>
               <span className="text-foreground font-bold text-xl">Q2 Group of Hostels</span>
             </Link>

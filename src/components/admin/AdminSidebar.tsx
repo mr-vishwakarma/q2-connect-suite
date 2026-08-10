@@ -23,10 +23,12 @@ import {
   ChevronRight,
   DollarSign,
   X,
+  BarChart,
 } from 'lucide-react';
 
 const adminLinks = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admin/analytics', icon: BarChart, label: 'Analytics' },
   { to: '/admin/register-student', icon: UserPlus, label: 'Register Student' },
   { to: '/admin/students', icon: Users, label: 'All Students' },
   { to: '/admin/fees', icon: DollarSign, label: 'Fee Management' },
@@ -100,9 +102,9 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
           <motion.div
             whileHover={{ rotate: 180 }}
             transition={{ duration: 0.3 }}
-            className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow shrink-0"
+            className="w-12 h-12 flex items-center justify-center shrink-0 overflow-hidden"
           >
-            <span className="text-primary-foreground font-bold text-lg">Q2</span>
+            <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain" />
           </motion.div>
           {!isCollapsed && (
             <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }} className="overflow-hidden whitespace-nowrap">

@@ -13,7 +13,7 @@ const messRequestSchema = new mongoose.Schema(
     documentUrl: { type: String },
     documentName: { type: String },
     documentFileId: { type: String }, // ImageKit fileId for deletion
-    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    status: { type: String, enum: ['pending', 'approved', 'rejected', 'returned'], default: 'pending' },
     adminMessage: { type: String },
     approvedDate: { type: Date },
   },

@@ -52,7 +52,7 @@ export default function FeeHistory() {
       const [sRes, fRes, pRes] = await Promise.all([
         api.get('/students/me'),
         api.get('/fees'),
-        api.get('/fee-payments')
+        api.get('/fees/payments')
       ]);
 
       if (sRes.data?.success) {

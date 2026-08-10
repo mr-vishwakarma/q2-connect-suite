@@ -60,7 +60,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
       {/* Logo */}
       <div className="p-6 relative flex items-center justify-between">
         <Link to={isAdmin ? "/admin/dashboard" : "/student/dashboard"} className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
-          <img src="/favicon.png" alt="Q2 Logo" className="w-20 h-20 object-contain shrink-0" />
+          <img src="/q2-logo.png" alt="Q2 Logo" className="w-20 h-20 object-contain shrink-0" />
           {!isCollapsed && (
             <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }} className="overflow-hidden whitespace-nowrap">
               <span className="text-sidebar-foreground font-semibold block">Q2 Management</span>

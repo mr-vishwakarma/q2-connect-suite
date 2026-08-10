@@ -38,6 +38,7 @@ const Complaints = lazy(() => import("./pages/student/Complaints"));
 const Suggestions = lazy(() => import("./pages/student/Suggestions"));
 const FeeHistory = lazy(() => import("./pages/student/FeeHistory"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
 const RegisterStudent = lazy(() => import("./pages/admin/RegisterStudent"));
 const AdminComplaints = lazy(() => import("./pages/admin/AdminComplaints"));
 const AdminSuggestions = lazy(() => import("./pages/admin/AdminSuggestions"));
@@ -54,6 +55,7 @@ const queryClient = new QueryClient();
 
 const adminTitles: Record<string, string> = {
   "/admin/dashboard": "",
+  "/admin/analytics": "Analytics",
   "/admin/register-student": "Register Student",
   "/admin/complaints": "Complaints",
   "/admin/suggestions": "Suggestions",
@@ -91,10 +93,9 @@ const App = () => (
             <Suspense fallback={
               <div className="flex h-screen w-full items-center justify-center">
                 <div className="animate-pulse flex flex-col items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
-                    <span className="text-primary-foreground font-bold text-xl">Q2</span>
+                  <div className="w-32 h-32 flex items-center justify-center overflow-hidden">
+                    <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain animate-pulse" />
                   </div>
-                  <div className="h-4 w-32 bg-muted rounded"></div>
                 </div>
               </div>
             }>
@@ -118,6 +119,7 @@ const App = () => (
               <Route path="/admin" element={<AdminShell />}>
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="register-student" element={<RegisterStudent />} />
                 <Route path="complaints" element={<AdminComplaints />} />
                 <Route path="suggestions" element={<AdminSuggestions />} />

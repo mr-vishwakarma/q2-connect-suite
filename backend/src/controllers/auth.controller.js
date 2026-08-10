@@ -114,23 +114,32 @@ const adminLogin = async (req, res) => {
 // @access  Public (you may want to protect this later with a secret key)
 const registerAdmin = async (req, res) => {
   try {
-    const { name, email, password, adminSecret } = req.body;
+    const { name, username, email, password, adminSecret, hostels } = req.body;
 
     // Optional: restrict registration with a secret
     if (adminSecret && adminSecret !== process.env.ADMIN_REGISTRATION_SECRET) {
       return res.status(403).json({ success: false, message: 'Invalid admin registration secret' });
     }
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+    if (!name || !username || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Name, username, email, and password are required' });
     }
 
-    const existing = await User.findOne({ email: email.toLowerCase() });
+    const existing = await User.findOne({ 
+      $or: [{ email: email.toLowerCase() }, { username }] 
+    });
     if (existing) {
-      return res.status(409).json({ success: false, message: 'Email already registered' });
+      return res.status(409).json({ success: false, message: 'Email or username already registered' });
     }
 
-    const user = await User.create({ name, email: email.toLowerCase(), password, role: 'admin' });
+    const user = await User.create({ 
+      name, 
+      username, 
+      email: email.toLowerCase(), 
+      password, 
+      role: 'admin',
+      hostels: hostels || ['Q2', 'Q2.0', 'Q2.1'] // default to all if not provided
+    });
     const { accessToken, refreshToken } = generateTokens(user._id);
 
     user.refreshTokens.push(refreshToken);

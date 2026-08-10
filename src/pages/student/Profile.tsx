@@ -87,7 +87,9 @@ export default function Profile() {
     data.append('file', file);
 
     try {
-      const response = await api.post('/upload/file', data);
+      const response = await api.post('/upload/file', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       
       const { url, fileId } = response.data;
       

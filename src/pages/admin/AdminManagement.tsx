@@ -122,7 +122,8 @@ export default function AdminManagement() {
       const email = `${formData.username.toLowerCase()}@q2hostel.local`;
       
       const response = await api.post('/auth/register-admin', {
-        name: formData.username,
+        name: formData.name || formData.username,
+        username: formData.username,
         email,
         password: formData.password
       });

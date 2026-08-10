@@ -52,9 +52,9 @@ export function Navbar() {
                 boxShadow: '0 0 30px hsl(var(--primary) / 0.5)'
               }}
               whileTap={{ scale: 0.95 }}
-              className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25 group-hover:shadow-primary/40 transition-shadow"
+              className="w-12 h-12 flex items-center justify-center overflow-hidden"
             >
-              <span className="text-primary-foreground font-bold text-lg">Q2</span>
+              <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain" />
             </motion.div>
           </Link>
 
