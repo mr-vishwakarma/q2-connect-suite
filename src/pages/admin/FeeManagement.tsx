@@ -22,6 +22,13 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { toast } from 'sonner';
 import {
   Search, IndianRupee, Calendar, Check, Filter, Download, TrendingUp,
@@ -83,7 +90,11 @@ export default function FeeManagement() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalStudents, setTotalStudents] = useState(0);
 
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
@@ -102,15 +113,31 @@ export default function FeeManagement() {
 
   const currentMonth = format(new Date(), 'MMMM yyyy');
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1); // Reset to page 1 on new search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const fetchData = useCallback(async () => {
     try {
-      const response = await api.get('/fees/dashboard', { params: { hostel: selectedHostel } });
+      const response = await api.get('/fees/dashboard', { 
+        params: { 
+          hostel: selectedHostel,
+          page: currentPage,
+          limit: 20
+        } 
+      });
       if (response.data?.success) {
-        const { students, fees, payments, deposits } = response.data.data;
+        const { students, fees, payments, deposits, totalPages, total } = response.data.data;
         setStudents(students || []);
         setFees(fees || []);
         setPayments(payments || []);
         setDeposits(deposits || []);
+        setTotalPages(totalPages || 1);
+        setTotalStudents(total || 0);
       }
     } catch (e) {
       console.error(e);
@@ -118,7 +145,7 @@ export default function FeeManagement() {
     } finally {
       setLoading(false);
     }
-  }, [selectedHostel]);
+  }, [selectedHostel, currentPage]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -152,20 +179,15 @@ export default function FeeManagement() {
     });
   }, [students, fees, currentMonth]);
 
-  const debouncedSearchQuery = useDebounce(searchQuery, 300);
-
   const filteredRecords = useMemo(() => {
-    const q = debouncedSearchQuery.toLowerCase();
     return records.filter(r => {
-      const matchesSearch = !q ||
-        r.student.name.toLowerCase().includes(q) ||
-        r.student.username.toLowerCase().includes(q) ||
-        (r.student.room_no?.toLowerCase().includes(q)) ||
-        (r.student.parent_phone?.toLowerCase().includes(q));
-      const matchesStatus = filterStatus === 'all' || r.status === filterStatus;
-      return matchesSearch && matchesStatus;
+      const matchSearch = r.student.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        r.student.username.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        (r.student.room_no && r.student.room_no.toLowerCase().includes(debouncedSearch.toLowerCase()));
+      const matchStatus = filterStatus === 'all' || r.status === filterStatus;
+      return matchSearch && matchStatus;
     });
-  }, [records, debouncedSearchQuery, filterStatus]);
+  }, [records, debouncedSearch, filterStatus]);
 
   // Stats
   const totalFeeAmount = useMemo(() => students.reduce((s, x) => s + (x.fees || 0), 0), [students]);
@@ -566,6 +588,30 @@ export default function FeeManagement() {
           </Card>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="text-sm px-4 text-muted-foreground">Page {currentPage} of {totalPages}</span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* Collect Payment Dialog */}
       <CollectPaymentDialog

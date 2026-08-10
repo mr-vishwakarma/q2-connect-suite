@@ -9,26 +9,57 @@ const Notification = require('../models/Notification');
 // @route   GET /api/fees/dashboard
 const getFeeManagementDashboard = async (req, res) => {
   try {
-    const { hostel } = req.query;
-    const filter = hostel && hostel !== 'All' ? { hostel } : {};
+    const { hostel, page = 1, limit = 50 } = req.query;
+    
+    const skipAmount = (parseInt(page) - 1) * parseInt(limit);
+    const limitAmount = parseInt(limit);
 
-    const [rawStudents, fees, payments, deposits] = await Promise.all([
-      Student.find(filter)
-        .populate('userId', 'role isActive admin')
-        .select('_id userId name phone roomNo fees startDate validDate username parentPhone')
-        .lean(),
-      Fee.find(filter).select('-createdAt -updatedAt -__v').sort({ createdAt: -1 }).lean(),
-      FeePayment.find(filter).select('-createdAt -updatedAt -__v').sort({ paymentDate: -1 }).lean(),
-      SecurityDeposit.find(filter).select('-createdAt -updatedAt -__v').lean(),
+    const studentMatch = { isActive: { $ne: false } };
+    if (hostel && hostel !== 'All') studentMatch.hostel = hostel;
+
+    const pipeline = [
+      { $match: studentMatch },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: false } },
+      {
+        $match: {
+          'user.role': { $ne: 'admin' },
+          'user.admin': { $ne: true },
+          'user.isActive': { $ne: false }
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          metadata: [{ $count: 'total' }],
+          data: [{ $skip: skipAmount }, { $limit: limitAmount }]
+        }
+      }
+    ];
+
+    const result = await Student.aggregate(pipeline);
+    
+    const total = result[0].metadata[0] ? result[0].metadata[0].total : 0;
+    const paginatedStudents = result[0].data;
+
+    const studentIds = paginatedStudents.map(s => s._id);
+
+    const [fees, payments, deposits] = await Promise.all([
+      Fee.find({ studentId: { $in: studentIds } }).select('-createdAt -updatedAt -__v').sort({ createdAt: -1 }).lean(),
+      FeePayment.find({ studentId: { $in: studentIds } }).select('-createdAt -updatedAt -__v').sort({ paymentDate: -1 }).lean(),
+      SecurityDeposit.find({ studentId: { $in: studentIds } }).select('-createdAt -updatedAt -__v').lean(),
     ]);
 
-    // Exclude any student records linked to admin users
-    const validStudents = rawStudents.filter(s => s.userId && s.userId.role !== 'admin' && s.userId.admin !== true && s.userId.isActive !== false);
-
-    // Map Mongoose _id to id and userId to user_id to match frontend expectations
-    const mappedStudents = validStudents.map(s => ({
+    const mappedStudents = paginatedStudents.map(s => ({
       id: s._id,
-      user_id: s.userId?._id || s.userId,
+      user_id: s.user._id,
       name: s.name,
       phone: s.phone,
       parent_phone: s.parentPhone,
@@ -86,7 +117,11 @@ const getFeeManagementDashboard = async (req, res) => {
         students: mappedStudents,
         fees: mappedFees,
         payments: mappedPayments,
-        deposits: mappedDeposits
+        deposits: mappedDeposits,
+        total,
+        page: parseInt(page),
+        totalPages: Math.ceil(total / limitAmount),
+        limit: limitAmount
       }
     });
 

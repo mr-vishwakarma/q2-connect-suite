@@ -3,17 +3,32 @@ const Student = require('../models/Student');
 
 const getComplaints = async (req, res) => {
   try {
-    const { hostel, status } = req.query;
+    const { hostel, status, page = 1, limit = 50 } = req.query;
     const query = {};
     if (req.user.role === 'student') query.userId = req.user._id;
     else if (hostel) query.hostel = hostel;
     if (status) query.status = status;
 
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitAmount = parseInt(limit);
+
     const complaints = await Complaint.find(query)
       .populate('userId', 'name username')
       .populate('studentId', 'name roomNo')
-      .sort({ createdAt: -1 });
-    return res.status(200).json({ success: true, data: complaints });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitAmount);
+
+    const total = await Complaint.countDocuments(query);
+
+    return res.status(200).json({ 
+      success: true, 
+      data: complaints,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / limitAmount),
+      limit: limitAmount
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

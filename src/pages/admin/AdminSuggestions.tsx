@@ -10,6 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { Lightbulb, CheckCircle, Clock, XCircle } from 'lucide-react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Suggestion {
   id: string;
@@ -26,6 +33,9 @@ export default function AdminSuggestions() {
   const navigate = useNavigate();
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalSuggestions, setTotalSuggestions] = useState(0);
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -37,12 +47,18 @@ export default function AdminSuggestions() {
     if (user && isAdmin) {
       fetchSuggestions();
     }
-  }, [user, isAdmin, selectedHostel]);
+  }, [user, isAdmin, selectedHostel, currentPage]);
 
   const fetchSuggestions = async () => {
     try {
       setIsLoading(prev => prev);
-      const { data } = await api.get('/suggestions', { params: { hostel: selectedHostel } });
+      const { data } = await api.get('/suggestions', { 
+        params: { 
+          hostel: selectedHostel,
+          page: currentPage,
+          limit: 20
+        } 
+      });
       
       const mappedSuggestions = (data?.data || []).map((s: any) => ({
         id: s._id,
@@ -54,6 +70,8 @@ export default function AdminSuggestions() {
       }));
 
       setSuggestions(mappedSuggestions);
+      setTotalPages(data?.totalPages || 1);
+      setTotalSuggestions(data?.total || 0);
     } catch (error) {
       console.error('Error fetching suggestions:', error);
       toast.error('Failed to fetch suggestions');
@@ -99,7 +117,7 @@ export default function AdminSuggestions() {
           All Suggestions - {selectedHostel}
         </h2>
         <Badge variant="outline" className="text-primary border-primary w-fit">
-          {suggestions.length} Total
+          {totalSuggestions} Total
         </Badge>
       </div>
 
@@ -173,6 +191,30 @@ export default function AdminSuggestions() {
           </Card>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="text-sm px-4">Page {currentPage} of {totalPages}</span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }

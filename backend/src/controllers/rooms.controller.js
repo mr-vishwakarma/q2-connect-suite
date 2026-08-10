@@ -2,12 +2,29 @@ const Room = require('../models/Room');
 
 const getAllRooms = async (req, res) => {
   try {
-    const { hostel, status } = req.query;
+    const { hostel, status, page = 1, limit = 50 } = req.query;
     const query = {};
     if (hostel) query.hostel = hostel;
     if (status) query.status = status;
-    const rooms = await Room.find(query).sort({ roomNumber: 1 });
-    return res.status(200).json({ success: true, data: rooms });
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitAmount = parseInt(limit);
+
+    const rooms = await Room.find(query)
+      .sort({ roomNumber: 1 })
+      .skip(skip)
+      .limit(limitAmount);
+
+    const total = await Room.countDocuments(query);
+
+    return res.status(200).json({ 
+      success: true, 
+      data: rooms,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / limitAmount),
+      limit: limitAmount
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

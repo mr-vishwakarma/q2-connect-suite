@@ -10,6 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { MessageSquare, CheckCircle, Clock, XCircle } from 'lucide-react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Complaint {
   id: string;
@@ -27,6 +34,9 @@ export default function AdminComplaints() {
   const navigate = useNavigate();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalComplaints, setTotalComplaints] = useState(0);
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -38,12 +48,16 @@ export default function AdminComplaints() {
     if (user && isAdmin) {
       fetchComplaints();
     }
-  }, [user, isAdmin, selectedHostel]);
+  }, [user, isAdmin, selectedHostel, currentPage]);
 
   const fetchComplaints = async () => {
     try {
       const response = await api.get('/complaints', {
-        params: { hostel: selectedHostel }
+        params: { 
+          hostel: selectedHostel,
+          page: currentPage,
+          limit: 20
+        }
       });
       if (response.data?.success) {
         const mapped = response.data.data.map((c: any) => ({
@@ -56,6 +70,8 @@ export default function AdminComplaints() {
           studentId: c.studentId,
         }));
         setComplaints(mapped);
+        setTotalPages(response.data.totalPages || 1);
+        setTotalComplaints(response.data.total || 0);
       }
     } catch (error) {
       console.error('Error fetching complaints:', error);
@@ -108,7 +124,7 @@ export default function AdminComplaints() {
           All Complaints - {selectedHostel}
         </h2>
         <Badge variant="outline" className="text-primary border-primary w-fit">
-          {complaints.length} Total
+          {totalComplaints} Total
         </Badge>
       </div>
 
@@ -182,6 +198,30 @@ export default function AdminComplaints() {
           </Card>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <span className="text-sm px-4">Page {currentPage} of {totalPages}</span>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,10 +12,14 @@ const { sendStudentCredentials } = require('../utils/email');
 const getAllStudents = async (req, res) => {
   try {
     const { hostel, search, page = 1, limit = 50 } = req.query;
-    const query = { isActive: { $ne: false } };
-    if (hostel) query.hostel = hostel;
+    
+    const skipAmount = (parseInt(page) - 1) * parseInt(limit);
+    const limitAmount = parseInt(limit);
+
+    const studentMatch = { isActive: { $ne: false } };
+    if (hostel) studentMatch.hostel = hostel;
     if (search) {
-      query.$or = [
+      studentMatch.$or = [
         { name: { $regex: search, $options: 'i' } },
         { username: { $regex: search, $options: 'i' } },
         { phone: { $regex: search, $options: 'i' } },
@@ -23,23 +27,54 @@ const getAllStudents = async (req, res) => {
       ];
     }
 
-    const allStudents = await Student.find(query)
-      .populate('userId', 'role isActive admin')
-      .sort({ createdAt: -1 })
-      .lean();
+    const pipeline = [
+      { $match: studentMatch },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: false } },
+      {
+        $match: {
+          'user.role': { $ne: 'admin' },
+          'user.admin': { $ne: true },
+          'user.isActive': { $ne: false }
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          metadata: [{ $count: 'total' }],
+          data: [{ $skip: skipAmount }, { $limit: limitAmount }]
+        }
+      }
+    ];
 
-    // Exclude any records where linked User has role === 'admin', admin === true, or isActive === false
-    const validStudents = allStudents.filter(s => s.userId && s.userId.role !== 'admin' && s.userId.admin !== true && s.userId.isActive !== false);
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const paginatedStudents = validStudents.slice(skip, skip + parseInt(limit));
+    const result = await Student.aggregate(pipeline);
+    
+    const total = result[0].metadata[0] ? result[0].metadata[0].total : 0;
+    const paginatedStudents = result[0].data.map(s => {
+       s.userId = {
+         _id: s.user._id,
+         role: s.user.role,
+         isActive: s.user.isActive,
+         admin: s.user.admin
+       };
+       delete s.user;
+       return s;
+    });
 
     return res.status(200).json({
       success: true,
       data: paginatedStudents,
-      total: validStudents.length,
+      total,
       page: parseInt(page),
-      limit: parseInt(limit)
+      totalPages: Math.ceil(total / limitAmount),
+      limit: limitAmount
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

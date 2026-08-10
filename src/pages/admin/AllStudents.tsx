@@ -31,6 +31,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Student {
   id: string;
@@ -68,7 +76,10 @@ export default function AllStudents() {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const deletedIdsRef = useRef<Set<string>>(new Set());
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -89,15 +100,31 @@ export default function AllStudents() {
   }, [user, isAdmin, loading, navigate]);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1); // Reset to page 1 on new search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     if (user && isAdmin) {
       fetchStudents();
     }
-  }, [user, isAdmin, selectedHostel]);
+  }, [user, isAdmin, selectedHostel, currentPage, debouncedSearch]);
 
   const fetchStudents = useCallback(async () => {
     try {
       setIsLoading(prev => prev);
-      const response = await api.get('/students', { params: { hostel: selectedHostel, _t: Date.now() } });
+      const response = await api.get('/students', { 
+        params: { 
+          hostel: selectedHostel, 
+          search: debouncedSearch,
+          page: currentPage,
+          limit: 20,
+          _t: Date.now() 
+        } 
+      });
       if (response.data?.success) {
         const mapped = response.data.data
           .filter((s: any) => !deletedIdsRef.current.has(s._id))
@@ -114,6 +141,7 @@ export default function AllStudents() {
             created_at: s.createdAt,
           }));
         setStudents(mapped);
+        setTotalPages(response.data.totalPages || 1);
       }
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -183,13 +211,7 @@ export default function AllStudents() {
     }
   };
 
-  const filteredStudents = students.filter(
-    (student) =>
-      student.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.room_no?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.username?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredStudents = students; // Filtering is now done on the server
 
   if (loading || isLoading) {
     return (
@@ -381,6 +403,30 @@ export default function AllStudents() {
             </CardContent>
           )}
         </Card>
+
+        {totalPages > 1 && (
+          <div className="mt-4 flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <span className="text-sm px-4">Page {currentPage} of {totalPages}</span>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </motion.div>
 
       <EditStudentDialog

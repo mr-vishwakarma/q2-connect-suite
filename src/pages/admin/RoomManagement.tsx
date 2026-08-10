@@ -22,6 +22,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { toast } from 'sonner';
 import { Home, Users, Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
 
@@ -53,9 +60,19 @@ export default function RoomManagement() {
   const [newRoom, setNewRoom] = useState({ room_number: '', capacity: 4 });
   const [editRoom, setEditRoom] = useState({ room_number: '', capacity: 4 });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRooms, setTotalRooms] = useState(0);
+
   const fetchRooms = useCallback(async () => {
     try {
-      const response = await api.get('/rooms', { params: { hostel: selectedHostel } });
+      const response = await api.get('/rooms', { 
+        params: { 
+          hostel: selectedHostel,
+          page: currentPage,
+          limit: 20
+        } 
+      });
       if (response.data?.success) {
         const mapped = response.data.data.map((r: any) => ({
           id: r._id,
@@ -65,6 +82,8 @@ export default function RoomManagement() {
           status: r.status,
         }));
         setRooms(mapped);
+        setTotalPages(response.data.totalPages || 1);
+        setTotalRooms(response.data.total || 0);
       }
     } catch (err) {
       console.error('Error fetching rooms:', err);
@@ -73,11 +92,12 @@ export default function RoomManagement() {
     } finally {
       setLoading(false);
     }
-  }, [selectedHostel]);
+  }, [selectedHostel, currentPage]);
 
   const fetchStudents = useCallback(async () => {
     try {
-      const response = await api.get('/students', { params: { hostel: selectedHostel } });
+      // Fetch a larger limit just for the unassigned students dropdown
+      const response = await api.get('/students', { params: { hostel: selectedHostel, limit: 1000 } });
       if (response.data?.success) {
         const mapped = response.data.data.map((s: any) => ({
           id: s._id,
@@ -336,6 +356,30 @@ export default function RoomManagement() {
             )}
           </CardContent>
         </Card>
+
+        {totalPages > 1 && (
+          <div className="mt-4 flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <span className="text-sm px-4">Page {currentPage} of {totalPages}</span>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
 
       {/* Add Room Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
