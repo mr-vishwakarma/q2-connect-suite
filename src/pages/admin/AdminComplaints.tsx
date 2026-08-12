@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { MessageSquare, CheckCircle, Clock, XCircle } from 'lucide-react';
 import {
@@ -156,35 +156,37 @@ export default function AdminComplaints() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">{complaint.description}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => updateStatus(complaint.id, 'in_progress')}
-                      className="text-yellow-400 border-yellow-400/30 hover:bg-yellow-400/10"
-                    >
-                      <Clock className="w-4 h-4 mr-1" />
-                      In Progress
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => updateStatus(complaint.id, 'resolved')}
-                      className="text-green-400 border-green-400/30 hover:bg-green-400/10"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      Resolved
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => updateStatus(complaint.id, 'rejected')}
-                      className="text-red-400 border-red-400/30 hover:bg-red-400/10"
-                    >
-                      <XCircle className="w-4 h-4 mr-1" />
-                      Reject
-                    </Button>
-                  </div>
+                  {complaint.status !== 'resolved' && complaint.status !== 'rejected' && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateStatus(complaint.id, 'in_progress')}
+                        className="text-yellow-400 border-yellow-400/30 hover:bg-yellow-400/10"
+                      >
+                        <Clock className="w-4 h-4 mr-1" />
+                        In Progress
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateStatus(complaint.id, 'resolved')}
+                        className="text-green-400 border-green-400/30 hover:bg-green-400/10"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Resolved
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateStatus(complaint.id, 'rejected')}
+                        className="text-red-400 border-red-400/30 hover:bg-red-400/10"
+                      >
+                        <XCircle className="w-4 h-4 mr-1" />
+                        Reject
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

@@ -61,9 +61,15 @@ const updateMessRequest = async (req, res) => {
   
   try {
     const { status, adminMessage } = req.body;
+    
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (adminMessage !== undefined) updateData.adminMessage = adminMessage;
+    if (status && status !== 'pending') updateData.approvedDate = new Date();
+
     const messReq = await MessRequest.findByIdAndUpdate(
       req.params.id,
-      { status, adminMessage, ...(status !== 'pending' ? { approvedDate: new Date() } : {}) },
+      { $set: updateData },
       { new: true, session }
     ).populate('userId', 'name email');
 
@@ -76,9 +82,9 @@ const updateMessRequest = async (req, res) => {
     await Notification.create([{
       userId: messReq.userId._id,
       hostel: messReq.hostel,
-      title: `Mess Off Request ${status === 'approved' ? 'Approved' : 'Rejected'}`,
-      message: adminMessage || `Your mess off request has been ${status}.`,
-      type: status === 'approved' ? 'success' : 'error',
+      title: `Mess Off Request ${status === 'approved' ? 'Approved' : (status === 'returned' ? 'Returned' : 'Rejected')}`,
+      message: adminMessage || `Your mess off request has been marked as ${status}.`,
+      type: status === 'approved' ? 'success' : (status === 'returned' ? 'info' : 'error'),
     }], { session });
 
     await session.commitTransaction();
@@ -102,6 +108,7 @@ const updateMessRequest = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
+    console.error('Error updating mess request:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

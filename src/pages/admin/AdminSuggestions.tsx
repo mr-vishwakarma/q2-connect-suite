@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { Lightbulb, CheckCircle, Clock, XCircle } from 'lucide-react';
 import {
@@ -95,8 +95,10 @@ export default function AdminSuggestions() {
     switch (status) {
       case 'implemented':
         return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Implemented</Badge>;
-      case 'under_review':
+      case 'reviewed':
         return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Under Review</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">In Progress</Badge>;
       case 'rejected':
         return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Rejected</Badge>;
       default:
@@ -149,35 +151,46 @@ export default function AdminSuggestions() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground mb-4">{suggestion.description}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => updateStatus(suggestion.id, 'under_review')}
-                      className="text-yellow-400 border-yellow-400/30 hover:bg-yellow-400/10"
-                    >
-                      <Clock className="w-4 h-4 mr-1" />
-                      Under Review
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => updateStatus(suggestion.id, 'implemented')}
-                      className="text-green-400 border-green-400/30 hover:bg-green-400/10"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      Implemented
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => updateStatus(suggestion.id, 'rejected')}
-                      className="text-red-400 border-red-400/30 hover:bg-red-400/10"
-                    >
-                      <XCircle className="w-4 h-4 mr-1" />
-                      Reject
-                    </Button>
-                  </div>
+                  {suggestion.status !== 'implemented' && suggestion.status !== 'rejected' && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateStatus(suggestion.id, 'reviewed')}
+                        className="text-yellow-400 border-yellow-400/30 hover:bg-yellow-400/10"
+                      >
+                        <Clock className="w-4 h-4 mr-1" />
+                        Under Review
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateStatus(suggestion.id, 'in_progress')}
+                        className="text-blue-400 border-blue-400/30 hover:bg-blue-400/10"
+                      >
+                        <Clock className="w-4 h-4 mr-1" />
+                        In Progress
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateStatus(suggestion.id, 'implemented')}
+                        className="text-green-400 border-green-400/30 hover:bg-green-400/10"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Implemented
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateStatus(suggestion.id, 'rejected')}
+                        className="text-red-400 border-red-400/30 hover:bg-red-400/10"
+                      >
+                        <XCircle className="w-4 h-4 mr-1" />
+                        Reject
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

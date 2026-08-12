@@ -10,7 +10,7 @@ import { Footer } from '@/components/landing/Footer';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { Eye, EyeOff, ShieldPlus, AlertCircle } from 'lucide-react';
 import { GlowButton } from '@/components/ui/animated-section';
 

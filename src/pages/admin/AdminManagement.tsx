@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { Shield, UserPlus, Trash2, Eye, EyeOff } from 'lucide-react';
 import {

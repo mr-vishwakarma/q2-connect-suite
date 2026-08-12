@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { Send, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -99,9 +99,9 @@ export default function Complaints() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <DashboardLayout title="Complaints" isAdmin={false}>
         <div className="py-8"><InlineSkeletonList rows={5} /></div>
-      </div>
+      </DashboardLayout>
     );
   }
 

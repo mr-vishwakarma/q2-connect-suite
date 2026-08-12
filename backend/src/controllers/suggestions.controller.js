@@ -57,14 +57,19 @@ const createSuggestion = async (req, res) => {
 const updateSuggestion = async (req, res) => {
   try {
     const { status, adminReply } = req.body;
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (adminReply !== undefined) updateData.adminReply = adminReply;
+
     const suggestion = await Suggestion.findByIdAndUpdate(
       req.params.id,
-      { status, adminReply },
+      { $set: updateData },
       { new: true }
     );
     if (!suggestion) return res.status(404).json({ success: false, message: 'Suggestion not found' });
     return res.status(200).json({ success: true, data: suggestion });
   } catch (error) {
+    console.error('Error updating suggestion:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

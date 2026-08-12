@@ -57,14 +57,19 @@ const createComplaint = async (req, res) => {
 const updateComplaint = async (req, res) => {
   try {
     const { status, adminReply } = req.body;
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (adminReply !== undefined) updateData.adminReply = adminReply;
+
     const complaint = await Complaint.findByIdAndUpdate(
       req.params.id,
-      { status, adminReply },
+      { $set: updateData },
       { new: true }
     );
     if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found' });
     return res.status(200).json({ success: true, data: complaint });
   } catch (error) {
+    console.error('Error updating complaint:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

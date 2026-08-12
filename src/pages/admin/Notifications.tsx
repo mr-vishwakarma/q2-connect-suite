@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { Bell, Plus, Trash2, Send, Users, AlertTriangle, Info, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 

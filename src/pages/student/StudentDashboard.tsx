@@ -8,7 +8,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { api } from '@/lib/api';
 import { CalendarCheck, MessageSquare, Lightbulb, CheckCircle, ArrowRight, User, Home, CreditCard, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 
 interface StudentData {
   name: string;
@@ -60,7 +60,11 @@ export default function StudentDashboard() {
   }, [user, fetchDashboardData]);
 
   if (loading) {
-    return <DashboardSkeleton />;
+    return (
+      <DashboardLayout title="Dashboard" isAdmin={false}>
+        <DashboardSkeleton />
+      </DashboardLayout>
+    );
   }
 
   const statCards = [

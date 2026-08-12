@@ -29,7 +29,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import {
   Search, IndianRupee, Calendar, Check, Filter, Download, TrendingUp,
   AlertCircle, Wallet, Users, FileText, Receipt, Plus, User, Printer,

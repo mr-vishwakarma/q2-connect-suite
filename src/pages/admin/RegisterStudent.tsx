@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { UserPlus, CalendarIcon, Eye, EyeOff, Home, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';

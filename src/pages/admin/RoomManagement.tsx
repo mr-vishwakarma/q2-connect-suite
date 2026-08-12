@@ -29,7 +29,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { Home, Users, Plus, Edit2, Trash2, UserPlus } from 'lucide-react';
 
 interface Room {

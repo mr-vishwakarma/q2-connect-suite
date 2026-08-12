@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { Calendar, Send, Upload, FileCheck, History, FileText, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -180,9 +180,9 @@ export default function MessOff() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <DashboardLayout title="Leave Requests" isAdmin={false}>
         <div className="py-8"><InlineSkeletonList rows={5} /></div>
-      </div>
+      </DashboardLayout>
     );
   }
 

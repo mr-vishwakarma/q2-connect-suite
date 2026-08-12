@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { Loader2, Camera, User, Mail, Phone, Home, Calendar } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -109,10 +110,8 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <DashboardLayout title="My Profile">
-        <div className="flex h-[50vh] items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
+      <DashboardLayout title="My Profile" isAdmin={false}>
+        <div className="py-8"><InlineSkeletonList rows={5} /></div>
       </DashboardLayout>
     );
   }

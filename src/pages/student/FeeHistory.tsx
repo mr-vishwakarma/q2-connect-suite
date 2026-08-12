@@ -128,9 +128,9 @@ export default function FeeHistory() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <DashboardLayout title="My Fees" isAdmin={false}>
         <div className="py-8"><InlineSkeletonList rows={5} /></div>
-      </div>
+      </DashboardLayout>
     );
   }
 

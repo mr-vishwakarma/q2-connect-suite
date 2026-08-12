@@ -9,7 +9,7 @@ import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { useAuth } from '@/hooks/useAuth';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 import { Eye, EyeOff, Shield, User } from 'lucide-react';
 import { GlowButton } from '@/components/ui/animated-section';
 
