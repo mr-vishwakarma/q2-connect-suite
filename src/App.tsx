@@ -91,12 +91,8 @@ const App = () => (
           <BrowserRouter>
             <ScrollToTop />
             <Suspense fallback={
-              <div className="flex h-screen w-full items-center justify-center">
-                <div className="animate-pulse flex flex-col items-center gap-4">
-                  <div className="w-32 h-32 flex items-center justify-center overflow-hidden">
-                    <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain animate-pulse" />
-                  </div>
-                </div>
+              <div className="flex h-screen w-full items-center justify-center bg-background">
+                <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
               </div>
             }>
             <Routes>
