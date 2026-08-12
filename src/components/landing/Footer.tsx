@@ -7,7 +7,6 @@ const footerLinks = [
   { name: 'Home', path: '/' },
   { name: 'About Us', path: '/about' },
   { name: 'Contact Us', path: '/contact' },
-  { name: 'Admin Login', path: '/admin-login' },
   { name: 'User Login', path: '/login' },
 ];
 

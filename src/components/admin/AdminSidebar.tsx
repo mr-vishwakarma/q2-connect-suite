@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { parseISO, differenceInDays } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,6 +49,7 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }: AdminSidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut, profile, user, isAdmin } = useAuth();
   const { selectedHostel } = useHostel();
   const [alertCount, setAlertCount] = useState(0);
@@ -185,9 +186,10 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
       {/* Logout Button */}
       <div className="p-4 border-t border-border">
         <motion.button
-          onClick={() => {
+          onClick={async () => {
             handleLinkClick();
-            signOut();
+            await signOut();
+            navigate('/');
           }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}

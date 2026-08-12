@@ -26,7 +26,6 @@ const Index = lazy(() => import("./pages/Index"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Login = lazy(() => import("./pages/Login"));
-const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const RegisterAdmin = lazy(() => import("./pages/RegisterAdmin"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const OurTeam = lazy(() => import("./pages/OurTeam"));
@@ -106,7 +105,6 @@ const App = () => (
               <Route path="/contact" element={<PublicOnlyRoute><Contact /></PublicOnlyRoute>} />
               <Route path="/our-team" element={<PublicOnlyRoute><OurTeam /></PublicOnlyRoute>} />
               <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-              <Route path="/admin-login" element={<PublicOnlyRoute><AdminLogin /></PublicOnlyRoute>} />
               <Route path="/register-admin" element={<PublicOnlyRoute><RegisterAdmin /></PublicOnlyRoute>} />
               <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
               <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';
@@ -18,6 +19,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAdminMode, setIsAdminMode] = useState(false);
   const { signIn, user, isAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -43,11 +45,11 @@ export default function Login() {
     
     // Send the User ID directly as username
     const normalizedUserId = userId.trim();
-    const { error } = await signIn(normalizedUserId, password);
+    const { error } = await signIn(normalizedUserId, password, isAdminMode);
     setIsLoading(false);
 
     if (error) {
-      toast.error('Invalid User ID or Password');
+      toast.error('Invalid Credentials');
     } else {
       toast.success('Welcome back!');
     }
@@ -60,7 +62,7 @@ export default function Login() {
       {/* Building Background */}
       <BuildingBackground showOnHome={true} />
       
-      <div className="flex-1 flex items-center justify-start pl-12 md:pl-24 lg:pl-32 pt-20 pb-12 px-6 relative z-10">
+      <div className="flex-1 flex items-center justify-center md:justify-start px-4 md:px-0 md:pl-24 lg:pl-32 pt-24 pb-12 relative z-10">
         {/* Card - Slides from RIGHT */}
         <motion.div
           initial={{ opacity: 0, x: 100 }}
@@ -75,7 +77,7 @@ export default function Login() {
             transition={{ duration: 0.3 }}
           >
             <Card className="w-full max-w-md relative z-10 bg-card/60 backdrop-blur-xl border-primary/20 shadow-2xl shadow-primary/10">
-              <CardHeader className="text-center pb-4">
+              <CardHeader className="text-center pb-2">
                 <motion.div 
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -86,15 +88,22 @@ export default function Login() {
                   }}
                   className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/25"
                 >
-                  <User className="w-8 h-8 text-primary-foreground" />
+                  {isAdminMode ? <Building className="w-8 h-8 text-primary-foreground" /> : <User className="w-8 h-8 text-primary-foreground" />}
                 </motion.div>
-                <CardTitle className="text-2xl text-foreground">Student Login</CardTitle>
+                <CardTitle className="text-2xl text-foreground">Welcome Back</CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  Q2 Hostel
+                  Login to your Q2 Hostel account
                 </CardDescription>
               </CardHeader>
               
               <CardContent>
+                <Tabs defaultValue="student" onValueChange={(v) => setIsAdminMode(v === 'admin')} className="w-full mb-6 mt-2">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="student">Student</TabsTrigger>
+                    <TabsTrigger value="admin">Admin</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
@@ -102,11 +111,11 @@ export default function Login() {
                     transition={{ delay: 0.4 }}
                     className="space-y-2"
                   >
-                    <Label htmlFor="userId" className="text-foreground">User ID</Label>
+                    <Label htmlFor="userId" className="text-foreground">{isAdminMode ? 'Email or Username' : 'User ID'}</Label>
                     <Input
                       id="userId"
                       type="text"
-                      placeholder="Enter your User ID"
+                      placeholder={isAdminMode ? 'admin@example.com' : 'Enter your User ID'}
                       value={userId}
                       onChange={(e) => setUserId(e.target.value)}
                       className="bg-secondary border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
@@ -156,26 +165,11 @@ export default function Login() {
                   >
                     <GlowButton className="w-full">
                       <Button type="submit" variant="hero" className="w-full" size="lg" disabled={isLoading}>
-                        {isLoading ? 'Signing in...' : 'Login'}
+                        {isLoading ? 'Signing in...' : `Login as ${isAdminMode ? 'Admin' : 'Student'}`}
                       </Button>
                     </GlowButton>
                   </motion.div>
                 </form>
-
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.7 }}
-                  className="mt-6 pt-6 border-t border-border/50 text-center text-sm text-muted-foreground"
-                >
-                  <p className="flex items-center justify-center gap-2">
-                    <Building className="w-4 h-4" />
-                    Are you an administrator?
-                  </p>
-                  <Link to="/admin-login" className="text-primary hover:underline mt-1 inline-block hover:text-primary/80 transition-colors">
-                    Admin Login
-                  </Link>
-                </motion.div>
               </CardContent>
             </Card>
           </motion.div>

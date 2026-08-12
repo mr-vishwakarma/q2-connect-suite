@@ -9,8 +9,6 @@ const navLinks = [
   { name: 'About Us', path: '/about' },
   { name: 'Our Team', path: '/our-team' },
   { name: 'Contact Us', path: '/contact' },
-  { name: 'Admin Login', path: '/admin-login' },
-  { name: 'User Login', path: '/login' },
 ];
 
 export function Navbar() {

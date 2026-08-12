@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,7 @@ interface SidebarProps {
 
 export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut, profile } = useAuth();
 
   const studentLinks = [
@@ -150,9 +151,10 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
         </div>
 
         <button
-          onClick={() => {
+          onClick={async () => {
             handleLinkClick();
-            signOut();
+            await signOut();
+            navigate('/');
           }}
           className={cn("flex items-center mt-2 w-full rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors group relative", isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3")}
         >
