@@ -229,6 +229,7 @@ const generateMonthlyFees = async (req, res) => {
           hostel: student.hostel,
           month,
           amount: student.fees || 0,
+          dueDate: student.validDate || new Date()
         });
         results.created++;
       } catch (err) {

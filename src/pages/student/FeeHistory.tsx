@@ -41,6 +41,7 @@ export default function FeeHistory() {
   const [fees, setFees] = useState<Fee[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState({ lateFeePerDay: 20, gracePeriodDays: 5 });
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/login');
@@ -64,6 +65,19 @@ export default function FeeHistory() {
           fees: sRes.data.data.fees,
           hostel: sRes.data.data.hostel,
         });
+
+        // Fetch settings for the student's hostel
+        try {
+          const settingsRes = await api.get(`/settings/${sRes.data.data.hostel}`);
+          if (settingsRes.data?.success) {
+            setSettings({
+              lateFeePerDay: settingsRes.data.data.lateFeePerDay,
+              gracePeriodDays: settingsRes.data.data.gracePeriodDays,
+            });
+          }
+        } catch (e) {
+          console.error('Could not fetch settings', e);
+        }
       } else {
         setStudent(null);
       }
@@ -177,6 +191,19 @@ export default function FeeHistory() {
             )}
           </CardContent>
         </Card>
+
+        {fees.some(f => f.status !== 'paid' && f.due_date) && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 text-sm text-foreground/80 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-primary mb-1">Important Note About Late Fees</p>
+              <p>
+                You are granted a <strong>{settings.gracePeriodDays}-day grace period</strong> after your fee due date. 
+                If the fee is not paid by the end of this grace period, a late fee of <strong>₹{settings.lateFeePerDay} per day</strong> will be dynamically applied to your pending balance starting from the following day.
+              </p>
+            </div>
+          </div>
+        )}
 
         <Card className="bg-card border-border">
           <CardHeader><CardTitle className="text-foreground flex items-center gap-2"><Receipt className="w-5 h-5" />Payment Receipts</CardTitle></CardHeader>

@@ -96,6 +96,9 @@ export default function FeeManagement() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalStudents, setTotalStudents] = useState(0);
 
+  const [lateFeeSetting, setLateFeeSetting] = useState(20);
+  const [gracePeriodSetting, setGracePeriodSetting] = useState(5);
+
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -123,13 +126,17 @@ export default function FeeManagement() {
 
   const fetchData = useCallback(async () => {
     try {
-      const response = await api.get('/fees/dashboard', { 
-        params: { 
-          hostel: selectedHostel,
-          page: currentPage,
-          limit: 20
-        } 
-      });
+      const [response, settingsResponse] = await Promise.all([
+        api.get('/fees/dashboard', { 
+          params: { 
+            hostel: selectedHostel,
+            page: currentPage,
+            limit: 20
+          } 
+        }),
+        api.get(`/settings/${selectedHostel}`)
+      ]);
+
       if (response.data?.success) {
         const { students, fees, payments, deposits, totalPages, total } = response.data.data;
         setStudents(students || []);
@@ -138,6 +145,11 @@ export default function FeeManagement() {
         setDeposits(deposits || []);
         setTotalPages(totalPages || 1);
         setTotalStudents(total || 0);
+      }
+      
+      if (settingsResponse.data?.success) {
+        setLateFeeSetting(settingsResponse.data.data.lateFeePerDay || 20);
+        setGracePeriodSetting(settingsResponse.data.data.gracePeriodDays || 5);
       }
     } catch (e) {
       console.error(e);
@@ -222,7 +234,7 @@ export default function FeeManagement() {
     const cf = fees.find(f => f.student_id === s.id && f.month === currentMonth);
     if (cf?.due_date) {
       const overdue = differenceInDays(new Date(), new Date(cf.due_date));
-      setPLateFee(overdue > 0 ? overdue * LATE_FEE_PER_DAY : 0);
+      setPLateFee(overdue > gracePeriodSetting ? (overdue - gracePeriodSetting) * lateFeeSetting : 0);
     } else setPLateFee(0);
     setPDiscount(0);
     setPDeposit(0);

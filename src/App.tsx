@@ -48,6 +48,7 @@ const AdminManagement = lazy(() => import("./pages/admin/AdminManagement"));
 const AdminAlerts = lazy(() => import("./pages/admin/AdminAlerts"));
 const FeeManagement = lazy(() => import("./pages/admin/FeeManagement"));
 const RoomManagement = lazy(() => import("./pages/admin/RoomManagement"));
+const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const Notifications = lazy(() => import("./pages/admin/Notifications"));
 const LeaveRequests = lazy(() => import("./pages/admin/LeaveRequests"));
 const LaundryManagement = lazy(() => import("./pages/admin/LaundryManagement"));
@@ -128,6 +129,7 @@ const App = () => (
                 <Route path="rooms" element={<RoomManagement />} />
                 <Route path="leave-requests" element={<LeaveRequests />} />
                 <Route path="laundry" element={<LaundryManagement />} />
+                <Route path="settings" element={<AdminSettings />} />
                 <Route path="notifications" element={<Notifications />} />
               </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

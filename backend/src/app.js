@@ -26,6 +26,7 @@ const dashboardRoutes = require('./routes/dashboard.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 const laundryRoutes = require('./routes/laundry.routes');
 const ratingRoutes = require('./routes/rating.routes');
+const settingsRoutes = require('./routes/settings.routes');
 const { requestLogger } = require('./middleware/requestLogger.middleware');
 
 // Connect to MongoDB
@@ -110,6 +111,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/laundry', laundryRoutes);
 app.use('/api/rating', ratingRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -134,6 +136,9 @@ app.use((req, res, next) => {
   req.io = io;
   next();
 });
+
+// Initialize scheduled cron jobs
+require('./utils/cron');
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {

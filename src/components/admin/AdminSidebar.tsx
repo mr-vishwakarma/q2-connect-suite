@@ -41,6 +41,7 @@ const adminLinks = [
   { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
   { to: '/admin/alerts', icon: AlertTriangle, label: 'Alert' },
   { to: '/admin/admin-management', icon: Shield, label: 'Admin Management' },
+  { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
 interface AdminSidebarProps {
