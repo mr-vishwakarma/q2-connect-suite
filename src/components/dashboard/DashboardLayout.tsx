@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { MobileBottomNav } from './MobileBottomNav';
 import { useSidebarDrawer } from '@/hooks/useSidebarDrawer';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SmartChatbot } from '@/components/chatbot/SmartChatbot';
@@ -12,10 +13,10 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, title, isAdmin = false }: DashboardLayoutProps) {
-  const { isOpen, setIsOpen, toggle, closeSidebar, shouldOverlay, isCollapsed, toggleCollapse } = useSidebarDrawer();
+  const { isOpen, toggle, closeSidebar, shouldOverlay, isCollapsed, toggleCollapse } = useSidebarDrawer();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background md:pb-0 pb-16">
       {/* Desktop Sidebar */}
       {!shouldOverlay && (
         <div className={`fixed left-0 top-0 h-screen transition-all duration-300 z-30 ${isCollapsed ? 'w-20' : 'w-64'}`}>
@@ -23,7 +24,7 @@ export function DashboardLayout({ children, title, isAdmin = false }: DashboardL
         </div>
       )}
 
-      {/* Mobile/Tablet Overlay */}
+      {/* Mobile/Tablet Overlay Sidebar (Accessed via Bottom Nav Menu) */}
       <AnimatePresence>
         {shouldOverlay && isOpen && (
           <>
@@ -54,6 +55,10 @@ export function DashboardLayout({ children, title, isAdmin = false }: DashboardL
           {children}
         </main>
       </div>
+      
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav onMenuToggle={toggle} />
+      
       <SmartChatbot isAdmin={isAdmin} />
     </div>
   );

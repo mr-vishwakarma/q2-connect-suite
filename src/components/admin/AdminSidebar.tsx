@@ -189,20 +189,25 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
 
       {/* Logout Button */}
       <div className="p-4 border-t border-border">
-        <motion.button
+        <button
           onClick={async () => {
             handleLinkClick();
             await signOut();
             navigate('/');
           }}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="flex items-center gap-3 px-4 py-3 w-full rounded-xl bg-primary text-primary-foreground font-medium transition-colors shadow-lg hover:bg-primary/90"
-          style={{ boxShadow: '0 0 20px hsl(0 100% 50% / 0.4)' }}
+          className={cn(
+            "flex items-center mt-2 w-full rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors group relative active:scale-95",
+            isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3"
+          )}
         >
-          <LogOut className="w-5 h-5" />
-          <span>Log Out</span>
-        </motion.button>
+          <LogOut className="w-5 h-5 shrink-0" />
+          {!isCollapsed && <span>Logout</span>}
+          {isCollapsed && (
+            <div className="absolute left-full ml-4 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50">
+              Logout
+            </div>
+          )}
+        </button>
       </div>
     </aside>
   );
