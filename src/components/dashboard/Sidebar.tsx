@@ -37,7 +37,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
     { to: '/student/profile', icon: User, label: 'My Profile' },
     { to: '/student/laundry', icon: Shirt, label: 'Laundry' },
     { to: '/student/mess-off', icon: UtensilsCrossed, label: 'Leave Request' },
-    { to: '/student/fees', icon: CalendarCheck, label: 'Fee History' },
+    { to: '/student/fee-history', icon: CalendarCheck, label: 'Fee History' },
     { to: '/student/complaints', icon: MessageSquare, label: 'Complaints' },
     { to: '/student/suggestions', icon: Lightbulb, label: 'Suggestions' },
   ];
