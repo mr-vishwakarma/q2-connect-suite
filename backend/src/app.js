@@ -34,6 +34,9 @@ connectDB();
 
 const app = express();
 
+// Trust proxy required for express-rate-limit behind a reverse proxy (like Render)
+app.set('trust proxy', 1);
+
 // Compress all responses
 app.use(compression());
 
