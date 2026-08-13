@@ -34,7 +34,6 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
 
   const studentLinks = [
     { to: '/student/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/student/profile', icon: User, label: 'My Profile' },
     { to: '/student/laundry', icon: Shirt, label: 'Laundry' },
     { to: '/student/mess-off', icon: UtensilsCrossed, label: 'Leave Request' },
     { to: '/student/fee-history', icon: CalendarCheck, label: 'Fee History' },

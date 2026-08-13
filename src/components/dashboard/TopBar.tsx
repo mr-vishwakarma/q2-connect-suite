@@ -1,4 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
+import { Link } from 'react-router-dom';
 import { Search, Menu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -32,7 +33,10 @@ export function TopBar({ title, onMenuToggle, showMenu }: TopBarProps) {
         <NotificationBell />
 
         <div className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-border">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full gradient-primary flex items-center justify-center overflow-hidden">
+          <Link
+            to={isAdmin ? "/admin/settings" : "/student/profile"}
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full gradient-primary flex items-center justify-center overflow-hidden hover:opacity-80 transition-opacity active:scale-95"
+          >
             {profile?.profilePhoto ? (
               <img src={profile.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
             ) : (
@@ -40,9 +44,11 @@ export function TopBar({ title, onMenuToggle, showMenu }: TopBarProps) {
                 {profile?.name?.charAt(0).toUpperCase() || 'U'}
               </span>
             )}
-          </div>
+          </Link>
           <div className="hidden sm:block">
-            <p className="text-sm font-medium text-foreground">{profile?.name || 'User'}</p>
+            <Link to={isAdmin ? "/admin/settings" : "/student/profile"} className="hover:underline">
+              <p className="text-sm font-medium text-foreground">{profile?.name || 'User'}</p>
+            </Link>
             <p className="text-xs text-muted-foreground">{isAdmin ? 'Admin' : 'Student'}</p>
           </div>
         </div>
