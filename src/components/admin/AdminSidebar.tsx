@@ -24,6 +24,7 @@ import {
   DollarSign,
   X,
   BarChart,
+  Shirt,
 } from 'lucide-react';
 
 const adminLinks = [
@@ -34,6 +35,7 @@ const adminLinks = [
   { to: '/admin/fees', icon: DollarSign, label: 'Fee Management' },
   { to: '/admin/rooms', icon: Building2, label: 'Room Management' },
   { to: '/admin/leave-requests', icon: CalendarCheck, label: 'Leave Requests' },
+  { to: '/admin/laundry', icon: Shirt, label: 'Laundry Management' },
   { to: '/admin/complaints', icon: MessageSquare, label: 'Complaints' },
   { to: '/admin/suggestions', icon: Lightbulb, label: 'Suggestions' },
   { to: '/admin/notifications', icon: Bell, label: 'Notifications' },

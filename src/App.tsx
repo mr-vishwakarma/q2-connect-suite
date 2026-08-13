@@ -36,6 +36,7 @@ const Profile = lazy(() => import("./pages/student/Profile"));
 const MessOff = lazy(() => import("./pages/student/MessOff"));
 const Complaints = lazy(() => import("./pages/student/Complaints"));
 const Suggestions = lazy(() => import("./pages/student/Suggestions"));
+const Laundry = lazy(() => import("./pages/student/Laundry"));
 const FeeHistory = lazy(() => import("./pages/student/FeeHistory"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
@@ -49,6 +50,7 @@ const FeeManagement = lazy(() => import("./pages/admin/FeeManagement"));
 const RoomManagement = lazy(() => import("./pages/admin/RoomManagement"));
 const Notifications = lazy(() => import("./pages/admin/Notifications"));
 const LeaveRequests = lazy(() => import("./pages/admin/LeaveRequests"));
+const LaundryManagement = lazy(() => import("./pages/admin/LaundryManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -110,7 +112,8 @@ const App = () => (
               <Route path="/student/mess-off" element={<MessOff />} />
               <Route path="/student/complaints" element={<Complaints />} />
               <Route path="/student/suggestions" element={<Suggestions />} />
-              <Route path="/student/fees" element={<FeeHistory />} />
+              <Route path="/student/laundry" element={<Laundry />} />
+              <Route path="/student/fee-history" element={<FeeHistory />} />
               <Route path="/admin" element={<AdminShell />}>
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
@@ -124,6 +127,7 @@ const App = () => (
                 <Route path="fees" element={<FeeManagement />} />
                 <Route path="rooms" element={<RoomManagement />} />
                 <Route path="leave-requests" element={<LeaveRequests />} />
+                <Route path="laundry" element={<LaundryManagement />} />
                 <Route path="notifications" element={<Notifications />} />
               </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

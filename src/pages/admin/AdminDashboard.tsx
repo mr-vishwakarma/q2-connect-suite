@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import { Link } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
+import { MenuRatingChart } from '@/components/admin/MenuRatingChart';
 
 interface DashboardStats {
   totalStudents: number;
@@ -319,6 +320,17 @@ export default function AdminDashboard() {
               </Button>
             </CardContent>
           </Card>
+        </motion.div>
+      </div>
+
+      {/* Menu Ratings Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <MenuRatingChart />
         </motion.div>
       </div>
     </div>

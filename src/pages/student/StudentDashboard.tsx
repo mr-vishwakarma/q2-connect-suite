@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { CalendarCheck, MessageSquare, Lightbulb, CheckCircle, ArrowRight, User, Home, CreditCard, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'react-toastify';
+import { MealRatingWidget } from '@/components/student/MealRatingWidget';
 
 interface StudentData {
   name: string;
@@ -203,6 +204,16 @@ export default function StudentDashboard() {
             </Card>
           </motion.div>
         </div>
+
+        {/* Meal Rating Widget */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="max-w-md"
+        >
+          <MealRatingWidget />
+        </motion.div>
       </div>
     </DashboardLayout>
   );

@@ -24,6 +24,8 @@ const uploadRoutes = require('./routes/upload.routes');
 const chatRoutes = require('./routes/chat.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
+const laundryRoutes = require('./routes/laundry.routes');
+const ratingRoutes = require('./routes/rating.routes');
 const { requestLogger } = require('./middleware/requestLogger.middleware');
 
 // Connect to MongoDB
@@ -106,6 +108,8 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/laundry', laundryRoutes);
+app.use('/api/rating', ratingRoutes);
 
 // 404 handler
 app.use((req, res) => {

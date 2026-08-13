@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Shirt,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -34,6 +35,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
   const studentLinks = [
     { to: '/student/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/student/profile', icon: User, label: 'My Profile' },
+    { to: '/student/laundry', icon: Shirt, label: 'Laundry' },
     { to: '/student/mess-off', icon: UtensilsCrossed, label: 'Leave Request' },
     { to: '/student/fees', icon: CalendarCheck, label: 'Fee History' },
     { to: '/student/complaints', icon: MessageSquare, label: 'Complaints' },
