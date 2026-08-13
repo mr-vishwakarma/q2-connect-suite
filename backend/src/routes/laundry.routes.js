@@ -6,7 +6,7 @@ const {
   cancelBooking, 
   getMyBookings 
 } = require('../controllers/laundry.controller');
-const { protect, authorize } = require('../middlewares/auth.middleware');
+const { protect, authorize } = require('../middleware/auth.middleware');
 
 // All routes require authentication
 router.use(protect);
