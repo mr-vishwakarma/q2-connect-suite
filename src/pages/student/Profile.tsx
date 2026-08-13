@@ -7,11 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { toast } from 'react-toastify';
-import { Loader2, Camera, User, Mail, Phone, Home, Calendar } from 'lucide-react';
+import { Loader2, Camera, User, Mail, Phone, Home, Calendar, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
-  const { profile: authProfile, refreshProfile } = useAuth();
+  const { profile: authProfile, refreshProfile, signOut } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -108,6 +110,11 @@ export default function Profile() {
     }
   };
 
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
+  };
+
   if (loading) {
     return (
       <DashboardLayout title="My Profile" isAdmin={false}>
@@ -118,12 +125,12 @@ export default function Profile() {
 
   return (
     <DashboardLayout title="My Profile">
-      <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
-        <Card className="bg-card border-border overflow-hidden">
+      <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-12">
+        <Card className="bg-card border-border overflow-hidden shadow-sm">
           <div className="h-32 bg-gradient-to-r from-primary/40 to-primary/10 relative">
             <div className="absolute -bottom-12 left-6">
               <div className="relative group">
-                <div className="w-24 h-24 rounded-full border-4 border-background overflow-hidden bg-secondary flex items-center justify-center">
+                <div className="w-24 h-24 rounded-full border-4 border-background overflow-hidden bg-secondary flex items-center justify-center shadow-sm">
                   {formData.profilePhoto ? (
                     <img src={formData.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -263,8 +270,8 @@ export default function Profile() {
                 </div>
               </div>
 
-              <div className="flex justify-end">
-                <Button type="submit" disabled={saving || uploading} className="px-8">
+              <div className="flex justify-end pt-2">
+                <Button type="submit" disabled={saving || uploading} className="px-8 shadow-sm">
                   {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Save Changes
                 </Button>
@@ -272,6 +279,18 @@ export default function Profile() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Clean Separate Logout Section */}
+        <div className="flex justify-center mt-6">
+          <Button 
+            variant="ghost" 
+            onClick={handleLogout}
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto px-6 py-6 rounded-xl border border-destructive/20 shadow-sm transition-all active:scale-95"
+          >
+            <LogOut className="w-5 h-5 mr-2" />
+            <span className="font-medium text-base">Logout securely</span>
+          </Button>
+        </div>
       </div>
     </DashboardLayout>
   );

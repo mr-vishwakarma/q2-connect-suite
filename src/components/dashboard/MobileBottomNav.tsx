@@ -9,7 +9,7 @@ export function MobileBottomNav({ onMenuToggle }: { onMenuToggle?: () => void })
   const links = [
     { to: '/student/dashboard', icon: LayoutDashboard, label: 'Home' },
     { to: '/student/laundry', icon: Shirt, label: 'Laundry' },
-    { to: '/student/leave', icon: CalendarOff, label: 'Leave' },
+    { to: '/student/mess-off', icon: CalendarOff, label: 'Leave' },
     { to: '/student/fee-history', icon: CalendarCheck, label: 'Fees' },
     { to: '/student/complaints', icon: MessageSquare, label: 'Complaints' },
     { to: '/student/suggestions', icon: Lightbulb, label: 'Suggestions' },

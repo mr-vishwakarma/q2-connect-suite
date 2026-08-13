@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminTopBar } from './AdminTopBar';
-import { MobileBottomNav } from '@/components/dashboard/MobileBottomNav';
 import { useSidebarDrawer } from '@/hooks/useSidebarDrawer';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SmartChatbot } from '@/components/chatbot/SmartChatbot';
@@ -15,7 +14,7 @@ function AdminLayoutInner({ children, title }: AdminLayoutProps) {
   const { isOpen, toggle, closeSidebar, isCollapsed, toggleCollapse, shouldOverlay } = useSidebarDrawer();
 
   return (
-    <div className="min-h-screen bg-background md:pb-0 pb-16">
+    <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
       {!shouldOverlay && (
         <div className={`fixed left-0 top-0 h-screen transition-all duration-300 z-30 ${isCollapsed ? 'w-20' : 'w-64'}`}>
@@ -23,7 +22,7 @@ function AdminLayoutInner({ children, title }: AdminLayoutProps) {
         </div>
       )}
 
-      {/* Mobile/Tablet Overlay Sidebar (Accessed via Bottom Nav Menu) */}
+      {/* Mobile/Tablet Overlay Sidebar */}
       <AnimatePresence>
         {shouldOverlay && isOpen && (
           <>
@@ -54,9 +53,6 @@ function AdminLayoutInner({ children, title }: AdminLayoutProps) {
           {children}
         </main>
       </div>
-
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav onMenuToggle={toggle} />
       
       <SmartChatbot isAdmin />
     </div>
