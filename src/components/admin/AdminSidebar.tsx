@@ -25,6 +25,7 @@ import {
   X,
   BarChart,
   Shirt,
+  Settings,
 } from 'lucide-react';
 
 const adminLinks = [
