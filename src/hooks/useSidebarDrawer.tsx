@@ -5,7 +5,13 @@ import { useIsMobile } from './use-mobile';
 const TABLET_BREAKPOINT = 1024;
 
 export function useIsTablet() {
-  const [isTablet, setIsTablet] = useState(false);
+  const [isTablet, setIsTablet] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const w = window.innerWidth;
+      return w >= 768 && w <= TABLET_BREAKPOINT;
+    }
+    return false;
+  });
 
   useEffect(() => {
     const check = () => {
@@ -21,42 +27,61 @@ export function useIsTablet() {
 }
 
 export function useSidebarDrawer() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    return localStorage.getItem('sidebar-collapsed') === 'true';
-  });
-  
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const location = useLocation();
   const shouldOverlay = isMobile || isTablet;
-  const hasMountedRef = useRef(false);
 
-  // Close sidebar on every route change (skip initial mount)
-  useEffect(() => {
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true;
-      return;
+  const [isOpen, setIsOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar-collapsed') === 'true';
     }
+    return false;
+  });
+
+  // Always close mobile sidebar on route changes
+  useEffect(() => {
     setIsOpen(false);
   }, [location.pathname]);
+
+  // Close on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const closeSidebar = useCallback(() => {
     setIsOpen(false);
   }, []);
 
-  const toggleCollapse = () => {
+  const toggleCollapse = useCallback(() => {
     setIsCollapsed(prev => {
       const next = !prev;
-      localStorage.setItem('sidebar-collapsed', String(next));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sidebar-collapsed', String(next));
+      }
       return next;
     });
-  };
+  }, []);
+
+  const toggle = useCallback(() => {
+    if (shouldOverlay) {
+      setIsOpen(prev => !prev);
+    } else {
+      toggleCollapse();
+    }
+  }, [shouldOverlay, toggleCollapse]);
 
   return {
     isOpen,
     setIsOpen,
-    toggle: () => setIsOpen(prev => !prev),
+    toggle,
     closeSidebar,
     isCollapsed,
     toggleCollapse,

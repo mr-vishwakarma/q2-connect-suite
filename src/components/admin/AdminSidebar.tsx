@@ -79,7 +79,7 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
   };
 
   return (
-    <aside className={cn("fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300", isCollapsed ? "w-20" : "w-64")}>
+    <aside className={cn("w-full h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300", isCollapsed ? "w-20" : "w-64")}>
       {/* Logo & Mobile Close */}
       <div className="p-6 relative flex items-center justify-between">
         <Link to="/admin/dashboard" className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
