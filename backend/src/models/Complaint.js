@@ -14,6 +14,7 @@ const complaintSchema = new mongoose.Schema(
 );
 
 complaintSchema.index({ hostel: 1, status: 1 });
+complaintSchema.index({ hostel: 1, createdAt: -1 });
 complaintSchema.index({ userId: 1 });
 
 module.exports = mongoose.model('Complaint', complaintSchema);

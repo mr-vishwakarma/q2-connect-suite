@@ -20,4 +20,8 @@ const messRequestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+messRequestSchema.index({ hostel: 1, status: 1 });
+messRequestSchema.index({ userId: 1, status: 1 });
+messRequestSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('MessRequest', messRequestSchema);

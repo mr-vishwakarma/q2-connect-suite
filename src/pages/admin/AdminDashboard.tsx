@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,6 +6,7 @@ import { useHostel } from '@/contexts/HostelContext';
 import { StatCard } from '@/components/ui/stat-card';
 import { DashboardSkeleton } from '@/components/ui/dashboard-skeleton';
 import { api } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 import { Users, MessageSquare, Lightbulb, Clock, ListChecks } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,43 +30,32 @@ interface RecentItem {
 }
 
 export default function AdminDashboard() {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats>({ totalStudents: 0, totalComplaints: 0, totalSuggestions: 0 });
-  const [recentComplaints, setRecentComplaints] = useState<RecentItem[]>([]);
-  const [recentSuggestions, setRecentSuggestions] = useState<RecentItem[]>([]);
-  const [complaintsData, setComplaintsData] = useState<{ name: string; value: number }[]>([]);
-  const [studentDistribution, setStudentDistribution] = useState<{ name: string; value: number }[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
+    if (!authLoading && (!user || !isAdmin)) {
       navigate('/admin-login');
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, isAdmin, authLoading, navigate]);
 
-  const fetchDashboardData = useCallback(async () => {
-    try {
+  const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
+    queryKey: ['adminDashboard', selectedHostel],
+    queryFn: async () => {
       const response = await api.get('/dashboard/admin', { params: { hostel: selectedHostel } });
-      if (response.data?.success) {
-        const { stats, recentComplaints, recentSuggestions, complaintsData, studentDistribution } = response.data.data;
-        setStats(stats);
-        setRecentComplaints(recentComplaints);
-        setRecentSuggestions(recentSuggestions);
-        setComplaintsData(complaintsData);
-        if (studentDistribution) setStudentDistribution(studentDistribution);
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    }
-  }, [selectedHostel]);
+      return response.data?.data;
+    },
+    staleTime: 60 * 1000,
+    enabled: !!(user && isAdmin),
+  });
 
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchDashboardData();
-    }
-  }, [user, isAdmin, selectedHostel, fetchDashboardData]);
+  const stats: DashboardStats = dashboardData?.stats || { totalStudents: 0, totalComplaints: 0, totalSuggestions: 0 };
+  const recentComplaints: RecentItem[] = dashboardData?.recentComplaints || [];
+  const recentSuggestions: RecentItem[] = dashboardData?.recentSuggestions || [];
+  const complaintsData = dashboardData?.complaintsData || [];
+  const studentDistribution = dashboardData?.studentDistribution || [];
 
   useEffect(() => {
     if (!user || !isAdmin) return;
@@ -75,17 +65,12 @@ export default function AdminDashboard() {
     });
     setSocket(newSocket);
 
-    // Whenever any entity relevant to the dashboard updates (like students), we can refetch.
-    // For now we'll just listen to general updates if the backend broadcasts them.
-    // Let's refetch on 'new-student' or any socket events you have.
-    // newSocket.on('student-updated', fetchDashboardData);
-
     return () => {
       newSocket.disconnect();
     };
-  }, [user, isAdmin, selectedHostel, fetchDashboardData]);
+  }, [user, isAdmin, selectedHostel]);
 
-  if (loading) {
+  if (authLoading || (isDashboardLoading && !dashboardData)) {
     return <DashboardSkeleton />;
   }
 

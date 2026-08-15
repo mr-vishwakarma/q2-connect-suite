@@ -24,6 +24,8 @@ const studentSchema = new mongoose.Schema(
 
 studentSchema.index({ hostel: 1 });
 studentSchema.index({ isActive: 1 });
+studentSchema.index({ hostel: 1, validDate: 1, isActive: 1 });
+studentSchema.index({ userId: 1, isActive: 1 });
 
 // Virtual: compute whether subscription is valid
 studentSchema.virtual('isValid').get(function () {

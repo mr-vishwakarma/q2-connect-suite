@@ -1,6 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
-import { parseISO, differenceInDays } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { api } from '@/lib/api';
@@ -60,30 +59,10 @@ export function AdminSidebar({ onNavigate, isCollapsed = false, onToggleCollapse
 
   const fetchAlertCount = useCallback(async () => {
     try {
-      const response = await api.get('/students', {
+      const response = await api.get('/students/alerts/count', {
         params: { hostel: selectedHostel }
       });
-      const students = response.data?.data;
-
-      if (!students) {
-        setAlertCount(0);
-        return;
-      }
-
-      const today = new Date();
-      let count = 0;
-
-      students.forEach((student: any) => {
-        if (student.validDate) {
-          const validDate = parseISO(student.validDate);
-          const daysLeft = differenceInDays(validDate, today);
-          if (daysLeft <= 5) {
-            count++;
-          }
-        }
-      });
-
-      setAlertCount(count);
+      setAlertCount(response.data?.count || 0);
     } catch (error) {
       console.error('Error fetching alert count:', error);
     }

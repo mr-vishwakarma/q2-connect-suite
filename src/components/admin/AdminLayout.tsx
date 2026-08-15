@@ -22,28 +22,18 @@ function AdminLayoutInner({ children, title }: AdminLayoutProps) {
         </div>
       )}
 
-      {/* Mobile/Tablet Overlay Sidebar */}
+      {/* Mobile/Tablet Collapsible Sidebar (No dark modal backdrop) */}
       <AnimatePresence>
         {shouldOverlay && isOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
-              onClick={closeSidebar}
-            />
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', bounce: 0.15, duration: 0.4 }}
-              className="fixed left-0 top-0 h-screen w-64 z-50"
-            >
-              <AdminSidebar onNavigate={closeSidebar} isCollapsed={false} />
-            </motion.div>
-          </>
+          <motion.div
+            initial={{ x: '-100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '-100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 280 }}
+            className="fixed left-0 top-0 h-screen w-64 z-50 shadow-2xl"
+          >
+            <AdminSidebar onNavigate={closeSidebar} isCollapsed={false} />
+          </motion.div>
         )}
       </AnimatePresence>
 

@@ -38,10 +38,8 @@ export function useSidebarDrawer() {
       hasMountedRef.current = true;
       return;
     }
-    if (shouldOverlay) {
-      setIsOpen(false);
-    }
-  }, [location.pathname, shouldOverlay]);
+    setIsOpen(false);
+  }, [location.pathname]);
 
   const closeSidebar = useCallback(() => {
     setIsOpen(false);

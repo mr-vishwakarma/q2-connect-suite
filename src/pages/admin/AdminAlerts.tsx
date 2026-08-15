@@ -20,8 +20,6 @@ import {
 } from '@/components/ui/table';
 import { differenceInDays, parseISO, format } from 'date-fns';
 
-// Fee status is now derived from valid_date, not from fees table
-
 interface AlertStudent {
   id: string;
   user_id: string;
@@ -52,9 +50,9 @@ export default function AdminAlerts() {
 
   const fetchAlertStudents = useCallback(async () => {
     try {
-      setIsLoading(prev => prev);
+      setIsLoading(true);
 
-      const response = await api.get('/students', { params: { hostel: selectedHostel } });
+      const response = await api.get('/students/alerts', { params: { hostel: selectedHostel } });
       const students = response.data?.success ? response.data.data : [];
 
       if (!students || students.length === 0) {
@@ -63,7 +61,6 @@ export default function AdminAlerts() {
         return;
       }
       
-      // Map API fields to the expected frontend fields
       const mappedStudents = students.map((s: any) => ({
         id: s._id,
         user_id: s.userId,
@@ -75,8 +72,6 @@ export default function AdminAlerts() {
         start_date: s.startDate
       }));
 
-      // Fee status is now derived from valid_date - no need to fetch fees table
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const alerts: AlertStudent[] = [];
@@ -85,9 +80,6 @@ export default function AdminAlerts() {
         let daysLeft: number | null = null;
         let daysOverdue = 0;
         let status: 'expired' | 'critical' | 'warning' | null = null;
-        
-        // CRITICAL: Fee status is determined by valid_date
-        // If expired = unpaid (regardless of any fee record)
         let feeStatus: 'paid' | 'unpaid' = 'paid';
 
         if (student.valid_date) {
@@ -97,7 +89,6 @@ export default function AdminAlerts() {
           if (daysLeft < 0) {
             status = 'expired';
             daysOverdue = Math.abs(daysLeft);
-            // CRITICAL: Expired = Unpaid
             feeStatus = 'unpaid';
           } else if (daysLeft <= 2) {
             status = 'critical';
@@ -106,9 +97,6 @@ export default function AdminAlerts() {
           }
         }
 
-        // Show in alerts if:
-        // 1. Status is expired (these are automatically unpaid)
-        // 2. Status is critical or warning (expiring soon)
         if (status === 'expired' || status === 'critical' || status === 'warning') {
           alerts.push({
             id: student.id,
@@ -127,19 +115,15 @@ export default function AdminAlerts() {
         }
       });
 
-      // Sort: Expired + unpaid first, then by days left
       alerts.sort((a, b) => {
-        // Priority 1: Expired + unpaid
         const aExpiredUnpaid = a.status === 'expired' && a.feeStatus === 'unpaid';
         const bExpiredUnpaid = b.status === 'expired' && b.feeStatus === 'unpaid';
         if (aExpiredUnpaid && !bExpiredUnpaid) return -1;
         if (bExpiredUnpaid && !aExpiredUnpaid) return 1;
         
-        // Priority 2: Expired only
         if (a.status === 'expired' && b.status !== 'expired') return -1;
         if (b.status === 'expired' && a.status !== 'expired') return 1;
         
-        // Priority 3: By days left
         if (a.daysLeft !== null && b.daysLeft !== null) return a.daysLeft - b.daysLeft;
         return 0;
       });
@@ -159,20 +143,17 @@ export default function AdminAlerts() {
     }
   }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
 
-  // Real-time subscription
   useEffect(() => {
     if (!user || !isAdmin) return;
 
     const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
       withCredentials: true,
     });
-    
-    // newSocket.on('student-updated', fetchAlertStudents);
 
     return () => {
       newSocket.disconnect();
     };
-  }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
+  }, [user, isAdmin, selectedHostel]);
 
   const exportData = () => {
     const csvContent = [

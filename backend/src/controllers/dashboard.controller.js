@@ -8,53 +8,55 @@ exports.getAdminDashboard = async (req, res) => {
     
     // Filter by hostel if provided, else fetch for all hostels
     const filter = hostel && hostel !== 'All' ? { hostel } : {};
+    const studentMatch = { isActive: { $ne: false }, ...(hostel && hostel !== 'All' ? { hostel } : {}) };
 
-    // Fetch all student records populated with user role
-    const rawStudents = await Student.find(filter).populate('userId', 'role isActive').lean();
-    const totalStudents = rawStudents.filter(s => s.userId && s.userId.role !== 'admin' && s.userId.isActive !== false).length;
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    // Parallel counts for complaints and suggestions
-    const [totalComplaints, totalSuggestions] = await Promise.all([
+    // Run all counts, aggregates, and recents in a single parallel batch
+    const [
+      totalStudents,
+      totalComplaints,
+      totalSuggestions,
+      recentComplaints,
+      recentSuggestions,
+      studentDistribution,
+      complaintsData
+    ] = await Promise.all([
+      Student.countDocuments(studentMatch),
       Complaint.countDocuments(filter),
-      Suggestion.countDocuments(filter)
-    ]);
-
-    // Fetch recent complaints and suggestions
-    const [recentComplaints, recentSuggestions] = await Promise.all([
+      Suggestion.countDocuments(filter),
       Complaint.find(filter)
         .sort({ createdAt: -1 })
         .limit(3)
-        .select('_id title description createdAt userId'),
+        .select('_id title description createdAt userId')
+        .lean(),
       Suggestion.find(filter)
         .sort({ createdAt: -1 })
         .limit(3)
         .select('_id title description createdAt userId')
+        .lean(),
+      Student.aggregate([
+        { $match: studentMatch },
+        { $group: { _id: '$hostel', value: { $sum: 1 } } },
+        { $project: { name: '$_id', value: 1, _id: 0 } }
+      ]),
+      Complaint.aggregate([
+        {
+          $match: {
+            ...filter,
+            createdAt: { $gte: sevenDaysAgo }
+          }
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%b %d", date: "$createdAt" } },
+            value: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } },
+        { $project: { name: '$_id', value: 1, _id: 0 } }
+      ])
     ]);
-
-    // Fetch complaints chart data (last 7 days grouped by date)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const complaintsDataQuery = await Complaint.find({
-      ...filter,
-      createdAt: { $gte: thirtyDaysAgo }
-    }).sort({ createdAt: 1 }).select('createdAt');
-
-    const chartDataMap = {};
-    complaintsDataQuery.forEach(item => {
-      const dateStr = new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      chartDataMap[dateStr] = (chartDataMap[dateStr] || 0) + 1;
-    });
-
-    const studentDistribution = await Student.aggregate([
-      { $match: filter },
-      { $group: { _id: '$hostel', value: { $sum: 1 } } },
-      { $project: { name: '$_id', value: 1, _id: 0 } }
-    ]);
-
-    const complaintsData = Object.entries(chartDataMap)
-      .slice(-7)
-      .map(([name, value]) => ({ name, value }));
 
     return res.status(200).json({
       success: true,
