@@ -9,7 +9,7 @@ const Notification = require('../models/Notification');
 // @route   GET /api/fees/dashboard
 const getFeeManagementDashboard = async (req, res) => {
   try {
-    const { hostel, page = 1, limit = 50 } = req.query;
+    const { hostel, page = 1, limit = 100 } = req.query;
     
     const skipAmount = (parseInt(page) - 1) * parseInt(limit);
     const limitAmount = parseInt(limit);
@@ -64,6 +64,8 @@ const getFeeManagementDashboard = async (req, res) => {
       phone: s.phone,
       parent_phone: s.parentPhone,
       room_no: s.roomNo,
+      floor: s.floor || null,
+      profile_photo: s.profilePhoto || null,
       fees: s.fees,
       start_date: s.startDate,
       valid_date: s.validDate,

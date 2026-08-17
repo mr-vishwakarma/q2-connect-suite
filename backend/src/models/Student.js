@@ -9,6 +9,7 @@ const studentSchema = new mongoose.Schema(
     parentPhone: { type: String, trim: true },
     email: { type: String, trim: true, lowercase: true },
     roomNo: { type: String, trim: true },
+    floor: { type: String, trim: true },
     hostel: { type: String, enum: ['Q2', 'Q2.0', 'Q2.1'] },
     fees: { type: Number, default: 0 },
     startDate: { type: Date },
