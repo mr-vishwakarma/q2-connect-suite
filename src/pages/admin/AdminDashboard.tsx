@@ -29,23 +29,19 @@ interface RecentItem {
   userId?: string;
 }
 
+import { dashboardService } from '@/services/api';
+
 export default function AdminDashboard() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
   const [socket, setSocket] = useState<Socket | null>(null);
 
-  useEffect(() => {
-    if (!authLoading && (!user || !isAdmin)) {
-      navigate('/admin-login');
-    }
-  }, [user, isAdmin, authLoading, navigate]);
-
   const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
     queryKey: ['adminDashboard', selectedHostel],
     queryFn: async () => {
-      const response = await api.get('/dashboard/admin', { params: { hostel: selectedHostel } });
-      return response.data?.data;
+      const response = await dashboardService.getAdminDashboard({ hostel: selectedHostel });
+      return response.data;
     },
     staleTime: 60 * 1000,
     enabled: !!(user && isAdmin),

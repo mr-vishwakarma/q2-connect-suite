@@ -380,21 +380,14 @@ const updateOwnProfile = async (req, res) => {
   }
 };
 
+const studentService = require('../services/student.service');
+
 // @desc    Get count of alert students (expiring within 5 days or already expired)
 // @route   GET /api/students/alerts/count
 const getAlertsCount = async (req, res) => {
   try {
     const { hostel } = req.query;
-    const filter = { isActive: { $ne: false } };
-    if (hostel && hostel !== 'All') filter.hostel = hostel;
-
-    const fiveDaysFromNow = new Date();
-    fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
-    fiveDaysFromNow.setHours(23, 59, 59, 999);
-
-    filter.validDate = { $exists: true, $ne: null, $lte: fiveDaysFromNow };
-
-    const count = await Student.countDocuments(filter);
+    const count = await studentService.getAlertsCount(hostel);
     return res.status(200).json({ success: true, count });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -406,20 +399,7 @@ const getAlertsCount = async (req, res) => {
 const getAlertStudents = async (req, res) => {
   try {
     const { hostel } = req.query;
-    const filter = { isActive: { $ne: false } };
-    if (hostel && hostel !== 'All') filter.hostel = hostel;
-
-    const fiveDaysFromNow = new Date();
-    fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
-    fiveDaysFromNow.setHours(23, 59, 59, 999);
-
-    filter.validDate = { $exists: true, $ne: null, $lte: fiveDaysFromNow };
-
-    const students = await Student.find(filter)
-      .select('name username phone roomNo fees startDate validDate hostel userId')
-      .sort({ validDate: 1 })
-      .lean();
-
+    const students = await studentService.getAlertStudents(hostel);
     return res.status(200).json({ success: true, data: students });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

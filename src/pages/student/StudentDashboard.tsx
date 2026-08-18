@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'react-toastify';
 import { MealRatingWidget } from '@/components/student/MealRatingWidget';
 
+import { dashboardService } from '@/services/api';
+
 interface StudentData {
   name: string;
   username: string;
@@ -22,7 +24,7 @@ interface StudentData {
 }
 
 export default function StudentDashboard() {
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [stats, setStats] = useState({
@@ -32,25 +34,16 @@ export default function StudentDashboard() {
     approvedRequests: 0
   });
 
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/login');
-    }
-    if (!loading && isAdmin) {
-      navigate('/admin/dashboard');
-    }
-  }, [user, loading, isAdmin, navigate]);
-
   const fetchDashboardData = useCallback(async () => {
     try {
-      const response = await api.get('/dashboard/student');
-      if (response.data?.success) {
-        setStudentData(response.data.data.student);
-        setStats(response.data.data.stats);
+      const response = await dashboardService.getStudentDashboard();
+      if (response.success && response.data) {
+        setStudentData(response.data.student);
+        setStats(response.data.stats);
       }
     } catch (error: any) {
       console.error('Failed to fetch dashboard data:', error);
-      toast.error(error.response?.data?.message || 'Failed to load dashboard data');
+      toast.error(error.message || 'Failed to load dashboard data');
     }
   }, []);
 

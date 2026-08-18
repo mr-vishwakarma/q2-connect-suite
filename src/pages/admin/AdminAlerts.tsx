@@ -35,25 +35,21 @@ interface AlertStudent {
   feeStatus: 'paid' | 'unpaid';
 }
 
+import { studentService } from '@/services/api';
+
 export default function AdminAlerts() {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
   const [alertStudents, setAlertStudents] = useState<AlertStudent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
-      navigate('/admin-login');
-    }
-  }, [user, isAdmin, loading, navigate]);
-
   const fetchAlertStudents = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      const response = await api.get('/students/alerts', { params: { hostel: selectedHostel } });
-      const students = response.data?.success ? response.data.data : [];
+      const response = await studentService.getAlerts({ hostel: selectedHostel });
+      const students = response.success ? response.data : [];
 
       if (!students || students.length === 0) {
         setAlertStudents([]);

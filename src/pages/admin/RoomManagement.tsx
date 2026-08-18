@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useHostel } from '@/contexts/HostelContext';
-import { api } from '@/lib/api';
+import { roomService, studentService } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,7 @@ interface Room {
   capacity: number;
   occupied_count: number;
   status: 'available' | 'full';
+  students?: { id: string; name: string; username: string }[];
 }
 
 interface Student {
@@ -66,50 +67,40 @@ export default function RoomManagement() {
 
   const fetchRooms = useCallback(async () => {
     try {
-      const response = await api.get('/rooms', { 
-        params: { 
-          hostel: selectedHostel,
-          page: currentPage,
-          limit: 20
-        } 
-      });
-      if (response.data?.success) {
-        const mapped = response.data.data.map((r: any) => ({
-          id: r._id,
+      const response = await roomService.getRooms({ hostel: selectedHostel });
+      if (response.success && response.data) {
+        const mapped = (response.data as any[]).map((r: any) => ({
+          id: r._id || r.id,
           room_number: r.roomNumber,
           capacity: r.capacity,
           occupied_count: r.occupiedCount,
           status: r.status,
         }));
         setRooms(mapped);
-        setTotalPages(response.data.totalPages || 1);
-        setTotalRooms(response.data.total || 0);
       }
     } catch (err) {
       console.error('Error fetching rooms:', err);
       toast.error('Failed to load rooms');
-      setRooms([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedHostel, currentPage]);
+  }, [selectedHostel]);
 
   const fetchStudents = useCallback(async () => {
     try {
-      // Fetch a larger limit just for the unassigned students dropdown
-      const response = await api.get('/students', { params: { hostel: selectedHostel, limit: 1000 } });
-      if (response.data?.success) {
-        const mapped = response.data.data.map((s: any) => ({
-          id: s._id,
+      const response = await studentService.getStudents({ hostel: selectedHostel, limit: 100 });
+      if (response.success && response.data) {
+        const studentList = Array.isArray(response.data) ? response.data : response.data.students || [];
+        const mapped = studentList.map((s: any) => ({
+          id: s._id || s.id,
           name: s.name,
           username: s.username,
-          room_no: s.roomNo,
+          room_no: s.roomNo || s.room_no,
         }));
         setStudents(mapped);
       }
     } catch (err) {
       console.error('Error fetching students:', err);
-      setStudents([]);
     }
   }, [selectedHostel]);
 

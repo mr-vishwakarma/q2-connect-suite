@@ -1,30 +1,28 @@
 import { ReactNode, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
-interface ProtectedAdminRouteProps {
+interface ProtectedStudentRouteProps {
   children: ReactNode;
 }
 
-export function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
+export function ProtectedStudentRoute({ children }: ProtectedStudentRouteProps) {
   const { user, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
         navigate("/login", { replace: true });
-      } else if (!isAdmin) {
-        navigate("/unauthorized", { replace: true });
+      } else if (isAdmin) {
+        navigate("/admin/dashboard", { replace: true });
       }
     }
   }, [user, isAdmin, loading, navigate]);
 
-
   if (loading) return null;
 
-  if (!user || !isAdmin) return null;
+  if (!user || isAdmin) return null;
 
   return <>{children}</>;
 }

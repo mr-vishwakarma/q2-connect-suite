@@ -6,7 +6,8 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHostel } from '@/contexts/HostelContext';
 import { useAuth } from '@/hooks/useAuth';
-import { api } from '@/lib/api';
+import { feeService, settingsService } from '@/services/api';
+import { Student, Fee, Payment, SecurityDeposit } from '@/types';
 import { io } from 'socket.io-client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ import {
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays, addMonths, addDays } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptData, getHistoryReceiptBlob } from '@/lib/receiptPdf';
+import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const generateMonthOptions = () => {
@@ -42,61 +44,6 @@ const generateMonthOptions = () => {
   return options;
 };
 const MONTH_OPTIONS = generateMonthOptions();
-
-interface Student {
-  id: string;
-  user_id: string;
-  name: string;
-  username: string;
-  room_no: string | null;
-  floor?: string | null;
-  profile_photo?: string | null;
-  fees: number | null;
-  start_date: string | null;
-  valid_date: string | null;
-  parent_phone?: string | null;
-}
-
-interface Fee {
-  id: string;
-  student_id: string;
-  month: string;
-  amount: number;
-  paid_date: string | null;
-  payment_mode: 'cash' | 'upi' | 'bank';
-  status: 'paid' | 'unpaid' | 'partial';
-  due_date: string | null;
-  late_fee: number;
-  discount: number;
-  paid_amount: number;
-  receipt_no: string | null;
-  notes: string | null;
-}
-
-interface Payment {
-  id: string;
-  fee_id: string;
-  student_id: string;
-  receipt_no: string;
-  amount: number;
-  late_fee: number;
-  discount: number;
-  security_deposit: number;
-  payment_mode: 'cash' | 'upi' | 'bank';
-  payment_date: string;
-  admin_name: string | null;
-  month: string;
-  notes: string | null;
-}
-
-interface Deposit {
-  id: string;
-  student_id: string;
-  amount: number;
-  status: string;
-  collected_date: string | null;
-  refund_date: string | null;
-}
 
 const genReceiptNo = () =>
   `RCPT-${format(new Date(), 'yyyyMMdd')}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
@@ -151,18 +98,16 @@ export default function FeeManagement() {
   const fetchData = useCallback(async () => {
     try {
       const [response, settingsResponse] = await Promise.all([
-        api.get('/fees/dashboard', {
-          params: {
-            hostel: selectedHostel,
-            page: currentPage,
-            limit: 100, // Load sufficient records for the complete matrix
-          },
+        feeService.getFeeDashboard({
+          hostel: selectedHostel,
+          page: currentPage,
+          limit: 100,
         }),
-        api.get(`/settings/${selectedHostel}`),
+        settingsService.getHostelSettings(selectedHostel),
       ]);
 
-      if (response.data?.success) {
-        const { students, fees, payments, deposits, totalPages, total } = response.data.data;
+      if (response.success && response.data) {
+        const { students, fees, payments, deposits, totalPages, total } = response.data;
         setStudents(students || []);
         setFees(fees || []);
         setPayments(payments || []);
@@ -171,9 +116,9 @@ export default function FeeManagement() {
         setTotalStudents(total || (students || []).length);
       }
 
-      if (settingsResponse.data?.success) {
-        setLateFeeSetting(settingsResponse.data.data.lateFeePerDay || 20);
-        setGracePeriodSetting(settingsResponse.data.data.gracePeriodDays || 5);
+      if (settingsResponse.success && settingsResponse.data) {
+        setLateFeeSetting(settingsResponse.data.lateFeePerDay || 20);
+        setGracePeriodSetting(settingsResponse.data.gracePeriodDays || 5);
       }
     } catch (e) {
       console.error(e);

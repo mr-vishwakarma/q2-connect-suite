@@ -71,6 +71,16 @@ const adminTitles: Record<string, string> = {
   "/admin/notifications": "Notifications",
 };
 
+import { ProtectedStudentRoute } from "@/components/auth/ProtectedStudentRoute";
+
+function StudentShell() {
+  return (
+    <ProtectedStudentRoute>
+      <Outlet />
+    </ProtectedStudentRoute>
+  );
+}
+
 function AdminShell() {
   const location = useLocation();
   const title = adminTitles[location.pathname] ?? "Admin Panel";
@@ -108,13 +118,20 @@ const App = () => (
               <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
               <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
               <Route path="/unauthorized" element={<Unauthorized />} />
-              <Route path="/student/dashboard" element={<StudentDashboard />} />
-              <Route path="/student/profile" element={<Profile />} />
-              <Route path="/student/mess-off" element={<MessOff />} />
-              <Route path="/student/complaints" element={<Complaints />} />
-              <Route path="/student/suggestions" element={<Suggestions />} />
-              <Route path="/student/laundry" element={<Laundry />} />
-              <Route path="/student/fee-history" element={<FeeHistory />} />
+
+              {/* Student Protected Routes */}
+              <Route path="/student" element={<StudentShell />}>
+                <Route index element={<Navigate to="/student/dashboard" replace />} />
+                <Route path="dashboard" element={<StudentDashboard />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="mess-off" element={<MessOff />} />
+                <Route path="complaints" element={<Complaints />} />
+                <Route path="suggestions" element={<Suggestions />} />
+                <Route path="laundry" element={<Laundry />} />
+                <Route path="fee-history" element={<FeeHistory />} />
+              </Route>
+
+              {/* Admin Protected Routes */}
               <Route path="/admin" element={<AdminShell />}>
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
