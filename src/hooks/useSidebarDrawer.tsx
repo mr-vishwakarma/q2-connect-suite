@@ -1,38 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useIsMobile } from './use-mobile';
 
-const TABLET_BREAKPOINT = 1024;
-
-export function useIsTablet() {
-  const [isTablet, setIsTablet] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const w = window.innerWidth;
-      return w >= 768 && w <= TABLET_BREAKPOINT;
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    const check = () => {
-      const w = window.innerWidth;
-      setIsTablet(w >= 768 && w <= TABLET_BREAKPOINT);
-    };
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
-
-  return isTablet;
-}
+const DESKTOP_BREAKPOINT = 1024;
 
 export function useSidebarDrawer() {
-  const isMobile = useIsMobile();
-  const isTablet = useIsTablet();
   const location = useLocation();
-  const shouldOverlay = isMobile || isTablet;
 
-  const [isOpen, setIsOpen] = useState(false);
+  // Mobile/Tablet drawer open state (defaults to closed)
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Desktop sidebar collapsed state (persisted in localStorage)
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('sidebar-collapsed') === 'true';
@@ -40,28 +17,47 @@ export function useSidebarDrawer() {
     return false;
   });
 
-  // Always close mobile sidebar on route changes
-  useEffect(() => {
-    setIsOpen(false);
-  }, [location.pathname]);
+  // Track if viewport is desktop (>= 1024px)
+  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= DESKTOP_BREAKPOINT;
+    }
+    return true;
+  });
 
-  // Close on Escape key press
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false);
+    const handleResize = () => {
+      const desktop = window.innerWidth >= DESKTOP_BREAKPOINT;
+      setIsDesktop(desktop);
+      // If resizing to desktop, close mobile drawer
+      if (desktop) {
+        setIsMobileOpen(false);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const closeSidebar = useCallback(() => {
-    setIsOpen(false);
+  // Synchronize route changes: ALWAYS close mobile drawer on navigation
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [location.pathname]);
+
+  const closeMobile = useCallback(() => {
+    setIsMobileOpen(false);
+  }, []);
+
+  const openMobile = useCallback(() => {
+    setIsMobileOpen(true);
+  }, []);
+
+  const toggleMobile = useCallback(() => {
+    setIsMobileOpen((prev) => !prev);
   }, []);
 
   const toggleCollapse = useCallback(() => {
-    setIsCollapsed(prev => {
+    setIsCollapsed((prev) => {
       const next = !prev;
       if (typeof window !== 'undefined') {
         localStorage.setItem('sidebar-collapsed', String(next));
@@ -70,23 +66,17 @@ export function useSidebarDrawer() {
     });
   }, []);
 
-  const toggle = useCallback(() => {
-    if (shouldOverlay) {
-      setIsOpen(prev => !prev);
-    } else {
-      toggleCollapse();
-    }
-  }, [shouldOverlay, toggleCollapse]);
-
   return {
-    isOpen,
-    setIsOpen,
-    toggle,
-    closeSidebar,
+    isOpen: isMobileOpen,
+    isMobileOpen,
+    openMobile,
+    closeMobile,
+    toggleMobile,
+    closeSidebar: closeMobile,
     isCollapsed,
     toggleCollapse,
-    shouldOverlay,
-    isMobile,
-    isTablet,
+    isDesktop,
+    shouldOverlay: !isDesktop,
+    toggle: toggleMobile,
   };
 }
