@@ -43,6 +43,8 @@ export interface SecurityDeposit {
   refund_date: string | null;
 }
 
+export type Deposit = SecurityDeposit;
+
 export interface CollectPaymentPayload {
   studentId: string;
   hostel: string;

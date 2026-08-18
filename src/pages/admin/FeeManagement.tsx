@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useHostel } from '@/contexts/HostelContext';
 import { useAuth } from '@/hooks/useAuth';
 import { feeService, settingsService } from '@/services/api';
-import { Student, Fee, Payment, SecurityDeposit } from '@/types';
+import { Student, Fee, Payment, SecurityDeposit, Deposit } from '@/types';
 import { io } from 'socket.io-client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

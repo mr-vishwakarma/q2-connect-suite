@@ -116,7 +116,7 @@ export default function RoomManagement() {
     }
 
     try {
-      await api.post('/rooms', {
+      await roomService.createRoom({
         roomNumber: newRoom.room_number,
         capacity: newRoom.capacity,
         hostel: selectedHostel,
@@ -127,7 +127,7 @@ export default function RoomManagement() {
       setNewRoom({ room_number: '', capacity: 4 });
       fetchRooms();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to add room');
+      toast.error(error.message || 'Failed to add room');
     }
   };
 
@@ -135,7 +135,7 @@ export default function RoomManagement() {
     if (!selectedRoom || !editRoom.room_number) return;
 
     try {
-      await api.put(`/rooms/${selectedRoom.id}`, {
+      await roomService.updateRoom(selectedRoom.id, {
         roomNumber: editRoom.room_number,
         capacity: editRoom.capacity,
       });
@@ -152,7 +152,7 @@ export default function RoomManagement() {
     if (!confirm('Are you sure you want to delete this room?')) return;
 
     try {
-      await api.delete(`/rooms/${roomId}`);
+      await roomService.deleteRoom(roomId);
       toast.success('Room deleted successfully');
       fetchRooms();
     } catch (error) {
@@ -164,7 +164,7 @@ export default function RoomManagement() {
     if (!selectedRoom || !selectedStudent) return;
 
     try {
-      await api.put(`/students/${selectedStudent}`, { 
+      await studentService.updateStudent(selectedStudent, { 
         roomNo: selectedRoom.room_number,
         hostel: selectedHostel
       });
