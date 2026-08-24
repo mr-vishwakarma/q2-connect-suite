@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const expenseSchema = new mongoose.Schema(
   {
     organizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', required: true },
-    hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel' },
+    hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel', default: null },
+    hostel: { type: String, trim: true },
     category: {
       type: String,
       enum: ['ELECTRICITY', 'WATER', 'FOOD', 'MAINTENANCE', 'SALARY', 'INTERNET', 'CLEANING', 'OTHER'],

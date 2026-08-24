@@ -43,9 +43,9 @@ export default function OrganizationDetail() {
     }
   }, [id]);
 
-  const loadData = async () => {
+  const loadData = async (showSpinner = true) => {
     try {
-      setIsLoading(true);
+      if (showSpinner) setIsLoading(true);
       const [orgRes, featRes] = await Promise.all([
         superAdminService.getOrganizationById(id!),
         superAdminService.getFeatures(),
@@ -60,23 +60,43 @@ export default function OrganizationDetail() {
     } catch (error) {
       console.error('Failed to load organization detail:', error);
     } finally {
-      setIsLoading(false);
+      if (showSpinner) setIsLoading(false);
     }
   };
 
   const handleToggleFeature = async (featureKey: string, currentEnabled: boolean) => {
+    const newEnabled = !currentEnabled;
+
+    // Instant optimistic update
+    setOrg((prev: any) => {
+      if (!prev) return prev;
+      const existingFeatures = prev.features || [];
+      const idx = existingFeatures.findIndex((f: any) => f.featureKey === featureKey);
+      let updatedFeatures;
+      if (idx >= 0) {
+        updatedFeatures = existingFeatures.map((f: any) =>
+          f.featureKey === featureKey ? { ...f, enabled: newEnabled } : f
+        );
+      } else {
+        updatedFeatures = [...existingFeatures, { featureKey, enabled: newEnabled }];
+      }
+      return { ...prev, features: updatedFeatures };
+    });
+
     try {
       const res = await superAdminService.toggleOrgFeature({
         organizationId: id!,
         featureKey,
-        enabled: !currentEnabled,
+        enabled: newEnabled,
       });
       if (res.success) {
-        toast.success(`Feature '${featureKey}' updated`);
-        loadData();
+        toast.success(`Feature '${featureKey}' ${newEnabled ? 'enabled' : 'disabled'}`);
+      } else {
+        loadData(false);
       }
     } catch (error) {
       toast.error('Failed to update feature');
+      loadData(false);
     }
   };
 
@@ -124,8 +144,8 @@ export default function OrganizationDetail() {
         </div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Overview Cards & Quotas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="border-border/60">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Subscription Plan</CardTitle>
@@ -136,13 +156,49 @@ export default function OrganizationDetail() {
           </CardContent>
         </Card>
 
+        {/* Student Quota Meter */}
         <Card className="border-border/60">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Capacity & Usage</CardTitle>
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Student Quota</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-emerald-400">{org.studentCount || 0} Students</div>
-            <p className="text-xs text-muted-foreground mt-1">Rooms: {org.roomCount || 0} Total</p>
+          <CardContent className="space-y-1.5">
+            <div className="flex justify-between items-baseline">
+              <span className="text-xl font-bold text-foreground">{org.studentCount || 0}</span>
+              <span className="text-xs text-muted-foreground font-mono">Max {org.subscription?.planId?.limits?.maxStudents || 100}</span>
+            </div>
+            <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  ((org.studentCount || 0) / (org.subscription?.planId?.limits?.maxStudents || 100)) > 0.85
+                    ? 'bg-rose-500'
+                    : 'bg-emerald-500'
+                }`}
+                style={{
+                  width: `${Math.min(100, ((org.studentCount || 0) / (org.subscription?.planId?.limits?.maxStudents || 100)) * 100)}%`,
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Branch Quota Meter */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Hostel Branches</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            <div className="flex justify-between items-baseline">
+              <span className="text-xl font-bold text-foreground">{org.hostels?.length || 0}</span>
+              <span className="text-xs text-muted-foreground font-mono">Max {org.subscription?.planId?.limits?.maxHostels || 5}</span>
+            </div>
+            <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-blue-500 h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.min(100, ((org.hostels?.length || 0) / (org.subscription?.planId?.limits?.maxHostels || 5)) * 100)}%`,
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -154,7 +210,7 @@ export default function OrganizationDetail() {
             <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-sm">
               {org.status}
             </Badge>
-            <p className="text-xs text-muted-foreground mt-1">{org.contactEmail}</p>
+            <p className="text-xs text-muted-foreground mt-1 truncate">{org.contactEmail}</p>
           </CardContent>
         </Card>
       </div>

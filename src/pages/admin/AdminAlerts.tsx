@@ -151,29 +151,39 @@ export default function AdminAlerts() {
     };
   }, [user, isAdmin, selectedHostel]);
 
-  const exportData = () => {
-    const csvContent = [
-      ['Name', 'Phone', 'Room No', 'Fees', 'Start Date', 'Valid Till', 'Status', 'Days Overdue', 'Fee Status'].join(','),
-      ...alertStudents.map(student => [
-        student.name,
-        student.phone || 'N/A',
-        student.room_no || 'N/A',
-        student.fees ? `₹${student.fees}` : 'N/A',
-        student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A',
-        student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A',
-        student.status === 'expired' ? 'Expired' : `${student.daysLeft} days left`,
-        student.daysOverdue > 0 ? `${student.daysOverdue} days` : '-',
-        student.feeStatus === 'paid' ? 'Paid' : 'Unpaid',
-      ].join(','))
-    ].join('\n');
+  const [filterType, setFilterType] = useState<'all' | 'unpaid' | 'critical' | 'warning'>('all');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `alerts-${selectedHostel}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
+  const handleWhatsAppReminder = (student: AlertStudent) => {
+    if (!student.phone) {
+      toast.error('No phone number registered for this resident');
+      return;
+    }
+    const cleanPhone = student.phone.replace(/[^0-9]/g, '');
+    const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    const msg = encodeURIComponent(
+      `Hello ${student.name}, this is a gentle reminder from Q2 Girls Hostel management. Your monthly hostel fee of ₹${student.fees || ''} for Room ${student.room_no || ''} is currently ${student.status === 'expired' ? `overdue by ${student.daysOverdue} days` : `due soon on ${student.valid_date ? format(parseISO(student.valid_date), 'dd MMM yyyy') : ''}`}. Please clear your dues or contact the hostel office. Thank you!`
+    );
+    window.open(`https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${msg}`, '_blank');
   };
+
+  const handleBulkWhatsApp = () => {
+    const overdueWithPhones = alertStudents.filter(s => s.phone && s.status === 'expired');
+    if (overdueWithPhones.length === 0) {
+      toast.info('No overdue residents with phone numbers found');
+      return;
+    }
+    toast.success(`Broadcasting reminders to ${overdueWithPhones.length} residents...`);
+    overdueWithPhones.slice(0, 3).forEach((s, idx) => {
+      setTimeout(() => handleWhatsAppReminder(s), idx * 1000);
+    });
+  };
+
+  const filteredAlertStudents = alertStudents.filter((s) => {
+    if (filterType === 'unpaid') return s.status === 'expired' && s.feeStatus === 'unpaid';
+    if (filterType === 'critical') return s.status === 'critical';
+    if (filterType === 'warning') return s.status === 'warning';
+    return true;
+  });
 
   const getStatusBadge = (student: AlertStudent) => {
     if (student.status === 'expired' && student.feeStatus === 'unpaid') {
@@ -210,12 +220,57 @@ export default function AdminAlerts() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg sm:text-2xl font-bold text-primary">Alerts - Expired & Pending Students</h2>
-          <p className="text-muted-foreground text-sm">Students with expired validity, unpaid fees, or validity expiring within 5 days</p>
+          <h2 className="text-lg sm:text-2xl font-bold text-primary">Alerts & Fee Reminders</h2>
+          <p className="text-muted-foreground text-sm">Automated alerts for expired validities, overdue fees, and expiring resident terms.</p>
         </div>
-        <Button variant="outline" onClick={exportData} disabled={alertStudents.length === 0} className="w-full sm:w-auto">
-          <Download className="w-4 h-4 mr-2" />
-          Export Data
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={handleBulkWhatsApp}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs"
+            disabled={expiredUnpaidCount === 0}
+          >
+            Broadcast Overdue Reminders ({expiredUnpaidCount})
+          </Button>
+          <Button variant="outline" onClick={exportData} disabled={alertStudents.length === 0} className="w-full sm:w-auto text-xs">
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
+          </Button>
+        </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant={filterType === 'all' ? 'default' : 'outline'}
+          onClick={() => setFilterType('all')}
+          className="rounded-full text-xs font-semibold"
+        >
+          All Alerts ({alertStudents.length})
+        </Button>
+        <Button
+          size="sm"
+          variant={filterType === 'unpaid' ? 'destructive' : 'outline'}
+          onClick={() => setFilterType('unpaid')}
+          className="rounded-full text-xs font-semibold"
+        >
+          Expired & Unpaid ({expiredUnpaidCount})
+        </Button>
+        <Button
+          size="sm"
+          variant={filterType === 'critical' ? 'default' : 'outline'}
+          onClick={() => setFilterType('critical')}
+          className="rounded-full text-xs font-semibold"
+        >
+          Critical ≤ 2 Days ({criticalCount})
+        </Button>
+        <Button
+          size="sm"
+          variant={filterType === 'warning' ? 'default' : 'outline'}
+          onClick={() => setFilterType('warning')}
+          className="rounded-full text-xs font-semibold"
+        >
+          Warning ≤ 5 Days ({warningCount})
         </Button>
       </div>
 
@@ -225,15 +280,15 @@ export default function AdminAlerts() {
       >
         {/* Mobile Card View */}
         <div className="block md:hidden space-y-3">
-          {alertStudents.length === 0 ? (
+          {filteredAlertStudents.length === 0 ? (
             <Card className="bg-card border-border">
               <CardContent className="py-12 text-center">
                 <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No alerts at this time. All students are up to date!</p>
+                <p className="text-muted-foreground">No alerts matching this filter.</p>
               </CardContent>
             </Card>
           ) : (
-            alertStudents.map((student) => (
+            filteredAlertStudents.map((student) => (
               <Card key={student.id} className="bg-card border-border">
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-start justify-between">
@@ -268,6 +323,23 @@ export default function AdminAlerts() {
                       )}
                     </div>
                   </div>
+                  <div className="flex gap-2 pt-2 border-t border-border/50">
+                    <Button
+                      size="sm"
+                      onClick={() => handleWhatsAppReminder(student)}
+                      className="w-full text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      WhatsApp Reminder
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate('/admin/fees')}
+                      className="w-full text-xs"
+                    >
+                      Collect Fee
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))
@@ -284,32 +356,29 @@ export default function AdminAlerts() {
                   <TableHead className="text-foreground font-bold hidden lg:table-cell">Phone</TableHead>
                   <TableHead className="text-foreground font-bold">Room No</TableHead>
                   <TableHead className="text-foreground font-bold">Fees</TableHead>
-                  <TableHead className="text-foreground font-bold hidden lg:table-cell">Joining Date</TableHead>
                   <TableHead className="text-foreground font-bold">Valid Till</TableHead>
                   <TableHead className="text-foreground font-bold">Status</TableHead>
                   <TableHead className="text-foreground font-bold hidden lg:table-cell">Days Overdue</TableHead>
                   <TableHead className="text-foreground font-bold">Fee Status</TableHead>
+                  <TableHead className="text-foreground font-bold text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {alertStudents.length === 0 ? (
+                {filteredAlertStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-12">
                       <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No alerts at this time. All students are up to date!</p>
+                      <p className="text-muted-foreground">No alerts matching this filter.</p>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  alertStudents.map((student) => (
+                  filteredAlertStudents.map((student) => (
                     <TableRow key={student.id} className="border-border hover:bg-secondary/30">
                       <TableCell className="font-medium text-foreground">{student.name}</TableCell>
                       <TableCell className="text-muted-foreground hidden lg:table-cell">{student.phone || 'N/A'}</TableCell>
                       <TableCell className="text-muted-foreground">{student.room_no || 'N/A'}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : 'N/A'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground hidden lg:table-cell">
-                        {student.start_date ? format(parseISO(student.start_date), 'dd-MM-yy') : 'N/A'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}
@@ -323,6 +392,25 @@ export default function AdminAlerts() {
                         )}
                       </TableCell>
                       <TableCell>{getFeeStatusBadge(student)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            onClick={() => handleWhatsAppReminder(student)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 h-8"
+                          >
+                            WhatsApp
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate('/admin/fees')}
+                            className="text-xs px-2.5 h-8"
+                          >
+                            Collect
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}

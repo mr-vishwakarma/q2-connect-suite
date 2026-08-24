@@ -53,6 +53,7 @@ const Notifications = lazy(() => import("./pages/admin/Notifications"));
 const LeaveRequests = lazy(() => import("./pages/admin/LeaveRequests"));
 const LaundryManagement = lazy(() => import("./pages/admin/LaundryManagement"));
 const ExpenseManagement = lazy(() => import("./pages/admin/ExpenseManagement"));
+const CashflowAnalyzer = lazy(() => import("./pages/admin/CashflowAnalyzer"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
 const OrganizationList = lazy(() => import("./pages/super-admin/OrganizationList"));
@@ -70,11 +71,12 @@ const adminTitles: Record<string, string> = {
   "/admin/complaints": "Complaints",
   "/admin/suggestions": "Suggestions",
   "/admin/students": "All Students",
-  "/admin/alerts": "Alerts",
+  "/admin/alerts": "Alerts & Reminders",
   "/admin/admin-management": "Admin Management",
   "/admin/fees": "Fee Management",
   "/admin/rooms": "Room Management",
   "/admin/expenses": "Expense Tracker",
+  "/admin/cashflow": "Cashflow & P&L",
   "/admin/leave-requests": "Leave Requests",
   "/admin/notifications": "Notifications",
 };
@@ -177,6 +179,7 @@ const App = () => (
                 <Route path="fees" element={<FeeManagement />} />
                 <Route path="rooms" element={<RoomManagement />} />
                 <Route path="expenses" element={<ExpenseManagement />} />
+                <Route path="cashflow" element={<CashflowAnalyzer />} />
                 <Route path="leave-requests" element={<LeaveRequests />} />
                 <Route path="laundry" element={<LaundryManagement />} />
                 <Route path="settings" element={<AdminSettings />} />

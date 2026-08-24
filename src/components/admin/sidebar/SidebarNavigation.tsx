@@ -29,6 +29,7 @@ export const ADMIN_NAV_LINKS = [
   { to: '/admin/fees', icon: DollarSign, label: 'Fee Management', featureKey: 'fee_management' },
   { to: '/admin/rooms', icon: Building2, label: 'Room Management', featureKey: 'room_management' },
   { to: '/admin/expenses', icon: Receipt, label: 'Expense Tracker', featureKey: 'expense_management' },
+  { to: '/admin/cashflow', icon: DollarSign, label: 'Cashflow & P&L', featureKey: 'expense_management' },
   { to: '/admin/leave-requests', icon: CalendarCheck, label: 'Leave Requests', featureKey: 'mess_management' },
   { to: '/admin/laundry', icon: Shirt, label: 'Laundry Management', featureKey: 'laundry' },
   { to: '/admin/complaints', icon: MessageSquare, label: 'Complaints', featureKey: 'complaints' },
