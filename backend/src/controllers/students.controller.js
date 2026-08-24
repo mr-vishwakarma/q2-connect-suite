@@ -387,7 +387,7 @@ const studentService = require('../services/student.service');
 const getAlertsCount = async (req, res) => {
   try {
     const { hostel } = req.query;
-    const count = await studentService.getAlertsCount(hostel);
+    const count = await studentService.getAlertsCount(hostel, req.tenant?.organizationId);
     return res.status(200).json({ success: true, count });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -399,7 +399,7 @@ const getAlertsCount = async (req, res) => {
 const getAlertStudents = async (req, res) => {
   try {
     const { hostel } = req.query;
-    const students = await studentService.getAlertStudents(hostel);
+    const students = await studentService.getAlertStudents(hostel, req.tenant?.organizationId);
     return res.status(200).json({ success: true, data: students });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

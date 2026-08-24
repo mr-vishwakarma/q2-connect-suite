@@ -12,7 +12,12 @@ const feeService = require('../services/fee.service');
 const getFeeManagementDashboard = async (req, res) => {
   try {
     const { hostel, page = 1, limit = 100 } = req.query;
-    const data = await feeService.getDashboardData({ hostel, page, limit });
+    const data = await feeService.getDashboardData({
+      hostel,
+      organizationId: req.tenant?.organizationId,
+      page,
+      limit,
+    });
 
     return res.status(200).json({
       success: true,

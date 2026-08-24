@@ -1,8 +1,9 @@
 const Student = require('../models/Student');
 
 const studentService = {
-  async getAlertsCount(hostel) {
+  async getAlertsCount(hostel, organizationId) {
     const filter = { isActive: { $ne: false } };
+    if (organizationId) filter.organizationId = organizationId;
     if (hostel && hostel !== 'All') filter.hostel = hostel;
 
     const fiveDaysFromNow = new Date();
@@ -15,8 +16,9 @@ const studentService = {
     return count;
   },
 
-  async getAlertStudents(hostel) {
+  async getAlertStudents(hostel, organizationId) {
     const filter = { isActive: { $ne: false } };
+    if (organizationId) filter.organizationId = organizationId;
     if (hostel && hostel !== 'All') filter.hostel = hostel;
 
     const fiveDaysFromNow = new Date();

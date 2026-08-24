@@ -4,11 +4,12 @@ const SecurityDeposit = require('../models/SecurityDeposit');
 const Student = require('../models/Student');
 
 const feeService = {
-  async getDashboardData({ hostel, page = 1, limit = 100 }) {
+  async getDashboardData({ hostel, organizationId, page = 1, limit = 100 }) {
     const skipAmount = (parseInt(page) - 1) * parseInt(limit);
     const limitAmount = parseInt(limit);
 
     const studentMatch = { isActive: { $ne: false } };
+    if (organizationId) studentMatch.organizationId = organizationId;
     if (hostel && hostel !== 'All') studentMatch.hostel = hostel;
 
     const pipeline = [

@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminMobileDrawer } from './sidebar/AdminMobileDrawer';
 import { AdminTopBar } from './AdminTopBar';
+import { ImpersonationBanner } from './ImpersonationBanner';
 import { useSidebarDrawer } from '@/hooks/useSidebarDrawer';
 import { SmartChatbot } from '@/components/chatbot/SmartChatbot';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
+      <ImpersonationBanner />
       {/* Desktop Persistent Sidebar (>= 1024px) */}
       <div
         className={cn(
