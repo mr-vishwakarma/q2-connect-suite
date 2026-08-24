@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { SaaSHeader } from '@/components/landing/SaaSHeader';
 import { SaaSFooter } from '@/components/landing/SaaSFooter';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';

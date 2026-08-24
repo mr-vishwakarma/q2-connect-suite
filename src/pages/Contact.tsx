@@ -61,7 +61,7 @@ export default function Contact() {
     setTimeout(() => {
       setIsSubmitting(false);
       toast.success('Message sent successfully! We will get back to you soon.');
-      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+      setFormData({ name: '', email: '', phone: '', message: '' });
     }, 1000);
   };
 
