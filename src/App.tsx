@@ -52,7 +52,14 @@ const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const Notifications = lazy(() => import("./pages/admin/Notifications"));
 const LeaveRequests = lazy(() => import("./pages/admin/LeaveRequests"));
 const LaundryManagement = lazy(() => import("./pages/admin/LaundryManagement"));
+const ExpenseManagement = lazy(() => import("./pages/admin/ExpenseManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
+const OrganizationList = lazy(() => import("./pages/super-admin/OrganizationList"));
+const OrganizationDetail = lazy(() => import("./pages/super-admin/OrganizationDetail"));
+const PlanManagement = lazy(() => import("./pages/super-admin/PlanManagement"));
+const FeatureCatalog = lazy(() => import("./pages/super-admin/FeatureCatalog"));
+const AuditLogsView = lazy(() => import("./pages/super-admin/AuditLogsView"));
 
 const queryClient = new QueryClient();
 
@@ -67,11 +74,23 @@ const adminTitles: Record<string, string> = {
   "/admin/admin-management": "Admin Management",
   "/admin/fees": "Fee Management",
   "/admin/rooms": "Room Management",
+  "/admin/expenses": "Expense Tracker",
   "/admin/leave-requests": "Leave Requests",
   "/admin/notifications": "Notifications",
 };
 
+const superAdminTitles: Record<string, string> = {
+  "/super-admin/dashboard": "SaaS Control Center",
+  "/super-admin/organizations": "Organizations",
+  "/super-admin/hostels": "Hostel Branches",
+  "/super-admin/plans": "Subscription Plans",
+  "/super-admin/features": "Feature Catalog",
+  "/super-admin/audit-logs": "Audit Logs",
+};
+
 import { ProtectedStudentRoute } from "@/components/auth/ProtectedStudentRoute";
+import { ProtectedSuperAdminRoute } from "@/components/auth/ProtectedSuperAdminRoute";
+import { SuperAdminLayout } from "@/components/super-admin/SuperAdminLayout";
 
 function StudentShell() {
   return (
@@ -91,6 +110,19 @@ function AdminShell() {
         <Outlet />
       </AdminLayout>
     </ProtectedAdminRoute>
+  );
+}
+
+function SuperAdminShell() {
+  const location = useLocation();
+  const title = superAdminTitles[location.pathname] ?? "Super Admin";
+
+  return (
+    <ProtectedSuperAdminRoute>
+      <SuperAdminLayout title={title}>
+        <Outlet />
+      </SuperAdminLayout>
+    </ProtectedSuperAdminRoute>
   );
 }
 
@@ -131,7 +163,7 @@ const App = () => (
                 <Route path="fee-history" element={<FeeHistory />} />
               </Route>
 
-              {/* Admin Protected Routes */}
+              {/* Tenant Hostel Admin Protected Routes */}
               <Route path="/admin" element={<AdminShell />}>
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
@@ -144,11 +176,25 @@ const App = () => (
                 <Route path="admin-management" element={<AdminManagement />} />
                 <Route path="fees" element={<FeeManagement />} />
                 <Route path="rooms" element={<RoomManagement />} />
+                <Route path="expenses" element={<ExpenseManagement />} />
                 <Route path="leave-requests" element={<LeaveRequests />} />
                 <Route path="laundry" element={<LaundryManagement />} />
                 <Route path="settings" element={<AdminSettings />} />
                 <Route path="notifications" element={<Notifications />} />
               </Route>
+
+              {/* Platform Super Admin Protected Routes */}
+              <Route path="/super-admin" element={<SuperAdminShell />}>
+                <Route index element={<Navigate to="/super-admin/dashboard" replace />} />
+                <Route path="dashboard" element={<SuperAdminDashboard />} />
+                <Route path="organizations" element={<OrganizationList />} />
+                <Route path="organizations/:id" element={<OrganizationDetail />} />
+                <Route path="hostels" element={<OrganizationList />} />
+                <Route path="plans" element={<PlanManagement />} />
+                <Route path="features" element={<FeatureCatalog />} />
+                <Route path="audit-logs" element={<AuditLogsView />} />
+              </Route>
+
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
@@ -161,3 +207,4 @@ const App = () => (
 );
 
 export default App;
+

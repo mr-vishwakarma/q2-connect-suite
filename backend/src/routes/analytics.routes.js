@@ -4,7 +4,7 @@ const { getAnalytics } = require('../controllers/analytics.controller');
 const { protect } = require('../middleware/auth.middleware');
 const { adminOnly } = require('../middleware/admin.middleware');
 
-router.use(protect, adminOnly);
-router.get('/', getAnalytics);
+router.use(protect);
+router.get('/', adminOnly, getAnalytics);
 
 module.exports = router;

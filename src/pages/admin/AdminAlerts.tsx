@@ -49,7 +49,7 @@ export default function AdminAlerts() {
       setIsLoading(true);
 
       const response = await studentService.getAlerts({ hostel: selectedHostel });
-      const students = response.success ? response.data : [];
+      const students = response.success && Array.isArray(response.data) ? response.data : [];
 
       if (!students || students.length === 0) {
         setAlertStudents([]);
@@ -195,7 +195,7 @@ export default function AdminAlerts() {
     return <Badge variant="destructive" className="text-xs">Unpaid</Badge>;
   };
 
-  if (loading || isLoading) {
+  if (isLoading) {
     return (
       <div className="py-8"><InlineSkeletonList rows={5} /></div>
     );

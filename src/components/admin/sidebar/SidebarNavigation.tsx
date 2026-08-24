@@ -14,6 +14,7 @@ import {
   BarChart,
   Shirt,
   Settings,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
@@ -27,6 +28,7 @@ export const ADMIN_NAV_LINKS = [
   { to: '/admin/students', icon: Users, label: 'All Students' },
   { to: '/admin/fees', icon: DollarSign, label: 'Fee Management' },
   { to: '/admin/rooms', icon: Building2, label: 'Room Management' },
+  { to: '/admin/expenses', icon: Receipt, label: 'Expense Tracker' },
   { to: '/admin/leave-requests', icon: CalendarCheck, label: 'Leave Requests' },
   { to: '/admin/laundry', icon: Shirt, label: 'Laundry Management' },
   { to: '/admin/complaints', icon: MessageSquare, label: 'Complaints' },

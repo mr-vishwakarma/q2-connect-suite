@@ -27,6 +27,8 @@ const analyticsRoutes = require('./routes/analytics.routes');
 const laundryRoutes = require('./routes/laundry.routes');
 const ratingRoutes = require('./routes/rating.routes');
 const settingsRoutes = require('./routes/settings.routes');
+const superAdminRoutes = require('./routes/superAdmin.routes');
+const expensesRoutes = require('./routes/expenses.routes');
 const { requestLogger } = require('./middleware/requestLogger.middleware');
 
 // Connect to MongoDB
@@ -115,6 +117,8 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/laundry', laundryRoutes);
 app.use('/api/rating', ratingRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/super-admin', superAdminRoutes);
+app.use('/api/expenses', expensesRoutes);
 
 // 404 handler
 app.use((req, res) => {

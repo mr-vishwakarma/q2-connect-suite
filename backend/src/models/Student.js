@@ -10,7 +10,9 @@ const studentSchema = new mongoose.Schema(
     email: { type: String, trim: true, lowercase: true },
     roomNo: { type: String, trim: true },
     floor: { type: String, trim: true },
-    hostel: { type: String, enum: ['Q2', 'Q2.0', 'Q2.1'] },
+    organizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
+    hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel' },
+    hostel: { type: String },
     fees: { type: Number, default: 0 },
     startDate: { type: Date },
     validDate: { type: Date },
@@ -23,6 +25,8 @@ const studentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+studentSchema.index({ organizationId: 1, hostelId: 1 });
+studentSchema.index({ organizationId: 1, validDate: 1, isActive: 1 });
 studentSchema.index({ hostel: 1 });
 studentSchema.index({ isActive: 1 });
 studentSchema.index({ hostel: 1, validDate: 1, isActive: 1 });

@@ -7,9 +7,12 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     username: { type: String, unique: true, sparse: true, trim: true },
     password: { type: String, required: true, minlength: 6 },
-    role: { type: String, enum: ['admin', 'student', 'warden'], default: 'student' },
+    role: { type: String, enum: ['super_admin', 'admin', 'student', 'warden', 'accountant', 'staff'], default: 'student' },
+    isSuperAdmin: { type: Boolean, default: false },
+    activeOrganizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
+    activeHostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel' },
     // Admin can manage multiple hostels
-    hostels: [{ type: String, enum: ['Q2', 'Q2.0', 'Q2.1'] }],
+    hostels: [{ type: String }],
     // Link to student profile if role is student
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
     isActive: { type: Boolean, default: true },

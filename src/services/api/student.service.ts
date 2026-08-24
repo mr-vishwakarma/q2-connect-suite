@@ -27,7 +27,7 @@ export const studentService = {
     return res.data;
   },
 
-  async getAlerts(params?: { hostel?: string }): Promise<ApiResponse<{ count: number; students: StudentAlert[] }>> {
+  async getAlerts(params?: { hostel?: string }): Promise<ApiResponse<StudentAlert[]>> {
     const res = await api.get('/students/alerts', { params });
     return res.data;
   },

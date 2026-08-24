@@ -6,3 +6,4 @@ export * from './room.types';
 export * from './feedback.types';
 export * from './laundry.types';
 export * from './leave.types';
+export * from './saas.types';

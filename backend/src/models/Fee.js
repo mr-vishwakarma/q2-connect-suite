@@ -3,7 +3,9 @@ const mongoose = require('mongoose');
 const feeSchema = new mongoose.Schema(
   {
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
-    hostel: { type: String, enum: ['Q2', 'Q2.0', 'Q2.1'] },
+    organizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
+    hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel' },
+    hostel: { type: String },
     month: { type: String, required: true }, // e.g., "2024-01"
     amount: { type: Number, required: true, default: 0 },
     discount: { type: Number, default: 0 },
@@ -21,6 +23,8 @@ const feeSchema = new mongoose.Schema(
 
 // Unique: one fee record per student per month
 feeSchema.index({ studentId: 1, month: 1 }, { unique: true });
+feeSchema.index({ organizationId: 1, hostelId: 1, month: 1 });
+feeSchema.index({ organizationId: 1, status: 1 });
 feeSchema.index({ hostel: 1 });
 feeSchema.index({ hostel: 1, status: 1, month: 1 });
 feeSchema.index({ studentId: 1, status: 1 });
