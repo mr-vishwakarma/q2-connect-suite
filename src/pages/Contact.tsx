@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Navbar } from '@/components/landing/Navbar';
-import { Footer } from '@/components/landing/Footer';
+import { SaaSHeader } from '@/components/landing/SaaSHeader';
+import { SaaSFooter } from '@/components/landing/SaaSFooter';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,25 +56,18 @@ export default function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name || !formData.email || !formData.phone || !formData.message) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
     setIsSubmitting(true);
-    
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast.success('Message sent successfully! We\'ll get back to you soon.');
-    setFormData({ name: '', email: '', phone: '', message: '' });
-    setIsSubmitting(false);
+    // Simulate submission
+    setTimeout(() => {
+      setIsSubmitting(false);
+      toast.success('Message sent successfully! We will get back to you soon.');
+      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
+    }, 1000);
   };
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
-      <Navbar />
+      <SaaSHeader />
       
       {/* Building Background */}
       <BuildingBackground showOnHome={true} />
@@ -289,7 +282,7 @@ export default function Contact() {
         </div>
       </section>
 
-      <Footer />
+      <SaaSFooter />
     </div>
   );
 }

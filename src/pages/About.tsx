@@ -1,6 +1,5 @@
-import { motion } from 'framer-motion';
-import { Navbar } from '@/components/landing/Navbar';
-import { Footer } from '@/components/landing/Footer';
+import { SaaSHeader } from '@/components/landing/SaaSHeader';
+import { SaaSFooter } from '@/components/landing/SaaSFooter';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { AnimatedSection, TiltCard, StaggerContainer, StaggerItem, FloatingElement } from '@/components/ui/animated-section';
 import { 
@@ -48,7 +47,7 @@ const values = [
 export default function About() {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
-      <Navbar />
+      <SaaSHeader />
       
       {/* Building Background */}
       <BuildingBackground showOnHome={true} />
@@ -262,7 +261,7 @@ export default function About() {
         </div>
       </section>
 
-      <Footer />
+      <SaaSFooter />
     </div>
   );
 }

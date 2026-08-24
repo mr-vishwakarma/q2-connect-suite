@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Menu, X, ArrowRight, Sparkles } from 'lucide-react';
+import { Menu, X, ArrowRight } from 'lucide-react';
 
-const navLinks = [
-  { name: 'Home', href: '#hero' },
-  { name: 'Platform', href: '#experiences' },
-  { name: 'Hostel Matrix', href: '#operations' },
-  { name: 'Features', href: '#features' },
-  { name: 'Security', href: '#security' },
-  { name: 'About', href: '/about' },
+const NAV_LINKS = [
+  { name: 'Home', href: '/#hero' },
+  { name: 'Platform', href: '/#experiences' },
+  { name: 'Hostel Matrix', href: '/#operations' },
+  { name: 'Features', href: '/#features' },
+  { name: 'Security', href: '/#security' },
+  { name: 'About Us', href: '/#about' },
 ];
 
 export function SaaSHeader() {
@@ -25,6 +25,19 @@ export function SaaSHeader() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleNavClick = (href: string) => {
+    setIsMobileOpen(false);
+    if (href.startsWith('/#')) {
+      const targetId = href.replace('/#', '');
+      if (location.pathname === '/') {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    }
+  };
 
   return (
     <motion.header
@@ -61,26 +74,16 @@ export function SaaSHeader() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1 bg-secondary/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/50">
-          {navLinks.map((link) => {
-            const isInternal = link.href.startsWith('#');
-            return isInternal ? (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-xs font-semibold px-3 py-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
-              >
-                {link.name}
-              </a>
-            ) : (
-              <Link
-                key={link.name}
-                to={link.href}
-                className="text-xs font-semibold px-3 py-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
-              >
-                {link.name}
-              </Link>
-            );
-          })}
+          {NAV_LINKS.map((link) => (
+            <a
+              key={link.name}
+              href={link.href}
+              onClick={() => handleNavClick(link.href)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
+            >
+              {link.name}
+            </a>
+          ))}
         </nav>
 
         {/* Right CTA Actions */}
@@ -116,11 +119,11 @@ export function SaaSHeader() {
             className="md:hidden bg-card/95 backdrop-blur-2xl border-b border-border px-6 py-5 space-y-4"
           >
             <div className="flex flex-col gap-2">
-              {navLinks.map((link) => (
+              {NAV_LINKS.map((link) => (
                 <a
                   key={link.name}
                   href={link.href}
-                  onClick={() => setIsMobileOpen(false)}
+                  onClick={() => handleNavClick(link.href)}
                   className="text-sm font-semibold text-foreground hover:text-primary py-2 px-3 rounded-lg hover:bg-secondary/60"
                 >
                   {link.name}

@@ -1,6 +1,5 @@
-import { motion } from 'framer-motion';
-import { Navbar } from '@/components/landing/Navbar';
-import { Footer } from '@/components/landing/Footer';
+import { SaaSHeader } from '@/components/landing/SaaSHeader';
+import { SaaSFooter } from '@/components/landing/SaaSFooter';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { User } from 'lucide-react';
 
@@ -29,8 +28,8 @@ const teamMembers = [
 
 export default function OurTeam() {
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden flex flex-col">
-      <Navbar />
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      <SaaSHeader />
       
       <BuildingBackground showOnHome={true} />
       
@@ -106,7 +105,7 @@ export default function OurTeam() {
         </div>
       </main>
       
-      <Footer />
+      <SaaSFooter />
     </div>
   );
 }
