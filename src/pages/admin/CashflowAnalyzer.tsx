@@ -49,7 +49,7 @@ export default function CashflowAnalyzer() {
 
       if (feeDashRes.success && feeDashRes.data) {
         const totalPaid = (feeDashRes.data.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
-        const totalFeeDues = (feeDashRes.data.fees || []).filter(f => f.status !== 'PAID').reduce((sum, f) => sum + (f.amount || 0), 0);
+        const totalFeeDues = (feeDashRes.data.fees || []).filter(f => f.status !== 'paid').reduce((sum, f) => sum + (f.amount || 0), 0);
         setTotalCollectedRent(totalPaid > 0 ? totalPaid : 476000);
         setPendingRent(totalFeeDues > 0 ? totalFeeDues : 68500);
       } else {
