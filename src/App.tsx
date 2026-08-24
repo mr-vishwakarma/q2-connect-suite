@@ -54,6 +54,7 @@ const LeaveRequests = lazy(() => import("./pages/admin/LeaveRequests"));
 const LaundryManagement = lazy(() => import("./pages/admin/LaundryManagement"));
 const ExpenseManagement = lazy(() => import("./pages/admin/ExpenseManagement"));
 const CashflowAnalyzer = lazy(() => import("./pages/admin/CashflowAnalyzer"));
+const AttendanceManagement = lazy(() => import("./pages/admin/AttendanceManagement"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
 const OrganizationList = lazy(() => import("./pages/super-admin/OrganizationList"));
@@ -75,6 +76,7 @@ const adminTitles: Record<string, string> = {
   "/admin/admin-management": "Admin Management",
   "/admin/fees": "Fee Management",
   "/admin/rooms": "Room Management",
+  "/admin/attendance": "Attendance & Gate Passes",
   "/admin/expenses": "Expense Tracker",
   "/admin/cashflow": "Cashflow & P&L",
   "/admin/leave-requests": "Leave Requests",
@@ -178,6 +180,7 @@ const App = () => (
                 <Route path="admin-management" element={<AdminManagement />} />
                 <Route path="fees" element={<FeeManagement />} />
                 <Route path="rooms" element={<RoomManagement />} />
+                <Route path="attendance" element={<AttendanceManagement />} />
                 <Route path="expenses" element={<ExpenseManagement />} />
                 <Route path="cashflow" element={<CashflowAnalyzer />} />
                 <Route path="leave-requests" element={<LeaveRequests />} />

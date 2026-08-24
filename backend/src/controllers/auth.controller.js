@@ -211,7 +211,29 @@ const getMe = async (req, res) => {
     if (req.user.role === 'student' && req.user.studentId) {
       studentProfile = await Student.findById(req.user.studentId);
     }
-    return res.status(200).json({ success: true, user: req.user, student: studentProfile });
+
+    let featuresMap = {};
+    let organization = null;
+
+    // Resolve active organization membership & enabled features
+    const Membership = require('../models/Membership');
+    const OrganizationFeature = require('../models/OrganizationFeature');
+    const membership = await Membership.findOne({ userId: req.user._id, status: 'ACTIVE' }).populate('organizationId');
+    if (membership && membership.organizationId) {
+      organization = membership.organizationId;
+      const orgFeatures = await OrganizationFeature.find({ organizationId: organization._id, enabled: true });
+      orgFeatures.forEach((f) => {
+        featuresMap[f.featureKey] = true;
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      user: req.user,
+      student: studentProfile,
+      organization,
+      features: featuresMap,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

@@ -26,6 +26,8 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   isPrimaryAdmin: boolean;
   profile: Profile | null;
+  features: Record<string, boolean>;
+  hasFeature: (featureKey: string) => boolean;
   signIn: (email: string, password: string, isAdminLogin?: boolean) => Promise<{ error: Error | null; user?: any }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -47,12 +49,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isPrimaryAdmin, setIsPrimaryAdmin] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [features, setFeatures] = useState<Record<string, boolean>>({});
+
+  const hasFeature = (featureKey: string): boolean => {
+    if (isSuperAdmin || user?.isSuperAdmin || user?.role === 'super_admin') return true;
+    const coreFeatures = ['student_management', 'room_management', 'fee_management', 'reports'];
+    if (coreFeatures.includes(featureKey)) return true;
+    return !!features[featureKey];
+  };
 
   const fetchProfile = async () => {
     try {
       const response = await api.get('/auth/me');
       if (response.data?.success) {
-        const { user: userData, student } = response.data;
+        const { user: userData, student, features: userFeatures } = response.data;
         
         const mappedUser: User = {
           id: userData._id,
@@ -67,6 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsSuperAdmin(userData.role === 'super_admin' || !!userData.isSuperAdmin);
         setIsAdmin(userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin);
         setIsPrimaryAdmin(userData.role === 'admin' || userData.role === 'super_admin');
+        if (userFeatures && typeof userFeatures === 'object') {
+          setFeatures(userFeatures);
+        }
 
         if (student) {
           setProfile({
@@ -282,8 +295,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       isAdmin,
+      isSuperAdmin,
       isPrimaryAdmin,
       profile,
+      features,
+      hasFeature,
       signIn,
       signUp,
       signOut,

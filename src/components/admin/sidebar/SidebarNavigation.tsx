@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   UserPlus,
+  UserCheck,
   MessageSquare,
   Lightbulb,
   Users,
@@ -28,6 +29,7 @@ export const ADMIN_NAV_LINKS = [
   { to: '/admin/students', icon: Users, label: 'All Students', featureKey: 'student_management' },
   { to: '/admin/fees', icon: DollarSign, label: 'Fee Management', featureKey: 'fee_management' },
   { to: '/admin/rooms', icon: Building2, label: 'Room Management', featureKey: 'room_management' },
+  { to: '/admin/attendance', icon: UserCheck, label: 'Attendance & Passes', featureKey: 'attendance' },
   { to: '/admin/expenses', icon: Receipt, label: 'Expense Tracker', featureKey: 'expense_management' },
   { to: '/admin/cashflow', icon: DollarSign, label: 'Cashflow & P&L', featureKey: 'expense_management' },
   { to: '/admin/leave-requests', icon: CalendarCheck, label: 'Leave Requests', featureKey: 'mess_management' },
@@ -46,7 +48,7 @@ export interface SidebarNavigationProps {
 }
 
 export function SidebarNavigation({ isCollapsed = false, onNavigate }: SidebarNavigationProps) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, hasFeature } = useAuth();
   const { selectedHostel } = useHostel();
   const [alertCount, setAlertCount] = useState(0);
 
@@ -67,9 +69,14 @@ export function SidebarNavigation({ isCollapsed = false, onNavigate }: SidebarNa
     }
   }, [user, isAdmin, selectedHostel, fetchAlertCount]);
 
+  const visibleLinks = ADMIN_NAV_LINKS.filter((link) => {
+    if (!('featureKey' in link) || !link.featureKey) return true;
+    return hasFeature(link.featureKey);
+  });
+
   return (
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
-      {ADMIN_NAV_LINKS.map((link) => {
+      {visibleLinks.map((link) => {
         const isAlertLink = link.to === '/admin/alerts';
         return (
           <SidebarNavItem
