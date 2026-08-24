@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { differenceInDays, parseISO, format } from 'date-fns';
+import { toast } from 'react-toastify';
 
 interface AlertStudent {
   id: string;
@@ -184,6 +185,29 @@ export default function AdminAlerts() {
     if (filterType === 'warning') return s.status === 'warning';
     return true;
   });
+
+  const exportData = () => {
+    const csvContent = [
+      ['Name', 'Phone', 'Room No', 'Fees', 'Valid Till', 'Status', 'Days Overdue', 'Fee Status'].join(','),
+      ...filteredAlertStudents.map(student => [
+        student.name,
+        student.phone || 'N/A',
+        student.room_no || 'N/A',
+        student.fees ? `₹${student.fees}` : 'N/A',
+        student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A',
+        student.status === 'expired' ? 'Expired' : `${student.daysLeft} days left`,
+        student.daysOverdue > 0 ? `${student.daysOverdue} days` : '-',
+        student.feeStatus === 'paid' ? 'Paid' : 'Unpaid',
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `alerts-${selectedHostel}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+  };
 
   const getStatusBadge = (student: AlertStudent) => {
     if (student.status === 'expired' && student.feeStatus === 'unpaid') {

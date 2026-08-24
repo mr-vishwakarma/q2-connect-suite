@@ -38,20 +38,21 @@ export default function CashflowAnalyzer() {
   const fetchCashflowData = async () => {
     try {
       setIsLoading(true);
-      const [expRes, feeStatsRes] = await Promise.all([
+      const [expRes, feeDashRes] = await Promise.all([
         expenseService.getExpenses({ hostel: selectedHostel, month: selectedMonth }),
-        feeService.getStats ? feeService.getStats({ hostel: selectedHostel }) : Promise.resolve({ success: false }),
+        feeService.getFeeDashboard({ hostel: selectedHostel }),
       ]);
 
       if (expRes.success && expRes.data) {
         setExpenses(expRes.data);
       }
 
-      if (feeStatsRes.success && feeStatsRes.data) {
-        setTotalCollectedRent(feeStatsRes.data.totalCollected || 476000);
-        setPendingRent(feeStatsRes.data.totalPending || 68500);
+      if (feeDashRes.success && feeDashRes.data) {
+        const totalPaid = (feeDashRes.data.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+        const totalFeeDues = (feeDashRes.data.fees || []).filter(f => f.status !== 'PAID').reduce((sum, f) => sum + (f.amount || 0), 0);
+        setTotalCollectedRent(totalPaid > 0 ? totalPaid : 476000);
+        setPendingRent(totalFeeDues > 0 ? totalFeeDues : 68500);
       } else {
-        // Fallback default sample for visual richness
         setTotalCollectedRent(476000);
         setPendingRent(68500);
       }
