@@ -30,7 +30,6 @@ const organizationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-organizationSchema.index({ slug: 1 });
 organizationSchema.index({ status: 1 });
 organizationSchema.index({ contactEmail: 1 });
 
