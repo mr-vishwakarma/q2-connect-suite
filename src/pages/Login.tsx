@@ -60,7 +60,9 @@ export default function Login() {
 
   useEffect(() => {
     if (user) {
-      if (user.role === 'admin' || isAdmin) {
+      if (user.role === 'super_admin' || user.isSuperAdmin) {
+        navigate('/super-admin/dashboard', { replace: true });
+      } else if (user.role === 'admin' || isAdmin) {
         navigate('/admin/dashboard', { replace: true });
       } else {
         navigate('/student/dashboard', { replace: true });
@@ -112,7 +114,7 @@ export default function Login() {
       const isSuperAdminLogin = selectedRole === 'super_admin';
       const isAdminLogin = selectedRole === 'admin' || isSuperAdminLogin;
 
-      const { error } = await signIn(
+      const { error, user: loggedUser } = await signIn(
         identifier.trim(),
         selectedRole === 'student' && studentLoginTab === 'otp' ? 'Student@123' : password,
         isAdminLogin
@@ -121,10 +123,10 @@ export default function Login() {
       setIsLoading(false);
 
       if (error) {
-        toast.error('Invalid Credentials. Please check your username and password.');
+        toast.error(error.message || 'Invalid Credentials. Please check your username and password.');
       } else {
         toast.success('Welcome back!');
-        if (isSuperAdminLogin) {
+        if (isSuperAdminLogin || loggedUser?.role === 'super_admin' || loggedUser?.isSuperAdmin) {
           navigate('/super-admin/dashboard', { replace: true });
         } else if (isAdminLogin) {
           navigate('/admin/dashboard', { replace: true });

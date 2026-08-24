@@ -6,7 +6,8 @@ export interface User {
   name: string;
   email: string;
   username?: string;
-  role: 'admin' | 'student';
+  role: 'super_admin' | 'admin' | 'student' | 'warden' | string;
+  isSuperAdmin?: boolean;
 }
 
 export interface Profile {
@@ -22,9 +23,10 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   isPrimaryAdmin: boolean;
   profile: Profile | null;
-  signIn: (email: string, password: string, isAdminLogin?: boolean) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string, isAdminLogin?: boolean) => Promise<{ error: Error | null; user?: any }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isPrimaryAdmin, setIsPrimaryAdmin] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
 
@@ -57,11 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: userData.email,
           username: userData.username,
           role: userData.role,
+          isSuperAdmin: userData.isSuperAdmin || userData.role === 'super_admin',
         };
 
         setUser(mappedUser);
-        setIsAdmin(userData.role === 'admin');
-        setIsPrimaryAdmin(userData.role === 'admin');
+        setIsSuperAdmin(userData.role === 'super_admin' || !!userData.isSuperAdmin);
+        setIsAdmin(userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin);
+        setIsPrimaryAdmin(userData.role === 'admin' || userData.role === 'super_admin');
 
         if (student) {
           setProfile({
@@ -158,11 +163,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: userData.email,
           username: userData.username,
           role: userData.role,
+          isSuperAdmin: userData.isSuperAdmin || userData.role === 'super_admin',
         };
 
         setUser(mappedUser);
-        setIsAdmin(userData.role === 'admin');
-        setIsPrimaryAdmin(userData.role === 'admin');
+        setIsSuperAdmin(userData.role === 'super_admin' || !!userData.isSuperAdmin);
+        setIsAdmin(userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin);
+        setIsPrimaryAdmin(userData.role === 'admin' || userData.role === 'super_admin');
 
         if (student) {
           setProfile({
@@ -195,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.warn('Socket connection failed:', socketErr);
         }
 
-        return { error: null };
+        return { error: null, user: mappedUser };
       }
       return { error: new Error('Login failed') };
     } catch (err: any) {

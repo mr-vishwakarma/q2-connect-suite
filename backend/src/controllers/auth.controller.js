@@ -85,7 +85,7 @@ const adminLogin = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    if (user.role !== 'admin') {
+    if (user.role !== 'admin' && user.role !== 'super_admin' && !user.isSuperAdmin && user.role !== 'warden') {
       return res.status(403).json({ success: false, message: 'Admin access only' });
     }
 
