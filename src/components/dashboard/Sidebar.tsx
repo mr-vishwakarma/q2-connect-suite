@@ -60,13 +60,28 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
   return (
     <aside className={cn("fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300", isCollapsed ? "w-20" : "w-64")}>
       {/* Logo */}
-      <div className="p-6 relative flex items-center justify-between">
-        <Link to={isAdmin ? "/admin/dashboard" : "/student/dashboard"} className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")} onClick={handleLinkClick}>
-          <img src="/q2-logo.png" alt="Q2 Logo" className="w-20 h-20 object-contain shrink-0" />
+      <div className="p-5 relative flex items-center justify-between border-b border-sidebar-border/40">
+        <Link
+          to={isAdmin ? "/admin/dashboard" : "/student/dashboard"}
+          className={cn("flex items-center select-none", isCollapsed ? "justify-center w-full" : "gap-3")}
+          onClick={handleLinkClick}
+        >
+          <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
+            <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain drop-shadow-sm" />
+          </div>
           {!isCollapsed && (
-            <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }} className="overflow-hidden whitespace-nowrap">
-              <span className="text-sidebar-foreground font-semibold block">Q2 Management</span>
-              <span className="text-xs text-muted-foreground">{isAdmin ? 'Admin Panel' : 'Student Panel'}</span>
+            <motion.div
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: 'auto' }}
+              exit={{ opacity: 0, width: 0 }}
+              className="overflow-hidden whitespace-nowrap flex flex-col justify-center text-left"
+            >
+              <span className="text-sidebar-foreground font-bold text-base tracking-tight leading-tight block">
+                Q2 Management
+              </span>
+              <span className="text-xs text-muted-foreground font-medium mt-0.5 block">
+                {isAdmin ? 'Admin Panel' : 'Student Panel'}
+              </span>
             </motion.div>
           )}
         </Link>
@@ -82,7 +97,7 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className="absolute -right-3 top-8 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="absolute -right-3 top-6 bg-card border border-border rounded-full p-1 shadow-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors z-20"
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
