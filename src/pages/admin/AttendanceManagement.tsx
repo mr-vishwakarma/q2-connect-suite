@@ -52,9 +52,10 @@ export default function AttendanceManagement() {
   const loadAttendanceData = useCallback(async () => {
     try {
       setIsLoading(true);
+      const hostelParam = (selectedHostel as string) !== 'All' ? selectedHostel : undefined;
       const [studentsRes, attRes] = await Promise.all([
-        studentService.getAllStudents({ hostel: selectedHostel }),
-        api.get('/attendance', { params: { hostel: selectedHostel !== 'All' ? selectedHostel : undefined, date: selectedDate } }),
+        studentService.getStudents({ hostel: hostelParam }),
+        api.get('/attendance', { params: { hostel: hostelParam, date: selectedDate } }),
       ]);
 
       if (studentsRes.success && Array.isArray(studentsRes.data)) {
@@ -88,7 +89,7 @@ export default function AttendanceManagement() {
       const res = await api.post('/attendance', {
         userId,
         studentId,
-        hostel: selectedHostel !== 'All' ? selectedHostel : 'Q2',
+        hostel: (selectedHostel as string) !== 'All' ? selectedHostel : 'Q2',
         date: selectedDate,
         status,
       });
