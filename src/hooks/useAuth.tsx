@@ -27,6 +27,7 @@ interface AuthContextType {
   isPrimaryAdmin: boolean;
   profile: Profile | null;
   features: Record<string, boolean>;
+  hasFeature: (featureKey: string) => boolean;
   signIn: (email: string, password: string, isAdminLogin?: boolean) => Promise<{ error: any; user?: any }>;
   signInWithGoogle: (credential: string) => Promise<{ error: any; user?: any }>;
   signUp: (payload: { name: string; email: string; password: string; username?: string; phone?: string; hostel?: string } | any) => Promise<{ error: any; user?: any }>;
