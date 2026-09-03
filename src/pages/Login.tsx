@@ -52,9 +52,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [studentLoginTab, setStudentLoginTab] = useState<'password' | 'otp'>('password');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
 
   // Student Registration fields
   const [regName, setRegName] = useState('');
@@ -110,19 +107,8 @@ export default function Login() {
     setSearchParams({});
     setIdentifier('');
     setPassword('');
-    setOtpSent(false);
     setIsRegistering(false);
     setLockoutInfo(null);
-  };
-
-  const handleSendOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!identifier) {
-      toast.error('Please enter your registered Mobile Number');
-      return;
-    }
-    setOtpSent(true);
-    toast.success('6-digit OTP sent to your registered phone number (Use 123456 for demo)');
   };
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
@@ -199,19 +185,64 @@ export default function Login() {
     await handleGoogleSuccess({ credential: mockToken });
   };
 
+  const renderGoogleButton = (buttonText: string = 'Continue with Google') => {
+    return (
+      <div className="w-full">
+        {hasValidGoogleClientId ? (
+          <div className="flex justify-center w-full [&>div]:!w-full [&>div>iframe]:!w-full">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => toast.error('Google Sign In failed. Please check Google Console configuration.')}
+              theme="outline"
+              size="large"
+              shape="rectangular"
+              text={isRegistering ? 'signup_with' : 'continue_with'}
+              width="100%"
+            />
+          </div>
+        ) : (
+          <div>
+            <button
+              type="button"
+              onClick={handleDemoGoogleLogin}
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-border/80 bg-card hover:bg-secondary/60 text-xs font-semibold text-foreground transition-all shadow-sm group"
+            >
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+              <span>{buttonText}</span>
+            </button>
+            <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+              💡 Notice: Add your real Google Client ID to <code className="text-foreground">.env</code> to activate live Google popup.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (selectedRole === 'student' && studentLoginTab === 'otp') {
-      if (otpCode !== '123456' && otpCode !== '999999') {
-        toast.error('Invalid OTP code. Please enter 123456');
-        return;
-      }
-    } else {
-      if (!identifier || !password) {
-        toast.error('Please fill in all credentials');
-        return;
-      }
+    if (!identifier || !password) {
+      toast.error('Please enter your credentials');
+      return;
     }
 
     setIsLoading(true);
@@ -222,7 +253,7 @@ export default function Login() {
 
       const { error, user: loggedUser } = await signIn(
         identifier.trim(),
-        selectedRole === 'student' && studentLoginTab === 'otp' ? 'Student@123' : password,
+        password,
         isAdminLogin
       );
 
@@ -442,322 +473,228 @@ export default function Login() {
 
                   {/* REGISTRATION FORM FOR STUDENTS */}
                   {selectedRole === 'student' && isRegistering ? (
-                    <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
-                      <div className="space-y-1">
-                        <Label htmlFor="reg-name" className="text-xs">Full Name</Label>
-                        <Input
-                          id="reg-name"
-                          type="text"
-                          placeholder="e.g. Priya Sharma"
-                          value={regName}
-                          onChange={(e) => setRegName(e.target.value)}
-                          required
-                          className="h-10"
-                        />
+                    <div className="space-y-4">
+                      {/* 1-Click Fast Google Registration */}
+                      <div className="space-y-1.5">
+                        {renderGoogleButton('1-Click Sign Up with Google')}
+                        <p className="text-[11px] text-muted-foreground text-center">
+                          ⚡ Instant email verification. You configure username & password in Step 2.
+                        </p>
                       </div>
 
-                      <div className="space-y-1">
-                        <Label htmlFor="reg-email" className="text-xs">Email Address</Label>
-                        <Input
-                          id="reg-email"
-                          type="email"
-                          placeholder="e.g. priya@gmail.com"
-                          value={regEmail}
-                          onChange={(e) => setRegEmail(e.target.value)}
-                          required
-                          className="h-10"
-                        />
+                      <div className="relative my-3">
+                        <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t border-border/60" />
+                        </div>
+                        <div className="relative flex justify-center text-[10px] uppercase">
+                          <span className="bg-card px-2.5 text-muted-foreground font-semibold">
+                            Or Register Manually
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2.5">
+                      {/* Manual Registration Form */}
+                      <form onSubmit={handleRegisterSubmit} className="space-y-3">
                         <div className="space-y-1">
-                          <Label htmlFor="reg-phone" className="text-xs">Mobile Number</Label>
+                          <Label htmlFor="reg-name" className="text-xs font-semibold">Full Name</Label>
                           <Input
-                            id="reg-phone"
-                            type="tel"
-                            placeholder="9876543210"
-                            value={regPhone}
-                            onChange={(e) => setRegPhone(e.target.value)}
+                            id="reg-name"
+                            type="text"
+                            placeholder="e.g. Priya Sharma"
+                            value={regName}
+                            onChange={(e) => setRegName(e.target.value)}
+                            required
                             className="h-10"
                           />
                         </div>
+
                         <div className="space-y-1">
-                          <Label className="text-xs">Hostel Branch</Label>
-                          <Select value={regHostel} onValueChange={setRegHostel}>
-                            <SelectTrigger className="h-10">
-                              <SelectValue placeholder="Branch" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Q2">Q2 Girls Hostel - Gachibowli</SelectItem>
-                              <SelectItem value="Q2.0">Q2 Girls Hostel - Kondapur</SelectItem>
-                              <SelectItem value="Q2.1">Q2 Girls Hostel - Madhapur</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label htmlFor="reg-password" className="text-xs">Create Password</Label>
-                        <div className="relative">
+                          <Label htmlFor="reg-email" className="text-xs font-semibold">Email Address</Label>
                           <Input
-                            id="reg-password"
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="At least 6 characters"
-                            value={regPassword}
-                            onChange={(e) => setRegPassword(e.target.value)}
+                            id="reg-email"
+                            type="email"
+                            placeholder="e.g. priya@gmail.com"
+                            value={regEmail}
+                            onChange={(e) => setRegEmail(e.target.value)}
                             required
-                            className="h-10 pr-9"
+                            className="h-10"
                           />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-                          >
-                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
                         </div>
-                      </div>
 
-                      <Button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md h-11 mt-2"
-                      >
-                        {isLoading ? 'Creating Account...' : 'Complete Resident Registration'}
-                      </Button>
-                    </form>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1">
+                            <Label htmlFor="reg-phone" className="text-xs font-semibold">Mobile Number</Label>
+                            <Input
+                              id="reg-phone"
+                              type="tel"
+                              placeholder="9876543210"
+                              value={regPhone}
+                              onChange={(e) => setRegPhone(e.target.value)}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-semibold">Hostel Branch</Label>
+                            <Select value={regHostel} onValueChange={setRegHostel}>
+                              <SelectTrigger className="h-10">
+                                <SelectValue placeholder="Branch" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Q2">Q2 Girls - Gachibowli</SelectItem>
+                                <SelectItem value="Q2.0">Q2 Girls - Kondapur</SelectItem>
+                                <SelectItem value="Q2.1">Q2 Girls - Madhapur</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label htmlFor="reg-password" className="text-xs font-semibold">Create Password</Label>
+                          <div className="relative">
+                            <Input
+                              id="reg-password"
+                              type={showPassword ? 'text' : 'password'}
+                              placeholder="At least 6 characters"
+                              value={regPassword}
+                              onChange={(e) => setRegPassword(e.target.value)}
+                              required
+                              className="h-10 pr-9"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="submit"
+                          disabled={isLoading}
+                          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md h-11 rounded-xl mt-2"
+                        >
+                          {isLoading ? 'Creating Account...' : 'Complete Resident Registration'}
+                        </Button>
+                      </form>
+                    </div>
                   ) : (
                     /* SIGN IN MODE */
-                    <>
-                      {/* Student OTP vs Password Switcher */}
-                      {selectedRole === 'student' && (
-                        <Tabs
-                          value={studentLoginTab}
-                          onValueChange={(v) => setStudentLoginTab(v as any)}
-                          className="w-full mb-3"
-                        >
-                          <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="password" className="text-xs">Password Sign In</TabsTrigger>
-                            <TabsTrigger value="otp" className="text-xs">Mobile OTP</TabsTrigger>
-                          </TabsList>
-                        </Tabs>
-                      )}
-
-                      {/* Student OTP Form */}
-                      {selectedRole === 'student' && studentLoginTab === 'otp' ? (
-                        <form onSubmit={otpSent ? handleSubmit : handleSendOtp} className="space-y-4">
+                    <div className="space-y-4">
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Hostel Branch Selector for Admin */}
+                        {selectedRole === 'admin' && (
                           <div className="space-y-1.5">
-                            <Label htmlFor="phone">Registered Mobile Number</Label>
-                            <div className="relative">
-                              <Phone className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                              <Input
-                                id="phone"
-                                type="tel"
-                                placeholder="e.g. 9876543210"
-                                value={identifier}
-                                onChange={(e) => setIdentifier(e.target.value)}
-                                disabled={otpSent}
-                                className="pl-9"
-                                required
-                              />
-                            </div>
+                            <Label>Select Hostel Property</Label>
+                            <Select value={selectedHostel} onValueChange={setSelectedHostel}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose branch" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Q2">Q2 Girls Hostel - Gachibowli</SelectItem>
+                                <SelectItem value="Q2.0">Q2 Girls Hostel - Kondapur</SelectItem>
+                                <SelectItem value="Q2.1">Q2 Girls Hostel - Madhapur</SelectItem>
+                                <SelectItem value="All">All Hostels (HQ Scope)</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
+                        )}
 
-                          {otpSent && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: 'auto' }}
-                              className="space-y-1.5"
+                        <div className="space-y-1.5">
+                          <Label htmlFor="identifier">
+                            {selectedRole === 'super_admin'
+                              ? 'Administrator Email'
+                              : selectedRole === 'admin'
+                              ? 'Email or Staff Username'
+                              : 'Student User ID / Email'}
+                          </Label>
+                          <div className="relative">
+                            {selectedRole === 'super_admin' ? (
+                              <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                            ) : (
+                              <UserIcon className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                            )}
+                            <Input
+                              id="identifier"
+                              type="text"
+                              placeholder={
+                                selectedRole === 'super_admin'
+                                  ? 'superadmin@q2connect.com'
+                                  : selectedRole === 'admin'
+                                  ? 'admin@q2hostels.com'
+                                  : 'e.g. kajalsharma / shyam06'
+                              }
+                              value={identifier}
+                              onChange={(e) => setIdentifier(e.target.value)}
+                              className="pl-9 h-11"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="password">Password</Label>
+                            <Link
+                              to="/forgot-password"
+                              className="text-[11px] font-semibold text-primary hover:underline"
                             >
-                              <Label htmlFor="otp">Enter 6-Digit OTP</Label>
-                              <div className="relative">
-                                <KeyRound className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                                <Input
-                                  id="otp"
-                                  type="text"
-                                  maxLength={6}
-                                  placeholder="123456"
-                                  value={otpCode}
-                                  onChange={(e) => setOtpCode(e.target.value)}
-                                  className="pl-9 font-mono tracking-widest text-center text-lg"
-                                  required
-                                />
-                              </div>
-                              <p className="text-[11px] text-muted-foreground text-center">
-                                Demo OTP: <strong className="text-foreground">123456</strong>
-                              </p>
-                            </motion.div>
-                          )}
+                              Forgot Password?
+                            </Link>
+                          </div>
+                          <div className="relative">
+                            <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
+                            <Input
+                              id="password"
+                              type={showPassword ? 'text' : 'password'}
+                              placeholder="••••••••••••"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              className="pl-9 pr-9 h-11"
+                              required
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
 
-                          <Button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full bg-primary text-primary-foreground font-bold shadow-md h-11"
-                          >
-                            {isLoading ? 'Verifying...' : otpSent ? 'Verify & Launch Portal' : 'Send One-Time Password'}
-                          </Button>
-                        </form>
-                      ) : (
-                        /* Standard Username/Email & Password Form */
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                          {/* Hostel Branch Selector for Admin */}
-                          {selectedRole === 'admin' && (
-                            <div className="space-y-1.5">
-                              <Label>Select Hostel Property</Label>
-                              <Select value={selectedHostel} onValueChange={setSelectedHostel}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Choose branch" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Q2">Q2 Girls Hostel - Gachibowli</SelectItem>
-                                  <SelectItem value="Q2.0">Q2 Girls Hostel - Kondapur</SelectItem>
-                                  <SelectItem value="Q2.1">Q2 Girls Hostel - Madhapur</SelectItem>
-                                  <SelectItem value="All">All Hostels (HQ Scope)</SelectItem>
-                                </SelectContent>
-                              </Select>
+                        <Button
+                          type="submit"
+                          disabled={isLoading}
+                          className={`w-full font-bold shadow-md h-11 rounded-xl ${
+                            selectedRole === 'super_admin'
+                              ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                              : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                          }`}
+                        >
+                          {isLoading ? 'Signing In...' : 'Sign In to Workspace'}
+                        </Button>
+                      </form>
+
+                      {/* Google Authentication Section (for students) */}
+                      {selectedRole === 'student' && (
+                        <div className="pt-1">
+                          <div className="relative my-4">
+                            <div className="absolute inset-0 flex items-center">
+                              <span className="w-full border-t border-border/60" />
                             </div>
-                          )}
-
-                          <div className="space-y-1.5">
-                            <Label htmlFor="identifier">
-                              {selectedRole === 'super_admin'
-                                ? 'Administrator Email'
-                                : selectedRole === 'admin'
-                                ? 'Email or Staff Username'
-                                : 'Student User ID / Email'}
-                            </Label>
-                            <div className="relative">
-                              {selectedRole === 'super_admin' ? (
-                                <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                              ) : (
-                                <UserIcon className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                              )}
-                              <Input
-                                id="identifier"
-                                type="text"
-                                placeholder={
-                                  selectedRole === 'super_admin'
-                                    ? 'superadmin@q2connect.com'
-                                    : selectedRole === 'admin'
-                                    ? 'admin@q2hostels.com'
-                                    : 'e.g. kajalsharma / shyam06'
-                                }
-                                value={identifier}
-                                onChange={(e) => setIdentifier(e.target.value)}
-                                className="pl-9"
-                                required
-                              />
+                            <div className="relative flex justify-center text-[10px] uppercase">
+                              <span className="bg-card px-2.5 text-muted-foreground font-semibold">
+                                Or Continue With Google
+                              </span>
                             </div>
                           </div>
 
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <Label htmlFor="password">Password</Label>
-                              <Link
-                                to="/forgot-password"
-                                className="text-[11px] font-semibold text-primary hover:underline"
-                              >
-                                Forgot Password?
-                              </Link>
-                            </div>
-                            <div className="relative">
-                              <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                              <Input
-                                id="password"
-                                type={showPassword ? 'text' : 'password'}
-                                placeholder="••••••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="pl-9 pr-9"
-                                required
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-                              >
-                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              </button>
-                            </div>
-                          </div>
-
-                          <Button
-                            type="submit"
-                            disabled={isLoading}
-                            className={`w-full font-bold shadow-md h-11 ${
-                              selectedRole === 'super_admin'
-                                ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                                : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                            }`}
-                          >
-                            {isLoading ? 'Signing In...' : 'Sign In to Workspace'}
-                          </Button>
-                        </form>
+                          {renderGoogleButton('Continue with Google')}
+                        </div>
                       )}
-
-                      {/* Google Authentication Section */}
-                      <div className="pt-2">
-                        <div className="relative my-4">
-                          <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-border/60" />
-                          </div>
-                          <div className="relative flex justify-center text-[10px] uppercase">
-                            <span className="bg-card px-2.5 text-muted-foreground font-semibold">
-                              Or Continue With Google
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Google OAuth Component & Direct Button */}
-                        <div className="space-y-2">
-                          {hasValidGoogleClientId ? (
-                            <div className="flex justify-center w-full">
-                              <GoogleLogin
-                                onSuccess={handleGoogleSuccess}
-                                onError={() => toast.error('Google Sign In failed. Please check Google Console configuration.')}
-                                theme="outline"
-                                size="large"
-                                shape="rectangular"
-                                text="continue_with"
-                                width="100%"
-                              />
-                            </div>
-                          ) : (
-                            <div>
-                              <button
-                                type="button"
-                                onClick={handleDemoGoogleLogin}
-                                disabled={isLoading}
-                                className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-border/80 bg-card hover:bg-secondary/60 text-xs font-semibold text-foreground transition-all shadow-sm group"
-                              >
-                                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                                  <path
-                                    fill="#4285F4"
-                                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                                  />
-                                  <path
-                                    fill="#34A853"
-                                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                                  />
-                                  <path
-                                    fill="#FBBC05"
-                                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                                  />
-                                  <path
-                                    fill="#EA4335"
-                                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                                  />
-                                </svg>
-                                <span>Continue with Google</span>
-                              </button>
-                              <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-                                💡 Notice: Paste your real Google Client ID into <code className="text-foreground">.env</code> to activate live Google Cloud popup.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </>
+                    </div>
                   )}
                 </CardContent>
 
