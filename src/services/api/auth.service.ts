@@ -7,8 +7,19 @@ export const authService = {
     return res.data;
   },
 
-  async googleLogin(credential: string): Promise<ApiResponse<AuthResponse>> {
+  async googleLogin(credential: string): Promise<ApiResponse<any>> {
     const res = await api.post('/auth/google', { credential });
+    return res.data;
+  },
+
+  async completeGoogleSetup(payload: {
+    setupToken: string;
+    username: string;
+    password: string;
+    phone?: string;
+    hostel?: string;
+  }): Promise<ApiResponse<AuthResponse>> {
+    const res = await api.post('/auth/complete-google-setup', payload);
     return res.data;
   },
 

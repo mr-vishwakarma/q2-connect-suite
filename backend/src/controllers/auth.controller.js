@@ -245,42 +245,148 @@ const googleLogin = async (req, res) => {
       }
       user.failedLoginAttempts = 0;
       user.lockUntil = null;
-    } else {
-      // 2. User doesn't exist. Check if Student profile exists with this email
-      let student = await Student.findOne({ email: normalizedEmail });
-      const generatedUsername = normalizedEmail.split('@')[0] + Math.floor(100 + Math.random() * 900);
 
-      user = new User({
-        name: name || student?.name || 'Resident',
+      const { accessToken, refreshToken } = generateTokens(user._id);
+      user.refreshTokens.push(refreshToken);
+      if (user.refreshTokens.length > 5) user.refreshTokens.shift();
+      await user.save({ validateBeforeSave: false });
+
+      let studentProfile = null;
+      if (user.role === 'student' && user.studentId) {
+        studentProfile = await Student.findById(user.studentId);
+      }
+
+      return res.status(200).json({
+        success: true,
+        requiresProfileSetup: false,
+        accessToken,
+        refreshToken,
+        user: user.toJSON(),
+        student: studentProfile,
+      });
+    }
+
+    // 2. User does not exist yet -> New student registration via Google!
+    // Generate a temporary 15-minute setup token so the client can submit step 2 (username, password, phone, hostel)
+    const setupToken = jwt.sign(
+      {
         email: normalizedEmail,
-        username: student?.username || generatedUsername,
         googleId,
-        authProvider: 'google',
+        name: name || 'Resident',
+        picture: picture || '',
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    // Suggest a clean username from email or name
+    const suggestedUsername = (normalizedEmail.split('@')[0] || 'resident').replace(/[^a-zA-Z0-9_]/g, '');
+
+    return res.status(200).json({
+      success: true,
+      requiresProfileSetup: true,
+      setupToken,
+      googleProfile: {
+        email: normalizedEmail,
+        name: name || 'Resident',
+        picture: picture || '',
+        googleId,
+        suggestedUsername,
+      },
+    });
+  } catch (error) {
+    console.error('Google Auth error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Google authentication failed' });
+  }
+};
+
+// @desc    Complete Google OAuth Step 2 (Choose username, password, phone, hostel)
+// @route   POST /api/auth/complete-google-setup
+// @access  Public
+const completeGoogleSetup = async (req, res) => {
+  try {
+    const { setupToken, username, password, phone, hostel = 'Q2' } = req.body;
+    if (!setupToken) {
+      return res.status(400).json({ success: false, message: 'Setup token is required' });
+    }
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: 'Username and password are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
+    }
+
+    // Verify setupToken
+    let decoded;
+    try {
+      decoded = jwt.verify(setupToken, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ success: false, message: 'Setup session expired. Please sign in with Google again.' });
+    }
+
+    const { email, googleId, name, picture } = decoded;
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedUsername = username.trim();
+
+    // Check username uniqueness
+    const existingUserWithUsername = await User.findOne({ username: normalizedUsername });
+    if (existingUserWithUsername && existingUserWithUsername.email !== normalizedEmail) {
+      return res.status(409).json({ success: false, message: 'This username is already taken. Please choose another.' });
+    }
+
+    // Check if user with this email already exists
+    let user = await User.findOne({ email: normalizedEmail });
+
+    if (user) {
+      // User was already created; update password and link
+      user.password = password;
+      user.username = normalizedUsername;
+      user.googleId = googleId;
+      user.authProvider = 'both';
+      await user.save();
+    } else {
+      // Check if Student record pre-exists with this email
+      let student = await Student.findOne({ email: normalizedEmail });
+
+      // Create User record with BOTH password and googleId
+      user = new User({
+        name: name || 'Resident',
+        email: normalizedEmail,
+        username: normalizedUsername,
+        password,
+        googleId,
+        authProvider: 'both',
         role: 'student',
-        studentId: student ? student._id : null,
+        hostels: [hostel],
         isActive: true,
       });
 
-      if (!student) {
-        // Auto-create basic resident record
+      if (student) {
+        user.studentId = student._id;
+        await user.save();
+        student.userId = user._id;
+        student.username = normalizedUsername;
+        if (phone) student.phone = phone;
+        if (hostel) student.hostel = hostel;
+        await student.save();
+      } else {
+        await user.save();
         student = await Student.create({
           userId: user._id,
           name: user.name,
-          username: user.username,
+          username: normalizedUsername,
           email: normalizedEmail,
-          hostel: 'Q2',
+          phone: phone || '',
+          hostel,
           fees: 0,
         });
         user.studentId = student._id;
-      } else {
-        student.userId = user._id;
-        await student.save();
+        await user.save({ validateBeforeSave: false });
       }
     }
 
     const { accessToken, refreshToken } = generateTokens(user._id);
     user.refreshTokens.push(refreshToken);
-    if (user.refreshTokens.length > 5) user.refreshTokens.shift();
     await user.save({ validateBeforeSave: false });
 
     let studentProfile = null;
@@ -288,16 +394,17 @@ const googleLogin = async (req, res) => {
       studentProfile = await Student.findById(user.studentId);
     }
 
-    return res.status(200).json({
+    return res.status(201).json({
       success: true,
+      message: 'Account configured and profile linked successfully!',
       accessToken,
       refreshToken,
       user: user.toJSON(),
       student: studentProfile,
     });
   } catch (error) {
-    console.error('Google Auth error:', error);
-    return res.status(500).json({ success: false, message: error.message || 'Google authentication failed' });
+    console.error('Complete Google Setup error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Setup completion failed' });
   }
 };
 
@@ -662,6 +769,6 @@ const resetPassword = async (req, res) => {
 module.exports = { 
   login, adminLogin, registerAdmin, refreshToken, logout, getMe, 
   checkAdminExists, getAdmins, deleteAdmin, requestPasswordReset, resetPassword,
-  googleLogin, registerStudent
+  googleLogin, registerStudent, completeGoogleSetup
 };
 

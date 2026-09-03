@@ -33,6 +33,7 @@ import {
   Sparkles,
   UserPlus,
 } from 'lucide-react';
+import { GoogleStep2Modal } from '@/components/auth/GoogleStep2Modal';
 
 export default function Login() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -40,6 +41,11 @@ export default function Login() {
 
   const [selectedRole, setSelectedRole] = useState<'super_admin' | 'admin' | 'student' | null>(initialRole);
   const [isRegistering, setIsRegistering] = useState(false);
+
+  // Google Step 2 Completion State
+  const [showGoogleStep2, setShowGoogleStep2] = useState(false);
+  const [googleSetupToken, setGoogleSetupToken] = useState('');
+  const [googleProfileData, setGoogleProfileData] = useState<any>(null);
 
   // Sign In credentials
   const [identifier, setIdentifier] = useState('');
@@ -129,20 +135,31 @@ export default function Login() {
     setLockoutInfo(null);
 
     try {
-      const { error, user: loggedUser } = await signInWithGoogle(credentialResponse.credential);
+      const result = await signInWithGoogle(credentialResponse.credential);
       setIsLoading(false);
 
-      if (error) {
-        toast.error(error.message || 'Google authentication failed');
+      if (result.error) {
+        toast.error(result.error.message || 'Google authentication failed');
+        return;
+      }
+
+      // If new resident requires Step 2 username, password, and hostel setup
+      if (result.requiresProfileSetup) {
+        setGoogleSetupToken(result.setupToken || '');
+        setGoogleProfileData(result.googleProfile);
+        setShowGoogleStep2(true);
+        toast.info('Google account verified! Please set up your username and password.');
+        return;
+      }
+
+      const loggedUser = result.user;
+      toast.success(`Welcome ${loggedUser?.name || 'back'}! (Authenticated via Google)`);
+      if (loggedUser?.role === 'super_admin' || loggedUser?.isSuperAdmin) {
+        navigate('/super-admin/dashboard', { replace: true });
+      } else if (loggedUser?.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
       } else {
-        toast.success(`Welcome ${loggedUser?.name || 'back'}! (Authenticated via Google)`);
-        if (loggedUser?.role === 'super_admin' || loggedUser?.isSuperAdmin) {
-          navigate('/super-admin/dashboard', { replace: true });
-        } else if (loggedUser?.role === 'admin') {
-          navigate('/admin/dashboard', { replace: true });
-        } else {
-          navigate('/student/dashboard', { replace: true });
-        }
+        navigate('/student/dashboard', { replace: true });
       }
     } catch (err: any) {
       setIsLoading(false);
@@ -732,6 +749,20 @@ export default function Login() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Google Sign-In Step 2 Completion Modal */}
+      {showGoogleStep2 && googleProfileData && (
+        <GoogleStep2Modal
+          isOpen={showGoogleStep2}
+          setupToken={googleSetupToken}
+          googleProfile={googleProfileData}
+          onSuccess={(user) => {
+            setShowGoogleStep2(false);
+            navigate('/student/dashboard', { replace: true });
+          }}
+          onCancel={() => setShowGoogleStep2(false)}
+        />
+      )}
 
       <SaaSFooter />
     </div>
