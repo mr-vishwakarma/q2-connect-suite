@@ -18,6 +18,7 @@ const {
   googleLogin,
   registerStudent,
   completeGoogleSetup,
+  requestGoogleRegistration,
 } = require('../controllers/auth.controller');
 const User = require('../models/User');
 
@@ -32,6 +33,7 @@ const authLimiter = rateLimit({
 router.post('/login', authLimiter, login);
 router.post('/admin/login', authLimiter, adminLogin);
 router.post('/google', authLimiter, googleLogin);
+router.post('/request-google-registration', authLimiter, requestGoogleRegistration);
 router.post('/complete-google-setup', authLimiter, completeGoogleSetup);
 router.post('/register', authLimiter, registerStudent);
 router.post('/register-admin', authLimiter, registerAdmin);

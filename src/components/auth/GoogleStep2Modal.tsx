@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'react-toastify';
-import { ShieldCheck, Eye, EyeOff, User, Lock, Phone, Building2, CheckCircle2, Sparkles, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, CheckCircle2, Sparkles, ArrowRight } from 'lucide-react';
 
 interface GoogleStep2ModalProps {
   isOpen: boolean;
@@ -35,8 +33,6 @@ export function GoogleStep2Modal({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [hostel, setHostel] = useState('Q2');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -76,8 +72,6 @@ export function GoogleStep2Modal({
         setupToken,
         username: username.trim(),
         password,
-        phone: phone.trim(),
-        hostel,
       });
 
       setIsLoading(false);
@@ -98,7 +92,7 @@ export function GoogleStep2Modal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
       <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden bg-card border-border/80 shadow-2xl rounded-2xl">
         {/* Top Gradient Banner */}
-        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-primary p-6 text-white text-left relative overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-primary p-6 text-white text-left relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
           <div className="flex items-center gap-3 relative z-10">
@@ -115,11 +109,11 @@ export function GoogleStep2Modal({
             )}
             <div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-semibold mb-1 backdrop-blur-sm">
-                <ShieldCheck className="w-3 h-3 text-emerald-300" />
-                <span>Google Account Verified</span>
+                <CheckCircle2 className="w-3 h-3 text-emerald-200" />
+                <span>Admin Approved • Verified Resident</span>
               </div>
-              <h3 className="text-lg font-bold leading-tight">Step 2: Set Up Resident Login</h3>
-              <p className="text-xs text-purple-100 opacity-90 truncate max-w-[280px]">
+              <h3 className="text-lg font-bold leading-tight">Step 2: Choose Username & Password</h3>
+              <p className="text-xs text-emerald-100 opacity-90 truncate max-w-[280px]">
                 {googleProfile.email}
               </p>
             </div>
@@ -128,10 +122,10 @@ export function GoogleStep2Modal({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-left">
-          <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-muted-foreground flex items-start gap-2.5">
-            <Sparkles className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-muted-foreground flex items-start gap-2.5">
+            <Sparkles className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
             <span>
-              Choose a username & password. You can use them to log in anytime, or simply 1-click sign in with Google using <strong className="text-foreground">{googleProfile.email}</strong>.
+              Your registration is approved! Choose your login credentials. You can log in with this username/password or with 1-click Google anytime.
             </span>
           </div>
 
@@ -196,40 +190,6 @@ export function GoogleStep2Modal({
                 className="pl-9 h-10"
                 required
               />
-            </div>
-          </div>
-
-          {/* Phone & Hostel Property in 2 Columns */}
-          <div className="grid grid-cols-2 gap-3 pt-1">
-            <div className="space-y-1">
-              <Label htmlFor="setup-phone" className="text-xs font-semibold">
-                Mobile Number
-              </Label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                <Input
-                  id="setup-phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="9876543210"
-                  className="pl-9 h-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold">Hostel Branch</Label>
-              <Select value={hostel} onValueChange={setHostel}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Q2">Q2 Girls - Gachibowli</SelectItem>
-                  <SelectItem value="Q2.0">Q2 Girls - Kondapur</SelectItem>
-                  <SelectItem value="Q2.1">Q2 Girls - Madhapur</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
 

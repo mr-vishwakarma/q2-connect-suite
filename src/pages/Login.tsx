@@ -32,8 +32,11 @@ import {
   AlertTriangle,
   Sparkles,
   UserPlus,
+  Hourglass,
+  Clock,
 } from 'lucide-react';
 import { GoogleStep2Modal } from '@/components/auth/GoogleStep2Modal';
+import { GoogleInitialDetailsModal } from '@/components/auth/GoogleInitialDetailsModal';
 
 export default function Login() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,10 +45,23 @@ export default function Login() {
   const [selectedRole, setSelectedRole] = useState<'super_admin' | 'admin' | 'student' | null>(initialRole);
   const [isRegistering, setIsRegistering] = useState(false);
 
-  // Google Step 2 Completion State
+  // Google Step 2 Completion State (After Admin Approval)
   const [showGoogleStep2, setShowGoogleStep2] = useState(false);
   const [googleSetupToken, setGoogleSetupToken] = useState('');
   const [googleProfileData, setGoogleProfileData] = useState<any>(null);
+
+  // Google Initial Details (Step 1) State (Pending Admin Approval)
+  const [showInitialModal, setShowInitialModal] = useState(false);
+  const [initialGoogleProfile, setInitialGoogleProfile] = useState<any>(null);
+  const [initialCredential, setInitialCredential] = useState('');
+
+  // Pending Admin Approval State Notice
+  const [pendingApprovalNotice, setPendingApprovalNotice] = useState<{
+    name?: string;
+    email?: string;
+    hostel?: string;
+    phone?: string;
+  } | null>(null);
 
   // Sign In credentials
   const [identifier, setIdentifier] = useState('');
@@ -73,7 +89,7 @@ export default function Login() {
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [showWorkspaceSelect, setShowWorkspaceSelect] = useState(false);
 
-  const { signIn, signInWithGoogle, signUp, user, isAdmin } = useAuth();
+  const { signIn, signInWithGoogle, requestGoogleRegistration, signUp, user, isAdmin } = useAuth();
   const { selectedHostel, setSelectedHostel } = useHostel();
   const navigate = useNavigate();
 
@@ -129,15 +145,37 @@ export default function Login() {
         return;
       }
 
-      // If new resident requires Step 2 username, password, and hostel setup
-      if (result.requiresProfileSetup) {
-        setGoogleSetupToken(result.setupToken || '');
-        setGoogleProfileData(result.googleProfile);
-        setShowGoogleStep2(true);
-        toast.info('Google account verified! Please set up your username and password.');
+      // 1. Brand new resident registering -> Open Initial Details Modal (Step 1)
+      if (result.status === 'new_resident' && result.requiresInitialDetails) {
+        setInitialGoogleProfile(result.googleProfile);
+        setInitialCredential(credentialResponse.credential);
+        setShowInitialModal(true);
+        toast.info('Google account verified! Please enter your phone number & preferred hostel branch.');
         return;
       }
 
+      // 2. Application submitted, pending admin review
+      if (result.status === 'pending_approval') {
+        setPendingApprovalNotice({
+          name: result.pendingUser?.name || 'Resident',
+          email: result.pendingUser?.email || '',
+          hostel: result.pendingUser?.hostel || 'Q2 Girls Hostel',
+          phone: result.pendingUser?.phone || '',
+        });
+        toast.info(result.message || 'Your registration request is pending admin approval.');
+        return;
+      }
+
+      // 3. Approved by admin -> Prompt to set permanent username & password (Step 2)
+      if (result.status === 'approved' && result.canCompleteSetup) {
+        setGoogleSetupToken(result.setupToken || '');
+        setGoogleProfileData(result.googleProfile);
+        setShowGoogleStep2(true);
+        toast.success('Congratulations! Your application has been approved. Please choose your username and password.');
+        return;
+      }
+
+      // 4. Active resident/admin -> Log directly in
       const loggedUser = result.user;
       toast.success(`Welcome ${loggedUser?.name || 'back'}! (Authenticated via Google)`);
       if (loggedUser?.role === 'super_admin' || loggedUser?.isSuperAdmin) {
@@ -150,6 +188,38 @@ export default function Login() {
     } catch (err: any) {
       setIsLoading(false);
       toast.error(err?.message || 'Google authentication failed');
+    }
+  };
+
+  const handleInitialDetailsSubmit = async (details: { name: string; phone: string; hostel: string }) => {
+    setIsLoading(true);
+    try {
+      const result = await requestGoogleRegistration({
+        credential: initialCredential,
+        name: details.name,
+        phone: details.phone,
+        hostel: details.hostel,
+      });
+
+      setIsLoading(false);
+      setShowInitialModal(false);
+
+      if (result.error) {
+        toast.error(result.error.message || 'Failed to submit registration request');
+        return;
+      }
+
+      setPendingApprovalNotice({
+        name: details.name,
+        email: initialGoogleProfile?.email,
+        hostel: details.hostel,
+        phone: details.phone,
+      });
+
+      toast.success('Registration request submitted! Awaiting hostel administrator approval.');
+    } catch (err: any) {
+      setIsLoading(false);
+      toast.error(err?.message || 'Submission failed');
     }
   };
 
@@ -447,6 +517,34 @@ export default function Login() {
                     </div>
                   )}
 
+                  {/* Pending Admin Approval Banner */}
+                  {pendingApprovalNotice && (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 animate-in fade-in slide-in-from-top-1 text-left">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 font-bold text-amber-600 dark:text-amber-400">
+                          <Hourglass className="w-4 h-4 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
+                          <span>Registration Pending Admin Approval</span>
+                        </div>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold px-2 py-0.5 rounded-full">
+                          In Review
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground leading-relaxed">
+                        Your application for <strong className="text-foreground">{pendingApprovalNotice.email}</strong> has been submitted and is waiting for approval from <strong className="text-foreground">{pendingApprovalNotice.hostel}</strong> administration.
+                      </p>
+                      <div className="pt-1 flex items-center justify-between border-t border-amber-500/20 text-[11px] text-muted-foreground">
+                        <span>⚡ Once approved, click "Continue with Google" to choose your password & username.</span>
+                        <button
+                          type="button"
+                          onClick={() => setPendingApprovalNotice(null)}
+                          className="text-foreground font-semibold hover:underline ml-2"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Student Mode Switcher: Sign In vs Register */}
                   {selectedRole === 'student' && (
                     <div className="flex rounded-xl bg-secondary/60 p-1 border border-border/40 mb-3">
@@ -709,6 +807,17 @@ export default function Login() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Google Step 1: Initial Details Modal for New Residents */}
+      {showInitialModal && initialGoogleProfile && (
+        <GoogleInitialDetailsModal
+          isOpen={showInitialModal}
+          googleProfile={initialGoogleProfile}
+          onSubmitDetails={handleInitialDetailsSubmit}
+          onClose={() => setShowInitialModal(false)}
+          isLoading={isLoading}
+        />
+      )}
 
       {/* Google Sign-In Step 2 Completion Modal */}
       {showGoogleStep2 && googleProfileData && (

@@ -29,8 +29,19 @@ interface AuthContextType {
   features: Record<string, boolean>;
   hasFeature: (featureKey: string) => boolean;
   signIn: (email: string, password: string, isAdminLogin?: boolean) => Promise<{ error: any; user?: any }>;
-  signInWithGoogle: (credential: string) => Promise<{ error: any; user?: any; requiresProfileSetup?: boolean; setupToken?: string; googleProfile?: any }>;
-  completeGoogleSetup: (payload: { setupToken: string; username: string; password: string; phone?: string; hostel?: string }) => Promise<{ error: any; user?: any }>;
+  signInWithGoogle: (credential: string) => Promise<{
+    error: any;
+    user?: any;
+    status?: 'active' | 'pending_approval' | 'approved' | 'new_resident' | 'rejected' | string;
+    requiresInitialDetails?: boolean;
+    canCompleteSetup?: boolean;
+    setupToken?: string;
+    googleProfile?: any;
+    message?: string;
+    pendingUser?: any;
+  }>;
+  requestGoogleRegistration: (payload: { credential: string; name?: string; phone?: string; hostel?: string }) => Promise<{ error: any; message?: string; status?: string }>;
+  completeGoogleSetup: (payload: { setupToken: string; username: string; password: string }) => Promise<{ error: any; user?: any }>;
   signUp: (payload: { name: string; email: string; password: string; username?: string; phone?: string; hostel?: string } | any) => Promise<{ error: any; user?: any }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -237,23 +248,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async (credential: string) => {
     try {
       const response = await api.post('/auth/google', { credential });
-      if (response.data?.requiresProfileSetup) {
+      const data = response.data;
+
+      if (data?.status === 'pending_approval') {
         return {
           error: null,
-          requiresProfileSetup: true,
-          setupToken: response.data.setupToken,
-          googleProfile: response.data.googleProfile,
+          status: 'pending_approval',
+          message: data.message,
+          pendingUser: data.user,
         };
       }
-      if (response.data?.success) {
-        const mappedUser = handleAuthSuccess(response.data);
-        return { error: null, user: mappedUser, requiresProfileSetup: false };
+
+      if (data?.status === 'approved' && data.canCompleteSetup) {
+        return {
+          error: null,
+          status: 'approved',
+          canCompleteSetup: true,
+          setupToken: data.setupToken,
+          googleProfile: data.googleProfile,
+        };
       }
-      return { error: new Error('Google authentication failed') };
+
+      if (data?.status === 'new_resident') {
+        return {
+          error: null,
+          status: 'new_resident',
+          requiresInitialDetails: true,
+          googleProfile: data.googleProfile,
+        };
+      }
+
+      if (data?.status === 'rejected') {
+        return {
+          error: new Error(data.message || 'Registration request was declined by hostel administration.'),
+          status: 'rejected',
+        };
+      }
+
+      if (data?.success && (data?.status === 'active' || !data?.status)) {
+        const mappedUser = handleAuthSuccess(data);
+        return { error: null, user: mappedUser, status: 'active' };
+      }
+
+      return { error: new Error(data?.message || 'Google authentication failed') };
     } catch (err: any) {
       const data = err.response?.data;
       const errorObj: any = new Error(data?.message || err.message || 'Google authentication failed');
-      return { error: errorObj };
+      return { error: errorObj, status: data?.status };
+    }
+  };
+
+  const requestGoogleRegistration = async (payload: {
+    credential: string;
+    name?: string;
+    phone?: string;
+    hostel?: string;
+  }) => {
+    try {
+      const response = await api.post('/auth/request-google-registration', payload);
+      if (response.data?.success) {
+        return { error: null, message: response.data.message, status: response.data.status };
+      }
+      return { error: new Error('Failed to submit registration request') };
+    } catch (err: any) {
+      const data = err.response?.data;
+      return { error: new Error(data?.message || err.message || 'Failed to submit registration request') };
     }
   };
 
@@ -261,8 +320,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setupToken: string;
     username: string;
     password: string;
-    phone?: string;
-    hostel?: string;
   }) => {
     try {
       const response = await api.post('/auth/complete-google-setup', payload);
@@ -322,6 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasFeature,
       signIn,
       signInWithGoogle,
+      requestGoogleRegistration,
       completeGoogleSetup,
       signUp,
       signOut,

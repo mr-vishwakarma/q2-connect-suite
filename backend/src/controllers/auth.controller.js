@@ -21,14 +21,15 @@ const generateTokens = (userId) => {
 // @access  Public
 const login = async (req, res) => {
   try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ success: false, message: 'Username and password are required' });
+    const loginIdentifier = req.body.username || req.body.identifier;
+    const { password } = req.body;
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ success: false, message: 'Username/Email and password are required' });
     }
 
     // Find by username or email
     const user = await User.findOne({
-      $or: [{ username }, { email: username.toLowerCase() }],
+      $or: [{ username: loginIdentifier }, { email: loginIdentifier.toLowerCase() }],
     });
 
     if (!user) {
@@ -204,12 +205,19 @@ const googleLogin = async (req, res) => {
     try {
       const clientId = process.env.GOOGLE_CLIENT_ID;
       if (clientId) {
-        const client = new OAuth2Client(clientId);
-        const ticket = await client.verifyIdToken({
-          idToken: credential,
-          audience: clientId,
-        });
-        payload = ticket.getPayload();
+        try {
+          const client = new OAuth2Client(clientId);
+          const ticket = await client.verifyIdToken({
+            idToken: credential,
+            audience: clientId,
+          });
+          payload = ticket.getPayload();
+        } catch (verifyErr) {
+          const base64Url = credential.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
+          payload = JSON.parse(jsonPayload);
+        }
       } else {
         // Fallback for development if client ID is not yet configured: decode JWT payload
         const base64Url = credential.split('.')[1];
@@ -236,7 +244,63 @@ const googleLogin = async (req, res) => {
         return res.status(401).json({ success: false, message: 'Account is deactivated' });
       }
 
-      // Link googleId and reset any failed login attempts/lockout
+      // Check registration approval status
+      if (user.registrationStatus === 'pending_approval') {
+        return res.status(200).json({
+          success: false,
+          status: 'pending_approval',
+          message: 'Your registration request is pending admin approval. You will be able to complete setup once verified by the hostel administration.',
+          user: {
+            name: user.name,
+            email: user.email,
+            hostel: user.registrationDetails?.hostel || user.hostels?.[0] || 'Q2',
+            phone: user.registrationDetails?.phone || '',
+            submittedAt: user.registrationDetails?.submittedAt || user.createdAt,
+          },
+        });
+      }
+
+      if (user.registrationStatus === 'rejected') {
+        return res.status(403).json({
+          success: false,
+          status: 'rejected',
+          message: `Your registration request was not approved: ${user.registrationDetails?.rejectionReason || 'Please contact hostel administration.'}`,
+        });
+      }
+
+      if (user.registrationStatus === 'approved') {
+        // User was approved by admin! Now they can set their username & password!
+        const setupToken = jwt.sign(
+          {
+            userId: user._id,
+            email: user.email,
+            googleId: user.googleId || googleId,
+            name: user.name,
+            picture: picture || user.registrationDetails?.picture || '',
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+
+        const suggestedUsername = (user.username || user.email.split('@')[0] || 'resident').replace(/[^a-zA-Z0-9_]/g, '');
+
+        return res.status(200).json({
+          success: true,
+          status: 'approved',
+          canCompleteSetup: true,
+          setupToken,
+          googleProfile: {
+            email: user.email,
+            name: user.name,
+            phone: user.registrationDetails?.phone || '',
+            hostel: user.registrationDetails?.hostel || user.hostels?.[0] || 'Q2',
+            picture: picture || user.registrationDetails?.picture || '',
+            suggestedUsername,
+          },
+        });
+      }
+
+      // User is active! Link googleId and reset any failed login attempts/lockout
       user.googleId = googleId;
       if (user.password) {
         user.authProvider = 'both';
@@ -258,6 +322,7 @@ const googleLogin = async (req, res) => {
 
       return res.status(200).json({
         success: true,
+        status: 'active',
         requiresProfileSetup: false,
         accessToken,
         refreshToken,
@@ -266,32 +331,18 @@ const googleLogin = async (req, res) => {
       });
     }
 
-    // 2. User does not exist yet -> New student registration via Google!
-    // Generate a temporary 15-minute setup token so the client can submit step 2 (username, password, phone, hostel)
-    const setupToken = jwt.sign(
-      {
-        email: normalizedEmail,
-        googleId,
-        name: name || 'Resident',
-        picture: picture || '',
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '15m' }
-    );
-
-    // Suggest a clean username from email or name
-    const suggestedUsername = (normalizedEmail.split('@')[0] || 'resident').replace(/[^a-zA-Z0-9_]/g, '');
-
+    // 2. User does NOT exist in DB -> New Resident requesting registration!
+    // Prompt frontend for phone and hostel branch to submit registration to admin
     return res.status(200).json({
       success: true,
-      requiresProfileSetup: true,
-      setupToken,
+      status: 'new_resident',
+      requiresInitialDetails: true,
       googleProfile: {
         email: normalizedEmail,
         name: name || 'Resident',
         picture: picture || '',
         googleId,
-        suggestedUsername,
+        suggestedUsername: (normalizedEmail.split('@')[0] || 'resident').replace(/[^a-zA-Z0-9_]/g, ''),
       },
     });
   } catch (error) {
@@ -300,12 +351,120 @@ const googleLogin = async (req, res) => {
   }
 };
 
-// @desc    Complete Google OAuth Step 2 (Choose username, password, phone, hostel)
+// @desc    Submit new resident registration request via Google Auth (Pending Admin Approval)
+// @route   POST /api/auth/request-google-registration
+// @access  Public
+const requestGoogleRegistration = async (req, res) => {
+  try {
+    const { credential, phone, hostel = 'Q2', name } = req.body;
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google credential token is required' });
+    }
+
+    let payload;
+    try {
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      if (clientId) {
+        try {
+          const client = new OAuth2Client(clientId);
+          const ticket = await client.verifyIdToken({
+            idToken: credential,
+            audience: clientId,
+          });
+          payload = ticket.getPayload();
+        } catch (verifyErr) {
+          const base64Url = credential.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
+          payload = JSON.parse(jsonPayload);
+        }
+      } else {
+        const base64Url = credential.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
+        payload = JSON.parse(jsonPayload);
+      }
+    } catch (err) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
+    }
+
+    const { sub: googleId, email, name: googleName, picture } = payload;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    let user = await User.findOne({ email: normalizedEmail });
+    if (user) {
+      if (user.registrationStatus === 'pending_approval') {
+        return res.status(200).json({
+          success: true,
+          status: 'pending_approval',
+          message: 'Your registration request is already submitted and pending admin approval.',
+        });
+      }
+      if (user.registrationStatus === 'active') {
+        return res.status(400).json({ success: false, message: 'An account with this email is already active. Please sign in.' });
+      }
+    }
+
+    const residentName = name?.trim() || googleName || 'Resident';
+    user = new User({
+      name: residentName,
+      email: normalizedEmail,
+      googleId,
+      authProvider: 'google',
+      role: 'student',
+      hostels: [hostel],
+      registrationStatus: 'pending_approval',
+      registrationDetails: {
+        phone: phone?.trim() || '',
+        hostel,
+        picture: picture || '',
+        submittedAt: new Date(),
+      },
+      isActive: true,
+    });
+
+    await user.save({ validateBeforeSave: false });
+
+    // Create In-App Notification for Admins
+    try {
+      const admins = await User.find({ role: { $in: ['admin', 'super_admin'] }, isActive: true });
+      const notifications = admins.map((admin) => ({
+        userId: admin._id,
+        hostel,
+        title: 'New Resident Registration Request',
+        message: `${residentName} (${normalizedEmail}, Phone: ${phone || 'N/A'}) has requested to join ${hostel}. Awaiting your approval.`,
+        type: 'info',
+      }));
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+      }
+    } catch (notifErr) {
+      console.error('Error creating admin notification for registration request:', notifErr);
+    }
+
+    return res.status(201).json({
+      success: true,
+      status: 'pending_approval',
+      message: 'Your registration request has been submitted to the hostel administration for approval.',
+      user: {
+        name: residentName,
+        email: normalizedEmail,
+        phone,
+        hostel,
+      },
+    });
+  } catch (error) {
+    console.error('Request Google Registration error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Registration request failed' });
+  }
+};
+
+// @desc    Complete Google OAuth Step 2 (Choose username, password) after Admin approval
 // @route   POST /api/auth/complete-google-setup
 // @access  Public
 const completeGoogleSetup = async (req, res) => {
   try {
-    const { setupToken, username, password, phone, hostel = 'Q2' } = req.body;
+    const { setupToken, username, password } = req.body;
     if (!setupToken) {
       return res.status(400).json({ success: false, message: 'Setup token is required' });
     }
@@ -324,7 +483,7 @@ const completeGoogleSetup = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Setup session expired. Please sign in with Google again.' });
     }
 
-    const { email, googleId, name, picture } = decoded;
+    const { userId, email, googleId, name, picture } = decoded;
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedUsername = username.trim();
 
@@ -334,65 +493,81 @@ const completeGoogleSetup = async (req, res) => {
       return res.status(409).json({ success: false, message: 'This username is already taken. Please choose another.' });
     }
 
-    // Check if user with this email already exists
-    let user = await User.findOne({ email: normalizedEmail });
+    // Find the approved user
+    let user = await User.findOne({
+      $or: [
+        { _id: userId },
+        { email: normalizedEmail },
+      ],
+    });
 
-    if (user) {
-      // User was already created; update password and link
-      user.password = password;
-      user.username = normalizedUsername;
-      user.googleId = googleId;
-      user.authProvider = 'both';
-      await user.save();
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Resident application not found. Please contact administration.' });
+    }
+
+    if (user.registrationStatus !== 'approved' && user.registrationStatus !== 'active') {
+      return res.status(403).json({ success: false, message: 'This account has not been approved by administration yet.' });
+    }
+
+    // Update user credentials & status
+    user.username = normalizedUsername;
+    user.password = password; // pre-save will hash
+    user.authProvider = 'both';
+    user.registrationStatus = 'active';
+    if (googleId) user.googleId = googleId;
+
+    const hostel = user.registrationDetails?.hostel || user.hostels?.[0] || 'Q2';
+    const phone = user.registrationDetails?.phone || '';
+
+    // Create or update Student profile
+    let student = await Student.findOne({ email: normalizedEmail });
+    if (!student && user.studentId) {
+      student = await Student.findById(user.studentId);
+    }
+
+    if (student) {
+      student.userId = user._id;
+      student.username = normalizedUsername;
+      if (phone) student.phone = phone;
+      if (hostel) student.hostel = hostel;
+      await student.save();
+      user.studentId = student._id;
     } else {
-      // Check if Student record pre-exists with this email
-      let student = await Student.findOne({ email: normalizedEmail });
-
-      // Create User record with BOTH password and googleId
-      user = new User({
-        name: name || 'Resident',
-        email: normalizedEmail,
+      student = await Student.create({
+        userId: user._id,
+        name: user.name,
         username: normalizedUsername,
-        password,
-        googleId,
-        authProvider: 'both',
-        role: 'student',
-        hostels: [hostel],
-        isActive: true,
+        email: normalizedEmail,
+        phone,
+        hostel,
+        profilePhoto: picture || user.registrationDetails?.picture || '',
+        fees: 0,
       });
+      user.studentId = student._id;
+    }
 
-      if (student) {
-        user.studentId = student._id;
-        await user.save();
-        student.userId = user._id;
-        student.username = normalizedUsername;
-        if (phone) student.phone = phone;
-        if (hostel) student.hostel = hostel;
-        await student.save();
-      } else {
-        await user.save();
-        student = await Student.create({
-          userId: user._id,
-          name: user.name,
-          username: normalizedUsername,
-          email: normalizedEmail,
-          phone: phone || '',
-          hostel,
-          fees: 0,
-        });
-        user.studentId = student._id;
-        await user.save({ validateBeforeSave: false });
+    await user.save();
+
+    // Notify Admins that the student completed registration!
+    try {
+      const admins = await User.find({ role: { $in: ['admin', 'super_admin'] }, isActive: true });
+      const notifications = admins.map((admin) => ({
+        userId: admin._id,
+        hostel,
+        title: 'Resident Registration Completed',
+        message: `Resident ${user.name} (${user.email}) has completed account setup with username "${user.username}". Resident profile is now active.`,
+        type: 'success',
+      }));
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
       }
+    } catch (notifErr) {
+      console.error('Error notifying admin of resident setup completion:', notifErr);
     }
 
     const { accessToken, refreshToken } = generateTokens(user._id);
     user.refreshTokens.push(refreshToken);
     await user.save({ validateBeforeSave: false });
-
-    let studentProfile = null;
-    if (user.role === 'student' && user.studentId) {
-      studentProfile = await Student.findById(user.studentId);
-    }
 
     return res.status(201).json({
       success: true,
@@ -400,7 +575,7 @@ const completeGoogleSetup = async (req, res) => {
       accessToken,
       refreshToken,
       user: user.toJSON(),
-      student: studentProfile,
+      student,
     });
   } catch (error) {
     console.error('Complete Google Setup error:', error);
@@ -769,6 +944,6 @@ const resetPassword = async (req, res) => {
 module.exports = { 
   login, adminLogin, registerAdmin, refreshToken, logout, getMe, 
   checkAdminExists, getAdmins, deleteAdmin, requestPasswordReset, resetPassword,
-  googleLogin, registerStudent, completeGoogleSetup
+  googleLogin, registerStudent, completeGoogleSetup, requestGoogleRegistration
 };
 

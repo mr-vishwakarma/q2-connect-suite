@@ -11,6 +11,9 @@ const {
   updateOwnProfile,
   getAlertsCount,
   getAlertStudents,
+  getPendingRegistrations,
+  approveRegistration,
+  rejectRegistration,
 } = require('../controllers/students.controller');
 
 router.use(protect);
@@ -18,6 +21,9 @@ router.use(protect);
 router.put('/profile', updateOwnProfile); // student updating own profile
 router.get('/alerts/count', adminOrWarden, getAlertsCount);
 router.get('/alerts', adminOrWarden, getAlertStudents);
+router.get('/pending-registrations', adminOrWarden, getPendingRegistrations);
+router.post('/approve-registration/:id', adminOnly, approveRegistration);
+router.post('/reject-registration/:id', adminOnly, rejectRegistration);
 router.get('/', adminOrWarden, getAllStudents);
 router.post('/', adminOnly, createStudent);
 router.get('/:id', getStudent); // admin or own student

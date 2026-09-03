@@ -31,6 +31,22 @@ const userSchema = new mongoose.Schema(
     // Google OAuth & Hybrid Auth
     googleId: { type: String, sparse: true },
     authProvider: { type: String, enum: ['local', 'google', 'both'], default: 'local' },
+
+    // Resident Registration & Admin Approval Workflow
+    registrationStatus: {
+      type: String,
+      enum: ['active', 'pending_approval', 'approved', 'rejected'],
+      default: 'active',
+    },
+    registrationDetails: {
+      phone: { type: String },
+      hostel: { type: String },
+      picture: { type: String },
+      rejectionReason: { type: String },
+      submittedAt: { type: Date },
+      approvedAt: { type: Date },
+      approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    },
   },
   { timestamps: true }
 );

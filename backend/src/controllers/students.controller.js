@@ -406,6 +406,97 @@ const getAlertStudents = async (req, res) => {
   }
 };
 
+// @desc    Get pending resident registrations awaiting admin approval
+// @route   GET /api/students/pending-registrations
+// @access  Admin/Warden
+const getPendingRegistrations = async (req, res) => {
+  try {
+    const { hostel } = req.query;
+    const query = {
+      role: 'student',
+      registrationStatus: 'pending_approval',
+    };
+    if (hostel && hostel !== 'All') {
+      query['registrationDetails.hostel'] = hostel;
+    }
+    const pendingUsers = await User.find(query).sort({ 'registrationDetails.submittedAt': -1, createdAt: -1 });
+    return res.status(200).json({
+      success: true,
+      count: pendingUsers.length,
+      data: pendingUsers.map((u) => ({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        phone: u.registrationDetails?.phone || 'N/A',
+        hostel: u.registrationDetails?.hostel || u.hostels?.[0] || 'Q2',
+        picture: u.registrationDetails?.picture || '',
+        submittedAt: u.registrationDetails?.submittedAt || u.createdAt,
+        registrationStatus: u.registrationStatus,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Approve resident registration request
+// @route   POST /api/students/approve-registration/:id
+// @access  Admin
+const approveRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Resident request not found' });
+    }
+    user.registrationStatus = 'approved';
+    if (!user.registrationDetails) user.registrationDetails = {};
+    user.registrationDetails.approvedAt = new Date();
+    user.registrationDetails.approvedBy = req.user._id;
+    await user.save();
+
+    // Create Notification for the student
+    await Notification.create({
+      userId: user._id,
+      title: 'Hostel Registration Approved!',
+      message: `Your registration request for ${user.registrationDetails?.hostel || 'Q2'} has been approved. Please log in with Google to choose your username and password.`,
+      type: 'success',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Registration for ${user.name} has been approved! The resident can now sign in with Google to set their username and password.`,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Reject resident registration request
+// @route   POST /api/students/reject-registration/:id
+// @access  Admin
+const rejectRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = 'Registration declined by administrator.' } = req.body;
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Resident request not found' });
+    }
+    user.registrationStatus = 'rejected';
+    if (!user.registrationDetails) user.registrationDetails = {};
+    user.registrationDetails.rejectionReason = reason;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Registration for ${user.name} has been declined.`,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getAllStudents,
   getStudent,
@@ -415,4 +506,7 @@ module.exports = {
   updateOwnProfile,
   getAlertsCount,
   getAlertStudents,
+  getPendingRegistrations,
+  approveRegistration,
+  rejectRegistration,
 };
