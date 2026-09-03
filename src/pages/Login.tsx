@@ -167,11 +167,12 @@ export default function Login() {
     }
   };
 
+  const activeGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID || '').trim();
   const hasValidGoogleClientId = Boolean(
-    import.meta.env.VITE_GOOGLE_CLIENT_ID &&
-    import.meta.env.VITE_GOOGLE_CLIENT_ID.trim().length > 15 &&
-    !import.meta.env.VITE_GOOGLE_CLIENT_ID.includes('not-configured') &&
-    !import.meta.env.VITE_GOOGLE_CLIENT_ID.includes('demo')
+    activeGoogleClientId &&
+    activeGoogleClientId.length > 15 &&
+    !activeGoogleClientId.includes('not-configured') &&
+    !activeGoogleClientId.includes('demo')
   );
 
   // Demo Google Login fallback for local dev when Google Client ID is not configured

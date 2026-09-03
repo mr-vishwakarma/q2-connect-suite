@@ -135,7 +135,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 const App = () => (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || "not-configured"}>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID || "not-configured"}>
       <AuthProvider>
         <HostelProvider>
           <Toaster />
