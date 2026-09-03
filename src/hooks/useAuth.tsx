@@ -292,6 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       features,
       hasFeature,
       signIn,
+      signInWithGoogle,
       signUp,
       signOut,
       refreshProfile
