@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const { sendPasswordResetEmail } = require('../utils/email');
@@ -30,12 +31,52 @@ const login = async (req, res) => {
       $or: [{ username }, { email: username.toLowerCase() }],
     });
 
-    if (!user || !(await user.comparePassword(password))) {
+    if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    // Check account lockout
+    if (user.isLocked()) {
+      const minutesLeft = Math.ceil((user.lockUntil.getTime() - Date.now()) / (60 * 1000));
+      return res.status(423).json({
+        success: false,
+        isLocked: true,
+        lockMinutes: minutesLeft,
+        message: `Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}, reset your password, or log in with Google.`
+      });
     }
 
     if (!user.isActive) {
       return res.status(401).json({ success: false, message: 'Account is deactivated' });
+    }
+
+    // Check password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      if (user.failedLoginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 mins lock
+        await user.save({ validateBeforeSave: false });
+        return res.status(423).json({
+          success: false,
+          isLocked: true,
+          lockMinutes: 15,
+          message: 'Account has been locked for 15 minutes due to 5 consecutive failed login attempts. You may reset your password or sign in with Google.'
+        });
+      }
+      await user.save({ validateBeforeSave: false });
+      const remaining = 5 - user.failedLoginAttempts;
+      return res.status(401).json({
+        success: false,
+        remainingAttempts: remaining,
+        message: `Invalid credentials. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before temporary account lock.`
+      });
+    }
+
+    // Reset lockout upon successful login
+    if (user.failedLoginAttempts > 0 || user.lockUntil) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
     }
 
     const { accessToken, refreshToken } = generateTokens(user._id);
@@ -81,16 +122,56 @@ const adminLogin = async (req, res) => {
       ]
     });
 
-    if (!user || !(await user.comparePassword(password))) {
+    if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    // Check account lockout
+    if (user.isLocked()) {
+      const minutesLeft = Math.ceil((user.lockUntil.getTime() - Date.now()) / (60 * 1000));
+      return res.status(423).json({
+        success: false,
+        isLocked: true,
+        lockMinutes: minutesLeft,
+        message: `Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}, reset your password, or log in with Google.`
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(401).json({ success: false, message: 'Account is deactivated' });
     }
 
     if (user.role !== 'admin' && user.role !== 'super_admin' && !user.isSuperAdmin && user.role !== 'warden') {
       return res.status(403).json({ success: false, message: 'Admin access only' });
     }
 
-    if (!user.isActive) {
-      return res.status(401).json({ success: false, message: 'Account is deactivated' });
+    // Check password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      if (user.failedLoginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+        await user.save({ validateBeforeSave: false });
+        return res.status(423).json({
+          success: false,
+          isLocked: true,
+          lockMinutes: 15,
+          message: 'Account has been locked for 15 minutes due to 5 consecutive failed login attempts. You may reset your password or sign in with Google.'
+        });
+      }
+      await user.save({ validateBeforeSave: false });
+      const remaining = 5 - user.failedLoginAttempts;
+      return res.status(401).json({
+        success: false,
+        remainingAttempts: remaining,
+        message: `Invalid credentials. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before temporary account lock.`
+      });
+    }
+
+    // Reset lockout upon successful login
+    if (user.failedLoginAttempts > 0 || user.lockUntil) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
     }
 
     const { accessToken, refreshToken } = generateTokens(user._id);
@@ -106,6 +187,193 @@ const adminLogin = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Google OAuth login & unified account linking
+// @route   POST /api/auth/google
+// @access  Public
+const googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google credential token is required' });
+    }
+
+    let payload;
+    try {
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      if (clientId) {
+        const client = new OAuth2Client(clientId);
+        const ticket = await client.verifyIdToken({
+          idToken: credential,
+          audience: clientId,
+        });
+        payload = ticket.getPayload();
+      } else {
+        // Fallback for development if client ID is not yet configured: decode JWT payload
+        const base64Url = credential.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
+        payload = JSON.parse(jsonPayload);
+      }
+    } catch (err) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
+    }
+
+    const { sub: googleId, email, name, picture } = payload;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Google account has no email associated' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 1. Check if user exists by email
+    let user = await User.findOne({ email: normalizedEmail });
+
+    if (user) {
+      if (!user.isActive) {
+        return res.status(401).json({ success: false, message: 'Account is deactivated' });
+      }
+
+      // Link googleId and reset any failed login attempts/lockout
+      user.googleId = googleId;
+      if (user.password) {
+        user.authProvider = 'both';
+      } else {
+        user.authProvider = 'google';
+      }
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+    } else {
+      // 2. User doesn't exist. Check if Student profile exists with this email
+      let student = await Student.findOne({ email: normalizedEmail });
+      const generatedUsername = normalizedEmail.split('@')[0] + Math.floor(100 + Math.random() * 900);
+
+      user = new User({
+        name: name || student?.name || 'Resident',
+        email: normalizedEmail,
+        username: student?.username || generatedUsername,
+        googleId,
+        authProvider: 'google',
+        role: 'student',
+        studentId: student ? student._id : null,
+        isActive: true,
+      });
+
+      if (!student) {
+        // Auto-create basic resident record
+        student = await Student.create({
+          userId: user._id,
+          name: user.name,
+          username: user.username,
+          email: normalizedEmail,
+          hostel: 'Q2',
+          fees: 0,
+        });
+        user.studentId = student._id;
+      } else {
+        student.userId = user._id;
+        await student.save();
+      }
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user._id);
+    user.refreshTokens.push(refreshToken);
+    if (user.refreshTokens.length > 5) user.refreshTokens.shift();
+    await user.save({ validateBeforeSave: false });
+
+    let studentProfile = null;
+    if (user.role === 'student' && user.studentId) {
+      studentProfile = await Student.findById(user.studentId);
+    }
+
+    return res.status(200).json({
+      success: true,
+      accessToken,
+      refreshToken,
+      user: user.toJSON(),
+      student: studentProfile,
+    });
+  } catch (error) {
+    console.error('Google Auth error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Google authentication failed' });
+  }
+};
+
+// @desc    Student self-registration
+// @route   POST /api/auth/register
+// @access  Public
+const registerStudent = async (req, res) => {
+  try {
+    const { name, email, username, phone, password, hostel = 'Q2' } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedUsername = (username || normalizedEmail.split('@')[0]).trim();
+
+    // Check uniqueness
+    const existingUser = await User.findOne({
+      $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
+    });
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: 'An account with this email or username already exists' });
+    }
+
+    // Check if student profile already existed without a User account
+    let student = await Student.findOne({ email: normalizedEmail });
+
+    const user = new User({
+      name: name.trim(),
+      email: normalizedEmail,
+      username: normalizedUsername,
+      password,
+      role: 'student',
+      authProvider: 'local',
+      hostels: [hostel],
+    });
+
+    if (student) {
+      user.studentId = student._id;
+      await user.save();
+      student.userId = user._id;
+      await student.save();
+    } else {
+      await user.save();
+      student = await Student.create({
+        userId: user._id,
+        name: user.name,
+        username: user.username,
+        email: normalizedEmail,
+        phone: phone || '',
+        hostel,
+        fees: 0,
+      });
+      user.studentId = student._id;
+      await user.save({ validateBeforeSave: false });
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user._id);
+    user.refreshTokens.push(refreshToken);
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Account created successfully',
+      accessToken,
+      refreshToken,
+      user: user.toJSON(),
+      student,
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Registration failed' });
   }
 };
 
@@ -393,6 +661,7 @@ const resetPassword = async (req, res) => {
 
 module.exports = { 
   login, adminLogin, registerAdmin, refreshToken, logout, getMe, 
-  checkAdminExists, getAdmins, deleteAdmin, requestPasswordReset, resetPassword 
+  checkAdminExists, getAdmins, deleteAdmin, requestPasswordReset, resetPassword,
+  googleLogin, registerStudent
 };
 

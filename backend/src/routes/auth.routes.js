@@ -15,17 +15,23 @@ const {
   deleteAdmin,
   requestPasswordReset,
   resetPassword,
+  googleLogin,
+  registerStudent,
 } = require('../controllers/auth.controller');
 const User = require('../models/User');
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per `window` (here, per 15 minutes)
-  message: { success: false, message: 'Too many login attempts from this IP, please try again after 15 minutes.' }
+  max: 15, // Limit each IP to 15 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many authentication attempts, please try again after 15 minutes.' }
 });
 
 router.post('/login', authLimiter, login);
 router.post('/admin/login', authLimiter, adminLogin);
+router.post('/google', authLimiter, googleLogin);
+router.post('/register', authLimiter, registerStudent);
 router.post('/register-admin', authLimiter, registerAdmin);
 router.post('/refresh', refreshToken);
 router.post('/logout', protect, logout);

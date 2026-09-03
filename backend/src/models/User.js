@@ -6,7 +6,11 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     username: { type: String, unique: true, sparse: true, trim: true },
-    password: { type: String, required: true, minlength: 6 },
+    password: { 
+      type: String, 
+      required: function () { return this.authProvider !== 'google'; }, 
+      minlength: 6 
+    },
     role: { type: String, enum: ['super_admin', 'admin', 'student', 'warden', 'accountant', 'staff'], default: 'student' },
     isSuperAdmin: { type: Boolean, default: false },
     activeOrganizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
@@ -19,9 +23,22 @@ const userSchema = new mongoose.Schema(
     refreshTokens: [{ type: String }],
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
+
+    // Security & Anti-Brute-Force Lockout
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date, default: null },
+
+    // Google OAuth & Hybrid Auth
+    googleId: { type: String, sparse: true },
+    authProvider: { type: String, enum: ['local', 'google', 'both'], default: 'local' },
   },
   { timestamps: true }
 );
+
+// Method: Check if account is locked
+userSchema.methods.isLocked = function () {
+  return !!(this.lockUntil && this.lockUntil > Date.now());
+};
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {

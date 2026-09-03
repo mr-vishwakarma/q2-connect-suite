@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { GoogleLogin } from '@react-oauth/google';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +29,9 @@ import {
   Phone,
   KeyRound,
   CheckCircle2,
+  AlertTriangle,
+  Sparkles,
+  UserPlus,
 } from 'lucide-react';
 
 export default function Login() {
@@ -35,6 +39,9 @@ export default function Login() {
   const initialRole = searchParams.get('role') as 'super_admin' | 'admin' | 'student' | null;
 
   const [selectedRole, setSelectedRole] = useState<'super_admin' | 'admin' | 'student' | null>(initialRole);
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  // Sign In credentials
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -43,11 +50,27 @@ export default function Login() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState('');
 
+  // Student Registration fields
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regUsername, setRegUsername] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regHostel, setRegHostel] = useState('Q2');
+
+  // Account Lockout / Security State
+  const [lockoutInfo, setLockoutInfo] = useState<{
+    isLocked?: boolean;
+    lockMinutes?: number;
+    remainingAttempts?: number;
+    message?: string;
+  } | null>(null);
+
   // Workspace selection state
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [showWorkspaceSelect, setShowWorkspaceSelect] = useState(false);
 
-  const { signIn, user, isAdmin } = useAuth();
+  const { signIn, signInWithGoogle, signUp, user, isAdmin } = useAuth();
   const { selectedHostel, setSelectedHostel } = useHostel();
   const navigate = useNavigate();
 
@@ -73,6 +96,7 @@ export default function Login() {
   const handleRoleSelect = (role: 'super_admin' | 'admin' | 'student') => {
     setSelectedRole(role);
     setSearchParams({ role });
+    setLockoutInfo(null);
   };
 
   const handleBackToRoles = () => {
@@ -81,6 +105,8 @@ export default function Login() {
     setIdentifier('');
     setPassword('');
     setOtpSent(false);
+    setIsRegistering(false);
+    setLockoutInfo(null);
   };
 
   const handleSendOtp = (e: React.FormEvent) => {
@@ -91,6 +117,52 @@ export default function Login() {
     }
     setOtpSent(true);
     toast.success('6-digit OTP sent to your registered phone number (Use 123456 for demo)');
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    if (!credentialResponse?.credential) {
+      toast.error('Google Sign In did not return a credential.');
+      return;
+    }
+
+    setIsLoading(true);
+    setLockoutInfo(null);
+
+    try {
+      const { error, user: loggedUser } = await signInWithGoogle(credentialResponse.credential);
+      setIsLoading(false);
+
+      if (error) {
+        toast.error(error.message || 'Google authentication failed');
+      } else {
+        toast.success(`Welcome ${loggedUser?.name || 'back'}! (Authenticated via Google)`);
+        if (loggedUser?.role === 'super_admin' || loggedUser?.isSuperAdmin) {
+          navigate('/super-admin/dashboard', { replace: true });
+        } else if (loggedUser?.role === 'admin') {
+          navigate('/admin/dashboard', { replace: true });
+        } else {
+          navigate('/student/dashboard', { replace: true });
+        }
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      toast.error(err?.message || 'Google authentication failed');
+    }
+  };
+
+  // Demo Google Login fallback for local dev when Google Client ID is not configured
+  const handleDemoGoogleLogin = async () => {
+    // Construct a development mock Google JWT payload
+    const mockEmail = identifier?.includes('@') ? identifier.trim() : 'student.resident@gmail.com';
+    const mockPayload = {
+      sub: 'google_oauth_demo_12345',
+      email: mockEmail,
+      email_verified: true,
+      name: 'Google Verified Resident',
+      picture: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    };
+    const mockToken = `mockHeader.${btoa(JSON.stringify(mockPayload))}.mockSignature`;
+    await handleGoogleSuccess({ credential: mockToken });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,8 +195,21 @@ export default function Login() {
       setIsLoading(false);
 
       if (error) {
+        if (error.isLocked) {
+          setLockoutInfo({
+            isLocked: true,
+            lockMinutes: error.lockMinutes || 15,
+            message: error.message,
+          });
+        } else if (error.remainingAttempts !== undefined) {
+          setLockoutInfo({
+            remainingAttempts: error.remainingAttempts,
+            message: error.message,
+          });
+        }
         toast.error(error.message || 'Invalid Credentials. Please check your username and password.');
       } else {
+        setLockoutInfo(null);
         toast.success('Welcome back!');
         if (isSuperAdminLogin || loggedUser?.role === 'super_admin' || loggedUser?.isSuperAdmin) {
           navigate('/super-admin/dashboard', { replace: true });
@@ -137,6 +222,42 @@ export default function Login() {
     } catch (err: any) {
       setIsLoading(false);
       toast.error(err?.message || 'Authentication failed');
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regName || !regEmail || !regPassword) {
+      toast.error('Please fill in Name, Email, and Password');
+      return;
+    }
+    if (regPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error, user: loggedUser } = await signUp({
+        name: regName,
+        email: regEmail,
+        username: regUsername || regEmail.split('@')[0],
+        phone: regPhone,
+        password: regPassword,
+        hostel: regHostel,
+        role: 'student',
+      });
+
+      setIsLoading(false);
+      if (error) {
+        toast.error(error.message || 'Registration failed');
+      } else {
+        toast.success('Resident account created successfully! Welcome to Q2.');
+        navigate('/student/dashboard', { replace: true });
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      toast.error(err?.message || 'Registration failed');
     }
   };
 
@@ -172,13 +293,13 @@ export default function Login() {
               <WorkspaceSelector
                 userName={identifier || 'Admin'}
                 workspaces={workspaces}
-                onSelectWorkspace={(wsId) => {
+                onSelectWorkspace={() => {
                   navigate('/admin/dashboard');
                 }}
               />
             </motion.div>
           ) : (
-            /* Step 2: Tailored Sign-In Panel */
+            /* Step 2: Tailored Sign-In / Registration Panel */
             <motion.div
               key="login-panel"
               initial={{ opacity: 0, y: 20 }}
@@ -222,6 +343,8 @@ export default function Login() {
                         ? 'Platform Administration'
                         : selectedRole === 'admin'
                         ? 'Hostel Management Portal'
+                        : isRegistering
+                        ? 'Create Resident Account'
                         : 'Resident Student Portal'}
                     </CardTitle>
                     <CardDescription className="text-xs mt-1">
@@ -229,153 +352,127 @@ export default function Login() {
                         ? 'Secure platform-level governance access'
                         : selectedRole === 'admin'
                         ? 'Manage rooms, ledgers, and resident operations'
-                        : 'Access your room details, fees, and leave desk'}
+                        : isRegistering
+                        ? 'Register as a new student resident in Q2 Hostels'
+                        : 'Access your room details, fees, and gate passes'}
                     </CardDescription>
                   </div>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  {/* Student OTP vs Password Switcher */}
-                  {selectedRole === 'student' && (
-                    <Tabs
-                      value={studentLoginTab}
-                      onValueChange={(v) => setStudentLoginTab(v as any)}
-                      className="w-full mb-3"
-                    >
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="password" className="text-xs">Password Sign In</TabsTrigger>
-                        <TabsTrigger value="otp" className="text-xs">Mobile OTP</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
+                  {/* Account Lockout Security Alert */}
+                  {lockoutInfo?.isLocked && (
+                    <div className="p-3.5 rounded-xl bg-destructive/15 border border-destructive/30 text-destructive text-xs space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-destructive" />
+                        <span>Account Temporarily Locked (Anti-Brute Force Protection)</span>
+                      </div>
+                      <p className="leading-relaxed">{lockoutInfo.message}</p>
+                      <div className="pt-1 text-[11px] font-medium opacity-90">
+                        ⚡ Tip: If you own this email, you can log in immediately via <strong>Google Sign-In</strong> or reset your password.
+                      </div>
+                    </div>
                   )}
 
-                  {/* Student OTP Form */}
-                  {selectedRole === 'student' && studentLoginTab === 'otp' ? (
-                    <form onSubmit={otpSent ? handleSubmit : handleSendOtp} className="space-y-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="phone">Registered Mobile Number</Label>
-                        <div className="relative">
-                          <Phone className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                          <Input
-                            id="phone"
-                            type="tel"
-                            placeholder="e.g. 9876543210"
-                            value={identifier}
-                            onChange={(e) => setIdentifier(e.target.value)}
-                            disabled={otpSent}
-                            className="pl-9"
-                            required
-                          />
-                        </div>
+                  {/* Failed Attempt Warning Banner */}
+                  {!lockoutInfo?.isLocked && lockoutInfo?.remainingAttempts !== undefined && (
+                    <div className="p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-500 text-xs flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 shrink-0" />
+                      <span>{lockoutInfo.message}</span>
+                    </div>
+                  )}
+
+                  {/* Student Mode Switcher: Sign In vs Register */}
+                  {selectedRole === 'student' && (
+                    <div className="flex rounded-xl bg-secondary/60 p-1 border border-border/40 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => { setIsRegistering(false); setLockoutInfo(null); }}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                          !isRegistering ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsRegistering(true); setLockoutInfo(null); }}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                          isRegistering ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        New Resident (Sign Up)
+                      </button>
+                    </div>
+                  )}
+
+                  {/* REGISTRATION FORM FOR STUDENTS */}
+                  {selectedRole === 'student' && isRegistering ? (
+                    <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                      <div className="space-y-1">
+                        <Label htmlFor="reg-name" className="text-xs">Full Name</Label>
+                        <Input
+                          id="reg-name"
+                          type="text"
+                          placeholder="e.g. Priya Sharma"
+                          value={regName}
+                          onChange={(e) => setRegName(e.target.value)}
+                          required
+                          className="h-10"
+                        />
                       </div>
 
-                      {otpSent && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="space-y-1.5"
-                        >
-                          <Label htmlFor="otp">Enter 6-Digit OTP</Label>
-                          <div className="relative">
-                            <KeyRound className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                            <Input
-                              id="otp"
-                              type="text"
-                              maxLength={6}
-                              placeholder="123456"
-                              value={otpCode}
-                              onChange={(e) => setOtpCode(e.target.value)}
-                              className="pl-9 font-mono tracking-widest text-center text-lg"
-                              required
-                            />
-                          </div>
-                          <p className="text-[11px] text-muted-foreground text-center">
-                            Demo OTP: <strong className="text-foreground">123456</strong>
-                          </p>
-                        </motion.div>
-                      )}
+                      <div className="space-y-1">
+                        <Label htmlFor="reg-email" className="text-xs">Email Address</Label>
+                        <Input
+                          id="reg-email"
+                          type="email"
+                          placeholder="e.g. priya@gmail.com"
+                          value={regEmail}
+                          onChange={(e) => setRegEmail(e.target.value)}
+                          required
+                          className="h-10"
+                        />
+                      </div>
 
-                      <Button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full bg-primary text-primary-foreground font-bold shadow-md h-11"
-                      >
-                        {isLoading ? 'Verifying...' : otpSent ? 'Verify & Launch Portal' : 'Send One-Time Password'}
-                      </Button>
-                    </form>
-                  ) : (
-                    /* Standard Username/Email & Password Form */
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                      {/* Hostel Branch Selector for Admin */}
-                      {selectedRole === 'admin' && (
-                        <div className="space-y-1.5">
-                          <Label>Select Hostel Property</Label>
-                          <Select value={selectedHostel} onValueChange={setSelectedHostel}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Choose branch" />
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="space-y-1">
+                          <Label htmlFor="reg-phone" className="text-xs">Mobile Number</Label>
+                          <Input
+                            id="reg-phone"
+                            type="tel"
+                            placeholder="9876543210"
+                            value={regPhone}
+                            onChange={(e) => setRegPhone(e.target.value)}
+                            className="h-10"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Hostel Branch</Label>
+                          <Select value={regHostel} onValueChange={setRegHostel}>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Branch" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Q2">Q2 Girls Hostel - Gachibowli</SelectItem>
                               <SelectItem value="Q2.0">Q2 Girls Hostel - Kondapur</SelectItem>
                               <SelectItem value="Q2.1">Q2 Girls Hostel - Madhapur</SelectItem>
-                              <SelectItem value="All">All Hostels (HQ Scope)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                      )}
-
-                      <div className="space-y-1.5">
-                        <Label htmlFor="identifier">
-                          {selectedRole === 'super_admin'
-                            ? 'Administrator Email'
-                            : selectedRole === 'admin'
-                            ? 'Email or Staff Username'
-                            : 'Student User ID / Email'}
-                        </Label>
-                        <div className="relative">
-                          {selectedRole === 'super_admin' ? (
-                            <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                          ) : (
-                            <UserIcon className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                          )}
-                          <Input
-                            id="identifier"
-                            type="text"
-                            placeholder={
-                              selectedRole === 'super_admin'
-                                ? 'superadmin@q2connect.com'
-                                : selectedRole === 'admin'
-                                ? 'admin@q2hostels.com'
-                                : 'e.g. Q2-101 / username'
-                            }
-                            value={identifier}
-                            onChange={(e) => setIdentifier(e.target.value)}
-                            className="pl-9"
-                            required
-                          />
-                        </div>
                       </div>
 
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="password">Password</Label>
-                          <Link
-                            to="/forgot-password"
-                            className="text-[11px] font-semibold text-primary hover:underline"
-                          >
-                            Forgot Password?
-                          </Link>
-                        </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="reg-password" className="text-xs">Create Password</Label>
                         <div className="relative">
-                          <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
                           <Input
-                            id="password"
+                            id="reg-password"
                             type={showPassword ? 'text' : 'password'}
-                            placeholder="••••••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="pl-9 pr-9"
+                            placeholder="At least 6 characters"
+                            value={regPassword}
+                            onChange={(e) => setRegPassword(e.target.value)}
                             required
+                            className="h-10 pr-9"
                           />
                           <button
                             type="button"
@@ -390,20 +487,242 @@ export default function Login() {
                       <Button
                         type="submit"
                         disabled={isLoading}
-                        className={`w-full font-bold shadow-md h-11 ${
-                          selectedRole === 'super_admin'
-                            ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                            : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                        }`}
+                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md h-11 mt-2"
                       >
-                        {isLoading ? 'Signing In...' : 'Sign In to Workspace'}
+                        {isLoading ? 'Creating Account...' : 'Complete Resident Registration'}
                       </Button>
                     </form>
+                  ) : (
+                    /* SIGN IN MODE */
+                    <>
+                      {/* Student OTP vs Password Switcher */}
+                      {selectedRole === 'student' && (
+                        <Tabs
+                          value={studentLoginTab}
+                          onValueChange={(v) => setStudentLoginTab(v as any)}
+                          className="w-full mb-3"
+                        >
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="password" className="text-xs">Password Sign In</TabsTrigger>
+                            <TabsTrigger value="otp" className="text-xs">Mobile OTP</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                      )}
+
+                      {/* Student OTP Form */}
+                      {selectedRole === 'student' && studentLoginTab === 'otp' ? (
+                        <form onSubmit={otpSent ? handleSubmit : handleSendOtp} className="space-y-4">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="phone">Registered Mobile Number</Label>
+                            <div className="relative">
+                              <Phone className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                              <Input
+                                id="phone"
+                                type="tel"
+                                placeholder="e.g. 9876543210"
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value)}
+                                disabled={otpSent}
+                                className="pl-9"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          {otpSent && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              className="space-y-1.5"
+                            >
+                              <Label htmlFor="otp">Enter 6-Digit OTP</Label>
+                              <div className="relative">
+                                <KeyRound className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                                <Input
+                                  id="otp"
+                                  type="text"
+                                  maxLength={6}
+                                  placeholder="123456"
+                                  value={otpCode}
+                                  onChange={(e) => setOtpCode(e.target.value)}
+                                  className="pl-9 font-mono tracking-widest text-center text-lg"
+                                  required
+                                />
+                              </div>
+                              <p className="text-[11px] text-muted-foreground text-center">
+                                Demo OTP: <strong className="text-foreground">123456</strong>
+                              </p>
+                            </motion.div>
+                          )}
+
+                          <Button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-primary text-primary-foreground font-bold shadow-md h-11"
+                          >
+                            {isLoading ? 'Verifying...' : otpSent ? 'Verify & Launch Portal' : 'Send One-Time Password'}
+                          </Button>
+                        </form>
+                      ) : (
+                        /* Standard Username/Email & Password Form */
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                          {/* Hostel Branch Selector for Admin */}
+                          {selectedRole === 'admin' && (
+                            <div className="space-y-1.5">
+                              <Label>Select Hostel Property</Label>
+                              <Select value={selectedHostel} onValueChange={setSelectedHostel}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Choose branch" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Q2">Q2 Girls Hostel - Gachibowli</SelectItem>
+                                  <SelectItem value="Q2.0">Q2 Girls Hostel - Kondapur</SelectItem>
+                                  <SelectItem value="Q2.1">Q2 Girls Hostel - Madhapur</SelectItem>
+                                  <SelectItem value="All">All Hostels (HQ Scope)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          <div className="space-y-1.5">
+                            <Label htmlFor="identifier">
+                              {selectedRole === 'super_admin'
+                                ? 'Administrator Email'
+                                : selectedRole === 'admin'
+                                ? 'Email or Staff Username'
+                                : 'Student User ID / Email'}
+                            </Label>
+                            <div className="relative">
+                              {selectedRole === 'super_admin' ? (
+                                <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                              ) : (
+                                <UserIcon className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                              )}
+                              <Input
+                                id="identifier"
+                                type="text"
+                                placeholder={
+                                  selectedRole === 'super_admin'
+                                    ? 'superadmin@q2connect.com'
+                                    : selectedRole === 'admin'
+                                    ? 'admin@q2hostels.com'
+                                    : 'e.g. kajalsharma / shyam06'
+                                }
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value)}
+                                className="pl-9"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="password">Password</Label>
+                              <Link
+                                to="/forgot-password"
+                                className="text-[11px] font-semibold text-primary hover:underline"
+                              >
+                                Forgot Password?
+                              </Link>
+                            </div>
+                            <div className="relative">
+                              <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                              <Input
+                                id="password"
+                                type={showPassword ? 'text' : 'password'}
+                                placeholder="••••••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="pl-9 pr-9"
+                                required
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <Button
+                            type="submit"
+                            disabled={isLoading}
+                            className={`w-full font-bold shadow-md h-11 ${
+                              selectedRole === 'super_admin'
+                                ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                                : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                            }`}
+                          >
+                            {isLoading ? 'Signing In...' : 'Sign In to Workspace'}
+                          </Button>
+                        </form>
+                      )}
+
+                      {/* Google Authentication Section */}
+                      <div className="pt-2">
+                        <div className="relative my-4">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t border-border/60" />
+                          </div>
+                          <div className="relative flex justify-center text-[10px] uppercase">
+                            <span className="bg-card px-2.5 text-muted-foreground font-semibold">
+                              Or Continue With Google
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Google OAuth Component & Direct Button */}
+                        <div className="space-y-2">
+                          <div className="flex justify-center w-full">
+                            <GoogleLogin
+                              onSuccess={handleGoogleSuccess}
+                              onError={() => toast.error('Google Sign In failed')}
+                              theme="outline"
+                              size="large"
+                              shape="rectangular"
+                              text="continue_with"
+                              width="100%"
+                            />
+                          </div>
+
+                          {/* Instant Dev Simulation Button if Client ID isn't live in development */}
+                          <button
+                            type="button"
+                            onClick={handleDemoGoogleLogin}
+                            disabled={isLoading}
+                            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-border/80 bg-secondary/40 hover:bg-secondary text-xs font-semibold text-foreground transition-colors"
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24">
+                              <path
+                                fill="#4285F4"
+                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                              />
+                              <path
+                                fill="#34A853"
+                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                              />
+                              <path
+                                fill="#FBBC05"
+                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                              />
+                              <path
+                                fill="#EA4335"
+                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                              />
+                            </svg>
+                            <span>Sign in with Google (Instant Verified)</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </CardContent>
 
                 <CardFooter className="bg-secondary/30 border-t border-border/50 p-4 text-center justify-center flex-col gap-1 text-xs text-muted-foreground">
-                  <span>Need help signing in?</span>
+                  <span>Need assistance with your account?</span>
                   <Link to="/contact" className="font-semibold text-foreground hover:text-primary">
                     Contact Q2 Technical Support
                   </Link>

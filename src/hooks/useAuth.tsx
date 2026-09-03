@@ -27,9 +27,9 @@ interface AuthContextType {
   isPrimaryAdmin: boolean;
   profile: Profile | null;
   features: Record<string, boolean>;
-  hasFeature: (featureKey: string) => boolean;
-  signIn: (email: string, password: string, isAdminLogin?: boolean) => Promise<{ error: Error | null; user?: any }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string, isAdminLogin?: boolean) => Promise<{ error: any; user?: any }>;
+  signInWithGoogle: (credential: string) => Promise<{ error: any; user?: any }>;
+  signUp: (payload: { name: string; email: string; password: string; username?: string; phone?: string; hostel?: string } | any) => Promise<{ error: any; user?: any }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -157,119 +157,109 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const handleAuthSuccess = (data: any) => {
+    const { accessToken, refreshToken, user: userData, student } = data;
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+
+    const mappedUser: User = {
+      id: userData._id || userData.id,
+      name: userData.name,
+      email: userData.email,
+      username: userData.username,
+      role: userData.role,
+      isSuperAdmin: userData.role === 'super_admin' || !!userData.isSuperAdmin,
+    };
+
+    setUser(mappedUser);
+    setIsSuperAdmin(userData.role === 'super_admin' || !!userData.isSuperAdmin);
+    setIsAdmin(userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin);
+    setIsPrimaryAdmin(userData.role === 'admin' || userData.role === 'super_admin');
+
+    if (student) {
+      setProfile({
+        id: student._id || student.id,
+        user_id: userData._id || userData.id,
+        name: student.name,
+        email: student.email,
+        username: student.username,
+        profilePhoto: student.profilePhoto,
+      });
+    } else {
+      setProfile({
+        id: userData._id || userData.id,
+        user_id: userData._id || userData.id,
+        name: userData.name,
+        email: userData.email,
+        username: userData.username,
+        profilePhoto: userData.profilePhoto,
+      });
+    }
+
+    // Connect Socket
+    try {
+      const socket = getSocket();
+      socket.connect();
+      if (userData.role === 'student' && student?.hostel) {
+        socket.emit('join:hostel', student.hostel);
+      }
+    } catch (socketErr) {
+      console.warn('Socket connection failed:', socketErr);
+    }
+
+    return mappedUser;
+  };
+
   const signIn = async (identifier: string, password: string, isAdminLogin: boolean = false) => {
     try {
-      let response;
-      response = await api.post(
+      const response = await api.post(
         isAdminLogin ? '/auth/admin/login' : '/auth/login',
         { email: identifier, username: identifier, password }
       );
 
       if (response.data?.success) {
-        const { accessToken, refreshToken, user: userData, student } = response.data;
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-
-        const mappedUser: User = {
-          id: userData._id,
-          name: userData.name,
-          email: userData.email,
-          username: userData.username,
-          role: userData.role,
-          isSuperAdmin: userData.isSuperAdmin || userData.role === 'super_admin',
-        };
-
-        setUser(mappedUser);
-        setIsSuperAdmin(userData.role === 'super_admin' || !!userData.isSuperAdmin);
-        setIsAdmin(userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin);
-        setIsPrimaryAdmin(userData.role === 'admin' || userData.role === 'super_admin');
-
-        if (student) {
-          setProfile({
-            id: student._id,
-            user_id: userData._id,
-            name: student.name,
-            email: student.email,
-            username: student.username,
-            profilePhoto: student.profilePhoto,
-          });
-        } else {
-          setProfile({
-            id: userData._id,
-            user_id: userData._id,
-            name: userData.name,
-            email: userData.email,
-            username: userData.username,
-            profilePhoto: userData.profilePhoto,
-          });
-        }
-
-        // Connect Socket
-        try {
-          const socket = getSocket();
-          socket.connect();
-          if (userData.role === 'student' && student) {
-            socket.emit('join:hostel', student.hostel);
-          }
-        } catch (socketErr) {
-          console.warn('Socket connection failed:', socketErr);
-        }
-
+        const mappedUser = handleAuthSuccess(response.data);
         return { error: null, user: mappedUser };
       }
       return { error: new Error('Login failed') };
     } catch (err: any) {
-      console.error(err);
-      return { error: new Error(err.response?.data?.message || err.message || 'Login failed') };
+      const data = err.response?.data;
+      const errorObj: any = new Error(data?.message || err.message || 'Login failed');
+      errorObj.isLocked = data?.isLocked;
+      errorObj.lockMinutes = data?.lockMinutes;
+      errorObj.remainingAttempts = data?.remainingAttempts;
+      return { error: errorObj };
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signInWithGoogle = async (credential: string) => {
     try {
-      const response = await api.post('/auth/register-admin', {
-        name,
-        email,
-        password,
-      });
+      const response = await api.post('/auth/google', { credential });
+      if (response.data?.success) {
+        const mappedUser = handleAuthSuccess(response.data);
+        return { error: null, user: mappedUser };
+      }
+      return { error: new Error('Google authentication failed') };
+    } catch (err: any) {
+      const data = err.response?.data;
+      const errorObj: any = new Error(data?.message || err.message || 'Google authentication failed');
+      return { error: errorObj };
+    }
+  };
+
+  const signUp = async (payload: any) => {
+    try {
+      const endpoint = payload.role === 'admin' ? '/auth/register-admin' : '/auth/register';
+      const response = await api.post(endpoint, payload);
 
       if (response.data?.success) {
-        const { accessToken, refreshToken, user: userData } = response.data;
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-
-        const mappedUser: User = {
-          id: userData._id,
-          name: userData.name,
-          email: userData.email,
-          role: userData.role,
-        };
-
-        setUser(mappedUser);
-        setIsAdmin(userData.role === 'admin');
-        setIsPrimaryAdmin(userData.role === 'admin');
-        setProfile({
-          id: userData._id,
-          user_id: userData._id,
-          name: userData.name,
-          email: userData.email,
-          username: null,
-          profilePhoto: userData.profilePhoto,
-        });
-
-        // Connect Socket
-        try {
-          const socket = getSocket();
-          socket.connect();
-        } catch (socketErr) {
-          console.warn('Socket connection failed:', socketErr);
-        }
-
-        return { error: null };
+        const mappedUser = handleAuthSuccess(response.data);
+        return { error: null, user: mappedUser };
       }
       return { error: new Error('Signup failed') };
     } catch (err: any) {
-      console.error(err);
-      return { error: new Error(err.response?.data?.message || err.message || 'Signup failed') };
+      const data = err.response?.data;
+      return { error: new Error(data?.message || err.message || 'Signup failed') };
     }
   };
 

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth.middleware');
 
-// @desc    Chat endpoint (replaces Supabase edge function)
+// @desc    Chat endpoint (AI assistant)
 // @route   POST /api/chat
 // @access  Private
 // Note: This is a simple AI chat passthrough. Extend with your preferred AI provider (OpenAI, Gemini, etc.)

@@ -7,6 +7,16 @@ export const authService = {
     return res.data;
   },
 
+  async googleLogin(credential: string): Promise<ApiResponse<AuthResponse>> {
+    const res = await api.post('/auth/google', { credential });
+    return res.data;
+  },
+
+  async register(payload: { name: string; email: string; username?: string; phone?: string; password: string; hostel?: string }): Promise<ApiResponse<AuthResponse>> {
+    const res = await api.post('/auth/register', payload);
+    return res.data;
+  },
+
   async registerAdmin(payload: any): Promise<ApiResponse<any>> {
     const res = await api.post('/auth/register-admin', payload);
     return res.data;

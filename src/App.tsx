@@ -130,9 +130,12 @@ function SuperAdminShell() {
   );
 }
 
+import { GoogleOAuthProvider } from '@react-oauth/google';
+
 const App = () => (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || "demo-q2-client-id"}>
       <AuthProvider>
         <HostelProvider>
           <Toaster />
@@ -208,6 +211,7 @@ const App = () => (
           </BrowserRouter>
         </HostelProvider>
       </AuthProvider>
+      </GoogleOAuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
