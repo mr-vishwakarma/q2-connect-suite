@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
-    "build": "echo 'No build step required'"
+    "build": "echo 'No build step required'",
+    "db:reset": "node src/scripts/resetDatabase.js",
+    "seed:saas": "node src/scripts/seedSaaSEnvironment.js"
   },
   "dependencies": {
     "@imagekit/nodejs": "^7.10.0",

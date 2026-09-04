@@ -8,7 +8,8 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:reset": "npm --prefix backend run db:reset"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
