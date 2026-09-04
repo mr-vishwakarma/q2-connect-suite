@@ -122,6 +122,7 @@ export default function AllStudents() {
   // Approval Workflow State
   const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active');
   const [pendingRegistrations, setPendingRegistrations] = useState<PendingApplicant[]>([]);
+  const [pendingBranchFilter, setPendingBranchFilter] = useState<'All' | 'Q2' | 'Q2.0' | 'Q2.1'>('All');
   const [isPendingLoading, setIsPendingLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
@@ -139,11 +140,15 @@ export default function AllStudents() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const fetchPendingRegistrations = useCallback(async () => {
+  const fetchPendingRegistrations = useCallback(async (filterOverride?: string) => {
     try {
       setIsPendingLoading(true);
+      const branchParam = filterOverride !== undefined ? filterOverride : pendingBranchFilter;
       const res = await api.get('/students/pending-registrations', {
-        params: { hostel: selectedHostel, _t: Date.now() },
+        params: {
+          hostel: branchParam === 'All' ? undefined : branchParam,
+          _t: Date.now(),
+        },
       });
       if (res.data?.success) {
         setPendingRegistrations(res.data.data || []);
@@ -153,14 +158,19 @@ export default function AllStudents() {
     } finally {
       setIsPendingLoading(false);
     }
-  }, [selectedHostel]);
+  }, [pendingBranchFilter]);
 
   useEffect(() => {
     if (user && isAdmin) {
       fetchStudents();
+    }
+  }, [user, isAdmin, selectedHostel, currentPage, debouncedSearch, fetchStudents]);
+
+  useEffect(() => {
+    if (user && isAdmin) {
       fetchPendingRegistrations();
     }
-  }, [user, isAdmin, selectedHostel, currentPage, debouncedSearch, fetchPendingRegistrations]);
+  }, [user, isAdmin, pendingBranchFilter, fetchPendingRegistrations]);
 
   const handleApproveRegistration = async (applicantId: string, applicantName: string) => {
     try {
@@ -386,6 +396,30 @@ export default function AllStudents() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-4"
         >
+          {/* Branch Quick Filter for Pending Approvals */}
+          <div className="flex items-center justify-between gap-2 flex-wrap pb-1">
+            <div className="flex items-center gap-1.5 bg-secondary/50 p-1 rounded-xl border border-border/60">
+              {(['All', 'Q2', 'Q2.0', 'Q2.1'] as const).map((branch) => (
+                <button
+                  key={branch}
+                  type="button"
+                  onClick={() => setPendingBranchFilter(branch)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-semibold rounded-lg transition-all",
+                    pendingBranchFilter === branch
+                      ? "bg-card text-foreground shadow-sm font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {branch === 'All' ? 'All Branches' : branch}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Showing {pendingRegistrations.length} pending applicant{pendingRegistrations.length === 1 ? '' : 's'}
+            </p>
+          </div>
+
           {isPendingLoading ? (
             <div className="py-8"><InlineSkeletonList rows={3} /></div>
           ) : pendingRegistrations.length === 0 ? (

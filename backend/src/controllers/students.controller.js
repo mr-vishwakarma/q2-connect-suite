@@ -416,9 +416,20 @@ const getPendingRegistrations = async (req, res) => {
       role: 'student',
       registrationStatus: 'pending_approval',
     };
-    if (hostel && hostel !== 'All') {
-      query['registrationDetails.hostel'] = hostel;
+
+    if (hostel && hostel.toLowerCase() !== 'all') {
+      query.$or = [
+        { 'registrationDetails.hostel': hostel },
+        { hostels: hostel },
+      ];
+    } else if (req.user && req.user.role === 'admin' && req.user.hostels && req.user.hostels.length > 0 && !req.user.isSuperAdmin) {
+      // If admin has restricted branch access, only show pending applicants for their branches
+      query.$or = [
+        { 'registrationDetails.hostel': { $in: req.user.hostels } },
+        { hostels: { $in: req.user.hostels } },
+      ];
     }
+
     const pendingUsers = await User.find(query).sort({ 'registrationDetails.submittedAt': -1, createdAt: -1 });
     return res.status(200).json({
       success: true,
