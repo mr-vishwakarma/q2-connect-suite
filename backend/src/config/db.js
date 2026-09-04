@@ -9,9 +9,12 @@ try {
   console.warn('DNS server override notice:', err.message);
 }
 
+const ACTUAL_MONGODB_URI = 'mongodb+srv://mayurvish:Mayur2003%21%40%23%24@complete-backend.pqjcnsk.mongodb.net/q2connect?retryWrites=true&w=majority';
+
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+    const mongoUri = process.env.MONGODB_URI || ACTUAL_MONGODB_URI;
+    const conn = await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 10000,
     });
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);

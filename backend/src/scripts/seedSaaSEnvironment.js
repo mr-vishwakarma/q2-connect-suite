@@ -118,8 +118,8 @@ const SEED_PLANS = [
 ];
 
 async function seedSaaSEnvironment() {
-  try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/q2-connect';
+    const actualMongoUri = 'mongodb+srv://mayurvish:Mayur2003%21%40%23%24@complete-backend.pqjcnsk.mongodb.net/q2connect?retryWrites=true&w=majority';
+    const mongoUri = process.env.MONGODB_URI || actualMongoUri;
     console.log('Connecting to MongoDB at:', mongoUri);
     await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB.');
