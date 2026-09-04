@@ -140,71 +140,6 @@ export default function AllStudents() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const fetchPendingRegistrations = useCallback(async (filterOverride?: string) => {
-    try {
-      setIsPendingLoading(true);
-      const branchParam = filterOverride !== undefined ? filterOverride : pendingBranchFilter;
-      const res = await api.get('/students/pending-registrations', {
-        params: {
-          hostel: branchParam === 'All' ? undefined : branchParam,
-          _t: Date.now(),
-        },
-      });
-      if (res.data?.success) {
-        setPendingRegistrations(res.data.data || []);
-      }
-    } catch (err) {
-      console.error('Failed to load pending registrations:', err);
-    } finally {
-      setIsPendingLoading(false);
-    }
-  }, [pendingBranchFilter]);
-
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchStudents();
-    }
-  }, [user, isAdmin, selectedHostel, currentPage, debouncedSearch, fetchStudents]);
-
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchPendingRegistrations();
-    }
-  }, [user, isAdmin, pendingBranchFilter, fetchPendingRegistrations]);
-
-  const handleApproveRegistration = async (applicantId: string, applicantName: string) => {
-    try {
-      setActionLoadingId(applicantId);
-      const res = await api.post(`/students/approve-registration/${applicantId}`);
-      if (res.data?.success) {
-        toast.success(`Registration approved for ${applicantName}! The resident can now sign in with Google to set their credentials.`);
-        setPendingRegistrations((prev) => prev.filter((item) => item.id !== applicantId));
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to approve registration');
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  const handleRejectRegistration = async (applicantId: string, applicantName: string) => {
-    const reason = window.prompt(`Enter reason for declining ${applicantName}'s registration (optional):`, 'Does not meet current room vacancy requirements');
-    if (reason === null) return;
-
-    try {
-      setActionLoadingId(applicantId);
-      const res = await api.post(`/students/reject-registration/${applicantId}`, { reason });
-      if (res.data?.success) {
-        toast.info(`Declined registration for ${applicantName}.`);
-        setPendingRegistrations((prev) => prev.filter((item) => item.id !== applicantId));
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to decline registration');
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
   const fetchStudents = useCallback(async () => {
     try {
       setIsLoading(prev => prev);
@@ -241,7 +176,72 @@ export default function AllStudents() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedHostel]);
+  }, [selectedHostel, debouncedSearch, currentPage]);
+
+  const fetchPendingRegistrations = useCallback(async (filterOverride?: string) => {
+    try {
+      setIsPendingLoading(true);
+      const branchParam = filterOverride !== undefined ? filterOverride : pendingBranchFilter;
+      const res = await api.get('/students/pending-registrations', {
+        params: {
+          hostel: branchParam === 'All' ? undefined : branchParam,
+          _t: Date.now(),
+        },
+      });
+      if (res.data?.success) {
+        setPendingRegistrations(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load pending registrations:', err);
+    } finally {
+      setIsPendingLoading(false);
+    }
+  }, [pendingBranchFilter]);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchStudents();
+    }
+  }, [user, isAdmin, fetchStudents]);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchPendingRegistrations();
+    }
+  }, [user, isAdmin, fetchPendingRegistrations]);
+
+  const handleApproveRegistration = async (applicantId: string, applicantName: string) => {
+    try {
+      setActionLoadingId(applicantId);
+      const res = await api.post(`/students/approve-registration/${applicantId}`);
+      if (res.data?.success) {
+        toast.success(`Registration approved for ${applicantName}! The resident can now sign in with Google to set their credentials.`);
+        setPendingRegistrations((prev) => prev.filter((item) => item.id !== applicantId));
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to approve registration');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRejectRegistration = async (applicantId: string, applicantName: string) => {
+    const reason = window.prompt(`Enter reason for declining ${applicantName}'s registration (optional):`, 'Does not meet current room vacancy requirements');
+    if (reason === null) return;
+
+    try {
+      setActionLoadingId(applicantId);
+      const res = await api.post(`/students/reject-registration/${applicantId}`, { reason });
+      if (res.data?.success) {
+        toast.info(`Declined registration for ${applicantName}.`);
+        setPendingRegistrations((prev) => prev.filter((item) => item.id !== applicantId));
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to decline registration');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   const openEditDialog = (student: Student) => {
     setEditingStudent(student);
@@ -379,7 +379,7 @@ export default function AllStudents() {
             type="button"
             variant="ghost"
             size="sm"
-            onClick={fetchPendingRegistrations}
+            onClick={() => fetchPendingRegistrations()}
             disabled={isPendingLoading}
             className="ml-auto text-xs text-muted-foreground hover:text-foreground h-8 gap-1.5"
           >
