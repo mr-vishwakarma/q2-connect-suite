@@ -45,19 +45,40 @@ export default function CashflowAnalyzer() {
 
       if (expRes.success && expRes.data) {
         setExpenses(expRes.data);
+      } else {
+        setExpenses([]);
       }
 
       if (feeDashRes.success && feeDashRes.data) {
-        const totalPaid = (feeDashRes.data.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
-        const totalFeeDues = (feeDashRes.data.fees || []).filter(f => f.status !== 'paid').reduce((sum, f) => sum + (f.amount || 0), 0);
-        setTotalCollectedRent(totalPaid > 0 ? totalPaid : 476000);
-        setPendingRent(totalFeeDues > 0 ? totalFeeDues : 68500);
+        const selectedYearMonth = selectedMonth; // e.g. "2026-09"
+        const allPayments = feeDashRes.data.payments || [];
+        const monthFilteredPayments = allPayments.filter((p: any) => {
+          if (!p.paymentDate) return true;
+          try {
+            return format(new Date(p.paymentDate), 'yyyy-MM') === selectedYearMonth;
+          } catch {
+            return true;
+          }
+        });
+
+        // Use filtered payments if any match, or all payments if monthly filter isn't recorded
+        const activePayments = monthFilteredPayments.length > 0 ? monthFilteredPayments : allPayments;
+        const totalPaid = activePayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        const totalFeeDues = (feeDashRes.data.fees || [])
+          .filter((f: any) => f.status !== 'paid')
+          .reduce((sum: number, f: any) => sum + (f.amount || 0), 0);
+
+        setTotalCollectedRent(totalPaid);
+        setPendingRent(totalFeeDues);
       } else {
-        setTotalCollectedRent(476000);
-        setPendingRent(68500);
+        setTotalCollectedRent(0);
+        setPendingRent(0);
       }
     } catch (error) {
       console.error('Failed to load cashflow data:', error);
+      setTotalCollectedRent(0);
+      setPendingRent(0);
+      setExpenses([]);
     } finally {
       setIsLoading(false);
     }
@@ -234,17 +255,30 @@ export default function CashflowAnalyzer() {
             <CardDescription className="text-xs">Automated financial health score & suggestions</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-xs">
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1">
-              <h4 className="font-bold text-emerald-400 text-sm">Strong Positive Cashflow</h4>
+            <div className={`p-3.5 rounded-xl border space-y-1 ${netOperatingProfit >= 0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-rose-500/10 border-rose-500/30'}`}>
+              <h4 className={`font-bold text-sm ${netOperatingProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {netOperatingProfit >= 0 ? 'Positive Operating Cashflow' : 'Operating Deficit'}
+              </h4>
               <p className="text-muted-foreground">
-                Your collected rents comfortably exceed operational utility expenses and maintenance reserves.
+                {netOperatingProfit >= 0 
+                  ? 'Your collected fee revenues exceed logged operational and maintenance expenditures for this period.'
+                  : 'Operational expenses exceeded collected rent for this period. Review pending dues and operational costs.'}
               </p>
             </div>
 
             <div className="p-3.5 rounded-xl bg-secondary/40 border border-border/50 space-y-1">
-              <h4 className="font-bold text-foreground text-sm">Uncollected Rent Recovery</h4>
+              <h4 className="font-bold text-foreground text-sm">Uncollected Rent Status</h4>
               <p className="text-muted-foreground">
-                Recovering the pending <strong>₹{pendingRent.toLocaleString()}</strong> will increase your net surplus by <strong>+14.3%</strong>. Use the Alerts tab to send automated WhatsApp reminders.
+                {pendingRent > 0 ? (
+                  <>
+                    Pending fee dues stand at <strong>₹{pendingRent.toLocaleString()}</strong>.
+                    {totalCollectedRent > 0 && (
+                      <> Recovering these pending dues will add an additional <strong>+{((pendingRent / totalCollectedRent) * 100).toFixed(1)}%</strong> to your operating cashflow.</>
+                    )} Use the Alerts tab to review student dues and send reminders.
+                  </>
+                ) : (
+                  'All resident fee dues are settled for this hostel branch! No outstanding dues recorded.'
+                )}
               </p>
             </div>
           </CardContent>

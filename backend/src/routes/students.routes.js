@@ -13,6 +13,7 @@ const {
   getAlertStudents,
   getPendingRegistrations,
   approveRegistration,
+  approveAndRegisterStudent,
   rejectRegistration,
 } = require('../controllers/students.controller');
 
@@ -23,6 +24,7 @@ router.get('/alerts/count', adminOrWarden, getAlertsCount);
 router.get('/alerts', adminOrWarden, getAlertStudents);
 router.get('/pending-registrations', adminOrWarden, getPendingRegistrations);
 router.post('/approve-registration/:id', adminOnly, approveRegistration);
+router.post('/approve-and-register/:id', adminOnly, approveAndRegisterStudent);
 router.post('/reject-registration/:id', adminOnly, rejectRegistration);
 router.get('/', adminOrWarden, getAllStudents);
 router.post('/', adminOnly, createStudent);

@@ -108,4 +108,42 @@ const sendMessRequestUpdate = async ({ to, name, status, leavingDate, returnDate
   return sendEmail({ to, subject, html });
 };
 
-module.exports = { sendEmail, sendStudentCredentials, sendMessRequestUpdate, sendPasswordResetEmail };
+/**
+ * Send notification email to admin when a new student registration is completed
+ * @param {object} options - { to, studentName, studentEmail, studentRoom, studentHostel, studentPhone, username }
+ */
+const sendAdminNewStudentRegisteredNotification = async ({ to, studentName, studentEmail, studentRoom, studentHostel, studentPhone, username }) => {
+  const subject = `New Student Registered: ${studentName} (${studentHostel} - Room ${studentRoom || 'N/A'})`;
+  const text = `New Student Registered Successfully!\n\nDetails:\n- Student Name: ${studentName}\n- Hostel: ${studentHostel}\n- Room No: ${studentRoom || 'Unassigned'}\n- User ID: ${username}\n- Email: ${studentEmail}\n- Phone: ${studentPhone || 'N/A'}\n\nLog in to the Admin Dashboard to manage this student: ${process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app'}/admin/students\n\nBest regards,\nQ2 Connect Suite`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333333;">
+      <h2 style="color: #6366f1;">New Student Registration Confirmed</h2>
+      <p>A new resident student has been officially registered in the system.</p>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 6px 0;"><strong>Student Name:</strong> ${studentName}</p>
+        <p style="margin: 6px 0;"><strong>Hostel Branch:</strong> ${studentHostel}</p>
+        <p style="margin: 6px 0;"><strong>Room Number:</strong> ${studentRoom || 'Not Assigned'}</p>
+        <p style="margin: 6px 0;"><strong>User ID:</strong> ${username}</p>
+        <p style="margin: 6px 0;"><strong>Email:</strong> ${studentEmail}</p>
+        <p style="margin: 6px 0;"><strong>Phone:</strong> ${studentPhone || 'N/A'}</p>
+      </div>
+      <a href="${process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app'}/admin/students" style="display: inline-block; padding: 12px 24px; background-color: #6366f1; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px 0;">View in Admin Panel</a>
+      <p style="margin-top: 15px; font-size: 12px; color: #64748b;">Q2 Connect Suite Automated Administrative Notification</p>
+    </div>
+  `;
+  try {
+    return await sendEmail({ to, subject, html, text });
+  } catch (err) {
+    console.warn(`[email] Admin notification email skipped or failed: ${err.message}`);
+    return null;
+  }
+};
+
+module.exports = { 
+  sendEmail, 
+  sendStudentCredentials, 
+  sendMessRequestUpdate, 
+  sendPasswordResetEmail,
+  sendAdminNewStudentRegisteredNotification
+};
+

@@ -1,6 +1,6 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { api } from '@/lib/api';
@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
-import { UserPlus, CalendarIcon, Eye, EyeOff, Home, AlertCircle } from 'lucide-react';
+import { UserPlus, CalendarIcon, Eye, EyeOff, Home, AlertCircle, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -47,6 +47,44 @@ function RegisterStudentContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [initialFeePaid, setInitialFeePaid] = useState(false);
   const [lastCreated, setLastCreated] = useState<{ name: string; username: string; email: string; pass: string } | null>(null);
+
+  const [searchParams] = useSearchParams();
+  const applicantIdParam = searchParams.get('applicantId');
+  const [pendingApplicants, setPendingApplicants] = useState<any[]>([]);
+  const [selectedApplicantId, setSelectedApplicantId] = useState<string>(applicantIdParam || '');
+
+  const applyApplicantData = useCallback((applicant: any) => {
+    if (!applicant) return;
+    const userEmail = (applicant.email || '').toLowerCase().trim();
+    setSelectedApplicantId(applicant.id);
+    setFormData(prev => ({
+      ...prev,
+      name: applicant.name || '',
+      email: userEmail,
+      username: userEmail,
+      password: userEmail,
+      phone: applicant.phone || '',
+    }));
+    toast.info(`Auto-filled details for Google applicant ${applicant.name}`);
+  }, []);
+
+  useEffect(() => {
+    const fetchPending = async () => {
+      try {
+        const res = await api.get('/students/pending-registrations');
+        if (res.data?.success && res.data.data) {
+          setPendingApplicants(res.data.data);
+          if (applicantIdParam) {
+            const found = res.data.data.find((a: any) => a.id === applicantIdParam);
+            if (found) applyApplicantData(found);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load pending applicants', err);
+      }
+    };
+    if (user && isAdmin) fetchPending();
+  }, [user, isAdmin, applicantIdParam, applyApplicantData]);
 
   // Auto-generate temp password
   const handleAutoGeneratePassword = () => {
@@ -151,8 +189,12 @@ function RegisterStudentContent() {
 
     setIsSubmitting(true);
 
+    const endpoint = selectedApplicantId
+      ? `/students/approve-and-register/${selectedApplicantId}`
+      : '/students';
+
     try {
-      const response = await api.post('/students', {
+      const response = await api.post(endpoint, {
         name: formData.name,
         username: normalizedUsername,
         password: formData.password,
@@ -175,6 +217,11 @@ function RegisterStudentContent() {
           email: email,
           pass: formData.password,
         });
+
+        if (selectedApplicantId) {
+          setPendingApplicants(prev => prev.filter(a => a.id !== selectedApplicantId));
+          setSelectedApplicantId('');
+        }
 
         setFormData({
           name: '',
@@ -226,6 +273,37 @@ function RegisterStudentContent() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {pendingApplicants.length > 0 && (
+            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 text-xs text-amber-500 font-medium">
+                <Sparkles className="w-4 h-4 shrink-0" />
+                <span>
+                  <strong>{pendingApplicants.length}</strong> Google Registration{pendingApplicants.length === 1 ? '' : 's'} waiting for approval
+                </span>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Select
+                  value={selectedApplicantId}
+                  onValueChange={(id) => {
+                    const applicant = pendingApplicants.find(a => a.id === id);
+                    if (applicant) applyApplicantData(applicant);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs bg-card border-amber-500/40 text-foreground w-full sm:w-[220px]">
+                    <SelectValue placeholder="Select applicant to auto-fill" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pendingApplicants.map(a => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name} ({a.hostel})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">

@@ -16,11 +16,20 @@ const laundrySlotSchema = new mongoose.Schema({
   },
   machineNumber: {
     type: Number,
+    default: 1,
     required: true
+  },
+  hostel: {
+    type: String,
+    default: 'Q2',
+    index: true
+  },
+  notes: {
+    type: String
   },
   status: {
     type: String,
-    enum: ['booked', 'completed', 'cancelled'],
+    enum: ['booked', 'completed', 'cancelled', 'maintenance'],
     default: 'booked'
   }
 }, { timestamps: true });
@@ -28,7 +37,7 @@ const laundrySlotSchema = new mongoose.Schema({
 // Prevent a student from booking more than 1 slot per day
 laundrySlotSchema.index({ student: 1, date: 1, status: 1 });
 
-// Prevent a machine from being double-booked at the same time on the same date
-laundrySlotSchema.index({ date: 1, timeSlot: 1, machineNumber: 1, status: 1 });
+// Prevent a machine in a hostel from being double-booked at the same time on the same date
+laundrySlotSchema.index({ hostel: 1, date: 1, timeSlot: 1, machineNumber: 1, status: 1 });
 
 module.exports = mongoose.model('LaundrySlot', laundrySlotSchema);

@@ -4,7 +4,8 @@ const {
   getAvailableSlots, 
   bookSlot, 
   cancelBooking, 
-  getMyBookings 
+  getMyBookings,
+  adminBlockSlot
 } = require('../controllers/laundry.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
 
@@ -18,5 +19,6 @@ router.get('/my-bookings', authorize('student'), getMyBookings);
 // Admin & Student routes
 router.get('/slots', getAvailableSlots);
 router.delete('/cancel/:id', cancelBooking);
+router.post('/admin/block', authorize('admin', 'super_admin', 'warden'), adminBlockSlot);
 
 module.exports = router;

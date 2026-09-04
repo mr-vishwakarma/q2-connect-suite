@@ -118,10 +118,6 @@ export default function MessOff() {
       toast.error('Return date must be after leaving date');
       return;
     }
-    if (!documentFile) {
-      toast.error('Please upload the Q2 Hostel Leave Document.');
-      return;
-    }
 
     setIsSubmitting(true);
 
@@ -149,9 +145,9 @@ export default function MessOff() {
         leavingDate: format(leavingDate, 'yyyy-MM-dd'),
         returnDate: format(returnDate, 'yyyy-MM-dd'),
         reason: reason.trim(),
-        documentUrl,
-        documentName: documentFile.name,
-        documentFileId,
+        documentUrl: documentUrl || null,
+        documentName: documentFile ? documentFile.name : null,
+        documentFileId: documentFileId || null,
       });
 
       toast.success('Leave request submitted!');
@@ -327,7 +323,7 @@ export default function MessOff() {
                 {/* Document Upload */}
                 <div className="space-y-2">
                   <Label className="text-foreground">
-                    Upload Leave Document <span className="text-destructive">*</span>
+                    Upload Leave Document <span className="text-muted-foreground text-xs font-normal">(Optional)</span>
                   </Label>
                   <label
                     htmlFor="leave-doc"

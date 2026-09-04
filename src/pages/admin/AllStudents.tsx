@@ -1,5 +1,6 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { EditStudentDialog } from './components/EditStudentDialog';
+import { CompleteRegistrationDialog } from './components/CompleteRegistrationDialog';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +23,7 @@ import {
   Pencil,
   CalendarIcon,
   UserCheck,
+  UserPlus,
   UserX,
   CheckCircle2,
   Clock,
@@ -125,6 +127,7 @@ export default function AllStudents() {
   const [pendingBranchFilter, setPendingBranchFilter] = useState<'All' | 'Q2' | 'Q2.0' | 'Q2.1'>('All');
   const [isPendingLoading, setIsPendingLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [registeringApplicant, setRegisteringApplicant] = useState<PendingApplicant | null>(null);
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -489,12 +492,11 @@ export default function AllStudents() {
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               size="sm"
-                              disabled={actionLoadingId === applicant.id}
-                              onClick={() => handleApproveRegistration(applicant.id, applicant.name)}
+                              onClick={() => setRegisteringApplicant(applicant)}
                               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-8 px-3 text-xs rounded-lg gap-1.5 shadow-sm"
                             >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              <span>{actionLoadingId === applicant.id ? 'Approving...' : 'Approve'}</span>
+                              <UserPlus className="w-3.5 h-3.5" />
+                              <span>Register & Approve</span>
                             </Button>
                             <Button
                               size="sm"
@@ -714,6 +716,16 @@ export default function AllStudents() {
         setEditEndDate={setEditEndDate}
         onSubmit={handleEditSubmit}
         submitting={isSubmitting}
+      />
+
+      <CompleteRegistrationDialog
+        open={!!registeringApplicant}
+        onOpenChange={(open) => !open && setRegisteringApplicant(null)}
+        applicant={registeringApplicant}
+        onSuccess={() => {
+          fetchPendingRegistrations();
+          fetchStudents();
+        }}
       />
     </div>
   );

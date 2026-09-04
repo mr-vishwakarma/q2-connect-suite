@@ -4,7 +4,7 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const Room = require('../models/Room');
 const Notification = require('../models/Notification');
-const { sendStudentCredentials } = require('../utils/email');
+const { sendStudentCredentials, sendAdminNewStudentRegisteredNotification } = require('../utils/email');
 
 // @desc    Get all students (with optional hostel filter)
 // @route   GET /api/students
@@ -122,21 +122,36 @@ const createStudent = async (req, res) => {
     }
 
     // Check for existing user/username
+    let user;
     const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username }] }).session(session);
     if (existingUser) {
-      await session.abortTransaction();
-      return res.status(409).json({ success: false, message: 'Email or username already exists' });
+      if (existingUser.registrationStatus === 'pending_approval' && existingUser.email === email.toLowerCase()) {
+        existingUser.name = name;
+        existingUser.username = username;
+        existingUser.password = password;
+        existingUser.role = 'student';
+        existingUser.registrationStatus = 'active';
+        existingUser.hostels = [hostel];
+        if (existingUser.authProvider === 'google') existingUser.authProvider = 'both';
+        await existingUser.save({ session });
+        user = existingUser;
+      } else {
+        await session.abortTransaction();
+        return res.status(409).json({ success: false, message: 'Email or username already exists' });
+      }
+    } else {
+      // Create User account
+      const users = await User.create([{
+        name,
+        email: email.toLowerCase(),
+        username,
+        password,
+        role: 'student',
+        registrationStatus: 'active',
+        hostels: [hostel],
+      }], { session });
+      user = users[0];
     }
-
-    // Create User account
-    const users = await User.create([{
-      name,
-      email: email.toLowerCase(),
-      username,
-      password,
-      role: 'student',
-    }], { session });
-    const user = users[0];
 
     // Create Student profile
     const students = await Student.create([{
@@ -233,6 +248,18 @@ const createStudent = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    // Asynchronously notify admin via email
+    const adminEmail = req.user?.email || 'abhi1006@q2connect.com';
+    sendAdminNewStudentRegisteredNotification({
+      to: adminEmail,
+      studentName: name,
+      studentEmail: email.toLowerCase(),
+      studentRoom: roomNo,
+      studentHostel: hostel,
+      studentPhone: phone,
+      username: username,
+    }).catch(err => console.warn('[students.controller] Admin notification email failed:', err.message));
 
     return res.status(201).json({
       success: true,
@@ -508,6 +535,200 @@ const rejectRegistration = async (req, res) => {
   }
 };
 
+// @desc    Approve and complete student registration directly by Admin
+// @route   POST /api/students/approve-and-register/:id
+// @access  Admin
+const approveAndRegisterStudent = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    let {
+      name,
+      username,
+      email,
+      phone,
+      parentPhone,
+      roomNo,
+      hostel,
+      fees,
+      startDate,
+      validDate,
+      password,
+      initialFeePaid
+    } = req.body;
+
+    const user = await User.findById(id).session(session);
+    if (!user) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ success: false, message: 'Applicant user not found' });
+    }
+
+    const finalEmail = (email || user.email || '').toLowerCase().trim();
+    // User ID, Email, and Password default to Google authentication email if not provided
+    const finalUsername = (username || finalEmail).toLowerCase().trim();
+    const finalPassword = password || finalEmail;
+    const finalHostel = hostel || user.registrationDetails?.hostel || user.hostels?.[0] || 'Q2';
+    const finalPhone = phone || user.registrationDetails?.phone || '';
+    const finalName = name || user.name || 'Resident';
+
+    // Update user properties
+    user.name = finalName;
+    user.email = finalEmail;
+    user.username = finalUsername;
+    user.password = finalPassword;
+    user.role = 'student';
+    user.registrationStatus = 'active';
+    user.hostels = [finalHostel];
+    if (user.authProvider === 'google') {
+      user.authProvider = 'both';
+    }
+
+    if (!user.registrationDetails) user.registrationDetails = {};
+    user.registrationDetails.approvedAt = new Date();
+    user.registrationDetails.approvedBy = req.user._id;
+
+    // Check if a Student profile already exists for this user
+    let student = await Student.findOne({ userId: user._id }).session(session);
+    if (student) {
+      student.name = finalName;
+      student.username = finalUsername;
+      student.email = finalEmail;
+      student.phone = finalPhone;
+      student.parentPhone = parentPhone;
+      student.roomNo = roomNo;
+      student.hostel = finalHostel;
+      student.fees = fees ? parseFloat(fees) : 0;
+      student.startDate = startDate || new Date();
+      student.validDate = validDate || null;
+      await student.save({ session });
+    } else {
+      const createdStudents = await Student.create([{
+        userId: user._id,
+        name: finalName,
+        username: finalUsername,
+        email: finalEmail,
+        phone: finalPhone,
+        parentPhone,
+        roomNo,
+        hostel: finalHostel,
+        fees: fees ? parseFloat(fees) : 0,
+        startDate: startDate || new Date(),
+        validDate: validDate || null,
+      }], { session });
+      student = createdStudents[0];
+    }
+
+    user.studentId = student._id;
+    await user.save({ session });
+
+    // Update Room occupancy if room assigned
+    if (roomNo && finalHostel) {
+      await Room.findOneAndUpdate(
+        { roomNumber: roomNo, hostel: finalHostel },
+        { $inc: { occupiedCount: 1 } },
+        { session }
+      );
+    }
+
+    // Handle Fee creation if fees > 0
+    if (fees && parseFloat(fees) > 0) {
+      const Fee = require('../models/Fee');
+      const FeePayment = require('../models/FeePayment');
+      const now = new Date();
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const month = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+      const feeAmount = parseFloat(fees);
+
+      if (initialFeePaid) {
+        const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+        const feeRecords = await Fee.create([{
+          studentId: student._id,
+          hostel: finalHostel,
+          month,
+          amount: feeAmount,
+          paidAmount: feeAmount,
+          status: 'paid',
+          paidDate: now,
+          paymentMode: 'cash',
+          receiptNo,
+        }], { session });
+
+        await FeePayment.create([{
+          feeId: feeRecords[0]._id,
+          studentId: student._id,
+          hostel: finalHostel,
+          receiptNo,
+          amount: feeAmount,
+          lateFee: 0,
+          discount: 0,
+          securityDeposit: 0,
+          paymentMode: 'cash',
+          paymentDate: now,
+          adminId: req.user._id,
+          adminName: req.user.name,
+          month,
+          notes: 'Initial registration fee collection',
+        }], { session });
+      } else {
+        const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
+        await Fee.create([{
+          studentId: student._id,
+          hostel: finalHostel,
+          month,
+          amount: feeAmount,
+          paidAmount: 0,
+          status: 'unpaid',
+          dueDate,
+        }], { session });
+      }
+    }
+
+    // In-app Notifications
+    await Notification.create([{
+      userId: user._id,
+      title: 'Hostel Registration Complete!',
+      message: `Welcome to ${finalHostel}! You have been assigned to Room ${roomNo || 'TBD'}. You can now sign in with Google or your credentials.`,
+      type: 'success',
+      hostel: finalHostel,
+    }, {
+      role: 'admin',
+      hostel: finalHostel,
+      title: 'New Student Registration Complete',
+      message: `${finalName} has been officially registered and assigned to Room ${roomNo || 'N/A'} in ${finalHostel}.`,
+      type: 'info',
+    }], { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Send asynchronous confirmation email to Admin
+    const adminEmail = req.user?.email || 'abhi1006@q2connect.com';
+    sendAdminNewStudentRegisteredNotification({
+      to: adminEmail,
+      studentName: finalName,
+      studentEmail: finalEmail,
+      studentRoom: roomNo,
+      studentHostel: finalHostel,
+      studentPhone: finalPhone,
+      username: finalUsername,
+    }).catch(e => console.warn('Admin registration confirmation email failed:', e.message));
+
+    return res.status(200).json({
+      success: true,
+      message: `Student ${finalName} successfully registered and approved!`,
+      data: { user: user.toJSON(), student },
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('approveAndRegisterStudent error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getAllStudents,
   getStudent,
@@ -519,5 +740,7 @@ module.exports = {
   getAlertStudents,
   getPendingRegistrations,
   approveRegistration,
+  approveAndRegisterStudent,
   rejectRegistration,
 };
+
