@@ -88,10 +88,12 @@ async function resetDatabase() {
     await User.updateMany({}, { $set: { failedLoginAttempts: 0, lockUntil: null } });
     console.log('   - Cleared failed login attempts & lockouts on all admins.');
 
-    console.log('\n👑 Step 3: Setting up pristine Admin accounts (Password: Admin@123)...');
+    console.log('\n👑 Step 3: Setting up pristine Admin accounts...');
     const adminPasswordPlain = 'Admin@123';
+    const superAdminPasswordPlain = 'SuperAdmin@123';
     const salt = await bcrypt.genSalt(12);
     const adminPasswordHashed = await bcrypt.hash(adminPasswordPlain, salt);
+    const superAdminPasswordHashed = await bcrypt.hash(superAdminPasswordPlain, salt);
 
     // 1. Super Admin
     const superAdmin = await User.findOneAndUpdate(
@@ -100,7 +102,7 @@ async function resetDatabase() {
         name: 'Super Administrator',
         email: 'superadmin@q2connect.com',
         username: 'superadmin',
-        password: adminPasswordHashed,
+        password: superAdminPasswordHashed,
         role: 'super_admin',
         isSuperAdmin: true,
         isActive: true,
@@ -110,7 +112,7 @@ async function resetDatabase() {
       },
       { upsert: true, new: true }
     );
-    console.log(`   ✅ Super Admin: superadmin@q2connect.com (username: superadmin | password: ${adminPasswordPlain})`);
+    console.log(`   ✅ Super Admin: superadmin@q2connect.com (username: superadmin | password: ${superAdminPasswordPlain})`);
 
     // 2. Primary Hostel Admin (Abhi)
     const hostelAdmin = await User.findOneAndUpdate(

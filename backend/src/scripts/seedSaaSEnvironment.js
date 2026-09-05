@@ -144,7 +144,12 @@ async function seedSaaSEnvironment() {
     // 3. Seed Super Admin
     console.log('\n--- 3. Seeding Super Administrator ---');
     const superAdminEmail = 'superadmin@q2connect.com';
-    let superAdmin = await User.findOne({ email: superAdminEmail });
+    let superAdmin = await User.findOne({ 
+      $or: [
+        { email: superAdminEmail },
+        { username: 'superadmin' }
+      ]
+    });
     if (!superAdmin) {
       superAdmin = await User.create({
         name: 'Super Administrator',
@@ -154,13 +159,23 @@ async function seedSaaSEnvironment() {
         role: 'super_admin',
         isSuperAdmin: true,
         isActive: true,
+        registrationStatus: 'active',
+        failedLoginAttempts: 0,
+        lockUntil: null,
       });
-      console.log(`✅ Created Super Admin: ${superAdminEmail} (password: SuperAdmin@123)`);
+      console.log(`✅ Created Super Admin: ${superAdminEmail} (username: superadmin | password: SuperAdmin@123)`);
     } else {
+      superAdmin.username = 'superadmin';
+      superAdmin.email = superAdminEmail;
+      superAdmin.password = 'SuperAdmin@123';
       superAdmin.isSuperAdmin = true;
       superAdmin.role = 'super_admin';
+      superAdmin.isActive = true;
+      superAdmin.registrationStatus = 'active';
+      superAdmin.failedLoginAttempts = 0;
+      superAdmin.lockUntil = null;
       await superAdmin.save();
-      console.log(`✅ Verified Super Admin: ${superAdminEmail}`);
+      console.log(`✅ Verified & Reset Super Admin: ${superAdminEmail} (username: superadmin | password: SuperAdmin@123)`);
     }
 
     // 4. Seed Default Organization (Q2 Hostel Group)

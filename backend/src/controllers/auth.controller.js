@@ -21,15 +21,19 @@ const generateTokens = (userId) => {
 // @access  Public
 const login = async (req, res) => {
   try {
-    const loginIdentifier = req.body.username || req.body.identifier;
+    const rawIdentifier = (req.body.username || req.body.email || req.body.identifier || '').trim();
     const { password } = req.body;
-    if (!loginIdentifier || !password) {
+    if (!rawIdentifier || !password) {
       return res.status(400).json({ success: false, message: 'Username/Email and password are required' });
     }
 
-    // Find by username or email
+    // Find by username or email (case-insensitive)
+    const escaped = rawIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const user = await User.findOne({
-      $or: [{ username: loginIdentifier }, { email: loginIdentifier.toLowerCase() }],
+      $or: [
+        { username: new RegExp('^' + escaped + '$', 'i') },
+        { email: rawIdentifier.toLowerCase() }
+      ],
     });
 
     if (!user) {
@@ -110,16 +114,17 @@ const login = async (req, res) => {
 // @access  Public
 const adminLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    const rawIdentifier = (req.body.email || req.body.username || req.body.identifier || '').trim();
+    const { password } = req.body;
+    if (!rawIdentifier || !password) {
+      return res.status(400).json({ success: false, message: 'Email or Username and password are required' });
     }
 
-    const searchKey = email.toLowerCase().trim();
+    const escaped = rawIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const user = await User.findOne({ 
       $or: [
-        { email: searchKey },
-        { username: new RegExp('^' + searchKey + '$', 'i') }
+        { email: rawIdentifier.toLowerCase() },
+        { username: new RegExp('^' + escaped + '$', 'i') }
       ]
     });
 
