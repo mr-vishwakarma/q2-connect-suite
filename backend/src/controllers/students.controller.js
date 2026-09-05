@@ -149,7 +149,7 @@ const createStudent = async (req, res) => {
         role: 'student',
         registrationStatus: 'active',
         hostels: [hostel],
-      }], { session });
+      }], { session, ordered: true });
       user = users[0];
     }
 
@@ -166,7 +166,7 @@ const createStudent = async (req, res) => {
       fees: fees || 0,
       startDate,
       validDate,
-    }], { session });
+    }], { session, ordered: true });
     const student = students[0];
 
     // Link student to user
@@ -203,7 +203,7 @@ const createStudent = async (req, res) => {
           paidDate: now,
           paymentMode: 'cash',
           receiptNo,
-        }], { session });
+        }], { session, ordered: true });
         const feeRecord = feeRecords[0];
 
         await FeePayment.create([{
@@ -221,7 +221,7 @@ const createStudent = async (req, res) => {
           adminName: req.user.name,
           month,
           notes: 'Initial fee paid at registration',
-        }], { session });
+        }], { session, ordered: true });
       } else {
         // Create UNPAID Fee record so status shows Unpaid and pending balance reflects monthly fee
         const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
@@ -233,7 +233,7 @@ const createStudent = async (req, res) => {
           paidAmount: 0,
           status: 'unpaid',
           dueDate,
-        }], { session });
+        }], { session, ordered: true });
       }
     }
 
@@ -244,7 +244,7 @@ const createStudent = async (req, res) => {
       title: 'Welcome to Q2 Connect Suite!',
       message: `Hello ${name}, your account has been set up. Welcome to ${hostel} hostel.`,
       type: 'success',
-    }], { session });
+    }], { session, ordered: true });
 
     await session.commitTransaction();
     session.endSession();
@@ -617,7 +617,7 @@ const approveAndRegisterStudent = async (req, res) => {
         fees: fees ? parseFloat(fees) : 0,
         startDate: startDate || new Date(),
         validDate: validDate || null,
-      }], { session });
+      }], { session, ordered: true });
       student = createdStudents[0];
     }
 
@@ -654,7 +654,7 @@ const approveAndRegisterStudent = async (req, res) => {
           paidDate: now,
           paymentMode: 'cash',
           receiptNo,
-        }], { session });
+        }], { session, ordered: true });
 
         await FeePayment.create([{
           feeId: feeRecords[0]._id,
@@ -671,7 +671,7 @@ const approveAndRegisterStudent = async (req, res) => {
           adminName: req.user.name,
           month,
           notes: 'Initial registration fee collection',
-        }], { session });
+        }], { session, ordered: true });
       } else {
         const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
         await Fee.create([{
@@ -682,24 +682,32 @@ const approveAndRegisterStudent = async (req, res) => {
           paidAmount: 0,
           status: 'unpaid',
           dueDate,
-        }], { session });
+        }], { session, ordered: true });
       }
     }
 
     // In-app Notifications
-    await Notification.create([{
-      userId: user._id,
-      title: 'Hostel Registration Complete!',
-      message: `Welcome to ${finalHostel}! You have been assigned to Room ${roomNo || 'TBD'}. You can now sign in with Google or your credentials.`,
-      type: 'success',
-      hostel: finalHostel,
-    }, {
-      role: 'admin',
-      hostel: finalHostel,
-      title: 'New Student Registration Complete',
-      message: `${finalName} has been officially registered and assigned to Room ${roomNo || 'N/A'} in ${finalHostel}.`,
-      type: 'info',
-    }], { session });
+    const notificationsToCreate = [
+      {
+        userId: user._id,
+        title: 'Hostel Registration Complete!',
+        message: `Welcome to ${finalHostel}! You have been assigned to Room ${roomNo || 'TBD'}. You can now sign in with Google or your credentials.`,
+        type: 'success',
+        hostel: finalHostel,
+      }
+    ];
+
+    if (req.user?._id) {
+      notificationsToCreate.push({
+        userId: req.user._id,
+        hostel: finalHostel,
+        title: 'New Student Registration Complete',
+        message: `${finalName} has been officially registered and assigned to Room ${roomNo || 'N/A'} in ${finalHostel}.`,
+        type: 'info',
+      });
+    }
+
+    await Notification.create(notificationsToCreate, { session, ordered: true });
 
     await session.commitTransaction();
     session.endSession();

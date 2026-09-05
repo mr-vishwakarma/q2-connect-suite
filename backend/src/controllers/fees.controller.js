@@ -202,7 +202,7 @@ const collectPayment = async (req, res) => {
       const newFees = await Fee.create([{
         studentId, hostel: actualHostel, month, amount, lateFee, discount,
         status: 'unpaid', paymentMode
-      }], { session });
+      }], { session, ordered: true });
       feeRow = newFees[0];
     } else {
       feeRow = await Fee.findByIdAndUpdate(
@@ -232,7 +232,7 @@ const collectPayment = async (req, res) => {
       adminName: req.user.name,
       month,
       notes: notes || null,
-    }], { session });
+    }], { session, ordered: true });
     const payment = payments[0];
 
     // 3. Security deposit tracking
@@ -244,7 +244,7 @@ const collectPayment = async (req, res) => {
         collectedDate: new Date(),
         status: 'collected',
         paymentMode,
-      }], { session });
+      }], { session, ordered: true });
     }
 
     // 4. Extend student validDate if fully paid (best-effort)

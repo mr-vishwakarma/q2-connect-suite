@@ -85,7 +85,7 @@ const updateMessRequest = async (req, res) => {
       title: `Mess Off Request ${status === 'approved' ? 'Approved' : (status === 'returned' ? 'Returned' : 'Rejected')}`,
       message: adminMessage || `Your mess off request has been marked as ${status}.`,
       type: status === 'approved' ? 'success' : (status === 'returned' ? 'info' : 'error'),
-    }], { session });
+    }], { session, ordered: true });
 
     await session.commitTransaction();
     session.endSession();
