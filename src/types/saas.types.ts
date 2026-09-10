@@ -32,6 +32,79 @@ export type FeatureKey =
   | 'api_access'
   | 'biometric_integration';
 
+export enum HostelAmenity {
+  WIFI = 'High-Speed Wi-Fi',
+  AC = 'Air Conditioning',
+  POWER_BACKUP = '24x7 Power Backup',
+  RO_WATER = 'RO Purified Drinking Water',
+  CCTV = 'CCTV Surveillance',
+  BIOMETRIC_ACCESS = 'Biometric Gate Access',
+  GYM = 'Fitness Center / Gym',
+  STUDY_LIBRARY = 'Quiet Study Room / Library',
+  LAUNDRY = 'Washing Machine / Laundry',
+  HOT_WATER = 'Geyser / Solar Hot Water',
+  REFRIGERATOR = 'Common Refrigerator',
+  HOUSEKEEPING = 'Daily Housekeeping',
+}
+
+export interface OnboardTenantPayload {
+  // Stage 1: Organization & KYC
+  name: string;
+  legalName?: string;
+  slug?: string;
+  contactEmail: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+  aadhaarNumber?: string;
+  aadhaarDocument?: string;
+  gstin?: string;
+  pan?: string;
+  orgType?: string;
+  primaryColor?: string;
+
+  // Stage 2: Property & Amenities
+  branchName?: string;
+  branchCode?: string;
+  genderType?: HostelGenderType;
+  propertyAddress?: string;
+  capacity?: number;
+  floors?: number;
+  totalRooms?: number;
+  amenities?: string[];
+  wardenName?: string;
+  wardenPhone?: string;
+  emergencyContact?: string;
+
+  // Stage 3: Primary Administrator Account
+  adminName?: string;
+  adminEmail?: string;
+  adminUsername?: string;
+  adminPhone?: string;
+  adminPassword?: string;
+  adminDesignation?: string;
+
+  // Stage 4: Subscription & Policies
+  planCode?: string;
+  planId?: string;
+  billingCycle?: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  trialDays?: number;
+
+  monthlyRentDueDay?: number;
+  gracePeriodDays?: number;
+  lateFeePerDay?: number;
+  securityDeposit?: number;
+  hasMess?: boolean;
+  messOffNoticeHours?: number;
+  messRebatePerDay?: number;
+  laundrySlotsPerWeek?: number;
+  curfewTime?: string;
+  parentConsentRequired?: boolean;
+}
+
 export interface Organization {
   _id?: string;
   id: string;
@@ -44,7 +117,14 @@ export interface Organization {
   address?: string;
   city?: string;
   state?: string;
+  pincode?: string;
   country?: string;
+  aadhaarNumber?: string;
+  aadhaarDocument?: string;
+  gstin?: string;
+  pan?: string;
+  orgType?: string;
+  primaryColor?: string;
   status: OrganizationStatus;
   subscriptionId?: string;
   activePlan?: string;

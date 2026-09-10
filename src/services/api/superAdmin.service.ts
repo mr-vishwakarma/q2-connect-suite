@@ -7,6 +7,7 @@ import {
   FeatureDefinition,
   AuditLogItem,
   SuperAdminDashboardStats,
+  OnboardTenantPayload,
 } from '@/types';
 
 export const superAdminService = {
@@ -25,7 +26,7 @@ export const superAdminService = {
     return res.data;
   },
 
-  async createOrganization(payload: Partial<Organization> & { genderType?: string }): Promise<ApiResponse<{ organization: Organization; hostel: HostelBranch }>> {
+  async createOrganization(payload: OnboardTenantPayload | (Partial<Organization> & { genderType?: string })): Promise<ApiResponse<{ organization: Organization; hostel: HostelBranch; adminUser?: any }>> {
     const res = await api.post('/super-admin/organizations', payload);
     return res.data;
   },

@@ -14,8 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { OnboardTenantModal } from '@/components/super-admin/OnboardTenantModal';
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { Organization } from '@/types';
 import { toast } from 'react-toastify';
@@ -25,17 +24,6 @@ export default function OrganizationList() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-
-  // Form State
-  const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    contactEmail: '',
-    phone: '',
-    address: '',
-    city: '',
-    state: '',
-  });
 
   useEffect(() => {
     fetchOrganizations();
@@ -52,21 +40,6 @@ export default function OrganizationList() {
       console.error('Failed to fetch organizations:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await superAdminService.createOrganization(formData);
-      if (res.success) {
-        toast.success(`Organization '${formData.name}' created successfully!`);
-        setIsCreateOpen(false);
-        setFormData({ name: '', slug: '', contactEmail: '', phone: '', address: '', city: '', state: '' });
-        fetchOrganizations();
-      }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to create organization');
     }
   };
 
@@ -203,71 +176,12 @@ export default function OrganizationList() {
         </CardContent>
       </Card>
 
-      {/* Onboard Dialog Modal */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Onboard New Organization</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Organization Name *</Label>
-              <Input
-                required
-                placeholder="e.g., ABC Hostel Group"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Slug Identifier</Label>
-                <Input
-                  placeholder="e.g., abc-hostels"
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Contact Email *</Label>
-                <Input
-                  type="email"
-                  required
-                  placeholder="admin@abchostels.com"
-                  value={formData.contactEmail}
-                  onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Phone</Label>
-                <Input
-                  placeholder="+91 9876543210"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>City</Label>
-                <Input
-                  placeholder="Hyderabad"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                />
-              </div>
-            </div>
-            <DialogFooter className="pt-3">
-              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
-                Create Tenant
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Real-world Multi-Stage Onboarding Wizard Modal */}
+      <OnboardTenantModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSuccess={fetchOrganizations}
+      />
     </div>
   );
 }

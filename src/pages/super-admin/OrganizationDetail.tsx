@@ -9,6 +9,8 @@ import {
   Shield,
   CheckCircle,
   Plus,
+  FileCheck,
+  ExternalLink,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -214,6 +216,58 @@ export default function OrganizationDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Statutory KYC & Aadhaar Verification Card */}
+      <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <FileCheck className="w-4 h-4 text-amber-400" />
+              Statutory KYC & Aadhaar Compliance
+            </CardTitle>
+            <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-400">
+              {org.orgType || 'Multi-Branch Chain'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+            <div className="p-3 rounded-lg bg-secondary/30 border border-border/50">
+              <span className="text-muted-foreground block mb-1">Aadhaar Card UID</span>
+              <span className="font-mono font-semibold text-foreground text-sm">
+                {org.aadhaarNumber || 'Not provided'}
+              </span>
+            </div>
+            <div className="p-3 rounded-lg bg-secondary/30 border border-border/50">
+              <span className="text-muted-foreground block mb-1">Aadhaar Document / Photo</span>
+              {org.aadhaarDocument ? (
+                <a
+                  href={org.aadhaarDocument}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-amber-400 hover:text-amber-300 font-semibold mt-1"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> View Photo Document
+                </a>
+              ) : (
+                <span className="text-muted-foreground italic mt-1 block">No photo document uploaded</span>
+              )}
+            </div>
+            <div className="p-3 rounded-lg bg-secondary/30 border border-border/50">
+              <span className="text-muted-foreground block mb-1">GSTIN Number</span>
+              <span className="font-mono font-semibold text-foreground text-sm">
+                {org.gstin || 'Not provided'}
+              </span>
+            </div>
+            <div className="p-3 rounded-lg bg-secondary/30 border border-border/50">
+              <span className="text-muted-foreground block mb-1">Business PAN / TAN</span>
+              <span className="font-mono font-semibold text-foreground text-sm">
+                {org.pan || 'Not provided'}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Branches & Feature Gating Tabs */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
