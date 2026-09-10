@@ -4,9 +4,10 @@ import { ShieldCheck, Bell, Menu } from 'lucide-react';
 export interface SuperAdminTopBarProps {
   title: string;
   onMenuToggle?: () => void;
+  isMenuOpen?: boolean;
 }
 
-export function SuperAdminTopBar({ title, onMenuToggle }: SuperAdminTopBarProps) {
+export function SuperAdminTopBar({ title, onMenuToggle, isMenuOpen = false }: SuperAdminTopBarProps) {
   const { user } = useAuth();
 
   return (
@@ -16,6 +17,8 @@ export function SuperAdminTopBar({ title, onMenuToggle }: SuperAdminTopBarProps)
           onClick={onMenuToggle}
           className="lg:hidden p-2 rounded-lg text-foreground hover:bg-secondary transition-colors"
           aria-label="Toggle Menu"
+          aria-expanded={isMenuOpen}
+          aria-controls="super-admin-sidebar"
         >
           <Menu className="w-5 h-5" />
         </button>
