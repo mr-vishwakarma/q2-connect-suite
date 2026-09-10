@@ -6,6 +6,7 @@ const { adminOnly } = require('../middleware/admin.middleware');
 const {
   login,
   adminLogin,
+  superAdminLogin,
   registerAdmin,
   refreshToken,
   logout,
@@ -32,6 +33,7 @@ const authLimiter = rateLimit({
 
 router.post('/login', authLimiter, login);
 router.post('/admin/login', authLimiter, adminLogin);
+router.post('/super-admin/login', authLimiter, superAdminLogin);
 router.post('/google', authLimiter, googleLogin);
 router.post('/request-google-registration', authLimiter, requestGoogleRegistration);
 router.post('/complete-google-setup', authLimiter, completeGoogleSetup);

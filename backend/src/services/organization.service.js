@@ -25,21 +25,43 @@ const organizationService = {
       .populate('subscriptionId')
       .sort({ createdAt: -1 });
 
-    // Aggregate counts for each organization
-    const orgsWithMetrics = await Promise.all(
-      organizations.map(async (org) => {
-        const hostelCount = await Hostel.countDocuments({ organizationId: org._id, isDeleted: false });
-        const studentCount = await Student.countDocuments({ organizationId: org._id, isActive: true });
-        const roomCount = await Room.countDocuments({ organizationId: org._id });
-        return {
-          ...org.toObject(),
-          id: org._id,
-          hostelCount,
-          studentCount,
-          roomCount,
-        };
-      })
-    );
+    if (organizations.length === 0) {
+      return [];
+    }
+
+    const orgIds = organizations.map((o) => o._id);
+
+    // High-performance batch aggregation: 3 parallel DB queries instead of 3 * N queries
+    const [hostelGroups, studentGroups, roomGroups] = await Promise.all([
+      Hostel.aggregate([
+        { $match: { organizationId: { $in: orgIds }, isDeleted: false } },
+        { $group: { _id: '$organizationId', count: { $sum: 1 } } },
+      ]),
+      Student.aggregate([
+        { $match: { organizationId: { $in: orgIds }, isActive: true } },
+        { $group: { _id: '$organizationId', count: { $sum: 1 } } },
+      ]),
+      Room.aggregate([
+        { $match: { organizationId: { $in: orgIds } } },
+        { $group: { _id: '$organizationId', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    // O(1) in-memory Hash Maps
+    const hostelMap = new Map(hostelGroups.map((g) => [String(g._id), g.count]));
+    const studentMap = new Map(studentGroups.map((g) => [String(g._id), g.count]));
+    const roomMap = new Map(roomGroups.map((g) => [String(g._id), g.count]));
+
+    const orgsWithMetrics = organizations.map((org) => {
+      const orgIdStr = String(org._id);
+      return {
+        ...org.toObject(),
+        id: org._id,
+        hostelCount: hostelMap.get(orgIdStr) || 0,
+        studentCount: studentMap.get(orgIdStr) || 0,
+        roomCount: roomMap.get(orgIdStr) || 0,
+      };
+    });
 
     return orgsWithMetrics;
   },

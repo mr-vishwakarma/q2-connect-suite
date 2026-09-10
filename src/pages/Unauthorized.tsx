@@ -6,8 +6,11 @@ import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { ShieldX, Home, LogIn } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Unauthorized() {
+  const { user, isSuperAdmin, isAdmin } = useAuth();
+
   return (
     <div className="min-h-screen bg-background overflow-x-hidden flex flex-col">
       <Navbar />
@@ -37,21 +40,45 @@ export default function Unauthorized() {
             
             <CardContent className="space-y-4">
               <p className="text-center text-muted-foreground text-sm">
-                This area is restricted to administrators only. If you believe this is an error, please contact the system administrator.
+                You do not have the required permissions or authoritative role to access this portal or resource.
               </p>
               
               <div className="flex flex-col gap-3 pt-4">
-                <Button asChild variant="default" className="w-full">
-                  <Link to="/" className="flex items-center gap-2">
-                    <Home className="w-4 h-4" />
-                    Go to Home
+                {user ? (
+                  <Button asChild variant="default" className="w-full">
+                    <Link
+                      to={
+                        isSuperAdmin || user.role === 'super_admin'
+                          ? "/super-admin/dashboard"
+                          : isAdmin || user.role === 'admin'
+                          ? "/admin/dashboard"
+                          : "/student/dashboard"
+                      }
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <Home className="w-4 h-4" />
+                      Return to Your Authorized Portal
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button asChild variant="default" className="w-full">
+                    <Link to="/login" className="flex items-center justify-center gap-2">
+                      <LogIn className="w-4 h-4" />
+                      Go to Login
+                    </Link>
+                  </Button>
+                )}
+                
+                <Button asChild variant="outline" className="w-full">
+                  <Link to="/login" className="flex items-center justify-center gap-2">
+                    <LogIn className="w-4 h-4" />
+                    Sign In with Different Role
                   </Link>
                 </Button>
                 
-                <Button asChild variant="outline" className="w-full">
-                  <Link to="/admin-login" className="flex items-center gap-2">
-                    <LogIn className="w-4 h-4" />
-                    Admin Login
+                <Button asChild variant="ghost" className="w-full text-xs text-muted-foreground">
+                  <Link to="/" className="flex items-center justify-center gap-2">
+                    Home Page
                   </Link>
                 </Button>
               </div>

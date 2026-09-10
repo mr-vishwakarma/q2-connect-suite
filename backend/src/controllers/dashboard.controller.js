@@ -5,10 +5,22 @@ const Suggestion = require('../models/Suggestion');
 exports.getAdminDashboard = async (req, res) => {
   try {
     const { hostel } = req.query;
-    
-    // Filter by hostel if provided, else fetch for all hostels
-    const filter = hostel && hostel !== 'All' ? { hostel } : {};
-    const studentMatch = { isActive: { $ne: false }, ...(hostel && hostel !== 'All' ? { hostel } : {}) };
+    const orgId = req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    // Enforce Tenant Scoping
+    const filter = {};
+    if (orgId && !isSuperAdmin) {
+      filter.organizationId = orgId;
+    }
+
+    if (hostel && hostel !== 'All') {
+      filter.hostel = hostel;
+    } else if (req.tenant?.hostelAccess && !req.tenant.hostelAccess.includes('all') && !isSuperAdmin) {
+      filter.hostel = { $in: req.tenant.hostelAccess };
+    }
+
+    const studentMatch = { isActive: { $ne: false }, ...filter };
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 

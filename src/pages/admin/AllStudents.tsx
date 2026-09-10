@@ -131,7 +131,7 @@ export default function AllStudents() {
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
-      navigate('/admin-login');
+      navigate('/login?role=admin');
     }
   }, [user, isAdmin, loading, navigate]);
 

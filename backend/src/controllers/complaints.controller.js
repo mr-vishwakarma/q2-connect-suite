@@ -5,8 +5,21 @@ const getComplaints = async (req, res) => {
   try {
     const { hostel, status, page = 1, limit = 50 } = req.query;
     const query = {};
-    if (req.user.role === 'student') query.userId = req.user._id;
-    else if (hostel) query.hostel = hostel;
+
+    const orgId = req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+    if (orgId && !isSuperAdmin) query.organizationId = orgId;
+
+    if (req.user.role === 'student') {
+      query.userId = req.user._id;
+    } else {
+      if (hostel && hostel !== 'All') {
+        query.hostel = hostel;
+      } else if (req.tenant?.hostelAccess && !req.tenant.hostelAccess.includes('all') && !isSuperAdmin) {
+        query.hostel = { $in: req.tenant.hostelAccess };
+      }
+    }
+
     if (status) query.status = status;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -44,7 +57,9 @@ const createComplaint = async (req, res) => {
     const complaint = await Complaint.create({
       userId: req.user._id,
       studentId: student?._id,
-      hostel: student?.hostel,
+      organizationId: req.tenant?.organizationId || student?.organizationId || null,
+      hostelId: student?.hostelId || null,
+      hostel: student?.hostel || 'Q2',
       title,
       description,
     });
@@ -61,15 +76,19 @@ const updateComplaint = async (req, res) => {
     if (status) updateData.status = status;
     if (adminReply !== undefined) updateData.adminReply = adminReply;
 
-    const complaint = await Complaint.findByIdAndUpdate(
-      req.params.id,
-      { $set: updateData },
-      { new: true }
+    const complaintQuery = { _id: req.params.id };
+    if (req.tenant?.organizationId && !req.tenant.isSuperAdmin) {
+      complaintQuery.organizationId = req.tenant.organizationId;
+    }
+
+    const complaint = await Complaint.findOneAndUpdate(
+      complaintQuery,
+      updateData,
+      { new: true, runValidators: true }
     );
     if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found' });
     return res.status(200).json({ success: true, data: complaint });
   } catch (error) {
-    console.error('Error updating complaint:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

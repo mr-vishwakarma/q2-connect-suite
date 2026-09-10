@@ -26,7 +26,10 @@ const studentSchema = new mongoose.Schema(
 );
 
 studentSchema.index({ organizationId: 1, hostelId: 1 });
+studentSchema.index({ organizationId: 1, isActive: 1, createdAt: -1 });
+studentSchema.index({ organizationId: 1, hostel: 1, isActive: 1 });
 studentSchema.index({ organizationId: 1, validDate: 1, isActive: 1 });
+studentSchema.index({ organizationId: 1, name: 1, phone: 1 });
 studentSchema.index({ hostel: 1 });
 studentSchema.index({ isActive: 1 });
 studentSchema.index({ hostel: 1, validDate: 1, isActive: 1 });

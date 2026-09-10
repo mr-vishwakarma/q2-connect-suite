@@ -40,22 +40,26 @@ const resolveTenantContext = async (req, res, next) => {
       membership = await Membership.findOne({ userId: req.user._id, status: 'ACTIVE' }).populate('organizationId');
     }
 
-    if (!membership || !membership.organizationId) {
-      // Fallback for legacy standalone records if not yet migrated
-      req.tenant = {
-        organizationId: null,
-        hostelId: req.headers['x-hostel-id'] || null,
-        role: req.user.role || 'student',
-        permissions: [],
-        features: {},
-      };
-      return next();
+    let organization = membership ? membership.organizationId : null;
+
+    // Resilient fallbacks if user membership record is not yet initialized
+    if (!organization) {
+      if (req.user.activeOrganizationId) {
+        organization = await Organization.findById(req.user.activeOrganizationId);
+      }
+      if (!organization && (req.user.studentId || req.user.role === 'student')) {
+        const studentDoc = await require('../models/Student').findOne({ userId: req.user._id });
+        if (studentDoc && studentDoc.organizationId) {
+          organization = await Organization.findById(studentDoc.organizationId);
+        }
+      }
+      if (!organization) {
+        organization = (await Organization.findOne({ slug: 'q2-hostels' })) || (await Organization.findOne({ status: 'ACTIVE' }));
+      }
     }
 
-    const organization = membership.organizationId;
-
     // Check organization active status
-    if (organization.status === 'SUSPENDED') {
+    if (organization && organization.status === 'SUSPENDED') {
       return res.status(403).json({
         success: false,
         code: 'TENANT_SUSPENDED',
@@ -65,12 +69,12 @@ const resolveTenantContext = async (req, res, next) => {
 
     // Resolve active hostel branch
     let activeHostelId = req.headers['x-hostel-id'] || req.user.activeHostelId;
-    if (!activeHostelId && membership.hostelAccess && membership.hostelAccess.length > 0 && membership.hostelAccess[0] !== 'all') {
+    if (!activeHostelId && membership && membership.hostelAccess && membership.hostelAccess.length > 0 && membership.hostelAccess[0] !== 'all') {
       activeHostelId = membership.hostelAccess[0];
     }
 
     // Load enabled features for organization
-    const orgFeatures = await OrganizationFeature.find({ organizationId: organization._id, enabled: true });
+    const orgFeatures = organization ? await OrganizationFeature.find({ organizationId: organization._id, enabled: true }) : [];
     const featuresMap = {};
     orgFeatures.forEach((f) => {
       featuresMap[f.featureKey] = f.configuration || true;
@@ -79,13 +83,13 @@ const resolveTenantContext = async (req, res, next) => {
     // Attach immutable tenant context
     req.tenant = {
       isSuperAdmin: false,
-      organizationId: organization._id,
-      organizationName: organization.name,
-      organizationSlug: organization.slug,
+      organizationId: organization ? organization._id : null,
+      organizationName: organization ? organization.name : 'Standalone',
+      organizationSlug: organization ? organization.slug : 'standalone',
       hostelId: activeHostelId || null,
-      role: membership.role,
-      hostelAccess: membership.hostelAccess || ['all'],
-      permissions: membership.permissions || [],
+      role: membership ? membership.role : (req.user.role || 'student'),
+      hostelAccess: membership ? (membership.hostelAccess || ['all']) : (req.user.hostels || ['all']),
+      permissions: membership ? (membership.permissions || []) : [],
       features: featuresMap,
     };
 

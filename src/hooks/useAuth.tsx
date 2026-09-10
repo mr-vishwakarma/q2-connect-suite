@@ -28,8 +28,15 @@ interface AuthContextType {
   profile: Profile | null;
   features: Record<string, boolean>;
   hasFeature: (featureKey: string) => boolean;
-  signIn: (email: string, password: string, isAdminLogin?: boolean) => Promise<{ error: any; user?: any }>;
-  signInWithGoogle: (credential: string) => Promise<{
+  signIn: (
+    identifier: string,
+    password: string,
+    portalOrIsAdmin?: 'super_admin' | 'admin' | 'student' | boolean
+  ) => Promise<{ error: any; user?: any }>;
+  signInWithGoogle: (
+    credential: string,
+    portal?: 'super_admin' | 'admin' | 'student'
+  ) => Promise<{
     error: any;
     user?: any;
     status?: 'active' | 'pending_approval' | 'approved' | 'new_resident' | 'rejected' | string;
@@ -223,12 +230,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return mappedUser;
   };
 
-  const signIn = async (identifier: string, password: string, isAdminLogin: boolean = false) => {
+  const signIn = async (
+    identifier: string,
+    password: string,
+    portalOrIsAdmin: 'super_admin' | 'admin' | 'student' | boolean = 'student'
+  ) => {
     try {
-      const response = await api.post(
-        isAdminLogin ? '/auth/admin/login' : '/auth/login',
-        { email: identifier, username: identifier, password }
-      );
+      let endpoint = '/auth/login';
+      let requestedPortal = 'STUDENT';
+
+      if (typeof portalOrIsAdmin === 'boolean') {
+        endpoint = portalOrIsAdmin ? '/auth/admin/login' : '/auth/login';
+        requestedPortal = portalOrIsAdmin ? 'ADMIN' : 'STUDENT';
+      } else if (portalOrIsAdmin === 'super_admin') {
+        endpoint = '/auth/super-admin/login';
+        requestedPortal = 'SUPER_ADMIN';
+      } else if (portalOrIsAdmin === 'admin') {
+        endpoint = '/auth/admin/login';
+        requestedPortal = 'ADMIN';
+      } else {
+        endpoint = '/auth/login';
+        requestedPortal = 'STUDENT';
+      }
+
+      const response = await api.post(endpoint, {
+        email: identifier,
+        username: identifier,
+        password,
+        portal: requestedPortal,
+      });
 
       if (response.data?.success) {
         const mappedUser = handleAuthSuccess(response.data);
@@ -241,13 +271,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       errorObj.isLocked = data?.isLocked;
       errorObj.lockMinutes = data?.lockMinutes;
       errorObj.remainingAttempts = data?.remainingAttempts;
+      errorObj.code = data?.code;
       return { error: errorObj };
     }
   };
 
-  const signInWithGoogle = async (credential: string) => {
+  const signInWithGoogle = async (
+    credential: string,
+    portal: 'super_admin' | 'admin' | 'student' = 'student'
+  ) => {
     try {
-      const response = await api.post('/auth/google', { credential });
+      const response = await api.post('/auth/google', {
+        credential,
+        portal: portal.toUpperCase(),
+      });
       const data = response.data;
 
       if (data?.status === 'pending_approval') {

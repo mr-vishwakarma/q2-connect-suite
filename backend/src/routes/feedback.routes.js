@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth.middleware');
+const { resolveTenantContext } = require('../middleware/tenant.middleware');
 const { adminOnly } = require('../middleware/admin.middleware');
 const { getComplaints, createComplaint, updateComplaint } = require('../controllers/complaints.controller');
 const { getSuggestions, createSuggestion, updateSuggestion } = require('../controllers/suggestions.controller');
 
-router.use(protect);
+router.use(protect, resolveTenantContext);
 
 // Complaints
 router.get('/complaints', getComplaints);

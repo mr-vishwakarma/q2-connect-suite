@@ -2,9 +2,11 @@ const mongoose = require('mongoose');
 
 const messRequestSchema = new mongoose.Schema(
   {
+    organizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
+    hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel' },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student' },
-    hostel: { type: String, enum: ['Q2', 'Q2.0', 'Q2.1'] },
+    hostel: { type: String, trim: true, default: 'Q2' },
     leavingDate: { type: Date, required: true },
     returnDate: { type: Date, required: true },
     reason: { type: String },
@@ -20,6 +22,8 @@ const messRequestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+messRequestSchema.index({ organizationId: 1, status: 1 });
+messRequestSchema.index({ organizationId: 1, hostelId: 1 });
 messRequestSchema.index({ hostel: 1, status: 1 });
 messRequestSchema.index({ userId: 1, status: 1 });
 messRequestSchema.index({ createdAt: -1 });

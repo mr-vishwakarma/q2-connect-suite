@@ -101,7 +101,8 @@ export default function Login() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (user) {
+    const roleParam = searchParams.get('role');
+    if (user && !roleParam && !selectedRole) {
       if (user.role === 'super_admin' || user.isSuperAdmin) {
         navigate('/super-admin/dashboard', { replace: true });
       } else if (user.role === 'admin' || isAdmin) {
@@ -110,7 +111,7 @@ export default function Login() {
         navigate('/student/dashboard', { replace: true });
       }
     }
-  }, [user, isAdmin, navigate]);
+  }, [user, isAdmin, selectedRole, searchParams, navigate]);
 
   const handleRoleSelect = (role: 'super_admin' | 'admin' | 'student') => {
     setSelectedRole(role);
@@ -137,7 +138,8 @@ export default function Login() {
     setLockoutInfo(null);
 
     try {
-      const result = await signInWithGoogle(credentialResponse.credential);
+      const portal = selectedRole || 'student';
+      const result = await signInWithGoogle(credentialResponse.credential, portal);
       setIsLoading(false);
 
       if (result.error) {
@@ -175,12 +177,12 @@ export default function Login() {
         return;
       }
 
-      // 4. Active resident/admin -> Log directly in
+      // 4. Active resident/admin -> Log directly in to authorized requested portal
       const loggedUser = result.user;
       toast.success(`Welcome ${loggedUser?.name || 'back'}! (Authenticated via Google)`);
-      if (loggedUser?.role === 'super_admin' || loggedUser?.isSuperAdmin) {
+      if (portal === 'super_admin') {
         navigate('/super-admin/dashboard', { replace: true });
-      } else if (loggedUser?.role === 'admin') {
+      } else if (portal === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else {
         navigate('/student/dashboard', { replace: true });
@@ -318,13 +320,12 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const isSuperAdminLogin = selectedRole === 'super_admin';
-      const isAdminLogin = selectedRole === 'admin' || isSuperAdminLogin;
+      const portal = selectedRole || 'student';
 
       const { error, user: loggedUser } = await signIn(
         identifier.trim(),
         password,
-        isAdminLogin
+        portal
       );
 
       setIsLoading(false);
@@ -342,13 +343,13 @@ export default function Login() {
             message: error.message,
           });
         }
-        toast.error(error.message || 'Invalid Credentials. Please check your username and password.');
+        toast.error(error.message || 'You are not authorized to access this portal.');
       } else {
         setLockoutInfo(null);
         toast.success('Welcome back!');
-        if (isSuperAdminLogin || loggedUser?.role === 'super_admin' || loggedUser?.isSuperAdmin) {
+        if (portal === 'super_admin') {
           navigate('/super-admin/dashboard', { replace: true });
-        } else if (isAdminLogin) {
+        } else if (portal === 'admin') {
           navigate('/admin/dashboard', { replace: true });
         } else {
           navigate('/student/dashboard', { replace: true });

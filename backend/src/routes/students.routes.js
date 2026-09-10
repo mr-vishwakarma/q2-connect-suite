@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth.middleware');
+const { resolveTenantContext } = require('../middleware/tenant.middleware');
 const { adminOnly, adminOrWarden } = require('../middleware/admin.middleware');
 const {
   getAllStudents,
@@ -17,7 +18,7 @@ const {
   rejectRegistration,
 } = require('../controllers/students.controller');
 
-router.use(protect);
+router.use(protect, resolveTenantContext);
 
 router.put('/profile', updateOwnProfile); // student updating own profile
 router.get('/alerts/count', adminOrWarden, getAlertsCount);

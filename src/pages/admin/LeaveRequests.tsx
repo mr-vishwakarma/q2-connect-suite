@@ -50,7 +50,7 @@ export default function LeaveRequests() {
   const [recordsOpen, setRecordsOpen] = useState(false);
 
   useEffect(() => {
-    if (!loading && (!user || !isAdmin)) navigate('/admin-login');
+    if (!loading && (!user || !isAdmin)) navigate('/login?role=admin');
   }, [user, isAdmin, loading, navigate]);
 
   const fetchRequests = useCallback(async () => {

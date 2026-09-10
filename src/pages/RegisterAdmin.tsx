@@ -86,7 +86,7 @@ export default function RegisterAdmin() {
       }
 
       toast.success('Admin account created successfully!');
-      navigate('/admin-login');
+      navigate('/login?role=admin');
     } catch (error: any) {
       toast.error(error.message || 'Failed to create admin');
     } finally {
@@ -133,7 +133,7 @@ export default function RegisterAdmin() {
                 </p>
                 
                 <Button asChild variant="default" className="w-full">
-                  <Link to="/admin-login">
+                  <Link to="/login?role=admin">
                     Go to Admin Login
                   </Link>
                 </Button>
@@ -271,7 +271,7 @@ export default function RegisterAdmin() {
                   className="mt-6 pt-6 border-t border-border/50 text-center text-sm text-muted-foreground"
                 >
                   <p>Already have an admin account?</p>
-                  <Link to="/admin-login" className="text-primary hover:underline mt-1 inline-block hover:text-primary/80 transition-colors">
+                  <Link to="/login?role=admin" className="text-primary hover:underline mt-1 inline-block hover:text-primary/80 transition-colors">
                     Admin Login
                   </Link>
                 </motion.div>

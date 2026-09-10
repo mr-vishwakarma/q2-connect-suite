@@ -7,24 +7,25 @@ interface ProtectedAdminRouteProps {
 }
 
 export function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isSuperAdmin, loading } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+
+  const isUserSuperAdmin = isSuperAdmin || user?.role === 'super_admin' || Boolean(user?.isSuperAdmin);
+  const isAllowedAdmin = isAdmin && !isUserSuperAdmin && user?.role !== 'student';
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        navigate("/login", { replace: true });
-      } else if (!isAdmin) {
+        navigate("/login?role=admin", { replace: true });
+      } else if (!isAllowedAdmin) {
         navigate("/unauthorized", { replace: true });
       }
     }
-  }, [user, isAdmin, loading, navigate]);
-
+  }, [user, isAllowedAdmin, loading, navigate]);
 
   if (loading) return null;
 
-  if (!user || !isAdmin) return null;
+  if (!user || !isAllowedAdmin) return null;
 
   return <>{children}</>;
 }

@@ -12,12 +12,23 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import ScrollToTop from "@/components/ScrollToTop";
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isSuperAdmin, isAdmin, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) return null;
 
+  if (user && location.pathname === '/login' && location.search.includes('role=')) {
+    return <>{children}</>;
+  }
+
   if (user) {
-    return <Navigate to={isAdmin ? "/admin/dashboard" : "/student/dashboard"} replace />;
+    if (isSuperAdmin || user.role === 'super_admin' || user.isSuperAdmin) {
+      return <Navigate to="/super-admin/dashboard" replace />;
+    }
+    if (isAdmin || user.role === 'admin') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    return <Navigate to="/student/dashboard" replace />;
   }
 
   return <>{children}</>;

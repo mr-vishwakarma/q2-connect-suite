@@ -20,9 +20,19 @@ const requestLogger = (req, res, next) => {
   const method = req.method;
   requestCounts.byMethod[method] = (requestCounts.byMethod[method] || 0) + 1;
 
-  // Increment endpoint (basic grouping)
-  const endpoint = req.originalUrl.split('?')[0]; // strip query params
-  requestCounts.byEndpoint[endpoint] = (requestCounts.byEndpoint[endpoint] || 0) + 1;
+  // Normalize endpoint to prevent unbounded memory leak from raw IDs
+  let endpoint = req.originalUrl.split('?')[0];
+  endpoint = endpoint
+    .replace(/\/[0-9a-fA-F]{24}(\/|$)/g, '/:id$1')
+    .replace(/\/[0-9a-fA-F-]{36}(\/|$)/g, '/:id$1')
+    .replace(/\/\d+(\/|$)/g, '/:id$1');
+
+  // Hard cap to ensure bounded memory usage
+  if (Object.keys(requestCounts.byEndpoint).length < 500 || requestCounts.byEndpoint[endpoint]) {
+    requestCounts.byEndpoint[endpoint] = (requestCounts.byEndpoint[endpoint] || 0) + 1;
+  } else {
+    requestCounts.byEndpoint['/api/other'] = (requestCounts.byEndpoint['/api/other'] || 0) + 1;
+  }
 
   // Hook into response finish to track errors
   res.on('finish', () => {

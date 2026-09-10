@@ -37,13 +37,22 @@ const getFees = async (req, res) => {
     const { studentId, hostel, month, status } = req.query;
     const query = {};
 
+    // Enforce Tenant Scoping
+    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
+      query.organizationId = req.tenant.organizationId;
+    }
+
     if (req.user.role === 'student') {
       const student = await Student.findOne({ userId: req.user._id });
       if (!student) return res.status(404).json({ success: false, message: 'Student profile not found' });
       query.studentId = student._id;
     } else {
       if (studentId) query.studentId = studentId;
-      if (hostel) query.hostel = hostel;
+      if (hostel && hostel !== 'All') {
+        query.hostel = hostel;
+      } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !req.tenant.isSuperAdmin) {
+        query.hostel = { $in: req.tenant.hostelAccess };
+      }
     }
 
     if (month) query.month = month;
@@ -67,7 +76,25 @@ const createFee = async (req, res) => {
     if (!studentId || !month || !amount) {
       return res.status(400).json({ success: false, message: 'studentId, month, amount are required' });
     }
-    const fee = await Fee.create({ studentId, hostel, month, amount, discount, lateFee, dueDate, notes, status, paymentMode });
+
+    const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
+    const Hostel = require('../models/Hostel');
+    const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel });
+
+    const fee = await Fee.create({
+      studentId,
+      organizationId: orgId || null,
+      hostelId: hostelDoc?._id || null,
+      hostel,
+      month,
+      amount,
+      discount,
+      lateFee,
+      dueDate,
+      notes,
+      status,
+      paymentMode,
+    });
     return res.status(201).json({ success: true, data: fee });
   } catch (error) {
     if (error.code === 11000) {
@@ -82,8 +109,13 @@ const createFee = async (req, res) => {
 const updateFee = async (req, res) => {
   try {
     const { paidAmount, status, paymentMode, receiptNo, paidDate, discount, lateFee, notes, amount } = req.body;
-    const fee = await Fee.findByIdAndUpdate(
-      req.params.id,
+    const feeQuery = { _id: req.params.id };
+    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
+      feeQuery.organizationId = req.tenant.organizationId;
+    }
+
+    const fee = await Fee.findOneAndUpdate(
+      feeQuery,
       { paidAmount, status, paymentMode, receiptNo, paidDate, discount, lateFee, notes, amount },
       { new: true, runValidators: true }
     ).populate('studentId', 'name username hostel userId');
@@ -94,6 +126,8 @@ const updateFee = async (req, res) => {
     if (status === 'paid' && fee.studentId) {
       await Notification.create({
         userId: fee.studentId.userId,
+        organizationId: fee.organizationId || null,
+        hostelId: fee.hostelId || null,
         hostel: fee.hostel,
         title: 'Fee Payment Confirmed',
         message: `Your fee for ${fee.month} has been marked as paid. Receipt: ${receiptNo || fee.receiptNo}`,
@@ -112,48 +146,93 @@ const updateFee = async (req, res) => {
 const generateMonthlyFees = async (req, res) => {
   try {
     const { month, hostel } = req.body;
-    if (!month) return res.status(400).json({ success: false, message: 'month is required (YYYY-MM)' });
+    if (!month) return res.status(400).json({ success: false, message: 'month is required (e.g. "October 2026" or "2026-10")' });
 
     const query = { isActive: true };
-    if (hostel) query.hostel = hostel;
 
-    const students = await Student.find(query);
-    const results = { created: 0, skipped: 0 };
-
-    for (const student of students) {
-      try {
-        await Fee.create({
-          studentId: student._id,
-          hostel: student.hostel,
-          month,
-          amount: student.fees || 0,
-          dueDate: student.validDate || new Date()
-        });
-        results.created++;
-      } catch (err) {
-        if (err.code === 11000) results.skipped++; // already exists
-      }
+    // Enforce Tenant Scoping
+    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
+      query.organizationId = req.tenant.organizationId;
     }
 
-    return res.status(200).json({ success: true, message: `Generated fees: ${results.created} created, ${results.skipped} skipped` });
+    if (hostel && hostel !== 'All') {
+      query.hostel = hostel;
+    } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !req.tenant.isSuperAdmin) {
+      query.hostel = { $in: req.tenant.hostelAccess };
+    }
+
+    const students = await Student.find(query).select('_id hostel hostelId organizationId fees validDate').lean();
+    if (students.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No active students found for fee generation',
+        created: 0,
+        skipped: 0,
+      });
+    }
+
+    // High-performance batched bulkWrite with $setOnInsert: 1 round-trip instead of N sequential writes
+    const bulkOps = students.map((student) => ({
+      updateOne: {
+        filter: {
+          studentId: student._id,
+          month,
+        },
+        update: {
+          $setOnInsert: {
+            studentId: student._id,
+            organizationId: student.organizationId || req.tenant?.organizationId || null,
+            hostelId: student.hostelId || null,
+            hostel: student.hostel || 'Q2',
+            month,
+            amount: student.fees || 0,
+            paidAmount: 0,
+            status: 'unpaid',
+            dueDate: student.validDate || new Date(),
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    const writeResult = await Fee.bulkWrite(bulkOps, { ordered: false });
+    const created = writeResult.upsertedCount || 0;
+    const skipped = writeResult.matchedCount || 0;
+
+    return res.status(200).json({
+      success: true,
+      message: `Generated monthly fees: ${created} created, ${skipped} skipped (already existed)`,
+      created,
+      skipped,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Get fee payments for a student
-// @route   GET /api/fee-payments
+// @desc    Get fee payments
+// @route   GET /api/fees/payments
 const getFeePayments = async (req, res) => {
   try {
-    const { studentId } = req.query;
+    const { studentId, hostel } = req.query;
     const query = {};
+
+    // Enforce Tenant Scoping
+    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
+      query.organizationId = req.tenant.organizationId;
+    }
 
     if (req.user.role === 'student') {
       const student = await Student.findOne({ userId: req.user._id });
       if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
       query.studentId = student._id;
-    } else if (studentId) {
-      query.studentId = studentId;
+    } else {
+      if (studentId) query.studentId = studentId;
+      if (hostel && hostel !== 'All') {
+        query.hostel = hostel;
+      } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !req.tenant.isSuperAdmin) {
+        query.hostel = { $in: req.tenant.hostelAccess };
+      }
     }
 
     const payments = await FeePayment.find(query)
@@ -175,33 +254,93 @@ const collectPayment = async (req, res) => {
   try {
     const {
       studentId, hostel, month, amount, lateFee, discount, securityDeposit,
-      receivedAmount, paymentMode, notes, receiptNo, receiptUrl
+      receivedAmount, paymentMode, notes, receiptNo, receiptUrl, idempotencyKey: bodyIdempotencyKey
     } = req.body;
+
+    const idempotencyKey = req.headers['idempotency-key'] || bodyIdempotencyKey;
 
     if (!studentId || !month || !receivedAmount || !paymentMode || !receiptNo) {
       await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    const student = await Student.findById(studentId).session(session);
+    const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
+
+    // Idempotency check: prevent duplicate financial charges on network retry
+    if (idempotencyKey) {
+      const existingPayment = await FeePayment.findOne({
+        idempotencyKey,
+        ...(orgId ? { organizationId: orgId } : {})
+      }).session(session);
+
+      if (existingPayment) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(200).json({
+          success: true,
+          data: existingPayment,
+          idempotent: true,
+          message: 'Payment already recorded successfully (idempotent response)'
+        });
+      }
+    }
+
+    // Check duplicate receipt number within organization
+    if (orgId) {
+      const existingReceipt = await FeePayment.findOne({
+        receiptNo,
+        organizationId: orgId
+      }).session(session);
+
+      if (existingReceipt) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(409).json({
+          success: false,
+          message: `Receipt number "${receiptNo}" has already been issued.`
+        });
+      }
+    }
+
+    // Verify student belongs to this tenant
+    const studentQuery = { _id: studentId };
+    if (orgId && !req.tenant?.isSuperAdmin) {
+      studentQuery.organizationId = orgId;
+    }
+
+    const student = await Student.findOne(studentQuery).session(session);
     if (!student) {
       await session.abortTransaction();
-      return res.status(404).json({ success: false, message: 'Student not found' });
+      session.endSession();
+      return res.status(404).json({ success: false, message: 'Student not found in this organization' });
     }
     const actualHostel = student.hostel || hostel;
 
     // 1. Ensure a monthly fees row exists
-    let feeRow = await Fee.findOne({ studentId, month, hostel: actualHostel }).session(session);
+    const feeFilter = { studentId, month, hostel: actualHostel };
+    if (orgId) feeFilter.organizationId = orgId;
+
+    let feeRow = await Fee.findOne(feeFilter).session(session);
     
     if (feeRow && feeRow.status === 'paid') {
       await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ success: false, message: 'Fee for this month is already fully paid' });
     }
 
     if (!feeRow) {
       const newFees = await Fee.create([{
-        studentId, hostel: actualHostel, month, amount, lateFee, discount,
-        status: 'unpaid', paymentMode
+        studentId,
+        organizationId: orgId || null,
+        hostelId: student.hostelId || null,
+        hostel: actualHostel,
+        month,
+        amount,
+        lateFee,
+        discount,
+        status: 'unpaid',
+        paymentMode
       }], { session, ordered: true });
       feeRow = newFees[0];
     } else {
@@ -215,10 +354,12 @@ const collectPayment = async (req, res) => {
     const feeCore = Math.max(0, receivedAmount - securityDeposit);
     const totalDue = amount + lateFee - discount;
 
-    // 2. Create the fee payment record
+    // 2. Create the fee payment record with organization and idempotency tracking
     const payments = await FeePayment.create([{
       feeId: feeRow._id,
       studentId,
+      organizationId: orgId || null,
+      hostelId: student.hostelId || null,
       hostel: actualHostel,
       receiptNo,
       receiptUrl,
@@ -232,6 +373,7 @@ const collectPayment = async (req, res) => {
       adminName: req.user.name,
       month,
       notes: notes || null,
+      idempotencyKey: idempotencyKey || null,
     }], { session, ordered: true });
     const payment = payments[0];
 
@@ -239,6 +381,8 @@ const collectPayment = async (req, res) => {
     if (securityDeposit > 0) {
       await SecurityDeposit.create([{
         studentId,
+        organizationId: orgId || null,
+        hostelId: student.hostelId || null,
         hostel: actualHostel,
         amount: securityDeposit,
         collectedDate: new Date(),

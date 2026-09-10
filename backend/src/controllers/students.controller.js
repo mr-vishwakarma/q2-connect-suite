@@ -17,7 +17,18 @@ const getAllStudents = async (req, res) => {
     const limitAmount = parseInt(limit);
 
     const studentMatch = { isActive: { $ne: false } };
-    if (hostel) studentMatch.hostel = hostel;
+    
+    // Enforce Tenant Scoping
+    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
+      studentMatch.organizationId = req.tenant.organizationId;
+    }
+
+    if (hostel && hostel !== 'All') {
+      studentMatch.hostel = hostel;
+    } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !req.tenant.isSuperAdmin) {
+      studentMatch.hostel = { $in: req.tenant.hostelAccess };
+    }
+
     if (search) {
       studentMatch.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -90,7 +101,11 @@ const getStudent = async (req, res) => {
     if (req.params.id === 'me') {
       student = await Student.findOne({ userId: req.user._id });
     } else {
-      student = await Student.findById(req.params.id);
+      const studentQuery = { _id: req.params.id };
+      if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
+        studentQuery.organizationId = req.tenant.organizationId;
+      }
+      student = await Student.findOne(studentQuery);
     }
     
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
@@ -121,6 +136,8 @@ const createStudent = async (req, res) => {
       return res.status(400).json({ success: false, message: 'name, username, email, password are required' });
     }
 
+    const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
+
     // Check for existing user/username
     let user;
     const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username }] }).session(session);
@@ -132,6 +149,7 @@ const createStudent = async (req, res) => {
         existingUser.role = 'student';
         existingUser.registrationStatus = 'active';
         existingUser.hostels = [hostel];
+        if (orgId) existingUser.activeOrganizationId = orgId;
         if (existingUser.authProvider === 'google') existingUser.authProvider = 'both';
         await existingUser.save({ session });
         user = existingUser;
@@ -149,13 +167,20 @@ const createStudent = async (req, res) => {
         role: 'student',
         registrationStatus: 'active',
         hostels: [hostel],
+        activeOrganizationId: orgId || null,
       }], { session, ordered: true });
       user = users[0];
     }
 
+    // Resolve hostelId
+    const Hostel = require('../models/Hostel');
+    const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel }).session(session);
+
     // Create Student profile
     const students = await Student.create([{
       userId: user._id,
+      organizationId: orgId || null,
+      hostelId: hostelDoc?._id || null,
       name,
       username,
       email: email.toLowerCase(),
@@ -173,13 +198,44 @@ const createStudent = async (req, res) => {
     user.studentId = student._id;
     await user.save({ validateBeforeSave: false, session });
 
-    // Update room occupancy if room assigned
-    if (roomNo && hostel) {
-      await Room.findOneAndUpdate(
-        { roomNumber: roomNo, hostel },
-        { $inc: { occupiedCount: 1 } },
-        { session }
+    // Ensure Membership exists for student user
+    if (orgId) {
+      const Membership = require('../models/Membership');
+      await Membership.findOneAndUpdate(
+        { organizationId: orgId, userId: user._id },
+        {
+          organizationId: orgId,
+          userId: user._id,
+          role: 'MEMBER',
+          status: 'ACTIVE',
+          hostelAccess: [hostel],
+        },
+        { upsert: true, session }
       );
+    }
+
+    // Update room occupancy if room assigned with atomic capacity check to prevent race condition
+    if (roomNo && hostel) {
+      const roomQuery = { roomNumber: roomNo, hostel };
+      if (orgId && !req.tenant?.isSuperAdmin) {
+        roomQuery.organizationId = orgId;
+      }
+      const roomDoc = await Room.findOne(roomQuery).session(session);
+      if (roomDoc) {
+        const updatedRoom = await Room.findOneAndUpdate(
+          { _id: roomDoc._id, occupiedCount: { $lt: roomDoc.capacity } },
+          { $inc: { occupiedCount: 1 } },
+          { session, new: true }
+        );
+        if (!updatedRoom) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            success: false,
+            message: `Room ${roomNo} in ${hostel} is already fully occupied (capacity: ${roomDoc.capacity})`,
+          });
+        }
+      }
     }
 
     // Handle initial Fee creation for current month
@@ -195,6 +251,8 @@ const createStudent = async (req, res) => {
 
         const feeRecords = await Fee.create([{
           studentId: student._id,
+          organizationId: orgId || null,
+          hostelId: hostelDoc?._id || null,
           hostel,
           month,
           amount: fees,
@@ -209,6 +267,8 @@ const createStudent = async (req, res) => {
         await FeePayment.create([{
           feeId: feeRecord._id,
           studentId: student._id,
+          organizationId: orgId || null,
+          hostelId: hostelDoc?._id || null,
           hostel,
           receiptNo,
           amount: fees,
@@ -227,6 +287,8 @@ const createStudent = async (req, res) => {
         const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
         await Fee.create([{
           studentId: student._id,
+          organizationId: orgId || null,
+          hostelId: hostelDoc?._id || null,
           hostel,
           month,
           amount: fees,
@@ -240,6 +302,8 @@ const createStudent = async (req, res) => {
     // Create welcome notification
     await Notification.create([{
       userId: user._id,
+      organizationId: orgId || null,
+      hostelId: hostelDoc?._id || null,
       hostel,
       title: 'Welcome to Q2 Connect Suite!',
       message: `Hello ${name}, your account has been set up. Welcome to ${hostel} hostel.`,
@@ -282,40 +346,58 @@ const updateStudent = async (req, res) => {
 
   try {
     const { name, phone, parentPhone, roomNo, hostel, fees, startDate, validDate } = req.body;
-    const student = await Student.findById(req.params.id).session(session);
+    const studentQuery = { _id: req.params.id };
+    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
+      studentQuery.organizationId = req.tenant.organizationId;
+    }
+
+    const student = await Student.findOne(studentQuery).session(session);
     if (!student) {
       await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
-    // Handle room change: update occupancy
+    // Handle room change: update occupancy safely
     const oldRoom = student.roomNo;
     const oldHostel = student.hostel;
     if (roomNo && hostel && (roomNo !== oldRoom || hostel !== oldHostel)) {
-      // Decrement old room
+      // Safe decrement on old room (only if occupiedCount > 0)
       if (oldRoom && oldHostel) {
         await Room.findOneAndUpdate(
-          { roomNumber: oldRoom, hostel: oldHostel },
+          { roomNumber: oldRoom, hostel: oldHostel, organizationId: student.organizationId, occupiedCount: { $gt: 0 } },
           { $inc: { occupiedCount: -1 } },
           { session }
         );
       }
-      // Increment new room
-      await Room.findOneAndUpdate(
-        { roomNumber: roomNo, hostel },
-        { $inc: { occupiedCount: 1 } },
-        { session }
-      );
+      // Atomic increment on new room (verify capacity)
+      const newRoomQuery = { roomNumber: roomNo, hostel, organizationId: student.organizationId };
+      const newRoomDoc = await Room.findOne(newRoomQuery).session(session);
+      if (newRoomDoc) {
+        const updatedNewRoom = await Room.findOneAndUpdate(
+          { _id: newRoomDoc._id, occupiedCount: { $lt: newRoomDoc.capacity } },
+          { $inc: { occupiedCount: 1 } },
+          { session, new: true }
+        );
+        if (!updatedNewRoom) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            success: false,
+            message: `Room ${roomNo} in ${hostel} is already fully occupied (capacity: ${newRoomDoc.capacity})`,
+          });
+        }
+      }
     }
 
     const updated = await Student.findByIdAndUpdate(
-      req.params.id,
+      student._id,
       { name, phone, parentPhone, roomNo, hostel, fees, startDate, validDate },
       { new: true, runValidators: true, session }
     );
 
     // Also update name on User record
-    if (name) {
+    if (name && student.userId) {
       await User.findByIdAndUpdate(student.userId, { name }, { session });
     }
 
@@ -337,15 +419,20 @@ const deleteStudent = async (req, res) => {
   session.startTransaction();
 
   try {
-    let student = await Student.findById(req.params.id).session(session);
+    const studentQuery = { _id: req.params.id };
+    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
+      studentQuery.organizationId = req.tenant.organizationId;
+    }
+
+    let student = await Student.findOne(studentQuery).session(session);
     if (!student) {
-      student = await Student.findOne({ userId: req.params.id }).session(session);
+      student = await Student.findOne({ userId: req.params.id, ...(req.tenant?.organizationId && !req.tenant.isSuperAdmin ? { organizationId: req.tenant.organizationId } : {}) }).session(session);
     }
 
     if (student) {
       if (student.roomNo && student.hostel) {
         await Room.findOneAndUpdate(
-          { roomNumber: student.roomNo, hostel: student.hostel },
+          { roomNumber: student.roomNo, hostel: student.hostel, organizationId: student.organizationId, occupiedCount: { $gt: 0 } },
           { $inc: { occupiedCount: -1 } },
           { session }
         );
@@ -574,6 +661,10 @@ const approveAndRegisterStudent = async (req, res) => {
     const finalPhone = phone || user.registrationDetails?.phone || '';
     const finalName = name || user.name || 'Resident';
 
+    const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
+    const Hostel = require('../models/Hostel');
+    const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: finalHostel }).session(session);
+
     // Update user properties
     user.name = finalName;
     user.email = finalEmail;
@@ -582,6 +673,8 @@ const approveAndRegisterStudent = async (req, res) => {
     user.role = 'student';
     user.registrationStatus = 'active';
     user.hostels = [finalHostel];
+    if (orgId) user.activeOrganizationId = orgId;
+    if (hostelDoc) user.activeHostelId = hostelDoc._id;
     if (user.authProvider === 'google') {
       user.authProvider = 'both';
     }
@@ -600,6 +693,8 @@ const approveAndRegisterStudent = async (req, res) => {
       student.parentPhone = parentPhone;
       student.roomNo = roomNo;
       student.hostel = finalHostel;
+      if (orgId) student.organizationId = orgId;
+      if (hostelDoc) student.hostelId = hostelDoc._id;
       student.fees = fees ? parseFloat(fees) : 0;
       student.startDate = startDate || new Date();
       student.validDate = validDate || null;
@@ -607,6 +702,8 @@ const approveAndRegisterStudent = async (req, res) => {
     } else {
       const createdStudents = await Student.create([{
         userId: user._id,
+        organizationId: orgId || null,
+        hostelId: hostelDoc?._id || null,
         name: finalName,
         username: finalUsername,
         email: finalEmail,
@@ -624,13 +721,44 @@ const approveAndRegisterStudent = async (req, res) => {
     user.studentId = student._id;
     await user.save({ session });
 
-    // Update Room occupancy if room assigned
-    if (roomNo && finalHostel) {
-      await Room.findOneAndUpdate(
-        { roomNumber: roomNo, hostel: finalHostel },
-        { $inc: { occupiedCount: 1 } },
-        { session }
+    // Ensure Membership exists for student user
+    if (orgId) {
+      const Membership = require('../models/Membership');
+      await Membership.findOneAndUpdate(
+        { organizationId: orgId, userId: user._id },
+        {
+          organizationId: orgId,
+          userId: user._id,
+          role: 'MEMBER',
+          status: 'ACTIVE',
+          hostelAccess: [finalHostel],
+        },
+        { upsert: true, session }
       );
+    }
+
+    // Update Room occupancy if room assigned with atomic capacity check
+    if (roomNo && finalHostel) {
+      const roomQuery = { roomNumber: roomNo, hostel: finalHostel };
+      if (orgId && !req.tenant?.isSuperAdmin) {
+        roomQuery.organizationId = orgId;
+      }
+      const roomDoc = await Room.findOne(roomQuery).session(session);
+      if (roomDoc) {
+        const updatedRoom = await Room.findOneAndUpdate(
+          { _id: roomDoc._id, occupiedCount: { $lt: roomDoc.capacity } },
+          { $inc: { occupiedCount: 1 } },
+          { session, new: true }
+        );
+        if (!updatedRoom) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            success: false,
+            message: `Room ${roomNo} in ${finalHostel} is already fully occupied (capacity: ${roomDoc.capacity})`,
+          });
+        }
+      }
     }
 
     // Handle Fee creation if fees > 0
@@ -646,6 +774,8 @@ const approveAndRegisterStudent = async (req, res) => {
         const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
         const feeRecords = await Fee.create([{
           studentId: student._id,
+          organizationId: orgId || null,
+          hostelId: hostelDoc?._id || null,
           hostel: finalHostel,
           month,
           amount: feeAmount,
@@ -659,6 +789,8 @@ const approveAndRegisterStudent = async (req, res) => {
         await FeePayment.create([{
           feeId: feeRecords[0]._id,
           studentId: student._id,
+          organizationId: orgId || null,
+          hostelId: hostelDoc?._id || null,
           hostel: finalHostel,
           receiptNo,
           amount: feeAmount,
@@ -676,6 +808,8 @@ const approveAndRegisterStudent = async (req, res) => {
         const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
         await Fee.create([{
           studentId: student._id,
+          organizationId: orgId || null,
+          hostelId: hostelDoc?._id || null,
           hostel: finalHostel,
           month,
           amount: feeAmount,
@@ -690,6 +824,8 @@ const approveAndRegisterStudent = async (req, res) => {
     const notificationsToCreate = [
       {
         userId: user._id,
+        organizationId: orgId || null,
+        hostelId: hostelDoc?._id || null,
         title: 'Hostel Registration Complete!',
         message: `Welcome to ${finalHostel}! You have been assigned to Room ${roomNo || 'TBD'}. You can now sign in with Google or your credentials.`,
         type: 'success',
@@ -700,6 +836,8 @@ const approveAndRegisterStudent = async (req, res) => {
     if (req.user?._id) {
       notificationsToCreate.push({
         userId: req.user._id,
+        organizationId: orgId || null,
+        hostelId: hostelDoc?._id || null,
         hostel: finalHostel,
         title: 'New Student Registration Complete',
         message: `${finalName} has been officially registered and assigned to Room ${roomNo || 'N/A'} in ${finalHostel}.`,

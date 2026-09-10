@@ -7,22 +7,23 @@ interface ProtectedStudentRouteProps {
 }
 
 export function ProtectedStudentRoute({ children }: ProtectedStudentRouteProps) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        navigate("/login", { replace: true });
-      } else if (isAdmin) {
-        navigate("/admin/dashboard", { replace: true });
+        navigate("/login?role=student", { replace: true });
+      } else if (user.role !== 'student') {
+        // STRICT: Super Admin and Admin are denied direct URL access to student portal
+        navigate("/unauthorized", { replace: true });
       }
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, loading, navigate]);
 
   if (loading) return null;
 
-  if (!user || isAdmin) return null;
+  if (!user || user.role !== 'student') return null;
 
   return <>{children}</>;
 }

@@ -4,6 +4,8 @@ const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const { sendPasswordResetEmail } = require('../utils/email');
+const { PORTALS, normalizePortal, isRoleAllowedForPortal } = require('../utils/portalAccess');
+const { logAuditAction } = require('../middleware/audit.middleware');
 
 // Helper: generate tokens
 const generateTokens = (userId) => {
@@ -16,16 +18,20 @@ const generateTokens = (userId) => {
   return { accessToken, refreshToken };
 };
 
-// @desc    Student login
-// @route   POST /api/auth/login
-// @access  Public
-const login = async (req, res) => {
+/**
+ * Unified authoritative login handler with strict portal-role boundary enforcement.
+ * Checks valid credentials, then strictly verifies user.role matches requested portal.
+ */
+const handleUnifiedLogin = async (req, res, defaultPortal) => {
   try {
     const rawIdentifier = (req.body.username || req.body.email || req.body.identifier || '').trim();
     const { password } = req.body;
     if (!rawIdentifier || !password) {
       return res.status(400).json({ success: false, message: 'Username/Email and password are required' });
     }
+
+    // Determine authoritative portal for this endpoint (defaultPortal takes precedence to prevent client-side spoofing)
+    const requestedPortal = defaultPortal || normalizePortal(req.body.portal) || PORTALS.STUDENT;
 
     // Find by username or email (case-insensitive)
     const escaped = rawIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -55,7 +61,7 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Account is deactivated' });
     }
 
-    // Check password
+    // Authenticate: Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
@@ -78,6 +84,30 @@ const login = async (req, res) => {
       });
     }
 
+    // Authorize: STRICT role-to-portal authorization boundary
+    if (!isRoleAllowedForPortal(user, requestedPortal)) {
+      console.warn(`[SECURITY AUDIT] Portal access denied: user "${user.username || user.email}" with role "${user.role}" attempted unauthorized access to portal "${requestedPortal}"`);
+      await logAuditAction({
+        req,
+        action: 'PORTAL_ACCESS_DENIED',
+        entityType: 'PORTAL',
+        entityId: requestedPortal,
+        actor: user,
+        newValue: {
+          requestedPortal,
+          actualRole: user.role,
+          isSuperAdmin: Boolean(user.isSuperAdmin),
+          email: user.email,
+        },
+      });
+
+      return res.status(403).json({
+        success: false,
+        code: 'PORTAL_ACCESS_DENIED',
+        message: 'You are not authorized to access this portal.',
+      });
+    }
+
     // Reset lockout upon successful login
     if (user.failedLoginAttempts > 0 || user.lockUntil) {
       user.failedLoginAttempts = 0;
@@ -97,104 +127,43 @@ const login = async (req, res) => {
       studentProfile = await Student.findById(user.studentId);
     }
 
+    await logAuditAction({
+      req,
+      action: 'LOGIN_SUCCESS',
+      entityType: 'PORTAL',
+      entityId: requestedPortal,
+      actor: user,
+      newValue: { portal: requestedPortal, role: user.role },
+    });
+
     return res.status(200).json({
       success: true,
+      portal: requestedPortal,
       accessToken,
       refreshToken,
       user: user.toJSON(),
       student: studentProfile,
     });
   } catch (error) {
+    console.error('Unified login error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Admin login (same endpoint, just checks role)
+// @desc    Student portal login
+// @route   POST /api/auth/login
+// @access  Public
+const login = async (req, res) => handleUnifiedLogin(req, res, PORTALS.STUDENT);
+
+// @desc    Admin portal login
 // @route   POST /api/auth/admin/login
 // @access  Public
-const adminLogin = async (req, res) => {
-  try {
-    const rawIdentifier = (req.body.email || req.body.username || req.body.identifier || '').trim();
-    const { password } = req.body;
-    if (!rawIdentifier || !password) {
-      return res.status(400).json({ success: false, message: 'Email or Username and password are required' });
-    }
+const adminLogin = async (req, res) => handleUnifiedLogin(req, res, PORTALS.ADMIN);
 
-    const escaped = rawIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const user = await User.findOne({ 
-      $or: [
-        { email: rawIdentifier.toLowerCase() },
-        { username: new RegExp('^' + escaped + '$', 'i') }
-      ]
-    });
-
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-
-    // Check account lockout
-    if (user.isLocked()) {
-      const minutesLeft = Math.ceil((user.lockUntil.getTime() - Date.now()) / (60 * 1000));
-      return res.status(423).json({
-        success: false,
-        isLocked: true,
-        lockMinutes: minutesLeft,
-        message: `Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}, reset your password, or log in with Google.`
-      });
-    }
-
-    if (!user.isActive) {
-      return res.status(401).json({ success: false, message: 'Account is deactivated' });
-    }
-
-    if (user.role !== 'admin' && user.role !== 'super_admin' && !user.isSuperAdmin && user.role !== 'warden') {
-      return res.status(403).json({ success: false, message: 'Admin access only' });
-    }
-
-    // Check password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
-      if (user.failedLoginAttempts >= 5) {
-        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
-        await user.save({ validateBeforeSave: false });
-        return res.status(423).json({
-          success: false,
-          isLocked: true,
-          lockMinutes: 15,
-          message: 'Account has been locked for 15 minutes due to 5 consecutive failed login attempts. You may reset your password or sign in with Google.'
-        });
-      }
-      await user.save({ validateBeforeSave: false });
-      const remaining = 5 - user.failedLoginAttempts;
-      return res.status(401).json({
-        success: false,
-        remainingAttempts: remaining,
-        message: `Invalid credentials. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before temporary account lock.`
-      });
-    }
-
-    // Reset lockout upon successful login
-    if (user.failedLoginAttempts > 0 || user.lockUntil) {
-      user.failedLoginAttempts = 0;
-      user.lockUntil = null;
-    }
-
-    const { accessToken, refreshToken } = generateTokens(user._id);
-    user.refreshTokens.push(refreshToken);
-    if (user.refreshTokens.length > 5) user.refreshTokens.shift();
-    await user.save({ validateBeforeSave: false });
-
-    return res.status(200).json({
-      success: true,
-      accessToken,
-      refreshToken,
-      user: user.toJSON(),
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
+// @desc    Super Admin portal login
+// @route   POST /api/auth/super-admin/login
+// @access  Public
+const superAdminLogin = async (req, res) => handleUnifiedLogin(req, res, PORTALS.SUPER_ADMIN);
 
 // @desc    Google OAuth login & unified account linking
 // @route   POST /api/auth/google
@@ -302,6 +271,26 @@ const googleLogin = async (req, res) => {
             picture: picture || user.registrationDetails?.picture || '',
             suggestedUsername,
           },
+        });
+      }
+
+      // Authorize: check portal access for Google authentication
+      const requestedPortal = normalizePortal(req.body.portal) || PORTALS.STUDENT;
+      if (!isRoleAllowedForPortal(user, requestedPortal)) {
+        console.warn(`[SECURITY AUDIT] Google login portal access denied: user "${user.username || user.email}" with role "${user.role}" attempted unauthorized access to portal "${requestedPortal}"`);
+        await logAuditAction({
+          req,
+          action: 'PORTAL_ACCESS_DENIED_GOOGLE',
+          entityType: 'PORTAL',
+          entityId: requestedPortal,
+          actor: user,
+          newValue: { requestedPortal, actualRole: user.role, email: user.email },
+        });
+
+        return res.status(403).json({
+          success: false,
+          code: 'PORTAL_ACCESS_DENIED',
+          message: 'You are not authorized to access this portal.',
         });
       }
 
@@ -947,7 +936,7 @@ const resetPassword = async (req, res) => {
 };
 
 module.exports = { 
-  login, adminLogin, registerAdmin, refreshToken, logout, getMe, 
+  login, adminLogin, superAdminLogin, registerAdmin, refreshToken, logout, getMe, 
   checkAdminExists, getAdmins, deleteAdmin, requestPasswordReset, resetPassword,
   googleLogin, registerStudent, completeGoogleSetup, requestGoogleRegistration
 };

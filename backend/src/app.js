@@ -96,6 +96,16 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+// Create HTTP server and initialize Socket.io
+const httpServer = http.createServer(app);
+const io = initSocket(httpServer);
+
+// Attach io to every request (available inside all controllers)
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'Q2 Connect Suite API is running 🚀', env: process.env.NODE_ENV });
@@ -125,23 +135,47 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
 
-// Global error handler
+// Centralized Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({
+  let statusCode = err.statusCode || err.status || 500;
+  let message = err.message || 'Internal Server Error';
+  let errorCode = err.errorCode || 'INTERNAL_ERROR';
+
+  // Handle Mongoose cast errors (invalid ObjectId)
+  if (err.name === 'CastError') {
+    statusCode = 400;
+    message = `Invalid format for parameter '${err.path}'`;
+    errorCode = 'INVALID_ID_FORMAT';
+  }
+
+  // Handle Mongoose duplicate key
+  if (err.code === 11000) {
+    statusCode = 409;
+    const field = Object.keys(err.keyValue || {})[0] || 'field';
+    message = `Duplicate entry: '${field}' must be unique`;
+    errorCode = 'DUPLICATE_ENTRY';
+  }
+
+  // Handle Mongoose validation errors
+  if (err.name === 'ValidationError') {
+    statusCode = 400;
+    message = Object.values(err.errors).map((e) => e.message).join(', ');
+    errorCode = 'VALIDATION_ERROR';
+  }
+
+  if (process.env.NODE_ENV !== 'production' && statusCode === 500) {
+    console.error('[UNHANDLED ERROR]', err.stack);
+  }
+
+  res.status(statusCode).json({
     success: false,
-    message: err.message || 'Internal Server Error',
+    error: {
+      code: errorCode,
+      message,
+      ...(process.env.NODE_ENV === 'development' && statusCode === 500 ? { stack: err.stack } : {}),
+    },
+    message, // Backwards compatibility with existing frontends checking res.data.message
   });
-});
-
-// Create HTTP server and attach Socket.io
-const httpServer = http.createServer(app);
-const io = initSocket(httpServer);
-
-// Attach io to every request (for use in controllers)
-app.use((req, res, next) => {
-  req.io = io;
-  next();
 });
 
 // Initialize scheduled cron jobs
@@ -180,5 +214,30 @@ httpServer.listen(PORT, () => {
     }).catch(err => console.error('❌ Error checking admin:', err));
   }
 });
+
+// Graceful Shutdown Handling
+const gracefulShutdown = async (signal) => {
+  console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
+  httpServer.close(async () => {
+    console.log('🚪 HTTP server closed.');
+    try {
+      const mongoose = require('mongoose');
+      await mongoose.connection.close(false);
+      console.log('📦 MongoDB connection closed cleanly.');
+      process.exit(0);
+    } catch (err) {
+      console.error('❌ Error closing MongoDB connection:', err);
+      process.exit(1);
+    }
+  });
+
+  setTimeout(() => {
+    console.error('⏰ Forcefully shutting down due to timeout.');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 module.exports = app;
