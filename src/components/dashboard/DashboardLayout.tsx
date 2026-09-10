@@ -3,7 +3,6 @@ import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { useSidebarDrawer } from '@/hooks/useSidebarDrawer';
-import { AnimatePresence, motion } from 'framer-motion';
 import { SmartChatbot } from '@/components/chatbot/SmartChatbot';
 
 interface DashboardLayoutProps {
