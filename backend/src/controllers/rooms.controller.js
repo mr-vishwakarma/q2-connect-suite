@@ -6,33 +6,44 @@ const getAllRooms = async (req, res) => {
     const { hostel, status, page = 1, limit = 50 } = req.query;
     const query = {};
 
-    // Enforce Tenant Scoping
+    // Enforce Tenant Scoping with fallback for legacy un-scoped rooms
     if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-      query.organizationId = req.tenant.organizationId;
+      query.$or = [
+        { organizationId: req.tenant.organizationId },
+        { organizationId: null },
+        { organizationId: { $exists: false } }
+      ];
     }
 
     if (hostel && hostel !== 'All') {
-      query.hostel = hostel;
+      const cleanHostel = hostel.trim();
+      query.hostel = { $regex: new RegExp(`^${cleanHostel.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') };
     } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !req.tenant.isSuperAdmin) {
-      query.hostel = { $in: req.tenant.hostelAccess };
+      query.hostel = { $in: req.tenant.hostelAccess.map(h => new RegExp(`^${h.trim().replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i')) };
     }
 
-    if (status) query.status = status;
-
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const limitAmount = parseInt(limit);
+    const limitAmount = parseInt(limit) || 100;
 
     const rooms = await Room.find(query)
       .sort({ roomNumber: 1 })
       .skip(skip)
       .limit(limitAmount);
 
+    const processedRooms = rooms.map(r => {
+      const doc = r.toObject ? r.toObject() : { ...r };
+      doc.status = (doc.occupiedCount || 0) >= (doc.capacity || 2) ? 'full' : 'available';
+      return doc;
+    });
+
+    const filteredRooms = status ? processedRooms.filter(r => r.status === status) : processedRooms;
+
     const total = await Room.countDocuments(query);
 
     return res.status(200).json({ 
       success: true, 
-      data: rooms,
-      total,
+      data: filteredRooms,
+      total: filteredRooms.length,
       page: parseInt(page),
       totalPages: Math.ceil(total / limitAmount),
       limit: limitAmount

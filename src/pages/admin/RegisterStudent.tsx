@@ -34,7 +34,6 @@ import {
   Printer,
   ChevronRight,
   GraduationCap,
-  Bell,
   Wand2,
   CheckCircle2,
   Copy,
@@ -147,14 +146,14 @@ function RegisterStudentContent() {
   // Fetch available rooms
   const fetchRooms = useCallback(async () => {
     try {
-      const response = await api.get('/rooms', { params: { hostel: selectedHostel } });
-      if (response.data?.success) {
+      const response = await api.get('/rooms', { params: { hostel: selectedHostel, limit: 100 } });
+      if (response.data?.success && Array.isArray(response.data.data)) {
         const mapped = response.data.data.map((r: any) => ({
-          id: r._id,
-          room_number: r.roomNumber,
-          capacity: r.capacity,
-          occupied_count: r.occupiedCount,
-          status: r.status,
+          id: r._id || r.id,
+          room_number: r.roomNumber || r.room_number,
+          capacity: r.capacity ?? 2,
+          occupied_count: r.occupiedCount ?? r.occupied_count ?? 0,
+          status: r.status || ((r.occupiedCount ?? 0) >= (r.capacity ?? 2) ? 'full' : 'available'),
         }));
         setRooms(mapped);
       }
@@ -167,6 +166,12 @@ function RegisterStudentContent() {
   useEffect(() => {
     fetchRooms();
   }, [fetchRooms]);
+
+  // Reset selected room whenever selectedHostel changes
+  useEffect(() => {
+    setSelectedRoomId('');
+    setRoomError('');
+  }, [selectedHostel]);
 
   // Validate room selection
   const validateRoom = (roomId: string) => {
@@ -390,20 +395,41 @@ function RegisterStudentContent() {
   }
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId);
-  const roomDisplayName = selectedRoom ? selectedRoom.room_number : (formData.username ? 'B-101' : 'Not assigned');
+  const roomDisplayName = selectedRoom ? selectedRoom.room_number : 'Not assigned';
 
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-3 space-y-6 text-foreground">
-      {/* Top Header Row with Title, Branch Pills & Notifications */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/40">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-            Register Student
-          </h1>
-        </div>
+      {/* Top Bar with Breadcrumbs & Branch Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/40">
+        {/* Breadcrumbs */}
+        <nav className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+          <Link to="/admin/dashboard" className="hover:text-white transition-colors flex items-center gap-1">
+            <Home className="w-3.5 h-3.5" />
+          </Link>
+          <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
+          <Link to="/admin/students" className="hover:text-white transition-colors">
+            Students
+          </Link>
+          <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
+          {viewMode === 'form' ? (
+            <span className="text-zinc-200 font-semibold">Register Student</span>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setViewMode('form')}
+                className="hover:text-white transition-colors cursor-pointer"
+              >
+                Register Student
+              </button>
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
+              <span className="text-zinc-200 font-semibold">Preview</span>
+            </>
+          )}
+        </nav>
 
         {/* Branch Pills Switcher */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center self-start sm:self-auto">
           <div className="flex items-center bg-[#121622] p-1 rounded-xl border border-white/5 shadow-inner">
             {branchPills.map((branch) => {
               const isActive = (selectedHostel || 'Q2') === branch;
@@ -424,44 +450,8 @@ function RegisterStudentContent() {
               );
             })}
           </div>
-
-          <Link
-            to="/admin/alerts"
-            className="w-9 h-9 rounded-xl bg-[#121622] border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:border-red-500/30 transition-colors relative"
-            title="Notifications & Alerts"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-background" />
-          </Link>
         </div>
       </div>
-
-      {/* Breadcrumbs */}
-      <nav className="flex items-center gap-2 text-xs font-medium text-zinc-400">
-        <Link to="/admin/dashboard" className="hover:text-white transition-colors flex items-center gap-1">
-          <Home className="w-3.5 h-3.5" />
-        </Link>
-        <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
-        <Link to="/admin/students" className="hover:text-white transition-colors">
-          Students
-        </Link>
-        <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
-        {viewMode === 'form' ? (
-          <span className="text-zinc-200 font-semibold">Register Student</span>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => setViewMode('form')}
-              className="hover:text-white transition-colors cursor-pointer"
-            >
-              Register Student
-            </button>
-            <ChevronRight className="w-3.5 h-3.5 text-zinc-600" />
-            <span className="text-zinc-200 font-semibold">Preview</span>
-          </>
-        )}
-      </nav>
 
       {/* Google Pending Applicants Quick-Bar */}
       {pendingApplicants.length > 0 && viewMode === 'form' && (
@@ -761,11 +751,13 @@ function RegisterStudentContent() {
                     </Label>
                     <Select value={selectedRoomId} onValueChange={handleRoomChange}>
                       <SelectTrigger className="bg-[#181d2a] border-border/40 text-white focus:border-red-500">
-                        <SelectValue placeholder="Select a room" />
+                        <SelectValue placeholder="Select a room">
+                          {selectedRoom ? `Room ${selectedRoom.room_number}` : undefined}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="bg-[#121622] border-border text-white">
                         {rooms.length === 0 ? (
-                          <SelectItem value="none" disabled>No rooms available. Add rooms first.</SelectItem>
+                          <SelectItem value="none" disabled>No rooms available for {selectedHostel}. Add rooms first.</SelectItem>
                         ) : (
                           rooms.map((room) => (
                             <SelectItem

@@ -156,7 +156,7 @@ export const StudentIDCard = forwardRef<HTMLDivElement, StudentIDCardProps>(({
               Room No.
             </span>
             <span className="block text-xs font-bold text-white truncate">
-              {roomNo ? (roomNo.startsWith('Room ') ? roomNo : `${roomNo}`) : 'B-101'}
+              {roomNo && roomNo !== 'Not assigned' ? (roomNo.startsWith('Room ') ? roomNo : `Room ${roomNo}`) : 'Not Assigned'}
             </span>
           </div>
         </div>
