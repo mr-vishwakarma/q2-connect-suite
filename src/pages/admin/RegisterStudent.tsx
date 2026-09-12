@@ -54,7 +54,7 @@ interface Room {
 
 function RegisterStudentContent() {
   const { user, isAdmin, loading } = useAuth();
-  const { selectedHostel, setSelectedHostel, hostels } = useHostel();
+  const { selectedHostel, setSelectedHostel } = useHostel();
   const navigate = useNavigate();
 
   // Active view: 'form' (Image 1) or 'preview' (Image 2)
@@ -94,9 +94,7 @@ function RegisterStudentContent() {
   const idCardRef = useRef<HTMLDivElement>(null);
 
   // Available branches list for pills in header
-  const branchPills = hostels && hostels.length > 0
-    ? hostels.map(h => h.name)
-    : ['Q2', 'Q2.0', 'Q2.1'];
+  const branchPills: ('Q2' | 'Q2.0' | 'Q2.1')[] = ['Q2', 'Q2.0', 'Q2.1'];
 
   const applyApplicantData = useCallback((applicant: any) => {
     if (!applicant) return;
@@ -333,7 +331,7 @@ function RegisterStudentContent() {
     try {
       toast.info('Generating high-resolution ID card...');
       const html2canvasModule = await import('html2canvas');
-      const html2canvas = html2canvasModule.default || html2canvasModule;
+      const html2canvas = (html2canvasModule.default || html2canvasModule) as any;
       const canvas = await html2canvas(cardElem, {
         scale: 2.5,
         useCORS: true,
