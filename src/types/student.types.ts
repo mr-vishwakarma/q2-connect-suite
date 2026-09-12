@@ -17,6 +17,8 @@ export interface Student {
   address?: string | null;
   dob?: string | null;
   profile_photo?: string | null;
+  student_code?: string | null;
+  studentCode?: string | null;
   isActive?: boolean;
 }
 
@@ -37,6 +39,7 @@ export interface StudentRegistrationPayload {
   dob?: string;
   profilePhoto?: string;
   profilePhotoFileId?: string;
+  studentCode?: string;
   securityDeposit?: number;
   paymentMode?: 'cash' | 'upi' | 'bank';
   notes?: string;

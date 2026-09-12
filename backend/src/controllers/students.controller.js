@@ -176,6 +176,15 @@ const createStudent = async (req, res) => {
     const Hostel = require('../models/Hostel');
     const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel }).session(session);
 
+    // Generate studentCode if not provided (e.g. Q2S2026001)
+    let finalStudentCode = req.body.studentCode;
+    if (!finalStudentCode) {
+      const year = new Date(startDate || Date.now()).getFullYear();
+      const count = await Student.countDocuments({ organizationId: orgId }).session(session);
+      const cleanHostel = (hostel || 'Q2').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      finalStudentCode = `${cleanHostel}S${year}${String(count + 1).padStart(3, '0')}`;
+    }
+
     // Create Student profile
     const students = await Student.create([{
       userId: user._id,
@@ -191,6 +200,7 @@ const createStudent = async (req, res) => {
       fees: fees || 0,
       startDate,
       validDate,
+      studentCode: finalStudentCode,
     }], { session, ordered: true });
     const student = students[0];
 
@@ -685,6 +695,15 @@ const approveAndRegisterStudent = async (req, res) => {
 
     // Check if a Student profile already exists for this user
     let student = await Student.findOne({ userId: user._id }).session(session);
+    // Generate studentCode if not provided
+    let finalStudentCode = req.body.studentCode;
+    if (!finalStudentCode) {
+      const year = new Date(startDate || Date.now()).getFullYear();
+      const count = await Student.countDocuments({ organizationId: orgId }).session(session);
+      const cleanHostel = (finalHostel || 'Q2').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      finalStudentCode = `${cleanHostel}S${year}${String(count + 1).padStart(3, '0')}`;
+    }
+
     if (student) {
       student.name = finalName;
       student.username = finalUsername;
@@ -698,6 +717,7 @@ const approveAndRegisterStudent = async (req, res) => {
       student.fees = fees ? parseFloat(fees) : 0;
       student.startDate = startDate || new Date();
       student.validDate = validDate || null;
+      if (!student.studentCode) student.studentCode = finalStudentCode;
       await student.save({ session });
     } else {
       const createdStudents = await Student.create([{
@@ -714,6 +734,7 @@ const approveAndRegisterStudent = async (req, res) => {
         fees: fees ? parseFloat(fees) : 0,
         startDate: startDate || new Date(),
         validDate: validDate || null,
+        studentCode: finalStudentCode,
       }], { session, ordered: true });
       student = createdStudents[0];
     }
