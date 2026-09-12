@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 
 interface AdminTopBarProps {
   title: string;
+  subtitle?: string;
   onMenuToggle?: () => void;
   isMenuOpen?: boolean;
   showMenu?: boolean;
@@ -13,6 +14,7 @@ interface AdminTopBarProps {
 
 export function AdminTopBar({
   title,
+  subtitle,
   onMenuToggle,
   isMenuOpen = false,
   showMenu = true,
@@ -34,10 +36,19 @@ export function AdminTopBar({
             <Menu className="w-5 h-5" />
           </button>
         )}
-        <h1 className="text-sm sm:text-xl font-bold text-foreground truncate max-w-[150px] sm:max-w-none">{title}</h1>
+        <div className="flex flex-col min-w-0">
+          <h1 className="text-sm sm:text-lg font-bold text-foreground truncate max-w-[150px] sm:max-w-none leading-tight">
+            {title}
+          </h1>
+          {subtitle && (
+            <span className="text-[11px] sm:text-xs text-muted-foreground font-normal leading-tight">
+              {subtitle}
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <HostelSelector />
         <span className="text-foreground font-medium hidden lg:block text-sm">
           {profile?.name || 'Admin'}
@@ -55,10 +66,11 @@ export function AdminTopBar({
           onClick={() => navigate('/admin/notifications')}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           aria-label="Notifications"
         >
           <Bell className="w-5 h-5" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-card" />
         </motion.button>
       </div>
     </header>

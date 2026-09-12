@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { HostelProvider } from "@/contexts/HostelContext";
+import { HostelProvider, useHostel } from "@/contexts/HostelContext";
 import { ProtectedAdminRoute } from "@/components/auth/ProtectedAdminRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import ScrollToTop from "@/components/ScrollToTop";
@@ -117,11 +117,16 @@ function StudentShell() {
 
 function AdminShell() {
   const location = useLocation();
-  const title = adminTitles[location.pathname] ?? "Admin Panel";
+  const { selectedHostel } = useHostel();
+  const isDashboard = location.pathname === "/admin/dashboard";
+  const title = isDashboard 
+    ? `${selectedHostel || 'Q2'} Hostel` 
+    : (adminTitles[location.pathname] ?? "Admin Panel");
+  const subtitle = isDashboard ? "Manager Dashboard" : undefined;
 
   return (
     <ProtectedAdminRoute>
-      <AdminLayout title={title}>
+      <AdminLayout title={title} subtitle={subtitle}>
         <Outlet />
       </AdminLayout>
     </ProtectedAdminRoute>

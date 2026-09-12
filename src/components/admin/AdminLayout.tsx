@@ -10,9 +10,10 @@ import { cn } from '@/lib/utils';
 interface AdminLayoutProps {
   children: ReactNode;
   title: string;
+  subtitle?: string;
 }
 
-export function AdminLayout({ children, title }: AdminLayoutProps) {
+export function AdminLayout({ children, title, subtitle }: AdminLayoutProps) {
   const {
     isMobileOpen,
     closeMobile,
@@ -52,6 +53,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
       >
         <AdminTopBar
           title={title}
+          subtitle={subtitle}
           onMenuToggle={toggleMobile}
           isMenuOpen={isMobileOpen}
           showMenu={true}
