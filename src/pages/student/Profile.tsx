@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { toast } from 'react-toastify';
-import { Loader2, Camera, User, Mail, Phone, Home, Calendar, LogOut } from 'lucide-react';
+import { Loader2, Camera, User, Mail, Phone, Home, Calendar, LogOut, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -156,11 +156,22 @@ export default function Profile() {
             </div>
           </div>
           
-          <CardHeader className="pt-16 pb-4">
-            <CardTitle className="text-2xl">{formData.name}</CardTitle>
-            <CardDescription className="text-base flex items-center gap-2">
-              @{formData.username}
-            </CardDescription>
+          <CardHeader className="pt-16 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <CardTitle className="text-2xl">{formData.name}</CardTitle>
+              <CardDescription className="text-base flex items-center gap-2">
+                @{formData.username}
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/student/dashboard')}
+              className="gap-2 self-start sm:self-auto rounded-xl border-primary/30 hover:bg-primary/10 text-xs font-semibold"
+            >
+              <ShieldCheck className="w-4 h-4 text-primary" />
+              Official Student ID Card
+            </Button>
           </CardHeader>
           
           <CardContent>
