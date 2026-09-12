@@ -12,17 +12,9 @@ import {
   MessageSquare,
   Lightbulb,
   CheckCircle,
-  ArrowRight,
-  User,
-  Home,
-  CreditCard,
-  Calendar,
   Download,
   Printer,
   ShieldCheck,
-  Sparkles,
-  Bed,
-  Phone,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from 'react-toastify';
@@ -153,75 +145,63 @@ export default function StudentDashboard() {
     { title: 'Suggestions', value: stats.suggestions, icon: Lightbulb, color: 'text-blue-500', bg: 'bg-blue-500/10 shadow-sm' },
   ];
 
-  const quickActions = [
-    { label: 'Request Leave', icon: CalendarCheck, path: '/student/mess-off', color: 'text-rose-500', bg: 'bg-rose-500/10 shadow-sm' },
-    { label: 'File Complaint', icon: MessageSquare, path: '/student/complaints', color: 'text-amber-500', bg: 'bg-amber-500/10 shadow-sm' },
-    { label: 'Submit Suggestion', icon: Lightbulb, path: '/student/suggestions', color: 'text-blue-500', bg: 'bg-blue-500/10 shadow-sm' },
-    { label: 'Fee History', icon: CreditCard, path: '/student/fee-history', color: 'text-green-500', bg: 'bg-green-500/10 shadow-sm' },
-  ];
-
   const isValidDate = studentData?.valid_date ? new Date(studentData.valid_date) >= new Date() : true;
 
   return (
     <DashboardLayout title="Dashboard" isAdmin={false}>
-      <div className="space-y-6 animate-fade-in">
-        {/* Welcome Section */}
+      <div className="space-y-4 sm:space-y-6 animate-fade-in">
+        {/* Compact Welcome Section */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card border border-border rounded-2xl p-6 shadow-card relative overflow-hidden"
+          className="bg-card border border-border rounded-xl sm:rounded-2xl p-3.5 sm:p-5 shadow-card relative overflow-hidden flex items-center justify-between gap-3"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-          <h2 className="text-2xl font-bold text-foreground mb-2">
-            Welcome back, <span className="text-primary">{studentData?.name || user?.name || 'Student'}</span>! 👋
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            Here's an overview of your activity and official hostel credentials in the Q2 Management System.
-          </p>
+          <div className="absolute top-0 right-0 w-28 h-28 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-2xl font-bold text-foreground truncate">
+              Welcome back, <span className="text-primary">{studentData?.name || user?.name || 'Student'}</span>! 👋
+            </h2>
+            <p className="text-muted-foreground text-xs hidden sm:block mt-0.5">
+              Here is your official hostel credential and real-time dashboard overview.
+            </p>
+            <p className="text-muted-foreground text-[11px] sm:hidden truncate mt-0.5">
+              {studentData?.room_no ? `Room ${studentData.room_no}` : 'Resident'} • {studentData?.hostel || 'Q2'} Hostel
+            </p>
+          </div>
+          <div className="shrink-0 flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
+              {isValidDate ? 'Active' : 'Expired'}
+            </span>
+          </div>
         </motion.div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {statCards.map((stat, index) => (
-            <StatCard
-              key={stat.title}
-              title={stat.title}
-              value={stat.value}
-              icon={stat.icon}
-              color={stat.color}
-              bg={stat.bg}
-              index={index}
-            />
-          ))}
-        </div>
-
-        {/* Main Grid: Student ID Card (Left) + Resident Summary & Quick Actions (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Main Grid: Student ID Card (Directly visible on mobile) + Stats & Meal Rating */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
           {/* LEFT: Official Student ID Card Component */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            className="lg:col-span-5 space-y-4"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="lg:col-span-5 space-y-3 sm:space-y-4"
           >
             <Card className="bg-card border-border shadow-xl overflow-hidden">
-              <CardHeader className="pb-3 border-b border-border/50">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-foreground flex items-center gap-2 text-base sm:text-lg">
-                    <ShieldCheck className="w-5 h-5 text-primary" />
+              <CardHeader className="p-3.5 sm:p-4 pb-2 sm:pb-3 border-b border-border/50 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-foreground flex items-center gap-2 text-sm sm:text-base">
+                    <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                     Official Student ID Card
                   </CardTitle>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
-                    {isValidDate ? 'Active' : 'Expired'}
-                  </span>
+                  <CardDescription className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+                    Your official resident badge & credential.
+                  </CardDescription>
                 </div>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Your official resident credential. You can download or print your physical ID card below.
-                </CardDescription>
+                <span className="text-[10px] sm:text-xs text-muted-foreground font-mono bg-secondary/70 px-2 py-0.5 rounded border border-border/40">
+                  {studentData?.student_code || ''}
+                </span>
               </CardHeader>
-              <CardContent className="pt-4 space-y-4">
+              <CardContent className="p-3 sm:p-4 pt-3 space-y-3 sm:space-y-4">
                 {/* Rendered Vertical ID Card */}
-                <div className="flex justify-center py-1">
+                <div className="flex justify-center py-0.5">
                   <StudentIDCard
                     ref={idCardRef}
                     name={studentData?.name || user?.name || 'Resident'}
@@ -237,23 +217,23 @@ export default function StudentDashboard() {
                 </div>
 
                 {/* Self-Service Actions: Download PNG & Print */}
-                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-0.5">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleDownloadIDCard}
-                    className="h-10 rounded-xl bg-secondary/80 hover:bg-secondary border-border text-foreground font-semibold text-xs flex items-center justify-center gap-2 shadow-sm hover:border-primary/40 transition-colors"
+                    className="h-9 sm:h-10 rounded-xl bg-secondary/80 hover:bg-secondary border-border text-foreground font-semibold text-xs flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm hover:border-primary/40 transition-colors"
                   >
-                    <Download className="w-4 h-4 text-primary" />
+                    <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
                     Download PNG
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handlePrintIDCard}
-                    className="h-10 rounded-xl bg-secondary/80 hover:bg-secondary border-border text-foreground font-semibold text-xs flex items-center justify-center gap-2 shadow-sm hover:border-primary/40 transition-colors"
+                    className="h-9 sm:h-10 rounded-xl bg-secondary/80 hover:bg-secondary border-border text-foreground font-semibold text-xs flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm hover:border-primary/40 transition-colors"
                   >
-                    <Printer className="w-4 h-4 text-primary" />
+                    <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
                     Print ID Card
                   </Button>
                 </div>
@@ -261,90 +241,27 @@ export default function StudentDashboard() {
             </Card>
           </motion.div>
 
-          {/* RIGHT: Quick Resident Summary & Quick Actions */}
+          {/* RIGHT: Stats Grid & Meal Rating */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-            className="lg:col-span-7 space-y-6"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="lg:col-span-7 space-y-5 sm:space-y-6"
           >
-            {/* Resident Quick Info Card */}
-            <Card className="bg-card border-border shadow-xl">
-              <CardHeader className="pb-3 border-b border-border/50">
-                <CardTitle className="text-foreground flex items-center gap-2 text-base">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                  Resident Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-secondary/50 border border-border/50 space-y-1">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Home className="w-3.5 h-3.5 text-primary" /> Hostel
-                  </span>
-                  <p className="font-bold text-sm text-foreground">{studentData?.hostel || 'Q2'}</p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-secondary/50 border border-border/50 space-y-1">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Bed className="w-3.5 h-3.5 text-primary" /> Room No
-                  </span>
-                  <p className="font-bold text-sm text-foreground">{studentData?.room_no ? `Room ${studentData.room_no}` : 'Not Assigned'}</p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-secondary/50 border border-border/50 space-y-1">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <CreditCard className="w-3.5 h-3.5 text-primary" /> Monthly Fees
-                  </span>
-                  <p className="font-bold text-sm text-foreground">₹{(studentData?.fees || 0).toLocaleString('en-IN')}</p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-secondary/50 border border-border/50 space-y-1">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-primary" /> Valid Until
-                  </span>
-                  <p className="font-bold text-sm text-foreground">
-                    {studentData?.valid_date ? new Date(studentData.valid_date).toLocaleDateString() : 'Active Stay'}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions Card */}
-            <Card className="bg-card border-border shadow-xl">
-              <CardHeader className="pb-3 border-b border-border/50">
-                <CardTitle className="text-foreground flex items-center gap-2 text-base">
-                  <Lightbulb className="w-5 h-5 text-primary" />
-                  Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4 grid grid-cols-2 gap-2 sm:gap-3">
-                {quickActions.map((action, index) => {
-                  const ActionIcon = action.icon;
-                  return (
-                    <motion.button
-                      key={action.label}
-                      onClick={() => navigate(action.path)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 + index * 0.1 }}
-                      className="p-3.5 sm:p-4 rounded-xl bg-secondary hover:bg-secondary/80 transition-all duration-300 text-left group border border-border/60 hover:border-primary/40 cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between mb-2 sm:mb-3">
-                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-transform duration-500 group-hover:-translate-y-1 shadow-sm group-hover:shadow-md ${action.bg}`}>
-                          <ActionIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${action.color}`} />
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" />
-                      </div>
-                      <p className="font-semibold text-foreground text-xs sm:text-sm">
-                        {action.label}
-                      </p>
-                    </motion.button>
-                  );
-                })}
-              </CardContent>
-            </Card>
+            {/* Stats Grid: 4 Cards in 2x2 grid */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              {statCards.map((stat, index) => (
+                <StatCard
+                  key={stat.title}
+                  title={stat.title}
+                  value={stat.value}
+                  icon={stat.icon}
+                  color={stat.color}
+                  bg={stat.bg}
+                  index={index}
+                />
+              ))}
+            </div>
 
             {/* Meal Rating Widget */}
             <MealRatingWidget />

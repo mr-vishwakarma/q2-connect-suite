@@ -52,7 +52,7 @@ export const StudentIDCard = forwardRef<HTMLDivElement, StudentIDCardProps>(({
     <div
       ref={ref}
       id="student-id-card-element"
-      className={`relative w-full max-w-[360px] mx-auto rounded-3xl overflow-hidden p-6 text-white border border-red-500/30 shadow-[0_12px_40px_rgba(239,68,68,0.2)] bg-gradient-to-b from-[#180e14] via-[#10131c] to-[#0a0d14] select-none ${className}`}
+      className={`relative w-full max-w-[340px] sm:max-w-[360px] mx-auto rounded-3xl overflow-hidden p-4 sm:p-6 text-white border border-red-500/30 shadow-[0_12px_40px_rgba(239,68,68,0.2)] bg-gradient-to-b from-[#180e14] via-[#10131c] to-[#0a0d14] select-none ${className}`}
       style={{
         backgroundImage: `
           radial-gradient(circle at 100% 0%, rgba(225, 29, 72, 0.25) 0%, transparent 50%),
