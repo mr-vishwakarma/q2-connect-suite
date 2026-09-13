@@ -38,6 +38,7 @@ const organizationSchema = new mongoose.Schema(
 );
 
 organizationSchema.index({ status: 1, createdAt: -1 });
+organizationSchema.index({ isDeleted: 1, createdAt: -1 });
 organizationSchema.index({ contactEmail: 1 });
 
 module.exports = mongoose.model('Organization', organizationSchema);

@@ -780,21 +780,27 @@ const logout = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
   try {
-    let studentProfile = null;
-    if (req.user.role === 'student' && req.user.studentId) {
-      studentProfile = await Student.findById(req.user.studentId);
-    }
+    const Membership = require('../models/Membership');
+    const OrganizationFeature = require('../models/OrganizationFeature');
+
+    const studentPromise = (req.user.role === 'student' && req.user.studentId)
+      ? Student.findById(req.user.studentId).lean()
+      : Promise.resolve(null);
+
+    const membershipPromise = Membership.findOne({ userId: req.user._id, status: 'ACTIVE' })
+      .populate('organizationId')
+      .lean();
+
+    const [studentProfile, membership] = await Promise.all([studentPromise, membershipPromise]);
 
     let featuresMap = {};
     let organization = null;
 
-    // Resolve active organization membership & enabled features
-    const Membership = require('../models/Membership');
-    const OrganizationFeature = require('../models/OrganizationFeature');
-    const membership = await Membership.findOne({ userId: req.user._id, status: 'ACTIVE' }).populate('organizationId');
     if (membership && membership.organizationId) {
       organization = membership.organizationId;
-      const orgFeatures = await OrganizationFeature.find({ organizationId: organization._id, enabled: true });
+      const orgFeatures = await OrganizationFeature.find({ organizationId: organization._id, enabled: true })
+        .select('featureKey')
+        .lean();
       orgFeatures.forEach((f) => {
         featuresMap[f.featureKey] = true;
       });

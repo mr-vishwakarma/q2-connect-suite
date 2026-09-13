@@ -35,7 +35,7 @@ const hostelAdminService = {
     const [hostels, total] = await Promise.all([
       Hostel.find(filter)
         .populate('organizationId', 'name slug status')
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),

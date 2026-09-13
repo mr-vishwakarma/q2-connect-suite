@@ -4,7 +4,7 @@ const Student = require('../models/Student');
 
 const getAttendance = async (req, res) => {
   try {
-    const { userId, hostel, startDate, endDate, date } = req.query;
+    const { userId, hostel, startDate, endDate, date, page = 1, limit = 50 } = req.query;
     const query = {};
 
     const orgId = req.organizationId || req.tenant?.organizationId;
@@ -36,11 +36,29 @@ const getAttendance = async (req, res) => {
       if (endDate) query.date.$lte = new Date(endDate);
     }
 
-    const records = await Attendance.find(query)
-      .populate('userId', 'name username')
-      .sort({ date: -1 });
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitAmount = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
+    const skip = (pageNum - 1) * limitAmount;
 
-    return res.status(200).json({ success: true, data: records });
+    const [total, records] = await Promise.all([
+      Attendance.countDocuments(query),
+      Attendance.find(query)
+        .populate('userId', 'name username')
+        .sort({ date: -1, _id: -1 })
+        .skip(skip)
+        .limit(limitAmount)
+        .lean()
+    ]);
+
+    return res.status(200).json({ 
+      success: true, 
+      count: records.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitAmount) || (total === 0 ? 0 : 1),
+      limit: limitAmount,
+      data: records 
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

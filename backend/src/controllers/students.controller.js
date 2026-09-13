@@ -56,7 +56,7 @@ const getAllStudents = async (req, res) => {
           'user.isActive': { $ne: false }
         }
       },
-      { $sort: { createdAt: -1 } },
+      { $sort: { createdAt: -1, _id: -1 } },
       {
         $facet: {
           metadata: [{ $count: 'total' }],
@@ -102,7 +102,7 @@ const getStudent = async (req, res) => {
     const isSuperAdmin = req.tenant?.isSuperAdmin;
 
     if (req.params.id === 'me') {
-      student = await Student.findOne({ userId: req.user._id });
+      student = await Student.findOne({ userId: req.user._id }).lean();
     } else {
       const studentQuery = { _id: req.params.id };
       if (!isSuperAdmin) {
@@ -110,7 +110,7 @@ const getStudent = async (req, res) => {
       } else if (orgId) {
         studentQuery.organizationId = orgId;
       }
-      student = await Student.findOne(studentQuery);
+      student = await Student.findOne(studentQuery).lean();
     }
     
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });

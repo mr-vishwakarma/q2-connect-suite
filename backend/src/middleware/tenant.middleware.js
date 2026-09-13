@@ -50,7 +50,7 @@ const resolveTenantContext = async (req, res, next) => {
     const userMemberships = await Membership.find({
       userId: req.user._id,
       status: 'ACTIVE',
-    }).populate('organizationId');
+    }).populate('organizationId').lean();
 
     let membership = null;
 
@@ -91,13 +91,13 @@ const resolveTenantContext = async (req, res, next) => {
     if (!organization) {
       if (req.user.studentId || req.user.role === 'student') {
         const Student = require('../models/Student');
-        const studentDoc = await Student.findOne({ userId: req.user._id });
+        const studentDoc = await Student.findOne({ userId: req.user._id }).lean();
         if (studentDoc && studentDoc.organizationId) {
-          organization = await Organization.findById(studentDoc.organizationId);
+          organization = await Organization.findById(studentDoc.organizationId).lean();
         }
       }
       if (!organization && req.user.activeOrganizationId) {
-        organization = await Organization.findById(req.user.activeOrganizationId);
+        organization = await Organization.findById(req.user.activeOrganizationId).lean();
       }
     }
 
@@ -125,7 +125,7 @@ const resolveTenantContext = async (req, res, next) => {
     }
 
     // Load enabled features for organization
-    const orgFeatures = organization ? await OrganizationFeature.find({ organizationId: organization._id, enabled: true }) : [];
+    const orgFeatures = organization ? await OrganizationFeature.find({ organizationId: organization._id, enabled: true }).lean() : [];
     const featuresMap = {};
     orgFeatures.forEach((f) => {
       featuresMap[f.featureKey] = f.configuration || true;

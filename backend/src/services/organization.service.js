@@ -23,7 +23,8 @@ const organizationService = {
 
     const organizations = await Organization.find(filter)
       .populate('subscriptionId')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1, _id: -1 })
+      .lean();
 
     if (organizations.length === 0) {
       return [];
@@ -55,7 +56,7 @@ const organizationService = {
     const orgsWithMetrics = organizations.map((org) => {
       const orgIdStr = String(org._id);
       return {
-        ...org.toObject(),
+        ...org,
         id: org._id,
         hostelCount: hostelMap.get(orgIdStr) || 0,
         studentCount: studentMap.get(orgIdStr) || 0,

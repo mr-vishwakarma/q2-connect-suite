@@ -13,6 +13,7 @@
     "seed:superadmin": "node src/scripts/seedSuperAdmin.js",
     "test:p0": "node src/scripts/test_p0_security.js",
     "test:tenant": "node src/scripts/test_phase_b_multitenant.js",
+    "test:perf": "node src/scripts/test_phase_c_performance.js",
     "test": "node src/scripts/test_p0_security.js"
   },
   "dependencies": {

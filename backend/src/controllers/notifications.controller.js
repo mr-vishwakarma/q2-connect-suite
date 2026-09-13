@@ -4,7 +4,7 @@ const Student = require('../models/Student');
 
 const getNotifications = async (req, res) => {
   try {
-    const { hostel } = req.query;
+    const { hostel, page = 1, limit = 50 } = req.query;
     const orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
 
@@ -23,17 +23,34 @@ const getNotifications = async (req, res) => {
       query.userId = req.user._id;
     }
 
-    const notifications = await Notification.find(query)
-      .populate('userId', 'name email username studentId')
-      .sort({ createdAt: -1 })
-      .limit(req.user.role === 'admin' ? 200 : 50);
-      
-    let unreadCount = 0;
-    if (req.user.role === 'student') {
-      unreadCount = await Notification.countDocuments({ userId: req.user._id, isRead: false });
-    }
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const defaultLimit = req.user.role === 'admin' ? 50 : 20;
+    const limitAmount = Math.min(Math.max(parseInt(limit) || defaultLimit, 1), 100);
+    const skip = (pageNum - 1) * limitAmount;
 
-    return res.status(200).json({ success: true, data: notifications, unreadCount });
+    const [total, notifications, unreadCount] = await Promise.all([
+      Notification.countDocuments(query),
+      Notification.find(query)
+        .populate('userId', 'name email username studentId')
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limitAmount)
+        .lean(),
+      req.user.role === 'student'
+        ? Notification.countDocuments({ userId: req.user._id, isRead: false })
+        : Promise.resolve(0)
+    ]);
+
+    return res.status(200).json({ 
+      success: true, 
+      count: notifications.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitAmount) || (total === 0 ? 0 : 1),
+      limit: limitAmount,
+      data: notifications, 
+      unreadCount 
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

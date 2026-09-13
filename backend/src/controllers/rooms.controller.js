@@ -24,30 +24,36 @@ const getAllRooms = async (req, res) => {
       query.hostel = { $in: req.tenant.hostelAccess.map(h => new RegExp(`^${h.trim().replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i')) };
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const limitAmount = parseInt(limit) || 100;
+    if (status === 'available') {
+      query.$expr = { $lt: [{ $ifNull: ['$occupiedCount', 0] }, { $ifNull: ['$capacity', 2] }] };
+    } else if (status === 'full') {
+      query.$expr = { $gte: [{ $ifNull: ['$occupiedCount', 0] }, { $ifNull: ['$capacity', 2] }] };
+    }
 
-    const rooms = await Room.find(query)
-      .sort({ roomNumber: 1 })
-      .skip(skip)
-      .limit(limitAmount);
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitAmount = Math.min(Math.max(parseInt(limit) || 20, 1), 100);
+    const skip = (pageNum - 1) * limitAmount;
 
-    const processedRooms = rooms.map(r => {
-      const doc = r.toObject ? r.toObject() : { ...r };
-      doc.status = (doc.occupiedCount || 0) >= (doc.capacity || 2) ? 'full' : 'available';
-      return doc;
-    });
+    const [total, rooms] = await Promise.all([
+      Room.countDocuments(query),
+      Room.find(query)
+        .sort({ roomNumber: 1, _id: 1 })
+        .skip(skip)
+        .limit(limitAmount)
+        .lean()
+    ]);
 
-    const filteredRooms = status ? processedRooms.filter(r => r.status === status) : processedRooms;
-
-    const total = await Room.countDocuments(query);
+    const processedRooms = rooms.map(r => ({
+      ...r,
+      status: (r.occupiedCount || 0) >= (r.capacity || 2) ? 'full' : 'available'
+    }));
 
     return res.status(200).json({ 
       success: true, 
-      data: filteredRooms,
-      total: filteredRooms.length,
-      page: parseInt(page),
-      totalPages: Math.ceil(total / limitAmount),
+      data: processedRooms,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitAmount) || (total === 0 ? 0 : 1),
       limit: limitAmount
     });
   } catch (error) {
@@ -67,7 +73,7 @@ const getRoomById = async (req, res) => {
       query.organizationId = orgId;
     }
 
-    const room = await Room.findOne(query);
+    const room = await Room.findOne(query).lean();
     if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
     return res.status(200).json({ success: true, data: room });
   } catch (error) {

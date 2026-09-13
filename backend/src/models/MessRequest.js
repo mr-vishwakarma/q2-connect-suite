@@ -22,10 +22,10 @@ const messRequestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-messRequestSchema.index({ organizationId: 1, status: 1 });
+messRequestSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
+messRequestSchema.index({ organizationId: 1, createdAt: -1 });
+messRequestSchema.index({ organizationId: 1, studentId: 1, createdAt: -1 });
+messRequestSchema.index({ userId: 1, createdAt: -1 });
 messRequestSchema.index({ organizationId: 1, hostelId: 1 });
-messRequestSchema.index({ hostel: 1, status: 1 });
-messRequestSchema.index({ userId: 1, status: 1 });
-messRequestSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('MessRequest', messRequestSchema);

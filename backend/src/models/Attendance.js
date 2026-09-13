@@ -13,8 +13,11 @@ const attendanceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Unique: one record per student per date
+// Dominant Query Indexes
 attendanceSchema.index({ userId: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ organizationId: 1, hostel: 1, date: -1 });
+attendanceSchema.index({ organizationId: 1, studentId: 1, date: -1 });
+attendanceSchema.index({ organizationId: 1, date: -1 });
 attendanceSchema.index({ organizationId: 1, date: 1, status: 1 });
 attendanceSchema.index({ organizationId: 1, hostelId: 1, date: 1 });
 

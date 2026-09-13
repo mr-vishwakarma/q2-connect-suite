@@ -5,7 +5,7 @@ const { logAuditAction } = require('../middleware/audit.middleware');
 const expensesController = {
   async getExpenses(req, res) {
     try {
-      const { category, month, hostel } = req.query;
+      const { category, month, hostel, page = 1, limit = 20 } = req.query;
       const orgId = req.organizationId || req.tenant?.organizationId;
       const isSuperAdmin = req.tenant?.isSuperAdmin;
 
@@ -13,13 +13,23 @@ const expensesController = {
         return res.status(403).json({ success: false, message: 'Organization context is required' });
       }
 
-      const expenses = await expenseService.getExpenses({
+      const result = await expenseService.getExpenses({
         organizationId: isSuperAdmin ? orgId : (orgId || new mongoose.Types.ObjectId()),
         hostelId: req.tenant?.hostelId || hostel,
         category,
         month,
+        page,
+        limit,
       });
-      return res.status(200).json({ success: true, data: expenses });
+      return res.status(200).json({ 
+        success: true, 
+        count: result.expenses.length,
+        total: result.total,
+        page: result.page,
+        totalPages: result.totalPages,
+        limit: result.limit,
+        data: result.expenses 
+      });
     } catch (error) {
       return res.status(500).json({ success: false, message: error.message });
     }

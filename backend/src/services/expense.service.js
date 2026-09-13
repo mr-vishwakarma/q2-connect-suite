@@ -3,7 +3,7 @@ const Expense = require('../models/Expense');
 const Hostel = require('../models/Hostel');
 
 const expenseService = {
-  async getExpenses({ organizationId, hostelId, category, month }) {
+  async getExpenses({ organizationId, hostelId, category, month, page = 1, limit = 20 }) {
     const filter = {};
     if (organizationId) filter.organizationId = organizationId;
 
@@ -11,7 +11,7 @@ const expenseService = {
       if (mongoose.Types.ObjectId.isValid(hostelId)) {
         filter.$or = [{ hostelId }, { hostel: hostelId }];
       } else {
-        const hostelDoc = await Hostel.findOne({ code: hostelId });
+        const hostelDoc = await Hostel.findOne({ code: hostelId }).lean();
         if (hostelDoc) {
           filter.$or = [{ hostelId: hostelDoc._id }, { hostel: hostelId }];
         } else {
@@ -29,8 +29,26 @@ const expenseService = {
       filter.date = { $gte: start, $lte: end };
     }
 
-    const expenses = await Expense.find(filter).sort({ date: -1 });
-    return expenses;
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitAmount = Math.min(Math.max(parseInt(limit) || 20, 1), 100);
+    const skip = (pageNum - 1) * limitAmount;
+
+    const [total, expenses] = await Promise.all([
+      Expense.countDocuments(filter),
+      Expense.find(filter)
+        .sort({ date: -1, _id: -1 })
+        .skip(skip)
+        .limit(limitAmount)
+        .lean()
+    ]);
+
+    return {
+      expenses,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitAmount) || (total === 0 ? 0 : 1),
+      limit: limitAmount,
+    };
   },
 
   async createExpense(data, userId, organizationId, hostelId) {

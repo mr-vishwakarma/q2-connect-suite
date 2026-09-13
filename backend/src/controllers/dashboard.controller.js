@@ -68,12 +68,12 @@ exports.getAdminDashboard = async (req, res) => {
 
       // Recents
       Complaint.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .limit(5)
         .select('_id title description status createdAt userId')
         .lean(),
       Suggestion.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .limit(3)
         .select('_id title description createdAt userId')
         .lean(),
@@ -231,7 +231,9 @@ exports.getStudentDashboard = async (req, res) => {
     const MessRequest = require('../models/MessRequest');
 
     const [studentData, leaveRequests, complaints, suggestions, approvedRequests] = await Promise.all([
-      Student.findOne({ userId }).select('name username email phone parentPhone roomNo fees startDate validDate hostel studentCode profilePhoto'),
+      Student.findOne({ userId })
+        .select('name username email phone parentPhone roomNo fees startDate validDate hostel studentCode profilePhoto')
+        .lean(),
       MessRequest.countDocuments({ userId }),
       Complaint.countDocuments({ userId }),
       Suggestion.countDocuments({ userId }),

@@ -34,7 +34,7 @@ const getFeeManagementDashboard = async (req, res) => {
 // @route   GET /api/fees
 const getFees = async (req, res) => {
   try {
-    const { studentId, hostel, month, status } = req.query;
+    const { studentId, hostel, month, status, page = 1, limit = 50 } = req.query;
     const query = {};
 
     const orgId = req.organizationId || req.tenant?.organizationId;
@@ -48,7 +48,7 @@ const getFees = async (req, res) => {
     }
 
     if (req.user.role === 'student') {
-      const student = await Student.findOne({ userId: req.user._id });
+      const student = await Student.findOne({ userId: req.user._id }).lean();
       if (!student) return res.status(404).json({ success: false, message: 'Student profile not found' });
       query.studentId = student._id;
     } else {
@@ -63,11 +63,29 @@ const getFees = async (req, res) => {
     if (month) query.month = month;
     if (status) query.status = status;
 
-    const fees = await Fee.find(query)
-      .populate('studentId', 'name username roomNo hostel')
-      .sort({ month: -1 });
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitAmount = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
+    const skip = (pageNum - 1) * limitAmount;
 
-    return res.status(200).json({ success: true, data: fees });
+    const [total, fees] = await Promise.all([
+      Fee.countDocuments(query),
+      Fee.find(query)
+        .populate('studentId', 'name username roomNo hostel')
+        .sort({ month: -1, _id: -1 })
+        .skip(skip)
+        .limit(limitAmount)
+        .lean()
+    ]);
+
+    return res.status(200).json({ 
+      success: true, 
+      count: fees.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitAmount) || (total === 0 ? 0 : 1),
+      limit: limitAmount,
+      data: fees 
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -244,32 +262,55 @@ const generateMonthlyFees = async (req, res) => {
 // @route   GET /api/fees/payments
 const getFeePayments = async (req, res) => {
   try {
-    const { studentId, hostel } = req.query;
+    const { studentId, hostel, page = 1, limit = 50 } = req.query;
     const query = {};
 
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     // Enforce Tenant Scoping
-    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-      query.organizationId = req.tenant.organizationId;
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
     }
 
     if (req.user.role === 'student') {
-      const student = await Student.findOne({ userId: req.user._id });
+      const student = await Student.findOne({ userId: req.user._id }).lean();
       if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
       query.studentId = student._id;
     } else {
       if (studentId) query.studentId = studentId;
       if (hostel && hostel !== 'All') {
         query.hostel = hostel;
-      } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !req.tenant.isSuperAdmin) {
+      } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !isSuperAdmin) {
         query.hostel = { $in: req.tenant.hostelAccess };
       }
     }
 
-    const payments = await FeePayment.find(query)
-      .populate('studentId', 'name username')
-      .sort({ paymentDate: -1 });
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitAmount = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
+    const skip = (pageNum - 1) * limitAmount;
 
-    return res.status(200).json({ success: true, data: payments });
+    const [total, payments] = await Promise.all([
+      FeePayment.countDocuments(query),
+      FeePayment.find(query)
+        .populate('studentId', 'name username')
+        .sort({ paymentDate: -1, _id: -1 })
+        .skip(skip)
+        .limit(limitAmount)
+        .lean()
+    ]);
+
+    return res.status(200).json({ 
+      success: true, 
+      count: payments.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitAmount) || (total === 0 ? 0 : 1),
+      limit: limitAmount,
+      data: payments 
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

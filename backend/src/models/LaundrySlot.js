@@ -5,7 +5,6 @@ const laundrySlotSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
     required: true,
-    index: true,
   },
   hostelId: {
     type: mongoose.Schema.Types.ObjectId,

@@ -8,28 +8,35 @@ const Plan = require('../models/Plan');
 
 const platformAnalyticsService = {
   async getPlatformStats() {
-    const totalOrganizations = await Organization.countDocuments({ isDeleted: false });
-    const activeOrganizations = await Organization.countDocuments({ status: 'ACTIVE', isDeleted: false });
-    const trialOrganizations = await Organization.countDocuments({ status: 'TRIAL', isDeleted: false });
-    const suspendedOrganizations = await Organization.countDocuments({ status: 'SUSPENDED', isDeleted: false });
-
-    const totalHostels = await Hostel.countDocuments({ isDeleted: false });
-    const totalStudents = await Student.countDocuments({ isActive: true });
-    const totalRooms = await Room.countDocuments();
+    const [
+      totalOrganizations,
+      activeOrganizations,
+      trialOrganizations,
+      suspendedOrganizations,
+      totalHostels,
+      totalStudents,
+      totalRooms,
+      subscriptions,
+      recentActivity
+    ] = await Promise.all([
+      Organization.countDocuments({ isDeleted: false }),
+      Organization.countDocuments({ status: 'ACTIVE', isDeleted: false }),
+      Organization.countDocuments({ status: 'TRIAL', isDeleted: false }),
+      Organization.countDocuments({ status: 'SUSPENDED', isDeleted: false }),
+      Hostel.countDocuments({ isDeleted: false }),
+      Student.countDocuments({ isActive: true }),
+      Room.countDocuments(),
+      Subscription.find({ status: 'ACTIVE' }).populate('planId', 'priceMonthly').lean(),
+      AuditLog.find().sort({ createdAt: -1, _id: -1 }).limit(10).lean()
+    ]);
 
     // Calculate Platform MRR from active subscriptions
-    const subscriptions = await Subscription.find({ status: 'ACTIVE' }).populate('planId');
     const monthlyRecurringRevenue = subscriptions.reduce((acc, sub) => {
       const price = sub.planId ? sub.planId.priceMonthly : 0;
       return acc + price;
     }, 0);
 
     const annualRecurringRevenue = monthlyRecurringRevenue * 12;
-
-    const recentActivity = await AuditLog.find()
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
 
     return {
       totalOrganizations,
@@ -84,8 +91,8 @@ const platformAnalyticsService = {
         {
           $group: {
             _id: null,
-            totalCapacity: { $sum: '$capacity' },
-            totalOccupied: { $sum: '$occupied' },
+            totalCapacity: { $sum: { $ifNull: ['$capacity', 0] } },
+            totalOccupied: { $sum: { $ifNull: ['$occupiedCount', { $ifNull: ['$occupied', 0] }] } },
           },
         },
       ]),

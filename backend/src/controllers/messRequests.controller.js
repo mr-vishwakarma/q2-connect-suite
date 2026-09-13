@@ -6,7 +6,7 @@ const { sendMessRequestUpdate } = require('../utils/email');
 
 const getMessRequests = async (req, res) => {
   try {
-    const { hostel, status } = req.query;
+    const { hostel, status, page = 1, limit = 20 } = req.query;
     const query = {};
 
     const orgId = req.organizationId || req.tenant?.organizationId;
@@ -30,12 +30,30 @@ const getMessRequests = async (req, res) => {
     }
     if (status) query.status = status;
 
-    const requests = await MessRequest.find(query)
-      .populate('userId', 'name email username')
-      .populate('studentId', 'name roomNo hostel')
-      .sort({ createdAt: -1 });
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitAmount = Math.min(Math.max(parseInt(limit) || 20, 1), 100);
+    const skip = (pageNum - 1) * limitAmount;
 
-    return res.status(200).json({ success: true, data: requests });
+    const [total, requests] = await Promise.all([
+      MessRequest.countDocuments(query),
+      MessRequest.find(query)
+        .populate('userId', 'name email username')
+        .populate('studentId', 'name roomNo hostel')
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limitAmount)
+        .lean()
+    ]);
+
+    return res.status(200).json({ 
+      success: true, 
+      count: requests.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitAmount) || (total === 0 ? 0 : 1),
+      limit: limitAmount,
+      data: requests 
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -48,7 +66,7 @@ const createMessRequest = async (req, res) => {
       return res.status(400).json({ success: false, message: 'leavingDate and returnDate are required' });
     }
 
-    const student = await Student.findOne({ userId: req.user._id });
+    const student = await Student.findOne({ userId: req.user._id }).lean();
     const orgId = req.organizationId || req.tenant?.organizationId || student?.organizationId || null;
     const hostelId = student?.hostelId || null;
 

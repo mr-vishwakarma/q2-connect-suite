@@ -30,7 +30,7 @@ exports.getAvailableSlots = async (req, res) => {
     let targetHostel = queryHostel;
     if (!targetHostel && req.user) {
       if (req.user.studentId) {
-        const student = await Student.findById(req.user.studentId);
+        const student = await Student.findById(req.user.studentId).lean();
         targetHostel = student?.hostel || req.user.hostels?.[0];
       } else if (req.user.hostels && req.user.hostels.length > 0) {
         targetHostel = req.user.hostels[0];
@@ -50,7 +50,8 @@ exports.getAvailableSlots = async (req, res) => {
 
     const bookings = await LaundrySlot.find(query)
       .populate('student', 'name roomNo phone email username')
-      .sort({ timeSlot: 1 });
+      .sort({ timeSlot: 1, _id: 1 })
+      .lean();
 
     res.status(200).json({
       success: true,
@@ -197,7 +198,7 @@ exports.getMyBookings = async (req, res) => {
   try {
     let studentId = req.user.studentId;
     if (!studentId && req.user.role === 'student') {
-      const foundStudent = await Student.findOne({ userId: req.user._id });
+      const foundStudent = await Student.findOne({ userId: req.user._id }).lean();
       if (foundStudent) studentId = foundStudent._id;
     }
 
@@ -212,8 +213,9 @@ exports.getMyBookings = async (req, res) => {
     }
 
     const bookings = await LaundrySlot.find(filter)
-      .sort({ date: -1, timeSlot: -1 })
-      .limit(15);
+      .sort({ date: -1, timeSlot: -1, _id: -1 })
+      .limit(15)
+      .lean();
 
     res.status(200).json({
       success: true,

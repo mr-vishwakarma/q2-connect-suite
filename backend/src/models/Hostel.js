@@ -37,5 +37,6 @@ const hostelSchema = new mongoose.Schema(
 
 hostelSchema.index({ organizationId: 1, code: 1 }, { unique: true });
 hostelSchema.index({ organizationId: 1, status: 1 });
+hostelSchema.index({ isDeleted: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Hostel', hostelSchema);

@@ -28,24 +28,27 @@ const getSuggestions = async (req, res) => {
 
     if (status) query.status = status;
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const limitAmount = parseInt(limit);
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitAmount = Math.min(Math.max(parseInt(limit) || 20, 1), 100);
+    const skip = (pageNum - 1) * limitAmount;
 
-    const suggestions = await Suggestion.find(query)
-      .populate('userId', 'name username')
-      .populate('studentId', 'name roomNo')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitAmount);
-
-    const total = await Suggestion.countDocuments(query);
+    const [total, suggestions] = await Promise.all([
+      Suggestion.countDocuments(query),
+      Suggestion.find(query)
+        .populate('userId', 'name username')
+        .populate('studentId', 'name roomNo')
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limitAmount)
+        .lean()
+    ]);
 
     return res.status(200).json({ 
       success: true, 
       data: suggestions,
       total,
-      page: parseInt(page),
-      totalPages: Math.ceil(total / limitAmount),
+      page: pageNum,
+      totalPages: Math.ceil(total / limitAmount) || (total === 0 ? 0 : 1),
       limit: limitAmount
     });
   } catch (error) {
@@ -59,7 +62,7 @@ const createSuggestion = async (req, res) => {
     if (!title || !description) {
       return res.status(400).json({ success: false, message: 'title and description are required' });
     }
-    const student = await Student.findOne({ userId: req.user._id });
+    const student = await Student.findOne({ userId: req.user._id }).lean();
     const orgId = req.organizationId || req.tenant?.organizationId || student?.organizationId || null;
 
     const suggestion = await Suggestion.create({
