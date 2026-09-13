@@ -311,3 +311,160 @@ export interface SuperAdminDashboardStats {
     revenue: number[];
   };
 }
+
+export interface SaasUserListItem {
+  _id: string;
+  name: string;
+  email: string;
+  username?: string;
+  role: string;
+  isActive: boolean;
+  isLocked: boolean;
+  failedLoginAttempts?: number;
+  lockUntil?: string;
+  createdAt: string;
+  lastLogin?: string;
+  organization?: {
+    _id: string;
+    name: string;
+    slug?: string;
+    status?: string;
+  };
+  membership?: {
+    role: string;
+    status: string;
+    joinedAt: string;
+  };
+}
+
+export interface DetailedAnalytics {
+  overview: {
+    totalOrgs: number;
+    activeOrgs: number;
+    trialOrgs: number;
+    suspendedOrgs: number;
+    cancelledOrgs: number;
+    totalHostels: number;
+    totalStudents: number;
+    totalCapacity: number;
+    totalOccupied: number;
+    occupancyRate: number;
+    mrr: number;
+    arr: number;
+    arpu: number;
+    activeSubCount: number;
+    trialSubCount: number;
+    pastDueSubCount: number;
+  };
+  planDistribution: Array<{
+    name: string;
+    count: number;
+  }>;
+  monthlyTrends: Array<{
+    month: string;
+    organizations: number;
+    students: number;
+    mrr: number;
+  }>;
+}
+
+export interface SecurityOverview {
+  metrics: {
+    lockedAccountsCount: number;
+    highRiskUsersCount: number;
+    activeSuperAdminsCount: number;
+    recentCriticalEventsCount: number;
+  };
+  lockedUsers: Array<{
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+    failedLoginAttempts: number;
+    lockUntil: string;
+    updatedAt: string;
+  }>;
+  securityEvents: Array<{
+    _id: string;
+    action: string;
+    actorName: string;
+    entityType: string;
+    entityId: string;
+    ipAddress?: string;
+    userAgent?: string;
+    createdAt: string;
+  }>;
+}
+
+export interface SystemHealthData {
+  timestamp: string;
+  status: 'HEALTHY' | 'DEGRADED' | 'DOWN';
+  environment: string;
+  uptimeSeconds: number;
+  database: {
+    status: 'CONNECTED' | 'DISCONNECTED';
+    readyState: number;
+    pingLatencyMs: number;
+    connectedHost: string;
+  };
+  memory: {
+    rssMb: number;
+    heapTotalMb: number;
+    heapUsedMb: number;
+    externalMb: number;
+  };
+  integrations: {
+    mongodbAtlas: string;
+    paymentGateway: string;
+    cloudStorage: string;
+    cronJobs: string;
+  };
+  nodeVersion: string;
+}
+
+export interface PlatformSettings {
+  _id?: string;
+  general: {
+    platformName: string;
+    supportEmail: string;
+    supportPhone: string;
+    defaultCurrency: string;
+    defaultTimezone: string;
+    allowSelfRegistration: boolean;
+  };
+  security: {
+    maxLoginAttempts: number;
+    lockoutDurationMinutes: number;
+    sessionTimeoutMinutes: number;
+    enforceMfaForSuperAdmin: boolean;
+    jwtExpiryHours: number;
+  };
+  trial: {
+    defaultTrialDays: number;
+    allowTrialExtension: boolean;
+    maxTrialExtensions: number;
+    notifyExpiringDaysBefore: number;
+  };
+  maintenance: {
+    isMaintenanceMode: boolean;
+    maintenanceMessage: string;
+    allowedIps: string[];
+  };
+  limits: {
+    maxHostelsPerTenant: number;
+    maxStudentsPerTenant: number;
+    maxFileSizeMb: number;
+  };
+  updatedAt?: string;
+}
+
+export interface HostelMetricsData {
+  totalHostels: number;
+  activeHostels: number;
+  totalCapacity: number;
+  totalOccupied: number;
+  totalVacant: number;
+  overallOccupancyRate: number;
+  totalStudentsEnrolled: number;
+}
+

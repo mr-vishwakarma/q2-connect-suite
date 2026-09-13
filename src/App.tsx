@@ -70,9 +70,18 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
 const OrganizationList = lazy(() => import("./pages/super-admin/OrganizationList"));
 const OrganizationDetail = lazy(() => import("./pages/super-admin/OrganizationDetail"));
+const HostelList = lazy(() => import("./pages/super-admin/HostelList"));
+const UserManagement = lazy(() => import("./pages/super-admin/UserManagement"));
 const PlanManagement = lazy(() => import("./pages/super-admin/PlanManagement"));
+const SubscriptionManagement = lazy(() => import("./pages/super-admin/SubscriptionManagement"));
 const FeatureCatalog = lazy(() => import("./pages/super-admin/FeatureCatalog"));
+const PlatformAnalytics = lazy(() => import("./pages/super-admin/PlatformAnalytics"));
 const AuditLogsView = lazy(() => import("./pages/super-admin/AuditLogsView"));
+const SecurityCenter = lazy(() => import("./pages/super-admin/SecurityCenter"));
+const ImpersonationCenter = lazy(() => import("./pages/super-admin/ImpersonationCenter"));
+const SystemHealth = lazy(() => import("./pages/super-admin/SystemHealth"));
+const PlatformReports = lazy(() => import("./pages/super-admin/PlatformReports"));
+const PlatformSettings = lazy(() => import("./pages/super-admin/PlatformSettings"));
 
 const queryClient = new QueryClient();
 
@@ -96,11 +105,19 @@ const adminTitles: Record<string, string> = {
 
 const superAdminTitles: Record<string, string> = {
   "/super-admin/dashboard": "SaaS Control Center",
-  "/super-admin/organizations": "Organizations",
-  "/super-admin/hostels": "Hostel Branches",
+  "/super-admin/analytics": "Platform Analytics",
+  "/super-admin/organizations": "Tenant Organizations",
+  "/super-admin/hostels": "Global Hostel Properties",
+  "/super-admin/users": "Global User Management",
   "/super-admin/plans": "Subscription Plans",
+  "/super-admin/subscriptions": "Tenant Subscriptions",
   "/super-admin/features": "Feature Catalog",
-  "/super-admin/audit-logs": "Audit Logs",
+  "/super-admin/audit-logs": "Audit & Compliance Logs",
+  "/super-admin/security": "Security Center",
+  "/super-admin/impersonation": "Controlled Impersonation",
+  "/super-admin/system-health": "System Health",
+  "/super-admin/reports": "Platform Reports & Exports",
+  "/super-admin/settings": "Platform Settings",
 };
 
 import { ProtectedStudentRoute } from "@/components/auth/ProtectedStudentRoute";
@@ -212,12 +229,20 @@ const App = () => (
               <Route path="/super-admin" element={<SuperAdminShell />}>
                 <Route index element={<Navigate to="/super-admin/dashboard" replace />} />
                 <Route path="dashboard" element={<SuperAdminDashboard />} />
+                <Route path="analytics" element={<PlatformAnalytics />} />
                 <Route path="organizations" element={<OrganizationList />} />
                 <Route path="organizations/:id" element={<OrganizationDetail />} />
-                <Route path="hostels" element={<OrganizationList />} />
+                <Route path="hostels" element={<HostelList />} />
+                <Route path="users" element={<UserManagement />} />
                 <Route path="plans" element={<PlanManagement />} />
+                <Route path="subscriptions" element={<SubscriptionManagement />} />
                 <Route path="features" element={<FeatureCatalog />} />
                 <Route path="audit-logs" element={<AuditLogsView />} />
+                <Route path="security" element={<SecurityCenter />} />
+                <Route path="impersonation" element={<ImpersonationCenter />} />
+                <Route path="system-health" element={<SystemHealth />} />
+                <Route path="reports" element={<PlatformReports />} />
+                <Route path="settings" element={<PlatformSettings />} />
               </Route>
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

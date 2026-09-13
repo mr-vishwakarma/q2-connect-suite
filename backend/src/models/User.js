@@ -51,6 +51,10 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+userSchema.index({ role: 1, isActive: 1, createdAt: -1 });
+userSchema.index({ activeOrganizationId: 1, role: 1 });
+userSchema.index({ lockUntil: 1 });
+
 // Method: Check if account is locked
 userSchema.methods.isLocked = function () {
   return !!(this.lockUntil && this.lockUntil > Date.now());

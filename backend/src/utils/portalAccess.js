@@ -45,12 +45,12 @@ const isRoleAllowedForPortal = (user, portal) => {
     return false;
   }
 
+  const userRole = String(user.role || '').toLowerCase();
   const isSuperAdminUser = Boolean(
     user.isSuperAdmin === true || 
-    user.role === 'super_admin' || 
+    userRole === 'super_admin' || 
     user.email === 'superadmin@q2connect.com'
   );
-  const userRole = String(user.role || '').toLowerCase();
 
   switch (normalizedPortal) {
     case PORTALS.SUPER_ADMIN:

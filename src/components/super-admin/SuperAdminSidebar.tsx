@@ -12,18 +12,61 @@ import {
   ChevronRight,
   Shield,
   X,
+  Users,
+  BarChart3,
+  Lock,
+  UserCheck,
+  Activity,
+  FileDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
-const SUPER_ADMIN_NAV_LINKS = [
-  { to: '/super-admin/dashboard', icon: LayoutDashboard, label: 'Control Center' },
-  { to: '/super-admin/organizations', icon: Building2, label: 'Organizations' },
-  { to: '/super-admin/hostels', icon: GitFork, label: 'Hostel Branches' },
-  { to: '/super-admin/plans', icon: CreditCard, label: 'Subscription Plans' },
-  { to: '/super-admin/features', icon: ToggleLeft, label: 'Feature Catalog' },
-  { to: '/super-admin/audit-logs', icon: ShieldAlert, label: 'Audit Logs' },
+interface NavSection {
+  title?: string;
+  links: Array<{
+    to: string;
+    icon: any;
+    label: string;
+  }>;
+}
+
+const SUPER_ADMIN_NAV_SECTIONS: NavSection[] = [
+  {
+    title: 'Platform Overview',
+    links: [
+      { to: '/super-admin/dashboard', icon: LayoutDashboard, label: 'Control Center' },
+      { to: '/super-admin/analytics', icon: BarChart3, label: 'Platform Analytics' },
+    ],
+  },
+  {
+    title: 'Tenant Operations',
+    links: [
+      { to: '/super-admin/organizations', icon: Building2, label: 'Organizations' },
+      { to: '/super-admin/hostels', icon: GitFork, label: 'Hostel Properties' },
+      { to: '/super-admin/users', icon: Users, label: 'Global Users' },
+    ],
+  },
+  {
+    title: 'SaaS & Entitlements',
+    links: [
+      { to: '/super-admin/plans', icon: CreditCard, label: 'Plans & Pricing' },
+      { to: '/super-admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+      { to: '/super-admin/features', icon: ToggleLeft, label: 'Feature Catalog' },
+    ],
+  },
+  {
+    title: 'Governance & Control',
+    links: [
+      { to: '/super-admin/audit-logs', icon: ShieldAlert, label: 'Audit Logs' },
+      { to: '/super-admin/security', icon: Lock, label: 'Security Center' },
+      { to: '/super-admin/impersonation', icon: UserCheck, label: 'Impersonation' },
+      { to: '/super-admin/system-health', icon: Activity, label: 'System Health' },
+      { to: '/super-admin/reports', icon: FileDown, label: 'Reports & Exports' },
+      { to: '/super-admin/settings', icon: Settings, label: 'Settings' },
+    ],
+  },
 ];
 
 export interface SuperAdminSidebarProps {
@@ -90,34 +133,43 @@ export function SuperAdminSidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto custom-scrollbar">
-        {SUPER_ADMIN_NAV_LINKS.map((link) => {
-          const Icon = link.icon;
-          const isActive = location.pathname === link.to;
+      <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto custom-scrollbar">
+        {SUPER_ADMIN_NAV_SECTIONS.map((section, secIdx) => (
+          <div key={secIdx} className="space-y-1">
+            {!isCollapsed && section.title && (
+              <p className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                {section.title}
+              </p>
+            )}
+            {section.links.map((link) => {
+              const Icon = link.icon;
+              const isActive = location.pathname === link.to;
 
-          return (
-            <Link
-              key={link.to}
-              to={link.to}
-              onClick={onClose}
-              className={cn(
-                'flex items-center px-4 py-3 rounded-xl transition-all duration-200 relative group',
-                isCollapsed ? 'justify-center' : 'gap-3',
-                isActive
-                  ? 'bg-amber-500/20 text-amber-400 font-semibold border border-amber-500/30 shadow-md'
-                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-              )}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!isCollapsed && <span className="text-sm">{link.label}</span>}
-              {isCollapsed && (
-                <div className="absolute left-full ml-3 px-2.5 py-1 bg-popover text-popover-foreground text-xs rounded-md shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                  {link.label}
-                </div>
-              )}
-            </Link>
-          );
-        })}
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center px-3.5 py-2 rounded-xl transition-all duration-200 relative group text-xs font-medium',
+                    isCollapsed ? 'justify-center py-2.5' : 'gap-3',
+                    isActive
+                      ? 'bg-amber-500/20 text-amber-400 font-semibold border border-amber-500/30 shadow-sm'
+                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  )}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {!isCollapsed && <span className="truncate">{link.label}</span>}
+                  {isCollapsed && (
+                    <div className="absolute left-full ml-3 px-2.5 py-1 bg-popover text-popover-foreground text-xs rounded-md shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                      {link.label}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
@@ -129,8 +181,8 @@ export function SuperAdminSidebar({
             isCollapsed ? 'justify-center' : 'gap-3'
           )}
         >
-          <LogOut className="w-5 h-5 shrink-0" />
-          {!isCollapsed && <span className="text-sm font-medium">Log out</span>}
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!isCollapsed && <span className="text-xs font-medium">Log out</span>}
         </button>
       </div>
     </aside>

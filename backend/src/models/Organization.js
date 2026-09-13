@@ -21,7 +21,7 @@ const organizationSchema = new mongoose.Schema(
     primaryColor: { type: String, trim: true, default: '#f59e0b' },
     status: {
       type: String,
-      enum: ['TRIAL', 'ACTIVE', 'PAST_DUE', 'SUSPENDED', 'CANCELLED'],
+      enum: ['TRIAL', 'ACTIVE', 'PAST_DUE', 'SUSPENDED', 'CANCELLED', 'ARCHIVED'],
       default: 'TRIAL',
     },
     subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' },
@@ -37,7 +37,7 @@ const organizationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-organizationSchema.index({ status: 1 });
+organizationSchema.index({ status: 1, createdAt: -1 });
 organizationSchema.index({ contactEmail: 1 });
 
 module.exports = mongoose.model('Organization', organizationSchema);
