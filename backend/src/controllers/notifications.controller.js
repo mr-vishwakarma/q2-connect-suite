@@ -1,10 +1,23 @@
+const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
+const Student = require('../models/Student');
 
 const getNotifications = async (req, res) => {
   try {
     const { hostel } = req.query;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     const query = {};
-    if (hostel) query.hostel = hostel;
+
+    // Enforce Tenant Scoping
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
+    }
+
+    if (hostel && hostel !== 'All') query.hostel = hostel;
 
     if (req.user.role === 'student') {
       query.userId = req.user._id;
@@ -49,7 +62,7 @@ const markAllAsRead = async (req, res) => {
   }
 };
 
-// Admin: broadcast notification to a hostel or specific user
+// Admin: broadcast notification to a hostel or specific user within own tenant
 const broadcastNotification = async (req, res) => {
   try {
     const { hostel, title, message, type, recipient } = req.body;
@@ -57,23 +70,42 @@ const broadcastNotification = async (req, res) => {
       return res.status(400).json({ success: false, message: 'title and message are required' });
     }
 
-    const Student = require('../models/Student');
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    if (!isSuperAdmin && !orgId) {
+      return res.status(403).json({ success: false, message: 'Organization tenant context required' });
+    }
+
+    const studentQuery = {};
+    if (!isSuperAdmin) {
+      studentQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      studentQuery.organizationId = orgId;
+    }
     
     let targetUserIds = [];
     if (recipient && recipient !== 'all') {
-      const student = await Student.findById(recipient);
-      if (student) targetUserIds.push(student.userId);
+      studentQuery._id = recipient;
+      const student = await Student.findOne(studentQuery);
+      if (student && student.userId) targetUserIds.push(student.userId);
     } else {
-      const students = await Student.find(hostel ? { hostel } : {}).select('userId');
-      targetUserIds = students.map(s => s.userId);
+      if (hostel && hostel !== 'All') studentQuery.hostel = hostel;
+      const students = await Student.find(studentQuery).select('userId');
+      targetUserIds = students.map(s => s.userId).filter(Boolean);
     }
 
     if (targetUserIds.length === 0) {
-      return res.status(404).json({ success: false, message: 'No students found to notify' });
+      return res.status(404).json({ success: false, message: 'No students found to notify in your organization' });
     }
 
     const notifications = targetUserIds.map(userId => ({
-      userId, hostel, title, message, type: type || 'info'
+      userId,
+      organizationId: orgId || null,
+      hostel,
+      title,
+      message,
+      type: type || 'info',
     }));
 
     await Notification.insertMany(notifications);
@@ -91,8 +123,18 @@ const broadcastNotification = async (req, res) => {
 
 const deleteNotification = async (req, res) => {
   try {
-    const notification = await Notification.findByIdAndDelete(req.params.id);
-    if (!notification) return res.status(404).json({ success: false, message: 'Notification not found' });
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    const filter = { _id: req.params.id };
+    if (!isSuperAdmin) {
+      filter.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      filter.organizationId = orgId;
+    }
+
+    const notification = await Notification.findOneAndDelete(filter);
+    if (!notification) return res.status(404).json({ success: false, message: 'Notification not found in your organization' });
     
     if (req.io) req.io.emit('notifications-updated');
     return res.status(200).json({ success: true, message: 'Deleted successfully' });
@@ -102,3 +144,4 @@ const deleteNotification = async (req, res) => {
 };
 
 module.exports = { getNotifications, markAsRead, markAllAsRead, broadcastNotification, deleteNotification };
+

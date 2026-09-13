@@ -8,9 +8,11 @@ const {
   adminBlockSlot
 } = require('../controllers/laundry.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
+const { resolveTenantContext } = require('../middleware/tenant.middleware');
 
-// All routes require authentication
-router.use(protect);
+// All routes require authentication & tenant context
+router.use(protect, resolveTenantContext);
+
 
 // Student routes
 router.post('/book', authorize('student'), bookSlot);

@@ -14,11 +14,11 @@ const roomSchema = new mongoose.Schema(
 );
 
 // Compound unique index: room number must be unique within an organization & hostel
+roomSchema.index({ organizationId: 1, hostel: 1, roomNumber: 1 }, { unique: true });
 roomSchema.index({ organizationId: 1, hostelId: 1, roomNumber: 1 });
-roomSchema.index({ organizationId: 1, hostel: 1, roomNumber: 1 });
 roomSchema.index({ organizationId: 1, status: 1 });
-roomSchema.index({ roomNumber: 1, hostel: 1 });
 roomSchema.index({ hostel: 1 });
+
 
 // Auto-update status based on occupancy
 roomSchema.pre('save', function (next) {

@@ -9,11 +9,18 @@ try {
   console.warn('DNS server override notice:', err.message);
 }
 
-const ACTUAL_MONGODB_URI = 'mongodb+srv://mayurvish:Mayur2003%21%40%23%24@complete-backend.pqjcnsk.mongodb.net/q2connect?retryWrites=true&w=majority';
-
 const connectDB = async () => {
+  const mongoUri = process.env.MONGODB_URI;
+
+  if (!mongoUri || !mongoUri.trim()) {
+    console.error('❌ FATAL CONFIGURATION ERROR: MONGODB_URI environment variable is required.');
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
+    throw new Error('MONGODB_URI environment variable is required');
+  }
+
   try {
-    const mongoUri = process.env.MONGODB_URI || ACTUAL_MONGODB_URI;
     const conn = await mongoose.connect(mongoUri, {
       maxPoolSize: 50,
       minPoolSize: 10,

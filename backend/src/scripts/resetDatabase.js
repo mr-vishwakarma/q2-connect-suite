@@ -31,12 +31,13 @@ const AuditLog = require('../models/AuditLog');
 const Expense = require('../models/Expense');
 const ImpersonationSession = require('../models/ImpersonationSession');
 
-const ACTUAL_MONGODB_URI =
-  'mongodb+srv://mayurvish:Mayur2003%21%40%23%24@complete-backend.pqjcnsk.mongodb.net/q2connect?retryWrites=true&w=majority';
-
 async function resetDatabase() {
   try {
-    const mongoUri = process.env.MONGODB_URI || ACTUAL_MONGODB_URI;
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri || !mongoUri.trim()) {
+      console.error('❌ MONGODB_URI environment variable is required to run resetDatabase.');
+      process.exit(1);
+    }
     console.log('🔄 Connecting to MongoDB:', mongoUri.replace(/:([^:@]+)@/, ':****@'));
     await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB.');

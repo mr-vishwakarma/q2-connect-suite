@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const Complaint = require('../models/Complaint');
 const Suggestion = require('../models/Suggestion');
@@ -7,12 +8,14 @@ const MenuRating = require('../models/MenuRating');
 exports.getAdminDashboard = async (req, res) => {
   try {
     const { hostel } = req.query;
-    const orgId = req.tenant?.organizationId;
+    const orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
 
     // Enforce Tenant Scoping
     const filter = {};
-    if (orgId && !isSuperAdmin) {
+    if (!isSuperAdmin) {
+      filter.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
       filter.organizationId = orgId;
     }
 
@@ -23,6 +26,7 @@ exports.getAdminDashboard = async (req, res) => {
     }
 
     const studentMatch = { isActive: { $ne: false }, ...filter };
+
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -115,8 +119,9 @@ exports.getAdminDashboard = async (req, res) => {
       // Active students with assigned room
       Student.countDocuments({ ...studentMatch, roomNo: { $exists: true, $ne: '', $ne: null } }),
 
-      // Menu ratings summary
+      // Menu ratings summary (strictly tenant-scoped)
       MenuRating.aggregate([
+        { $match: filter },
         {
           $group: {
             _id: null,
@@ -125,6 +130,7 @@ exports.getAdminDashboard = async (req, res) => {
           }
         }
       ])
+
     ]);
 
     // Build complete 7-day timeline (ensuring no missing days in chart)

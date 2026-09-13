@@ -9,10 +9,24 @@ const getMessRequests = async (req, res) => {
     const { hostel, status } = req.query;
     const query = {};
 
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    // Enforce Tenant Scoping
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
+    }
+
     if (req.user.role === 'student') {
       query.userId = req.user._id;
     } else {
-      if (hostel) query.hostel = hostel;
+      if (hostel && hostel !== 'All') {
+        query.hostel = hostel;
+      } else if (req.tenant?.hostelAccess && !req.tenant.hostelAccess.includes('all') && !isSuperAdmin) {
+        query.hostel = { $in: req.tenant.hostelAccess };
+      }
     }
     if (status) query.status = status;
 
@@ -35,11 +49,15 @@ const createMessRequest = async (req, res) => {
     }
 
     const student = await Student.findOne({ userId: req.user._id });
+    const orgId = req.organizationId || req.tenant?.organizationId || student?.organizationId || null;
+    const hostelId = student?.hostelId || null;
 
     const request = await MessRequest.create({
+      organizationId: orgId,
+      hostelId,
       userId: req.user._id,
       studentId: student?._id,
-      hostel: student?.hostel,
+      hostel: student?.hostel || 'Q2',
       leavingDate: new Date(leavingDate),
       returnDate: new Date(returnDate),
       reason,
@@ -67,8 +85,19 @@ const updateMessRequest = async (req, res) => {
     if (adminMessage !== undefined) updateData.adminMessage = adminMessage;
     if (status && status !== 'pending') updateData.approvedDate = new Date();
 
-    const messReq = await MessRequest.findByIdAndUpdate(
-      req.params.id,
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    // Enforce Tenant Ownership in lookup
+    const filter = { _id: req.params.id };
+    if (!isSuperAdmin) {
+      filter.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      filter.organizationId = orgId;
+    }
+
+    const messReq = await MessRequest.findOneAndUpdate(
+      filter,
       { $set: updateData },
       { new: true, session }
     ).populate('userId', 'name email');
@@ -81,6 +110,8 @@ const updateMessRequest = async (req, res) => {
     // Notify student
     await Notification.create([{
       userId: messReq.userId._id,
+      organizationId: messReq.organizationId || orgId,
+      hostelId: messReq.hostelId || null,
       hostel: messReq.hostel,
       title: `Mess Off Request ${status === 'approved' ? 'Approved' : (status === 'returned' ? 'Returned' : 'Rejected')}`,
       message: adminMessage || `Your mess off request has been marked as ${status}.`,
@@ -92,14 +123,16 @@ const updateMessRequest = async (req, res) => {
 
     // Send email (outside transaction)
     try {
-      await sendMessRequestUpdate({
-        to: messReq.userId.email,
-        name: messReq.userId.name,
-        status,
-        leavingDate: messReq.leavingDate.toDateString(),
-        returnDate: messReq.returnDate.toDateString(),
-        adminMessage,
-      });
+      if (messReq.userId?.email) {
+        await sendMessRequestUpdate({
+          to: messReq.userId.email,
+          name: messReq.userId.name,
+          status,
+          leavingDate: messReq.leavingDate.toDateString(),
+          returnDate: messReq.returnDate.toDateString(),
+          adminMessage,
+        });
+      }
     } catch (emailErr) {
       console.error('Email send failed (non-fatal):', emailErr.message);
     }
@@ -114,3 +147,4 @@ const updateMessRequest = async (req, res) => {
 };
 
 module.exports = { getMessRequests, createMessRequest, updateMessRequest };
+

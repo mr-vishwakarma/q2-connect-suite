@@ -1,10 +1,31 @@
+const mongoose = require('mongoose');
 const MenuRating = require('../models/MenuRating');
+const Student = require('../models/Student');
 const moment = require('moment');
 
 exports.submitRating = async (req, res) => {
   try {
     const { mealType, rating, feedback } = req.body;
-    const studentId = req.user.studentId;
+    let studentId = req.user.studentId;
+    if (!studentId && req.user.role === 'student') {
+      const foundStudent = await Student.findOne({ userId: req.user._id });
+      if (foundStudent) studentId = foundStudent._id;
+    }
+
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Student profile not found' });
+    }
+
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    const orgId = req.organizationId || req.tenant?.organizationId || student.organizationId;
+    if (!orgId) {
+      return res.status(403).json({ success: false, message: 'Organization context is required' });
+    }
+
     const date = moment().format('YYYY-MM-DD');
 
     if (!mealType || !rating) {
@@ -15,11 +36,18 @@ exports.submitRating = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
     }
 
-    // Upsert rating (if student already rated this meal today, update it)
+    // Upsert rating scoped to tenant organization
     const newRating = await MenuRating.findOneAndUpdate(
-      { student: studentId, date, mealType },
-      { rating, feedback },
-      { new: true, upsert: true }
+      { organizationId: orgId, student: studentId, date, mealType },
+      {
+        $set: {
+          rating,
+          feedback,
+          hostelId: student.hostelId || null,
+          hostel: student.hostel || 'Q2',
+        },
+      },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
 
     res.status(200).json({
@@ -37,9 +65,23 @@ exports.submitRating = async (req, res) => {
 
 exports.getAnalytics = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, hostel } = req.query;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
 
     const query = {};
+
+    // Enforce Tenant Scoping on Analytics Aggregation
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
+    }
+
+    if (hostel && hostel !== 'All') {
+      query.hostel = hostel;
+    }
+
     if (startDate && endDate) {
       query.date = { $gte: startDate, $lte: endDate };
     } else {
@@ -50,7 +92,7 @@ exports.getAnalytics = async (req, res) => {
       };
     }
 
-    // Aggregate average rating per meal type per day
+    // Aggregate average rating per meal type per day (strictly scoped to organizationId)
     const analytics = await MenuRating.aggregate([
       { $match: query },
       {
@@ -94,3 +136,4 @@ exports.getAnalytics = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+

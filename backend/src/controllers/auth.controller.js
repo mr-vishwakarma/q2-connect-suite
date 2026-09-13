@@ -19,6 +19,43 @@ const generateTokens = (userId) => {
 };
 
 /**
+ * Authoritative Google ID Token verification.
+ * Strictly verifies signature, issuer, audience, and expiry with Google's public keys.
+ * Fails closed if token is invalid or if GOOGLE_CLIENT_ID is unconfigured.
+ * NEVER falls back to unverified base64 decoding.
+ */
+const verifyGoogleCredential = async (credential) => {
+  if (!credential || typeof credential !== 'string') {
+    const error = new Error('Google credential token is required');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId || !clientId.trim()) {
+    console.error('[SECURITY AUDIT] Google OAuth rejected: GOOGLE_CLIENT_ID is not configured on the server.');
+    const error = new Error('Google authentication is not configured on this server.');
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const client = new OAuth2Client(clientId);
+  const ticket = await client.verifyIdToken({
+    idToken: credential,
+    audience: clientId,
+  });
+
+  const payload = ticket.getPayload();
+  if (!payload || !payload.email) {
+    const error = new Error('Google token does not contain a verified email address');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return payload;
+};
+
+/**
  * Unified authoritative login handler with strict portal-role boundary enforcement.
  * Checks valid credentials, then strictly verifies user.role matches requested portal.
  */
@@ -171,43 +208,18 @@ const superAdminLogin = async (req, res) => handleUnifiedLogin(req, res, PORTALS
 const googleLogin = async (req, res) => {
   try {
     const { credential } = req.body;
-    if (!credential) {
-      return res.status(400).json({ success: false, message: 'Google credential token is required' });
-    }
-
     let payload;
     try {
-      const clientId = process.env.GOOGLE_CLIENT_ID;
-      if (clientId) {
-        try {
-          const client = new OAuth2Client(clientId);
-          const ticket = await client.verifyIdToken({
-            idToken: credential,
-            audience: clientId,
-          });
-          payload = ticket.getPayload();
-        } catch (verifyErr) {
-          const base64Url = credential.split('.')[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
-          payload = JSON.parse(jsonPayload);
-        }
-      } else {
-        // Fallback for development if client ID is not yet configured: decode JWT payload
-        const base64Url = credential.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
-        payload = JSON.parse(jsonPayload);
-      }
-    } catch (err) {
-      return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
+      payload = await verifyGoogleCredential(credential);
+    } catch (verifyError) {
+      const statusCode = verifyError.statusCode || 401;
+      return res.status(statusCode).json({
+        success: false,
+        message: verifyError.message || 'Invalid or expired Google token',
+      });
     }
 
     const { sub: googleId, email, name, picture } = payload;
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Google account has no email associated' });
-    }
-
     const normalizedEmail = email.toLowerCase().trim();
 
     // 1. Check if user exists by email
@@ -351,35 +363,15 @@ const googleLogin = async (req, res) => {
 const requestGoogleRegistration = async (req, res) => {
   try {
     const { credential, phone, hostel = 'Q2', name } = req.body;
-    if (!credential) {
-      return res.status(400).json({ success: false, message: 'Google credential token is required' });
-    }
-
     let payload;
     try {
-      const clientId = process.env.GOOGLE_CLIENT_ID;
-      if (clientId) {
-        try {
-          const client = new OAuth2Client(clientId);
-          const ticket = await client.verifyIdToken({
-            idToken: credential,
-            audience: clientId,
-          });
-          payload = ticket.getPayload();
-        } catch (verifyErr) {
-          const base64Url = credential.split('.')[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
-          payload = JSON.parse(jsonPayload);
-        }
-      } else {
-        const base64Url = credential.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
-        payload = JSON.parse(jsonPayload);
-      }
-    } catch (err) {
-      return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
+      payload = await verifyGoogleCredential(credential);
+    } catch (verifyError) {
+      const statusCode = verifyError.statusCode || 401;
+      return res.status(statusCode).json({
+        success: false,
+        message: verifyError.message || 'Invalid or expired Google token',
+      });
     }
 
     const { sub: googleId, email, name: googleName, picture } = payload;
@@ -653,33 +645,70 @@ const registerStudent = async (req, res) => {
   }
 };
 
-// @desc    Register admin (first-time setup or superadmin use)
+// @desc    Register admin (first-time bootstrap setup or authenticated admin staff creation)
 // @route   POST /api/auth/register-admin
-// @access  Public (you may want to protect this later with a secret key)
+// @access  Public with mandatory secret OR Authenticated Admin/SuperAdmin
 const registerAdmin = async (req, res) => {
   try {
     const { name, username, email, password, adminSecret, hostels } = req.body;
 
-    // Optional: restrict registration with a secret
-    if (adminSecret && adminSecret !== process.env.ADMIN_REGISTRATION_SECRET) {
-      return res.status(403).json({ success: false, message: 'Invalid admin registration secret' });
+    // Determine caller authorization:
+    // 1. Authenticated Admin/SuperAdmin (via Bearer token)
+    // 2. Unauthenticated bootstrap caller providing valid mandatory adminSecret
+    let isAuthorizedCaller = false;
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const caller = await User.findById(decoded.id).select('role isActive');
+        if (caller && caller.isActive && (caller.role === 'admin' || caller.role === 'super_admin')) {
+          isAuthorizedCaller = true;
+        }
+      } catch (authErr) {
+        // Token invalid or expired: fall through to secret verification
+      }
+    }
+
+    if (!isAuthorizedCaller) {
+      const serverAdminSecret = process.env.ADMIN_REGISTRATION_SECRET;
+
+      // Fail closed: If server has no secret configured, public bootstrap registration is disabled
+      if (!serverAdminSecret || !serverAdminSecret.trim()) {
+        return res.status(503).json({
+          success: false,
+          message: 'Public administrator registration is disabled.',
+        });
+      }
+
+      // Mandatory adminSecret validation
+      if (!adminSecret || typeof adminSecret !== 'string' || adminSecret.trim() !== serverAdminSecret) {
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid administrator registration secret.',
+        });
+      }
     }
 
     if (!name || !username || !email || !password) {
       return res.status(400).json({ success: false, message: 'Name, username, email, and password are required' });
     }
 
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
+    }
+
     const existing = await User.findOne({ 
-      $or: [{ email: email.toLowerCase() }, { username }] 
+      $or: [{ email: email.toLowerCase() }, { username: username.trim() }] 
     });
     if (existing) {
       return res.status(409).json({ success: false, message: 'Email or username already registered' });
     }
 
     const user = await User.create({ 
-      name, 
-      username, 
-      email: email.toLowerCase(), 
+      name: name.trim(), 
+      username: username.trim(), 
+      email: email.toLowerCase().trim(), 
       password, 
       role: 'admin',
       hostels: hostels || ['Q2', 'Q2.0', 'Q2.1'] // default to all if not provided

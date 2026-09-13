@@ -98,12 +98,17 @@ const getAllStudents = async (req, res) => {
 const getStudent = async (req, res) => {
   try {
     let student;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     if (req.params.id === 'me') {
       student = await Student.findOne({ userId: req.user._id });
     } else {
       const studentQuery = { _id: req.params.id };
-      if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-        studentQuery.organizationId = req.tenant.organizationId;
+      if (!isSuperAdmin) {
+        studentQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+      } else if (orgId) {
+        studentQuery.organizationId = orgId;
       }
       student = await Student.findOne(studentQuery);
     }
@@ -120,6 +125,7 @@ const getStudent = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // @desc    Register a new student (creates User + Student records)
 // @route   POST /api/students
@@ -355,10 +361,13 @@ const updateStudent = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { name, phone, parentPhone, roomNo, hostel, fees, startDate, validDate } = req.body;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
     const studentQuery = { _id: req.params.id };
-    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-      studentQuery.organizationId = req.tenant.organizationId;
+    if (!isSuperAdmin) {
+      studentQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      studentQuery.organizationId = orgId;
     }
 
     const student = await Student.findOne(studentQuery).session(session);
@@ -429,31 +438,41 @@ const deleteStudent = async (req, res) => {
   session.startTransaction();
 
   try {
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     const studentQuery = { _id: req.params.id };
-    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-      studentQuery.organizationId = req.tenant.organizationId;
+    if (!isSuperAdmin) {
+      studentQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      studentQuery.organizationId = orgId;
     }
 
     let student = await Student.findOne(studentQuery).session(session);
     if (!student) {
-      student = await Student.findOne({ userId: req.params.id, ...(req.tenant?.organizationId && !req.tenant.isSuperAdmin ? { organizationId: req.tenant.organizationId } : {}) }).session(session);
+      student = await Student.findOne({
+        userId: req.params.id,
+        ...(!isSuperAdmin ? { organizationId: orgId || new mongoose.Types.ObjectId() } : (orgId ? { organizationId: orgId } : {})),
+      }).session(session);
     }
 
-    if (student) {
-      if (student.roomNo && student.hostel) {
-        await Room.findOneAndUpdate(
-          { roomNumber: student.roomNo, hostel: student.hostel, organizationId: student.organizationId, occupiedCount: { $gt: 0 } },
-          { $inc: { occupiedCount: -1 } },
-          { session }
-        );
-      }
-      if (student.userId) {
-        await User.findByIdAndDelete(student.userId, { session });
-      }
-      await Student.findByIdAndDelete(student._id, { session });
-    } else {
-      await User.findByIdAndDelete(req.params.id, { session });
+    if (!student) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ success: false, message: 'Student not found in your organization' });
     }
+
+    if (student.roomNo && student.hostel) {
+      await Room.findOneAndUpdate(
+        { roomNumber: student.roomNo, hostel: student.hostel, organizationId: student.organizationId, occupiedCount: { $gt: 0 } },
+        { $inc: { occupiedCount: -1 } },
+        { session }
+      );
+    }
+    if (student.userId) {
+      await User.findByIdAndDelete(student.userId, { session });
+    }
+    await Student.findByIdAndDelete(student._id, { session });
 
     await session.commitTransaction();
     session.endSession();
@@ -464,6 +483,7 @@ const deleteStudent = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // @desc    Update student's own profile
 // @route   PUT /api/students/profile
@@ -536,10 +556,19 @@ const getAlertStudents = async (req, res) => {
 const getPendingRegistrations = async (req, res) => {
   try {
     const { hostel } = req.query;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     const query = {
       role: 'student',
       registrationStatus: 'pending_approval',
     };
+
+    if (!isSuperAdmin) {
+      query.activeOrganizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.activeOrganizationId = orgId;
+    }
 
     if (hostel && hostel.toLowerCase() !== 'all') {
       query.$or = [
@@ -580,9 +609,19 @@ const getPendingRegistrations = async (req, res) => {
 const approveRegistration = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id);
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    const userQuery = { _id: id };
+    if (!isSuperAdmin) {
+      userQuery.activeOrganizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      userQuery.activeOrganizationId = orgId;
+    }
+
+    const user = await User.findOne(userQuery);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'Resident request not found' });
+      return res.status(404).json({ success: false, message: 'Resident request not found in your organization' });
     }
     user.registrationStatus = 'approved';
     if (!user.registrationDetails) user.registrationDetails = {};
@@ -593,6 +632,7 @@ const approveRegistration = async (req, res) => {
     // Create Notification for the student
     await Notification.create({
       userId: user._id,
+      organizationId: user.activeOrganizationId || orgId,
       title: 'Hostel Registration Approved!',
       message: `Your registration request for ${user.registrationDetails?.hostel || 'Q2'} has been approved. Please log in with Google to choose your username and password.`,
       type: 'success',
@@ -614,9 +654,19 @@ const rejectRegistration = async (req, res) => {
   try {
     const { id } = req.params;
     const { reason = 'Registration declined by administrator.' } = req.body;
-    const user = await User.findById(id);
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    const userQuery = { _id: id };
+    if (!isSuperAdmin) {
+      userQuery.activeOrganizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      userQuery.activeOrganizationId = orgId;
+    }
+
+    const user = await User.findOne(userQuery);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'Resident request not found' });
+      return res.status(404).json({ success: false, message: 'Resident request not found in your organization' });
     }
     user.registrationStatus = 'rejected';
     if (!user.registrationDetails) user.registrationDetails = {};
@@ -656,12 +706,23 @@ const approveAndRegisterStudent = async (req, res) => {
       initialFeePaid
     } = req.body;
 
-    const user = await User.findById(id).session(session);
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    const userQuery = { _id: id };
+    if (!isSuperAdmin) {
+      userQuery.activeOrganizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      userQuery.activeOrganizationId = orgId;
+    }
+
+    const user = await User.findOne(userQuery).session(session);
     if (!user) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({ success: false, message: 'Applicant user not found' });
+      return res.status(404).json({ success: false, message: 'Applicant user not found in your organization' });
     }
+
 
     const finalEmail = (email || user.email || '').toLowerCase().trim();
     // User ID, Email, and Password default to Google authentication email if not provided
@@ -671,9 +732,9 @@ const approveAndRegisterStudent = async (req, res) => {
     const finalPhone = phone || user.registrationDetails?.phone || '';
     const finalName = name || user.name || 'Resident';
 
-    const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
+    const targetOrgId = orgId || req.tenant?.organizationId || req.user?.activeOrganizationId;
     const Hostel = require('../models/Hostel');
-    const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: finalHostel }).session(session);
+    const hostelDoc = await Hostel.findOne({ organizationId: targetOrgId, code: finalHostel }).session(session);
 
     // Update user properties
     user.name = finalName;

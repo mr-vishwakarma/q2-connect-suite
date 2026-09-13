@@ -119,9 +119,12 @@ const SEED_PLANS = [
 
 async function seedSaaSEnvironment() {
   try {
-    const actualMongoUri = 'mongodb+srv://mayurvish:Mayur2003%21%40%23%24@complete-backend.pqjcnsk.mongodb.net/q2connect?retryWrites=true&w=majority';
-    const mongoUri = process.env.MONGODB_URI || actualMongoUri;
-    console.log('Connecting to MongoDB at:', mongoUri);
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri || !mongoUri.trim()) {
+      console.error('❌ MONGODB_URI environment variable is required to seed SaaS environment.');
+      process.exit(1);
+    }
+    console.log('Connecting to MongoDB at:', mongoUri.replace(/:([^:@]+)@/, ':****@'));
     await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB.');
 

@@ -1,5 +1,6 @@
 const LaundrySlot = require('../models/LaundrySlot');
 const Student = require('../models/Student');
+const Hostel = require('../models/Hostel');
 
 // Config: Default to single washing machine system
 const TOTAL_MACHINES = 1;
@@ -19,6 +20,13 @@ exports.getAvailableSlots = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Date is required (YYYY-MM-DD)' });
     }
 
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    if (!isSuperAdmin && !orgId) {
+      return res.status(403).json({ success: false, message: 'Organization context is required' });
+    }
+
     let targetHostel = queryHostel;
     if (!targetHostel && req.user) {
       if (req.user.studentId) {
@@ -30,13 +38,14 @@ exports.getAvailableSlots = async (req, res) => {
     }
     if (!targetHostel) targetHostel = 'Q2';
 
-    // Get all active bookings for that hostel and date
+    // Get all active bookings for that tenant, hostel, and date
     const query = {
       date,
+      hostel: targetHostel,
       status: { $in: ['booked', 'maintenance'] },
     };
-    if (targetHostel) {
-      query.$or = [{ hostel: targetHostel }, { hostel: { $exists: false } }];
+    if (orgId) {
+      query.organizationId = orgId;
     }
 
     const bookings = await LaundrySlot.find(query)
@@ -76,12 +85,23 @@ exports.bookSlot = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide date and time slot' });
     }
 
-    // Determine student hostel
+    // Determine student hostel and organization
     const student = await Student.findById(studentId);
-    const targetHostel = student?.hostel || req.user.hostels?.[0] || 'Q2';
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
 
-    // Check if student already has an active booking for this date (Limit: 1 slot per day)
+    const orgId = req.organizationId || req.tenant?.organizationId || student.organizationId;
+    const targetHostel = student.hostel || req.user.hostels?.[0] || 'Q2';
+    const hostelId = student.hostelId || null;
+
+    if (!orgId) {
+      return res.status(403).json({ success: false, message: 'Organization context is required' });
+    }
+
+    // Check if student already has an active booking for this date (Limit: 1 slot per day within organization)
     const existingStudentBooking = await LaundrySlot.findOne({
+      organizationId: orgId,
       student: studentId,
       date,
       status: 'booked'
@@ -94,12 +114,13 @@ exports.bookSlot = async (req, res) => {
       });
     }
 
-    // Check if machine slot is already booked or in maintenance
+    // Check if machine slot is already booked or in maintenance in this organization & hostel
     const existingSlot = await LaundrySlot.findOne({
+      organizationId: orgId,
+      hostel: targetHostel,
       date,
       timeSlot,
       machineNumber: 1,
-      $or: [{ hostel: targetHostel }, { hostel: { $exists: false } }],
       status: { $in: ['booked', 'maintenance'] }
     });
 
@@ -113,6 +134,8 @@ exports.bookSlot = async (req, res) => {
     }
 
     const newBooking = await LaundrySlot.create({
+      organizationId: orgId,
+      hostelId,
       student: studentId,
       hostel: targetHostel,
       date,
@@ -137,13 +160,20 @@ exports.bookSlot = async (req, res) => {
 exports.cancelBooking = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const booking = await LaundrySlot.findById(id);
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    const filter = { _id: id };
+    if (!isSuperAdmin) {
+      filter.organizationId = orgId || new require('mongoose').Types.ObjectId();
+    }
+
+    const booking = await LaundrySlot.findOne(filter);
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
-    // Check if the user is the owner student or an admin
+    // Check if the user is the owner student or an admin of this organization
     const isOwner = req.user.studentId && booking.student.toString() === req.user.studentId.toString();
     const isAdmin = ['admin', 'super_admin', 'warden'].includes(req.user.role);
 
@@ -175,7 +205,13 @@ exports.getMyBookings = async (req, res) => {
       return res.status(200).json({ success: true, data: [] });
     }
 
-    const bookings = await LaundrySlot.find({ student: studentId })
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const filter = { student: studentId };
+    if (orgId && !req.tenant?.isSuperAdmin) {
+      filter.organizationId = orgId;
+    }
+
+    const bookings = await LaundrySlot.find(filter)
       .sort({ date: -1, timeSlot: -1 })
       .limit(15);
 
@@ -195,25 +231,39 @@ exports.adminBlockSlot = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Date and timeSlot are required' });
     }
 
-    const existing = await LaundrySlot.findOne({
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    if (!isSuperAdmin && !orgId) {
+      return res.status(403).json({ success: false, message: 'Organization context is required' });
+    }
+
+    const filter = {
       date,
       timeSlot,
       machineNumber: 1,
       hostel,
       status: { $in: ['booked', 'maintenance'] }
-    });
+    };
+    if (orgId) filter.organizationId = orgId;
+
+    const existing = await LaundrySlot.findOne(filter);
 
     if (existing) {
       if (existing.status === 'maintenance') {
         // Toggle unblock
-        await LaundrySlot.findByIdAndDelete(existing._id);
+        await LaundrySlot.deleteOne({ _id: existing._id, ...(orgId ? { organizationId: orgId } : {}) });
         return res.status(200).json({ success: true, message: 'Maintenance block removed. Slot is now available.' });
       }
       return res.status(400).json({ success: false, message: 'Slot is currently booked by a student. Cancel booking first.' });
     }
 
+    const hostelDoc = orgId ? await Hostel.findOne({ organizationId: orgId, code: hostel }) : null;
+
     // Block slot for maintenance
     const blocked = await LaundrySlot.create({
+      organizationId: orgId,
+      hostelId: hostelDoc?._id || null,
       student: req.user._id, // admin placeholder
       hostel,
       date,
@@ -228,3 +278,4 @@ exports.adminBlockSlot = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+

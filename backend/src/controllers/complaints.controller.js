@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Complaint = require('../models/Complaint');
 const Student = require('../models/Student');
 
@@ -6,9 +7,14 @@ const getComplaints = async (req, res) => {
     const { hostel, status, page = 1, limit = 50 } = req.query;
     const query = {};
 
-    const orgId = req.tenant?.organizationId;
+    const orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
-    if (orgId && !isSuperAdmin) query.organizationId = orgId;
+    
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
+    }
 
     if (req.user.role === 'student') {
       query.userId = req.user._id;
@@ -54,10 +60,12 @@ const createComplaint = async (req, res) => {
       return res.status(400).json({ success: false, message: 'title and description are required' });
     }
     const student = await Student.findOne({ userId: req.user._id });
+    const orgId = req.organizationId || req.tenant?.organizationId || student?.organizationId || null;
+
     const complaint = await Complaint.create({
       userId: req.user._id,
       studentId: student?._id,
-      organizationId: req.tenant?.organizationId || student?.organizationId || null,
+      organizationId: orgId,
       hostelId: student?.hostelId || null,
       hostel: student?.hostel || 'Q2',
       title,
@@ -76,9 +84,14 @@ const updateComplaint = async (req, res) => {
     if (status) updateData.status = status;
     if (adminReply !== undefined) updateData.adminReply = adminReply;
 
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     const complaintQuery = { _id: req.params.id };
-    if (req.tenant?.organizationId && !req.tenant.isSuperAdmin) {
-      complaintQuery.organizationId = req.tenant.organizationId;
+    if (!isSuperAdmin) {
+      complaintQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      complaintQuery.organizationId = orgId;
     }
 
     const complaint = await Complaint.findOneAndUpdate(
@@ -94,3 +107,4 @@ const updateComplaint = async (req, res) => {
 };
 
 module.exports = { getComplaints, createComplaint, updateComplaint };
+

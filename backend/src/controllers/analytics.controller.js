@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const Room = require('../models/Room');
@@ -9,6 +10,21 @@ const { getStats } = require('../middleware/requestLogger.middleware');
 
 const getAnalytics = async (req, res) => {
   try {
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    const orgFilter = {};
+    const userFilter = {};
+
+    // Enforce Tenant Scoping: Ordinary admins only see their own organization's metrics
+    if (!isSuperAdmin) {
+      orgFilter.organizationId = orgId || new mongoose.Types.ObjectId();
+      userFilter.activeOrganizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      orgFilter.organizationId = orgId;
+      userFilter.activeOrganizationId = orgId;
+    }
+
     const [
       totalUsers,
       totalStudents,
@@ -18,22 +34,25 @@ const getAnalytics = async (req, res) => {
       totalSuggestions,
       totalMessRequests
     ] = await Promise.all([
-      User.countDocuments(),
-      Student.countDocuments(),
-      Room.countDocuments(),
-      Fee.countDocuments(),
-      Complaint.countDocuments(),
-      Suggestion.countDocuments(),
-      MessRequest.countDocuments()
+      User.countDocuments(userFilter),
+      Student.countDocuments(orgFilter),
+      Room.countDocuments(orgFilter),
+      Fee.countDocuments(orgFilter),
+      Complaint.countDocuments(orgFilter),
+      Suggestion.countDocuments(orgFilter),
+      MessRequest.countDocuments(orgFilter)
     ]);
 
     // Calculate active sessions (proxy based on users with refreshTokens)
-    const activeSessions = await User.countDocuments({ refreshTokens: { $exists: true, $not: { $size: 0 } } });
+    const activeSessions = await User.countDocuments({
+      ...userFilter,
+      refreshTokens: { $exists: true, $not: { $size: 0 } }
+    });
 
-    // Login Activity (simulated from user creation/login for now, could be improved if we had a LoginHistory model)
+    // Login Activity (simulated from user creation/login for this tenant)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const recentLogins = await User.aggregate([
-      { $match: { updatedAt: { $gte: thirtyDaysAgo } } },
+      { $match: { ...userFilter, updatedAt: { $gte: thirtyDaysAgo } } },
       { 
         $group: { 
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$updatedAt" } }, 
@@ -42,6 +61,7 @@ const getAnalytics = async (req, res) => {
       },
       { $sort: { _id: 1 } }
     ]);
+
 
     // Memory Usage
     const memory = process.memoryUsage();

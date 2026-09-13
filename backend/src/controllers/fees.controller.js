@@ -37,9 +37,14 @@ const getFees = async (req, res) => {
     const { studentId, hostel, month, status } = req.query;
     const query = {};
 
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     // Enforce Tenant Scoping
-    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-      query.organizationId = req.tenant.organizationId;
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
     }
 
     if (req.user.role === 'student') {
@@ -50,7 +55,7 @@ const getFees = async (req, res) => {
       if (studentId) query.studentId = studentId;
       if (hostel && hostel !== 'All') {
         query.hostel = hostel;
-      } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !req.tenant.isSuperAdmin) {
+      } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !isSuperAdmin) {
         query.hostel = { $in: req.tenant.hostelAccess };
       }
     }
@@ -77,15 +82,34 @@ const createFee = async (req, res) => {
       return res.status(400).json({ success: false, message: 'studentId, month, amount are required' });
     }
 
-    const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    if (!isSuperAdmin && !orgId) {
+      return res.status(403).json({ success: false, message: 'Organization tenant context required' });
+    }
+
+    // Verify student belongs to this tenant organization
+    const studentQuery = { _id: studentId };
+    if (!isSuperAdmin) {
+      studentQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      studentQuery.organizationId = orgId;
+    }
+
+    const student = await Student.findOne(studentQuery);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found in your organization' });
+    }
+
     const Hostel = require('../models/Hostel');
-    const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel });
+    const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel || student.hostel });
 
     const fee = await Fee.create({
       studentId,
       organizationId: orgId || null,
-      hostelId: hostelDoc?._id || null,
-      hostel,
+      hostelId: student.hostelId || hostelDoc?._id || null,
+      hostel: hostel || student.hostel || 'Q2',
       month,
       amount,
       discount,
@@ -109,9 +133,14 @@ const createFee = async (req, res) => {
 const updateFee = async (req, res) => {
   try {
     const { paidAmount, status, paymentMode, receiptNo, paidDate, discount, lateFee, notes, amount } = req.body;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     const feeQuery = { _id: req.params.id };
-    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-      feeQuery.organizationId = req.tenant.organizationId;
+    if (!isSuperAdmin) {
+      feeQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      feeQuery.organizationId = orgId;
     }
 
     const fee = await Fee.findOneAndUpdate(
@@ -120,7 +149,7 @@ const updateFee = async (req, res) => {
       { new: true, runValidators: true }
     ).populate('studentId', 'name username hostel userId');
 
-    if (!fee) return res.status(404).json({ success: false, message: 'Fee not found' });
+    if (!fee) return res.status(404).json({ success: false, message: 'Fee not found in your organization' });
 
     // If marked as paid, notify student
     if (status === 'paid' && fee.studentId) {
@@ -140,6 +169,7 @@ const updateFee = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 // @desc    Generate monthly fees for all active students
 // @route   POST /api/fees/generate-monthly
@@ -265,7 +295,14 @@ const collectPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    if (!isSuperAdmin && !orgId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({ success: false, message: 'Organization tenant context required' });
+    }
 
     // Idempotency check: prevent duplicate financial charges on network retry
     if (idempotencyKey) {
@@ -305,7 +342,9 @@ const collectPayment = async (req, res) => {
 
     // Verify student belongs to this tenant
     const studentQuery = { _id: studentId };
-    if (orgId && !req.tenant?.isSuperAdmin) {
+    if (!isSuperAdmin) {
+      studentQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
       studentQuery.organizationId = orgId;
     }
 
@@ -316,6 +355,7 @@ const collectPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Student not found in this organization' });
     }
     const actualHostel = student.hostel || hostel;
+
 
     // 1. Ensure a monthly fees row exists
     const feeFilter = { studentId, month, hostel: actualHostel };

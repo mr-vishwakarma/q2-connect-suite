@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { expenseService } = require('../services/expense.service');
 const { logAuditAction } = require('../middleware/audit.middleware');
 
@@ -5,8 +6,15 @@ const expensesController = {
   async getExpenses(req, res) {
     try {
       const { category, month, hostel } = req.query;
+      const orgId = req.organizationId || req.tenant?.organizationId;
+      const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+      if (!isSuperAdmin && !orgId) {
+        return res.status(403).json({ success: false, message: 'Organization context is required' });
+      }
+
       const expenses = await expenseService.getExpenses({
-        organizationId: req.tenant?.organizationId,
+        organizationId: isSuperAdmin ? orgId : (orgId || new mongoose.Types.ObjectId()),
         hostelId: req.tenant?.hostelId || hostel,
         category,
         month,
@@ -19,10 +27,17 @@ const expensesController = {
 
   async createExpense(req, res) {
     try {
+      const orgId = req.organizationId || req.tenant?.organizationId;
+      const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+      if (!isSuperAdmin && !orgId) {
+        return res.status(403).json({ success: false, message: 'Organization context is required' });
+      }
+
       const expense = await expenseService.createExpense(
         req.body,
         req.user._id,
-        req.tenant?.organizationId,
+        orgId,
         req.tenant?.hostelId
       );
 
@@ -42,7 +57,18 @@ const expensesController = {
 
   async deleteExpense(req, res) {
     try {
-      await expenseService.deleteExpense(req.params.id, req.tenant?.organizationId);
+      const orgId = req.organizationId || req.tenant?.organizationId;
+      const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+      if (!isSuperAdmin && !orgId) {
+        return res.status(403).json({ success: false, message: 'Organization context is required' });
+      }
+
+      await expenseService.deleteExpense(
+        req.params.id,
+        isSuperAdmin ? orgId : (orgId || new mongoose.Types.ObjectId())
+      );
+
       await logAuditAction({
         req,
         action: 'DELETE_EXPENSE',
@@ -51,9 +77,10 @@ const expensesController = {
       });
       return res.status(200).json({ success: true, message: 'Expense deleted' });
     } catch (error) {
-      return res.status(400).json({ success: false, message: error.message });
+      return res.status(404).json({ success: false, message: error.message });
     }
   },
 };
 
 module.exports = expensesController;
+

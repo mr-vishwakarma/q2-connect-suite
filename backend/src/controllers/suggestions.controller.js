@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Suggestion = require('../models/Suggestion');
 const Student = require('../models/Student');
 
@@ -6,9 +7,14 @@ const getSuggestions = async (req, res) => {
     const { hostel, status, page = 1, limit = 50 } = req.query;
     const query = {};
 
-    const orgId = req.tenant?.organizationId;
+    const orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
-    if (orgId && !isSuperAdmin) query.organizationId = orgId;
+
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
+    }
 
     if (req.user.role === 'student') {
       query.userId = req.user._id;
@@ -54,10 +60,12 @@ const createSuggestion = async (req, res) => {
       return res.status(400).json({ success: false, message: 'title and description are required' });
     }
     const student = await Student.findOne({ userId: req.user._id });
+    const orgId = req.organizationId || req.tenant?.organizationId || student?.organizationId || null;
+
     const suggestion = await Suggestion.create({
       userId: req.user._id,
       studentId: student?._id,
-      organizationId: req.tenant?.organizationId || student?.organizationId || null,
+      organizationId: orgId,
       hostelId: student?.hostelId || null,
       hostel: student?.hostel || 'Q2',
       title,
@@ -76,9 +84,14 @@ const updateSuggestion = async (req, res) => {
     if (status) updateData.status = status;
     if (adminReply !== undefined) updateData.adminReply = adminReply;
 
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     const suggestionQuery = { _id: req.params.id };
-    if (req.tenant?.organizationId && !req.tenant.isSuperAdmin) {
-      suggestionQuery.organizationId = req.tenant.organizationId;
+    if (!isSuperAdmin) {
+      suggestionQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      suggestionQuery.organizationId = orgId;
     }
 
     const suggestion = await Suggestion.findOneAndUpdate(
@@ -86,7 +99,7 @@ const updateSuggestion = async (req, res) => {
       updateData,
       { new: true, runValidators: true }
     );
-    if (!suggestion) return res.status(404).json({ success: false, message: 'Suggestion not found' });
+    if (!suggestion) return res.status(404).json({ success: false, message: 'Suggestion not found in your organization' });
     return res.status(200).json({ success: true, data: suggestion });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -94,3 +107,4 @@ const updateSuggestion = async (req, res) => {
 };
 
 module.exports = { getSuggestions, createSuggestion, updateSuggestion };
+

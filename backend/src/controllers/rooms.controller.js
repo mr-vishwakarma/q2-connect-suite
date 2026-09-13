@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Room = require('../models/Room');
 const Hostel = require('../models/Hostel');
 
@@ -6,19 +7,20 @@ const getAllRooms = async (req, res) => {
     const { hostel, status, page = 1, limit = 50 } = req.query;
     const query = {};
 
-    // Enforce Tenant Scoping with fallback for legacy un-scoped rooms
-    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-      query.$or = [
-        { organizationId: req.tenant.organizationId },
-        { organizationId: null },
-        { organizationId: { $exists: false } }
-      ];
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    // Strict Tenant Scoping: Unassigned/foreign tenant rooms are never exposed
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
     }
 
     if (hostel && hostel !== 'All') {
       const cleanHostel = hostel.trim();
       query.hostel = { $regex: new RegExp(`^${cleanHostel.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i') };
-    } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !req.tenant.isSuperAdmin) {
+    } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !isSuperAdmin) {
       query.hostel = { $in: req.tenant.hostelAccess.map(h => new RegExp(`^${h.trim().replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}$`, 'i')) };
     }
 
@@ -53,6 +55,26 @@ const getAllRooms = async (req, res) => {
   }
 };
 
+const getRoomById = async (req, res) => {
+  try {
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+    const query = { _id: req.params.id };
+
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
+    }
+
+    const room = await Room.findOne(query);
+    if (!room) return res.status(404).json({ success: false, message: 'Room not found' });
+    return res.status(200).json({ success: true, data: room });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 const createRoom = async (req, res) => {
   try {
     const { roomNumber, hostel, capacity = 2 } = req.body;
@@ -60,8 +82,20 @@ const createRoom = async (req, res) => {
       return res.status(400).json({ success: false, message: 'roomNumber and hostel are required' });
     }
 
-    const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
-    const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel });
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    if (!isSuperAdmin && !orgId) {
+      return res.status(403).json({
+        success: false,
+        code: 'TENANT_CONTEXT_REQUIRED',
+        message: 'Organization tenant context is required to create a room.',
+      });
+    }
+
+    const hostelQuery = { code: hostel };
+    if (orgId) hostelQuery.organizationId = orgId;
+    const hostelDoc = await Hostel.findOne(hostelQuery);
 
     const room = await Room.create({
       roomNumber,
@@ -82,9 +116,14 @@ const createRoom = async (req, res) => {
 const updateRoom = async (req, res) => {
   try {
     const { capacity, occupiedCount } = req.body;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     const roomQuery = { _id: req.params.id };
-    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-      roomQuery.organizationId = req.tenant.organizationId;
+    if (!isSuperAdmin) {
+      roomQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      roomQuery.organizationId = orgId;
     }
 
     const room = await Room.findOne(roomQuery);
@@ -119,9 +158,14 @@ const updateRoom = async (req, res) => {
 
 const deleteRoom = async (req, res) => {
   try {
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
     const roomQuery = { _id: req.params.id };
-    if (req.tenant && req.tenant.organizationId && !req.tenant.isSuperAdmin) {
-      roomQuery.organizationId = req.tenant.organizationId;
+    if (!isSuperAdmin) {
+      roomQuery.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      roomQuery.organizationId = orgId;
     }
 
     const room = await Room.findOne(roomQuery);
@@ -141,4 +185,5 @@ const deleteRoom = async (req, res) => {
   }
 };
 
-module.exports = { getAllRooms, createRoom, updateRoom, deleteRoom };
+module.exports = { getAllRooms, getRoomById, createRoom, updateRoom, deleteRoom };
+

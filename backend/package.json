@@ -10,7 +10,10 @@
     "build": "echo 'No build step required'",
     "db:reset": "node src/scripts/resetDatabase.js",
     "seed:saas": "node src/scripts/seedSaaSEnvironment.js",
-    "seed:superadmin": "node src/scripts/seedSuperAdmin.js"
+    "seed:superadmin": "node src/scripts/seedSuperAdmin.js",
+    "test:p0": "node src/scripts/test_p0_security.js",
+    "test:tenant": "node src/scripts/test_phase_b_multitenant.js",
+    "test": "node src/scripts/test_p0_security.js"
   },
   "dependencies": {
     "@imagekit/nodejs": "^7.10.0",

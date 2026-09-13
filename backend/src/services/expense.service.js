@@ -50,10 +50,13 @@ const expenseService = {
       }
     }
 
+    const cleanData = { ...data };
+    delete cleanData.organizationId; // Prevent untrusted body override
+
     const expense = await Expense.create({
-      ...data,
+      ...cleanData,
       createdBy: userId,
-      organizationId: organizationId || data.organizationId,
+      organizationId: organizationId,
       hostelId: resolvedHostelId,
       hostel: hostelCode !== 'All' ? hostelCode : null,
     });
@@ -64,9 +67,10 @@ const expenseService = {
     const filter = { _id: id };
     if (organizationId) filter.organizationId = organizationId;
     const expense = await Expense.findOneAndDelete(filter);
-    if (!expense) throw new Error('Expense not found');
+    if (!expense) throw new Error('Expense not found in this organization');
     return expense;
   },
 };
 
 module.exports = { expenseService };
+
