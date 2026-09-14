@@ -16,6 +16,10 @@ const Student = require('../models/Student');
 const Invoice = require('../models/Invoice');
 const InvoiceSequence = require('../models/InvoiceSequence');
 const Notification = require('../models/Notification');
+const LedgerEntry = require('../models/LedgerEntry');
+const PaymentAttempt = require('../models/PaymentAttempt');
+const Refund = require('../models/Refund');
+const AuditLog = require('../models/AuditLog');
 const {
   createOrder,
   verifyPaymentSignature,
@@ -138,6 +142,15 @@ const createPaymentOrder = async (req, res) => {
       receiptNo: receiptId,
       notes: `Online Fee Payment for ${fee.month}`,
     });
+
+    // Record initial PaymentAttempt
+    await PaymentAttempt.create({
+      organizationId: payment.organizationId,
+      paymentId: payment._id,
+      providerOrderId: razorpayOrder.id,
+      status: 'INITIATED',
+      metadata: { feeId: fee._id, amountPaise },
+    }).catch((e) => console.warn('[Payment:CreateOrder] PaymentAttempt notice:', e.message));
 
     return res.status(201).json({
       success: true,
@@ -268,6 +281,69 @@ const verifyPayment = async (req, res) => {
 
     payment.invoiceId = invoice[0]._id;
     await payment.save({ session });
+
+    // 8b. Create Immutable Financial Ledger Entry (CREDIT from ONLINE_PAYMENT)
+    await LedgerEntry.create(
+      [
+        {
+          organizationId: payment.organizationId,
+          hostelId: payment.hostelId || null,
+          studentId: payment.studentId,
+          feeId: fee._id,
+          paymentId: payment._id,
+          invoiceId: invoice[0]._id,
+          amountPaise: payment.amountPaise,
+          amountRupees: payment.amountRupees,
+          currency: payment.currency || 'INR',
+          type: 'CREDIT',
+          source: 'ONLINE_PAYMENT',
+          externalReference: razorpay_payment_id,
+          description: `Razorpay Online Payment for ${fee.month}`,
+          metadata: { orderId: razorpay_order_id, receiptNo: invoiceNumber },
+        },
+      ],
+      { session }
+    );
+
+    // 8c. Record PaymentAttempt transition to CAPTURED
+    await PaymentAttempt.create(
+      [
+        {
+          organizationId: payment.organizationId,
+          paymentId: payment._id,
+          providerOrderId: razorpay_order_id,
+          providerPaymentId: razorpay_payment_id,
+          status: 'CAPTURED',
+          metadata: { invoiceNumber },
+        },
+      ],
+      { session }
+    );
+
+    // 8d. Financial Audit Trail
+    if (req.user) {
+      await AuditLog.create(
+        [
+          {
+            organizationId: payment.organizationId,
+            hostelId: payment.hostelId || null,
+            actorId: req.user._id,
+            actorName: req.user.name,
+            actorEmail: req.user.email,
+            action: 'PAYMENT_CAPTURED',
+            entityType: 'Payment',
+            entityId: payment._id.toString(),
+            newValue: {
+              amountRupees: payment.amountRupees,
+              paymentId: razorpay_payment_id,
+              orderId: razorpay_order_id,
+              invoiceNumber,
+            },
+          },
+        ],
+        { session }
+      );
+    }
 
     // 9. Update Fee Balance and Status Monotonically
     fee.paidAmount = (fee.paidAmount || 0) + payment.amountRupees;
@@ -437,10 +513,189 @@ const getPayments = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Issue a full or partial refund for a captured payment
+ * @route   POST /api/payments/:id/refund
+ * @access  Private (Admin only)
+ */
+const refundPayment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { id } = req.params;
+    const { amountRupees, reason } = req.body;
+
+    const organizationId = resolveTenantId(req);
+    const query = { _id: id };
+    if (!req.tenant?.isSuperAdmin && organizationId) {
+      query.organizationId = organizationId;
+    }
+
+    const payment = await Payment.findOne(query).session(session);
+    if (!payment) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ success: false, message: 'Payment record not found in your organization' });
+    }
+
+    if (payment.status !== 'CAPTURED' && payment.status !== 'AUTHORIZED') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: `Only CAPTURED or AUTHORIZED payments can be refunded (current status: ${payment.status})`,
+      });
+    }
+
+    const currentRefundedPaise = payment.refundedAmountPaise || 0;
+    const maxRefundablePaise = payment.amountPaise - currentRefundedPaise;
+
+    if (maxRefundablePaise <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: 'Payment has already been fully refunded' });
+    }
+
+    const requestedPaise = amountRupees ? Math.round(Number(amountRupees) * 100) : maxRefundablePaise;
+
+    if (requestedPaise <= 0 || requestedPaise > maxRefundablePaise) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: `Invalid refund amount. Maximum refundable balance is ₹${(maxRefundablePaise / 100).toFixed(2)}`,
+      });
+    }
+
+    const refundRupees = requestedPaise / 100;
+    const providerRefundId = `rfnd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // 1. Create Refund Record
+    const refundDoc = await Refund.create(
+      [
+        {
+          organizationId: payment.organizationId,
+          hostelId: payment.hostelId || null,
+          paymentId: payment._id,
+          feeId: payment.feeId,
+          invoiceId: payment.invoiceId,
+          amountPaise: requestedPaise,
+          amountRupees: refundRupees,
+          currency: payment.currency || 'INR',
+          providerRefundId,
+          status: 'REFUNDED',
+          reason: reason || 'Administrative refund',
+          adminId: req.user._id,
+          adminName: req.user.name,
+          processedAt: new Date(),
+        },
+      ],
+      { session }
+    );
+
+    // 2. Update Payment State
+    payment.refundedAmountPaise = currentRefundedPaise + requestedPaise;
+    payment.refundedAmountRupees = (payment.refundedAmountRupees || 0) + refundRupees;
+    payment.refundId = providerRefundId;
+    payment.refundedAt = new Date();
+
+    if (payment.refundedAmountPaise >= payment.amountPaise) {
+      payment.status = 'REFUNDED';
+    }
+    await payment.save({ session });
+
+    // 3. Update Fee Balance and Status
+    const fee = await Fee.findById(payment.feeId).session(session);
+    if (fee) {
+      fee.paidAmount = Math.max(0, (fee.paidAmount || 0) - refundRupees);
+      const totalDue = (fee.amount || 0) + (fee.lateFee || 0) - (fee.discount || 0);
+      if (fee.paidAmount >= totalDue) {
+        fee.status = 'paid';
+      } else if (fee.paidAmount > 0) {
+        fee.status = 'partial';
+      } else {
+        fee.status = 'unpaid';
+      }
+      await fee.save({ session });
+    }
+
+    // 4. Update Invoice Status if fully refunded
+    if (payment.status === 'REFUNDED' && payment.invoiceId) {
+      await Invoice.findByIdAndUpdate(payment.invoiceId, { status: 'REFUNDED' }, { session });
+    }
+
+    // 5. Create Reversing Ledger Entry (DEBIT for refund)
+    await LedgerEntry.create(
+      [
+        {
+          organizationId: payment.organizationId,
+          hostelId: payment.hostelId || null,
+          studentId: payment.studentId,
+          feeId: payment.feeId,
+          paymentId: payment._id,
+          invoiceId: payment.invoiceId,
+          amountPaise: requestedPaise,
+          amountRupees: refundRupees,
+          currency: payment.currency || 'INR',
+          type: 'DEBIT',
+          source: 'REFUND',
+          externalReference: providerRefundId,
+          description: `Refund for payment ${payment.orderId}: ${reason || 'Administrative'}`,
+          metadata: { refundId: providerRefundId, adminId: req.user._id },
+        },
+      ],
+      { session }
+    );
+
+    // 6. Financial Audit Trail
+    await AuditLog.create(
+      [
+        {
+          organizationId: payment.organizationId,
+          hostelId: payment.hostelId || null,
+          actorId: req.user._id,
+          actorName: req.user.name,
+          actorEmail: req.user.email,
+          action: 'PAYMENT_REFUNDED',
+          entityType: 'Payment',
+          entityId: payment._id.toString(),
+          newValue: {
+            refundId: providerRefundId,
+            refundRupees,
+            paymentStatus: payment.status,
+            reason,
+          },
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Refund processed successfully and ledger updated',
+      data: {
+        refundId: providerRefundId,
+        refundedAmountRupees: refundRupees,
+        paymentStatus: payment.status,
+      },
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error('[Payment:Refund] Error processing refund:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createPaymentOrder,
   verifyPayment,
   getPaymentById,
   getMyPayments,
   getPayments,
+  refundPayment,
 };

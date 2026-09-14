@@ -14,7 +14,7 @@ const feeSchema = new mongoose.Schema(
     status: { type: String, enum: ['paid', 'unpaid', 'partial'], default: 'unpaid' },
     dueDate: { type: Date },
     paidDate: { type: Date },
-    paymentMode: { type: String, enum: ['cash', 'upi', 'bank'], default: null },
+    paymentMode: { type: String, enum: ['cash', 'upi', 'bank', 'online'], default: null },
     receiptNo: { type: String, trim: true },
     notes: { type: String },
     lastReminderSentAt: { type: Date, default: null },

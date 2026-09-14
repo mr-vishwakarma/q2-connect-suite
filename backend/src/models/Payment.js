@@ -110,6 +110,14 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    refundedAmountPaise: {
+      type: Number,
+      default: 0,
+    },
+    refundedAmountRupees: {
+      type: Number,
+      default: 0,
+    },
     idempotencyKey: {
       type: String,
       sparse: true,

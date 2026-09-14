@@ -16,6 +16,10 @@ const Student = require('../models/Student');
 const Invoice = require('../models/Invoice');
 const InvoiceSequence = require('../models/InvoiceSequence');
 const Notification = require('../models/Notification');
+const LedgerEntry = require('../models/LedgerEntry');
+const PaymentAttempt = require('../models/PaymentAttempt');
+const Refund = require('../models/Refund');
+const AuditLog = require('../models/AuditLog');
 const { verifyWebhookSignature } = require('../config/razorpay');
 
 /**
@@ -179,6 +183,44 @@ async function processPaymentCapturedEvent(orderId, paymentId, paymentEntity) {
 
       payment.invoiceId = invoice[0]._id;
 
+      // Create Immutable Ledger Entry
+      await LedgerEntry.create(
+        [
+          {
+            organizationId: payment.organizationId,
+            hostelId: payment.hostelId || null,
+            studentId: payment.studentId,
+            feeId: fee._id,
+            paymentId: payment._id,
+            invoiceId: invoice[0]._id,
+            amountPaise: payment.amountPaise,
+            amountRupees: payment.amountRupees,
+            currency: payment.currency || 'INR',
+            type: 'CREDIT',
+            source: 'ONLINE_PAYMENT',
+            externalReference: paymentId,
+            description: `Razorpay Webhook Captured for ${fee.month}`,
+            metadata: { orderId, receiptNo: invoiceNumber },
+          },
+        ],
+        { session }
+      );
+
+      // Record PaymentAttempt
+      await PaymentAttempt.create(
+        [
+          {
+            organizationId: payment.organizationId,
+            paymentId: payment._id,
+            providerOrderId: orderId,
+            providerPaymentId: paymentId,
+            status: 'CAPTURED',
+            metadata: { invoiceNumber, viaWebhook: true },
+          },
+        ],
+        { session }
+      );
+
       fee.paidAmount = (fee.paidAmount || 0) + payment.amountRupees;
       const totalDue = (fee.amount || 0) + (fee.lateFee || 0) - (fee.discount || 0);
       fee.status = fee.paidAmount >= totalDue ? 'paid' : 'partial';
@@ -224,6 +266,15 @@ async function processPaymentFailedEvent(orderId, paymentEntity) {
   payment.failureCode = paymentEntity?.error_code || 'PAYMENT_FAILED';
   payment.failureReason = paymentEntity?.error_description || 'Payment failed at provider';
   await payment.save();
+
+  await PaymentAttempt.create({
+    organizationId: payment.organizationId,
+    paymentId: payment._id,
+    providerOrderId: orderId,
+    status: 'FAILED',
+    failureCode: payment.failureCode,
+    failureReason: payment.failureReason,
+  }).catch(() => {});
 }
 
 /**
@@ -236,11 +287,32 @@ async function processRefundEvent(paymentId, refundEntity) {
   payment.status = 'REFUNDED';
   payment.refundedAt = new Date();
   payment.refundId = refundEntity?.id;
+  const refundPaise = refundEntity?.amount || payment.amountPaise;
+  const refundRupees = refundPaise / 100;
+  payment.refundedAmountPaise = (payment.refundedAmountPaise || 0) + refundPaise;
+  payment.refundedAmountRupees = (payment.refundedAmountRupees || 0) + refundRupees;
   await payment.save();
 
   if (payment.invoiceId) {
     await Invoice.findByIdAndUpdate(payment.invoiceId, { status: 'REFUNDED' });
   }
+
+  // Create reversing Ledger Entry
+  await LedgerEntry.create({
+    organizationId: payment.organizationId,
+    hostelId: payment.hostelId || null,
+    studentId: payment.studentId,
+    feeId: payment.feeId,
+    paymentId: payment._id,
+    invoiceId: payment.invoiceId,
+    amountPaise: refundPaise,
+    amountRupees: refundRupees,
+    currency: payment.currency || 'INR',
+    type: 'DEBIT',
+    source: 'REFUND',
+    externalReference: refundEntity?.id,
+    description: `Razorpay Webhook Refund Processed (${refundEntity?.id})`,
+  }).catch((e) => console.warn('[Webhook:Refund] LedgerEntry notice:', e.message));
 }
 
 module.exports = {

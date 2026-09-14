@@ -16,6 +16,7 @@ import {
   Shirt,
   Settings,
   Receipt,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
@@ -28,6 +29,7 @@ export const ADMIN_NAV_LINKS = [
   { to: '/admin/register-student', icon: UserPlus, label: 'Register Student', featureKey: 'student_management' },
   { to: '/admin/students', icon: Users, label: 'All Students', featureKey: 'student_management' },
   { to: '/admin/fees', icon: DollarSign, label: 'Fee Management', featureKey: 'fee_management' },
+  { to: '/admin/payments', icon: CreditCard, label: 'Payments', featureKey: 'fee_management' },
   { to: '/admin/rooms', icon: Building2, label: 'Room Management', featureKey: 'room_management' },
   { to: '/admin/attendance', icon: UserCheck, label: 'Attendance & Passes', featureKey: 'attendance' },
   { to: '/admin/expenses', icon: Receipt, label: 'Expense Tracker', featureKey: 'expense_management' },

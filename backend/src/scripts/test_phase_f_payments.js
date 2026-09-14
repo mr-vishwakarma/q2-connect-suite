@@ -39,6 +39,9 @@ const Payment = require('../models/Payment');
 const WebhookEvent = require('../models/WebhookEvent');
 const Invoice = require('../models/Invoice');
 const InvoiceSequence = require('../models/InvoiceSequence');
+const LedgerEntry = require('../models/LedgerEntry');
+const PaymentAttempt = require('../models/PaymentAttempt');
+const Refund = require('../models/Refund');
 
 const {
   createPaymentOrder,
@@ -46,6 +49,7 @@ const {
   getPaymentById,
   getMyPayments,
   getPayments,
+  refundPayment,
 } = require('../controllers/payment.controller');
 
 const { handleRazorpayWebhook } = require('../controllers/webhook.controller');
@@ -768,6 +772,105 @@ async function runPhaseFTestSuite() {
       assert(res.getStatusCode() === 200, 'Super Admin cross-tenant payments query returned 200 OK');
     }
 
+    console.log('\n--- TEST GROUP 11: Immutable Financial Ledger & Payment Attempt Tracking ---');
+
+    // Test 11.1: Verified payment creates durable LedgerEntry record with CREDIT
+    {
+      const creditLedger = await LedgerEntry.findOne({
+        organizationId: orgA._id,
+        type: 'CREDIT',
+        source: 'ONLINE_PAYMENT',
+      });
+      assert(Boolean(creditLedger), 'Immutable LedgerEntry created for verified payment');
+      assert(creditLedger.type === 'CREDIT', 'LedgerEntry type is CREDIT');
+      assert(creditLedger.source === 'ONLINE_PAYMENT', 'LedgerEntry source is ONLINE_PAYMENT');
+      assert(creditLedger.amountPaise === creditLedger.amountRupees * 100, 'LedgerEntry integer minor-unit amount strictly matches rupees * 100');
+
+      const initiatedAttempt = await PaymentAttempt.findOne({
+        organizationId: orgA._id,
+        status: 'INITIATED',
+      });
+      assert(Boolean(initiatedAttempt), 'PaymentAttempt record tracked INITIATED checkout launch');
+
+      const capturedAttempt = await PaymentAttempt.findOne({
+        organizationId: orgA._id,
+        status: 'CAPTURED',
+      });
+      assert(Boolean(capturedAttempt), 'PaymentAttempt record tracked CAPTURED transaction state');
+    }
+
+    console.log('\n--- TEST GROUP 12: Administrative Refund Execution & Reversing Ledger Entries ---');
+
+    // Test 12.1: Admin issuing refund updates payment, creates reversing ledger entry (DEBIT), and adjusts fee balance
+    {
+      const refundFee = await Fee.create({
+        studentId: studentA1._id,
+        organizationId: orgA._id,
+        hostelId: hostelA._id,
+        month: `2026-rfnd-${Date.now()}`,
+        amount: 5000,
+        paidAmount: 5000,
+        status: 'paid',
+      });
+
+      const refundTargetPayment = await Payment.create({
+        organizationId: orgA._id,
+        hostelId: hostelA._id,
+        studentId: studentA1._id,
+        feeId: refundFee._id,
+        amountPaise: 500000,
+        amountRupees: 5000,
+        orderId: `order_rfnd_target_${Date.now()}`,
+        status: 'CAPTURED',
+        capturedAt: new Date(),
+      });
+      assert(Boolean(refundTargetPayment), 'Captured payment located for administrative refund');
+
+      const initialFee = await Fee.findById(refundTargetPayment.feeId);
+      const initialFeePaid = initialFee.paidAmount;
+
+      const { req, res } = createMockReqRes({
+        params: { id: refundTargetPayment._id.toString() },
+        body: { amountRupees: 1000, reason: 'Early vacation credit' },
+        user: { _id: new mongoose.Types.ObjectId(), name: 'Hostel Admin', email: 'admin@q2test.com' },
+        tenant: { organizationId: orgA._id, isSuperAdmin: false },
+      });
+
+      await refundPayment(req, res);
+      assert(res.getStatusCode() === 200, 'Administrative refund returned 200 OK');
+      assert(Boolean(res.getData()?.data?.refundId), 'Provider refund ID issued');
+
+      const updatedPayment = await Payment.findById(refundTargetPayment._id);
+      assert(updatedPayment.refundedAmountRupees >= 1000, 'Payment refundedAmountRupees updated');
+
+      const updatedFee = await Fee.findById(refundTargetPayment.feeId);
+      assert(updatedFee.paidAmount === initialFeePaid - 1000, 'Fee paidAmount correctly reduced by refund amount');
+
+      const reversingLedger = await LedgerEntry.findOne({
+        paymentId: refundTargetPayment._id,
+        type: 'DEBIT',
+        source: 'REFUND',
+      });
+      assert(Boolean(reversingLedger), 'Reversing LedgerEntry (DEBIT/REFUND) created immutably');
+      assert(reversingLedger.amountRupees === 1000, 'Reversing ledger amount strictly matches ₹1000');
+    }
+
+    // Test 12.2: Cross-tenant refund probe rejected with 404
+    {
+      const orgAPayment = await Payment.findOne({ organizationId: orgA._id, status: 'CAPTURED' });
+      if (orgAPayment) {
+        const { req, res } = createMockReqRes({
+          params: { id: orgAPayment._id.toString() },
+          body: { amountRupees: 500, reason: 'Unauthorized probe' },
+          user: { _id: new mongoose.Types.ObjectId(), name: 'Org B Admin', email: 'adminb@q2test.com' },
+          tenant: { organizationId: orgB._id, isSuperAdmin: false }, // Org B attempting refund on Org A
+        });
+
+        await refundPayment(req, res);
+        assert(res.getStatusCode() === 404, 'Cross-tenant refund attempt rejected with 404 Not Found');
+      }
+    }
+
     // Teardown temporary test fixtures
     console.log('\n[Teardown] Cleaning temporary test fixtures...');
     await Organization.deleteMany({ _id: { $in: [orgA._id, orgB._id] } });
@@ -777,6 +880,9 @@ async function runPhaseFTestSuite() {
     await Fee.deleteMany({ studentId: { $in: [studentA1._id, studentA2._id] } });
     await Payment.deleteMany({ studentId: { $in: [studentA1._id, studentA2._id] } });
     await WebhookEvent.deleteMany({ provider: 'RAZORPAY' });
+    await LedgerEntry.deleteMany({ organizationId: { $in: [orgA._id, orgB._id] } });
+    await PaymentAttempt.deleteMany({ organizationId: { $in: [orgA._id, orgB._id] } });
+    await Refund.deleteMany({ organizationId: { $in: [orgA._id, orgB._id] } });
     console.log('📦 Cleaned up and disconnected cleanly from MongoDB.');
 
   } catch (err) {

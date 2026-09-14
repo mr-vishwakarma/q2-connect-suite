@@ -14,7 +14,7 @@ const feePaymentSchema = new mongoose.Schema(
     discount: { type: Number, default: 0 },
     lateFee: { type: Number, default: 0 },
     securityDeposit: { type: Number, default: 0 },
-    paymentMode: { type: String, enum: ['cash', 'upi', 'bank'], required: true },
+    paymentMode: { type: String, enum: ['cash', 'upi', 'bank', 'online'], required: true },
     paymentDate: { type: Date, default: Date.now },
     receiptNo: { type: String, required: true },
     receiptUrl: { type: String },

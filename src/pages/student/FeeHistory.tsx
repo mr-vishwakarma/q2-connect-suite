@@ -15,7 +15,8 @@ import { IndianRupee, Calendar, Check, AlertCircle, Download, Receipt, CreditCar
 import { format, parseISO } from 'date-fns';
 import { toast } from 'react-toastify';
 import { downloadReceipt, ReceiptData } from '@/lib/receiptPdf';
-import { openRazorpayCheckout } from '@/utils/razorpay';
+import { useRazorpayPayment } from '@/hooks/useRazorpayPayment';
+import { PaymentModal } from '@/components/payment/PaymentModal';
 
 interface Fee {
   id: string; month: string; amount: number; paid_date: string | null;
@@ -143,49 +144,26 @@ export default function FeeHistory() {
     downloadReceipt(d);
   };
 
-  const handlePayOnline = async (fee: Fee) => {
-    try {
-      setPayingFeeId(fee.id);
-      const orderRes = await api.post('/payments/create-order', { feeId: fee.id });
-      if (!orderRes.data?.success || !orderRes.data?.data) {
-        throw new Error(orderRes.data?.message || 'Failed to initialize payment order');
-      }
+  const {
+    state: paymentState,
+    activeContext,
+    verificationResult,
+    errorMessage,
+    initiatePayment,
+    proceedToCheckout,
+    resetPaymentState,
+  } = useRazorpayPayment(fetchAll);
 
-      const orderData = orderRes.data.data;
-
-      await openRazorpayCheckout(
-        {
-          orderId: orderData.orderId,
-          amountPaise: orderData.amountPaise,
-          currency: orderData.currency,
-          keyId: orderData.keyId,
-          studentName: student?.name,
-          description: `Hostel Fee for ${fee.month}`,
-        },
-        async (response) => {
-          try {
-            const verifyRes = await api.post('/payments/verify', response);
-            if (verifyRes.data?.success) {
-              toast.success(`Payment successful! Receipt: ${verifyRes.data.data?.invoiceNumber || 'Issued'}`);
-              await fetchAll();
-            } else {
-              toast.error(verifyRes.data?.message || 'Payment verification failed');
-            }
-          } catch (verifyErr: any) {
-            toast.error(verifyErr.response?.data?.message || 'Error verifying payment with server');
-          } finally {
-            setPayingFeeId(null);
-          }
-        },
-        (dismissErr) => {
-          setPayingFeeId(null);
-          console.log('[Razorpay] Checkout modal dismissed:', dismissErr?.message);
-        }
-      );
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || 'Payment failed to initiate');
-      setPayingFeeId(null);
-    }
+  const handleOpenPaymentModal = (fee: Fee, bal: number) => {
+    initiatePayment({
+      feeId: fee.id,
+      month: fee.month,
+      totalAmount: fee.amount + (fee.late_fee || 0) - (fee.discount || 0),
+      paidAmount: fee.paid_amount || 0,
+      outstandingAmount: bal,
+      studentName: student?.name,
+      studentEmail: user?.email,
+    });
   };
 
   if (authLoading || loading) {
@@ -235,13 +213,13 @@ export default function FeeHistory() {
                               <Button
                                 size="sm"
                                 className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-2.5 py-1 h-7"
-                                disabled={payingFeeId === f.id}
-                                onClick={() => handlePayOnline(f)}
+                                disabled={paymentState !== 'IDLE' && paymentState !== 'SUCCESS'}
+                                onClick={() => handleOpenPaymentModal(f, bal)}
                               >
-                                {payingFeeId === f.id ? (
+                                {paymentState === 'CREATING_ORDER' && activeContext?.feeId === f.id ? (
                                   <>
                                     <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                    Processing
+                                    Starting...
                                   </>
                                 ) : (
                                   <>
@@ -308,6 +286,16 @@ export default function FeeHistory() {
           </CardContent>
         </Card>
       </div>
+
+      <PaymentModal
+        state={paymentState}
+        context={activeContext}
+        verificationResult={verificationResult}
+        errorMessage={errorMessage}
+        onProceed={proceedToCheckout}
+        onClose={resetPaymentState}
+        onRetry={proceedToCheckout}
+      />
     </DashboardLayout>
   );
 }
