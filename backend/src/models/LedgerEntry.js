@@ -33,6 +33,11 @@ const ledgerEntrySchema = new mongoose.Schema(
       ref: 'Payment',
       index: true,
     },
+    subscriptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subscription',
+      index: true,
+    },
     invoiceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Invoice',
@@ -61,7 +66,7 @@ const ledgerEntrySchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ['ONLINE_PAYMENT', 'MANUAL_PAYMENT', 'REFUND', 'ADJUSTMENT', 'WAIVER', 'REVERSAL'],
+      enum: ['ONLINE_PAYMENT', 'MANUAL_PAYMENT', 'REFUND', 'ADJUSTMENT', 'WAIVER', 'REVERSAL', 'SAAS_SUBSCRIPTION'],
       required: true,
       index: true,
     },

@@ -24,6 +24,11 @@ const invoiceSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    subscriptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subscription',
+      index: true,
+    },
     feeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Fee',

@@ -1,21 +1,21 @@
 /**
- * Webhook Controller (Phase F)
+ * Webhook Controller (Phase F/G Reconciliation)
  * 
  * Handles incoming Razorpay webhooks:
  * - Validates HMAC-SHA256 signature against unmodified raw request body
  * - Enforces durable idempotency via WebhookEvent collection (x-razorpay-event-id)
  * - Safely handles out-of-order and duplicate webhook events
- * - Monotonically updates Payment, Fee, and Invoice records
+ * - Orchestrates Razorpay SaaS Subscription lifecycle (authenticated, activated, charged, halted, cancelled)
+ * - Preserves monotonic state updates & prevents duplicate invoices/ledger entries
  */
 
 const mongoose = require('mongoose');
 const WebhookEvent = require('../models/WebhookEvent');
+const Subscription = require('../models/Subscription');
+const Organization = require('../models/Organization');
 const Payment = require('../models/Payment');
-const Fee = require('../models/Fee');
-const Student = require('../models/Student');
 const Invoice = require('../models/Invoice');
 const InvoiceSequence = require('../models/InvoiceSequence');
-const Notification = require('../models/Notification');
 const LedgerEntry = require('../models/LedgerEntry');
 const PaymentAttempt = require('../models/PaymentAttempt');
 const Refund = require('../models/Refund');
@@ -86,10 +86,14 @@ const handleRazorpayWebhook = async (req, res) => {
       throw insertErr;
     }
 
-    // 4. Process Financial Events Monotonically
+    // 4. Process Financial & Subscription Events Monotonically
     const payload = req.body?.payload;
 
-    if (event === 'payment.captured' || event === 'order.paid') {
+    if (event && event.startsWith('subscription.')) {
+      const subscriptionEntity = payload?.subscription?.entity;
+      const paymentEntity = payload?.payment?.entity;
+      await processSubscriptionEvent(event, subscriptionEntity, paymentEntity);
+    } else if (event === 'payment.captured' || event === 'order.paid') {
       const paymentEntity = payload?.payment?.entity;
       const orderId = paymentEntity?.order_id || payload?.order?.entity?.id;
       const paymentId = paymentEntity?.id;
@@ -128,153 +132,198 @@ const handleRazorpayWebhook = async (req, res) => {
 };
 
 /**
- * Atomically handles payment captured event.
- * Idempotent: safe if verification endpoint already processed it.
+ * Handles all Razorpay Subscription lifecycle events.
  */
-async function processPaymentCapturedEvent(orderId, paymentId, paymentEntity) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+async function processSubscriptionEvent(event, subscriptionEntity, paymentEntity) {
+  const subscriptionId = subscriptionEntity?.id;
+  if (!subscriptionId) return;
 
-  try {
-    const payment = await Payment.findOne({ orderId }).session(session);
-    if (!payment) {
-      await session.abortTransaction();
-      session.endSession();
-      return;
-    }
+  const subscription = await Subscription.findOne({
+    razorpaySubscriptionId: subscriptionId,
+  }).populate('planId');
 
-    // If already CAPTURED, maintain monotonic state (no duplicate invoices or fee updates)
-    if (payment.status === 'CAPTURED') {
-      await session.commitTransaction();
-      session.endSession();
-      return;
-    }
+  if (!subscription) {
+    console.warn(`[Webhook:Subscription] Subscription ${subscriptionId} not found in database.`);
+    return;
+  }
 
-    payment.status = 'CAPTURED';
-    payment.paymentId = paymentId || payment.paymentId;
-    payment.capturedAt = new Date();
-    if (paymentEntity?.method) {
-      payment.paymentMethod = paymentEntity.method;
-    }
+  switch (event) {
+    case 'subscription.authenticated':
+      subscription.status = 'AUTHENTICATED';
+      await subscription.save();
+      break;
 
-    const fee = await Fee.findById(payment.feeId).session(session);
-    if (fee) {
-      const invoiceNumber = await InvoiceSequence.getNextInvoiceNumber(payment.organizationId);
-      payment.receiptNo = invoiceNumber;
+    case 'subscription.activated':
+      subscription.status = 'ACTIVE';
+      subscription.startedAt = subscription.startedAt || new Date();
+      await subscription.save();
+      await Organization.findByIdAndUpdate(subscription.organizationId, {
+        subscriptionId: subscription._id,
+        status: 'ACTIVE',
+      });
+      break;
 
-      const invoice = await Invoice.create(
-        [
-          {
-            organizationId: payment.organizationId,
-            hostelId: payment.hostelId || null,
-            studentId: payment.studentId,
+    case 'subscription.charged': {
+      subscription.status = 'ACTIVE';
+      subscription.paidCount = (subscription.paidCount || 0) + 1;
+      if (subscriptionEntity?.current_start) {
+        subscription.currentPeriodStart = new Date(subscriptionEntity.current_start * 1000);
+      }
+      if (subscriptionEntity?.current_end) {
+        subscription.currentPeriodEnd = new Date(subscriptionEntity.current_end * 1000);
+      }
+      if (subscriptionEntity?.charge_at) {
+        subscription.nextChargeAt = new Date(subscriptionEntity.charge_at * 1000);
+      }
+      await subscription.save();
+
+      // Record SaaS payment and sequential invoice if new payment captured
+      const paymentId = paymentEntity?.id;
+      if (paymentId) {
+        const existingPayment = await Payment.findOne({ paymentId });
+        if (!existingPayment) {
+          const amountPaise = paymentEntity.amount || subscription.amountPaise || 0;
+          const amountRupees = amountPaise / 100;
+
+          const payment = await Payment.create({
+            organizationId: subscription.organizationId,
+            billingDomain: 'SAAS',
+            subscriptionId: subscription._id,
+            planId: subscription.planId._id,
+            razorpaySubscriptionId: subscription.razorpaySubscriptionId,
+            orderId: `order_sub_${paymentId || Date.now()}`,
+            amountPaise,
+            amountRupees,
+            currency: paymentEntity.currency || subscription.currency || 'INR',
+            provider: 'RAZORPAY',
+            paymentId,
+            status: 'CAPTURED',
+            paymentMethod: paymentEntity.method || 'subscription_recurring',
+            capturedAt: new Date(),
+          });
+
+          const invoiceNumber = await InvoiceSequence.getNextInvoiceNumber(subscription.organizationId);
+          const invoice = await Invoice.create({
+            organizationId: subscription.organizationId,
             paymentId: payment._id,
-            feeId: fee._id,
+            subscriptionId: subscription._id,
             invoiceNumber,
-            subtotalRupees: payment.amountRupees,
-            totalRupees: payment.amountRupees,
-            status: 'PAID',
+            invoiceType: 'SAAS_INVOICE',
+            subtotalRupees: amountRupees,
+            taxRupees: 0,
+            totalRupees: amountRupees,
+            currency: payment.currency,
+            status: 'ISSUED',
             issuedAt: new Date(),
-            notes: `Razorpay Webhook Captured (${paymentId})`,
-          },
-        ],
-        { session }
-      );
+            paidAt: new Date(),
+          });
 
-      payment.invoiceId = invoice[0]._id;
+          payment.invoiceId = invoice._id;
+          await payment.save();
 
-      // Create Immutable Ledger Entry
-      await LedgerEntry.create(
-        [
-          {
-            organizationId: payment.organizationId,
-            hostelId: payment.hostelId || null,
-            studentId: payment.studentId,
-            feeId: fee._id,
+          await LedgerEntry.create({
+            organizationId: subscription.organizationId,
+            subscriptionId: subscription._id,
             paymentId: payment._id,
-            invoiceId: invoice[0]._id,
+            invoiceId: invoice._id,
             amountPaise: payment.amountPaise,
             amountRupees: payment.amountRupees,
-            currency: payment.currency || 'INR',
+            currency: payment.currency,
             type: 'CREDIT',
-            source: 'ONLINE_PAYMENT',
+            source: 'SAAS_SUBSCRIPTION',
             externalReference: paymentId,
-            description: `Razorpay Webhook Captured for ${fee.month}`,
-            metadata: { orderId, receiptNo: invoiceNumber },
-          },
-        ],
-        { session }
-      );
-
-      // Record PaymentAttempt
-      await PaymentAttempt.create(
-        [
-          {
-            organizationId: payment.organizationId,
-            paymentId: payment._id,
-            providerOrderId: orderId,
-            providerPaymentId: paymentId,
-            status: 'CAPTURED',
-            metadata: { invoiceNumber, viaWebhook: true },
-          },
-        ],
-        { session }
-      );
-
-      fee.paidAmount = (fee.paidAmount || 0) + payment.amountRupees;
-      const totalDue = (fee.amount || 0) + (fee.lateFee || 0) - (fee.discount || 0);
-      fee.status = fee.paidAmount >= totalDue ? 'paid' : 'partial';
-      fee.paidDate = new Date();
-      fee.paymentMode = 'upi';
-      fee.receiptNo = invoiceNumber;
-      await fee.save({ session });
-
-      if (fee.status === 'paid') {
-        const student = await Student.findById(payment.studentId).session(session);
-        if (student && student.validDate) {
-          const cur = new Date(student.validDate);
-          cur.setMonth(cur.getMonth() + 1);
-          await Student.findByIdAndUpdate(student._id, { validDate: cur }, { session });
+            description: `SaaS Subscription Recurring Charge - ${subscription.planId.name} (${invoiceNumber})`,
+          });
         }
       }
+      break;
     }
 
-    await payment.save({ session });
-    await session.commitTransaction();
-    session.endSession();
-  } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
-    throw err;
+    case 'subscription.pending':
+      subscription.status = 'PENDING';
+      await subscription.save();
+      break;
+
+    case 'subscription.halted':
+      subscription.status = 'HALTED';
+      await subscription.save();
+      break;
+
+    case 'subscription.paused':
+      subscription.status = 'PAUSED';
+      subscription.pausedAt = new Date();
+      await subscription.save();
+      break;
+
+    case 'subscription.resumed':
+      subscription.status = 'ACTIVE';
+      await subscription.save();
+      break;
+
+    case 'subscription.cancelled':
+      subscription.status = 'CANCELLED';
+      subscription.cancelledAt = new Date();
+      await subscription.save();
+      break;
+
+    case 'subscription.completed':
+      subscription.status = 'COMPLETED';
+      subscription.endedAt = new Date();
+      await subscription.save();
+      break;
+
+    case 'subscription.updated':
+      if (subscriptionEntity?.current_start) {
+        subscription.currentPeriodStart = new Date(subscriptionEntity.current_start * 1000);
+      }
+      if (subscriptionEntity?.current_end) {
+        subscription.currentPeriodEnd = new Date(subscriptionEntity.current_end * 1000);
+      }
+      await subscription.save();
+      break;
+
+    default:
+      console.log(`[Webhook:Subscription] Unhandled subscription event: ${event}`);
   }
 }
 
 /**
- * Handles payment failure event without corrupting Fee state.
+ * Handles payment captured event for legacy or direct orders.
+ */
+async function processPaymentCapturedEvent(orderId, paymentId, paymentEntity) {
+  const payment = await Payment.findOne({ orderId });
+  if (!payment) return;
+
+  if (payment.status === 'CAPTURED') return;
+
+  payment.status = 'CAPTURED';
+  payment.paymentId = paymentId || payment.paymentId;
+  payment.capturedAt = new Date();
+  if (paymentEntity?.method) {
+    payment.paymentMethod = paymentEntity.method;
+  }
+  await payment.save();
+
+  if (payment.invoiceId) {
+    await Invoice.findByIdAndUpdate(payment.invoiceId, { status: 'ISSUED', paidAt: new Date() });
+  }
+}
+
+/**
+ * Handles payment failure event without corrupting state.
  */
 async function processPaymentFailedEvent(orderId, paymentEntity) {
   const payment = await Payment.findOne({ orderId });
   if (!payment) return;
 
   // Never downgrade a CAPTURED payment to FAILED if out-of-order webhook arrived
-  if (payment.status === 'CAPTURED') {
-    return;
-  }
+  if (payment.status === 'CAPTURED') return;
 
   payment.status = 'FAILED';
   payment.failedAt = new Date();
   payment.failureCode = paymentEntity?.error_code || 'PAYMENT_FAILED';
   payment.failureReason = paymentEntity?.error_description || 'Payment failed at provider';
   await payment.save();
-
-  await PaymentAttempt.create({
-    organizationId: payment.organizationId,
-    paymentId: payment._id,
-    providerOrderId: orderId,
-    status: 'FAILED',
-    failureCode: payment.failureCode,
-    failureReason: payment.failureReason,
-  }).catch(() => {});
 }
 
 /**
@@ -300,9 +349,7 @@ async function processRefundEvent(paymentId, refundEntity) {
   // Create reversing Ledger Entry
   await LedgerEntry.create({
     organizationId: payment.organizationId,
-    hostelId: payment.hostelId || null,
-    studentId: payment.studentId,
-    feeId: payment.feeId,
+    subscriptionId: payment.subscriptionId,
     paymentId: payment._id,
     invoiceId: payment.invoiceId,
     amountPaise: refundPaise,

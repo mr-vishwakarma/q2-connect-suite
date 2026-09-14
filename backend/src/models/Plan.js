@@ -17,6 +17,10 @@ const planSchema = new mongoose.Schema(
     includedFeatures: [{ type: String }],
     isActive: { type: Boolean, default: true },
     isPopular: { type: Boolean, default: false },
+    currency: { type: String, default: 'INR', uppercase: true },
+    razorpayPlanIdMonthly: { type: String, trim: true, sparse: true },
+    razorpayPlanIdYearly: { type: String, trim: true, sparse: true },
+    status: { type: String, enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'], default: 'ACTIVE' },
   },
   { timestamps: true }
 );

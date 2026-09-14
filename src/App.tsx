@@ -59,6 +59,7 @@ const AdminManagement = lazy(() => import("./pages/admin/AdminManagement"));
 const AdminAlerts = lazy(() => import("./pages/admin/AdminAlerts"));
 const FeeManagement = lazy(() => import("./pages/admin/FeeManagement"));
 const PaymentManagement = lazy(() => import("./pages/admin/PaymentManagement"));
+const Billing = lazy(() => import("./pages/admin/Billing"));
 const RoomManagement = lazy(() => import("./pages/admin/RoomManagement"));
 const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const Notifications = lazy(() => import("./pages/admin/Notifications"));
@@ -97,6 +98,7 @@ const adminTitles: Record<string, string> = {
   "/admin/admin-management": "Admin Management",
   "/admin/fees": "Fee Management",
   "/admin/payments": "Payments & Invoices",
+  "/admin/billing": "SaaS Billing & Subscriptions",
   "/admin/rooms": "Room Management",
   "/admin/attendance": "Attendance & Gate Passes",
   "/admin/expenses": "Expense Tracker",
@@ -218,6 +220,7 @@ const App = () => (
                 <Route path="admin-management" element={<AdminManagement />} />
                 <Route path="fees" element={<FeeManagement />} />
                 <Route path="payments" element={<PaymentManagement />} />
+                <Route path="billing" element={<Billing />} />
                 <Route path="rooms" element={<RoomManagement />} />
                 <Route path="attendance" element={<AttendanceManagement />} />
                 <Route path="expenses" element={<ExpenseManagement />} />

@@ -41,6 +41,15 @@ This load test evaluated the performance, response latency percentiles (p50, p95
    - Heap Usage: 26.08 MB (Well within typical 512MB Render free/starter tiers and 2GB production tiers)
 2. **Database Connection Pool**:
    - MaxPoolSize configured at 50 handled concurrent streams with zero connection timeouts.
-3. **Observed Capacity Ceiling**:
+3. **Observed Capacity Ceiling (Representative Baseline)**:
+   - **Baseline Dataset**: 5 organizations, 10 hostels, 250 rooms, 250 students, 250 fee records.
    - **Recommended Single-Instance Capacity**: 1,200 requests/minute.
    - **Multi-Instance Scale (Horizontal)**: Scales linearly on Render/Vercel with stateless backend nodes.
+
+---
+
+## 4. Scale Validation Status
+
+- **Representative Multi-Tenant Baseline (Empirically Validated)**: 5 orgs / 250 students / 50 concurrent streams passed with 0 errors and sub-100ms p50 latencies.
+- **High-Scale Target (1,000+ Organizations, 100,000+ Students, Millions of Records)**: **Architectural Target — Not Yet Empirically Validated**.
+- Graduated empirical verification across Tier 1 (100 orgs / 10k students), Tier 2 (500 orgs / 50k students), and Tier 3 (1,000+ orgs / 100k students) will be conducted per `PHASE_H_SCALE_TEST_PLAN.md` in a dedicated staging environment.

@@ -1,5 +1,12 @@
 const mongoose = require('mongoose');
 
+/**
+ * Payment Model (Phase F/G Architectural Reconciliation)
+ * 
+ * Tracks financial transactions with explicit domain separation:
+ * - SAAS: Organization SaaS subscription charges, renewals, and plan upgrades
+ * - STUDENT_LEGACY: Historical resident fee online records (read-compatibility only)
+ */
 const paymentSchema = new mongoose.Schema(
   {
     organizationId: {
@@ -8,6 +15,30 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // Domain separation: SAAS billing vs legacy resident records
+    billingDomain: {
+      type: String,
+      enum: ['SAAS', 'STUDENT_LEGACY'],
+      default: 'SAAS',
+      index: true,
+    },
+    // SaaS Subscription References
+    subscriptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subscription',
+      index: true,
+    },
+    planId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Plan',
+    },
+    razorpaySubscriptionId: {
+      type: String,
+      trim: true,
+      sparse: true,
+      index: true,
+    },
+    // Legacy / Hostel Resident References (optional for SaaS)
     hostelId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Hostel',
@@ -15,13 +46,11 @@ const paymentSchema = new mongoose.Schema(
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Student',
-      required: true,
       index: true,
     },
     feeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Fee',
-      required: true,
       index: true,
     },
     // Exact monetary representation in integer minor-unit (paise) to prevent floating point inaccuracies
@@ -46,12 +75,11 @@ const paymentSchema = new mongoose.Schema(
       default: 'RAZORPAY',
       index: true,
     },
-    // Provider Order Identifier (e.g. order_Q2_xyz)
+    // Provider Order Identifier (e.g. order_Q2_xyz) or Subscription Charge Reference
     orderId: {
       type: String,
-      required: true,
-      unique: true,
       trim: true,
+      sparse: true,
       index: true,
     },
     // Provider Payment Identifier (e.g. pay_xyz)
@@ -129,7 +157,9 @@ const paymentSchema = new mongoose.Schema(
 
 // Compound indexes for tenant isolation, reporting, and reconciliation
 paymentSchema.index({ organizationId: 1, createdAt: -1 });
+paymentSchema.index({ organizationId: 1, billingDomain: 1, createdAt: -1 });
 paymentSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
+paymentSchema.index({ subscriptionId: 1, status: 1 });
 paymentSchema.index({ studentId: 1, status: 1, createdAt: -1 });
 paymentSchema.index({ feeId: 1, status: 1 });
 paymentSchema.index({ provider: 1, orderId: 1 });

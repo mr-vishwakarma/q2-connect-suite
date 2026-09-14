@@ -11,12 +11,10 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { IndianRupee, Calendar, Check, AlertCircle, Download, Receipt, CreditCard, Loader2 } from 'lucide-react';
+import { IndianRupee, Calendar, Check, AlertCircle, Download, Receipt } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'react-toastify';
 import { downloadReceipt, ReceiptData } from '@/lib/receiptPdf';
-import { useRazorpayPayment } from '@/hooks/useRazorpayPayment';
-import { PaymentModal } from '@/components/payment/PaymentModal';
 
 interface Fee {
   id: string; month: string; amount: number; paid_date: string | null;
@@ -144,28 +142,6 @@ export default function FeeHistory() {
     downloadReceipt(d);
   };
 
-  const {
-    state: paymentState,
-    activeContext,
-    verificationResult,
-    errorMessage,
-    initiatePayment,
-    proceedToCheckout,
-    resetPaymentState,
-  } = useRazorpayPayment(fetchAll);
-
-  const handleOpenPaymentModal = (fee: Fee, bal: number) => {
-    initiatePayment({
-      feeId: fee.id,
-      month: fee.month,
-      totalAmount: fee.amount + (fee.late_fee || 0) - (fee.discount || 0),
-      paidAmount: fee.paid_amount || 0,
-      outstandingAmount: bal,
-      studentName: student?.name,
-      studentEmail: user?.email,
-    });
-  };
-
   if (authLoading || loading) {
     return (
       <DashboardLayout title="My Fees" isAdmin={false}>
@@ -210,24 +186,9 @@ export default function FeeHistory() {
                           </TableCell>
                           <TableCell className="text-right">
                             {f.status !== 'paid' && bal > 0 ? (
-                              <Button
-                                size="sm"
-                                className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-2.5 py-1 h-7"
-                                disabled={paymentState !== 'IDLE' && paymentState !== 'SUCCESS'}
-                                onClick={() => handleOpenPaymentModal(f, bal)}
-                              >
-                                {paymentState === 'CREATING_ORDER' && activeContext?.feeId === f.id ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                    Starting...
-                                  </>
-                                ) : (
-                                  <>
-                                    <CreditCard className="w-3 h-3 mr-1" />
-                                    Pay Online
-                                  </>
-                                )}
-                              </Button>
+                              <Badge variant="outline" className="text-amber-500 border-amber-500/30 bg-amber-500/10 text-xs font-medium">
+                                Pending Offline
+                              </Badge>
                             ) : (
                               <span className="text-xs text-muted-foreground font-medium flex items-center justify-end gap-1">
                                 <Check className="w-3.5 h-3.5 text-green-500" /> Settled
@@ -287,15 +248,6 @@ export default function FeeHistory() {
         </Card>
       </div>
 
-      <PaymentModal
-        state={paymentState}
-        context={activeContext}
-        verificationResult={verificationResult}
-        errorMessage={errorMessage}
-        onProceed={proceedToCheckout}
-        onClose={resetPaymentState}
-        onRetry={proceedToCheckout}
-      />
     </DashboardLayout>
   );
 }
