@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const os = require('os');
+const { getRedisStatus } = require('../config/redis');
+const { getQueueMetrics } = require('../queues/queueManager');
 
 const systemHealthService = {
   async getSystemHealth() {
@@ -21,15 +23,23 @@ const systemHealthService = {
       dbPingMs = -1;
     }
 
-    // 2. Node.js Memory & Process Metrics
+    // 2. Redis & Queue System Status (Classified as DEGRADED DEPENDENCY)
+    const redisStatus = getRedisStatus();
+    let queueMetrics = { status: 'DEGRADED' };
+    try {
+      queueMetrics = await getQueueMetrics();
+    } catch (e) {
+      queueMetrics = { status: 'DEGRADED', error: e.message };
+    }
+
+    // 3. Node.js Memory & Process Metrics
     const memUsage = process.memoryUsage();
     const toMB = (bytes) => Math.round((bytes / 1024 / 1024) * 10) / 10;
 
-    // 3. Infrastructure Details
+    // 4. Infrastructure Details
     const uptimeSeconds = process.uptime();
-    const systemUptimeSeconds = os.uptime();
 
-    // 4. External Services Configuration Check
+    // 5. External Services Configuration Check
     const services = {
       imageKit: {
         configured: Boolean(process.env.IMAGEKIT_PUBLIC_KEY && process.env.IMAGEKIT_PRIVATE_KEY),
@@ -47,11 +57,30 @@ const systemHealthService = {
         configured: Boolean(process.env.JWT_SECRET),
         status: process.env.JWT_SECRET ? 'SECURE' : 'DEFAULT_WARN',
       },
+      redis: {
+        configured: redisStatus.configured,
+        status: redisStatus.status,
+        classification: 'DEGRADED_DEPENDENCY',
+      },
+      queueSystem: {
+        status: queueMetrics.status,
+        classification: 'DEGRADED_DEPENDENCY',
+        metrics: queueMetrics,
+      },
     };
 
     return {
       status: dbStatus === 'HEALTHY' ? 'OPERATIONAL' : 'DEGRADED',
       timestamp: new Date(),
+      dependencies: {
+        core: {
+          database: dbStatus === 'HEALTHY' ? 'OPERATIONAL' : 'DEGRADED',
+        },
+        degraded: {
+          redis: redisStatus.ready ? 'OPERATIONAL' : 'DEGRADED',
+          backgroundQueues: queueMetrics.status === 'HEALTHY' ? 'OPERATIONAL' : 'DEGRADED',
+        },
+      },
       uptime: {
         processSeconds: Math.floor(uptimeSeconds),
         formatted: `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${Math.floor(uptimeSeconds % 60)}s`,

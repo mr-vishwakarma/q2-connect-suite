@@ -17,6 +17,7 @@ const feeSchema = new mongoose.Schema(
     paymentMode: { type: String, enum: ['cash', 'upi', 'bank'], default: null },
     receiptNo: { type: String, trim: true },
     notes: { type: String },
+    lastReminderSentAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -29,5 +30,6 @@ feeSchema.index({ organizationId: 1, month: 1, status: 1 });
 feeSchema.index({ organizationId: 1, dueDate: 1, status: 1 });
 feeSchema.index({ organizationId: 1, status: 1 });
 feeSchema.index({ organizationId: 1, hostelId: 1, month: 1 });
+feeSchema.index({ organizationId: 1, status: 1, lastReminderSentAt: 1 });
 
 module.exports = mongoose.model('Fee', feeSchema);

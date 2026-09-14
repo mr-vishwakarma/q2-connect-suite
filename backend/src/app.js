@@ -4,7 +4,7 @@ const http = require('http');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const initSocket = require('./socket');
-const { initCronJobs } = require('./utils/cronJobs');
+const { initBackgroundSystem, shutdownBackgroundSystem } = require('./jobs');
 const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -178,17 +178,14 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Initialize scheduled cron jobs
-require('./utils/cron');
-
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   console.log(`\n🚀 Q2 Connect Suite Backend running on port ${PORT}`);
   console.log(`📡 Socket.io enabled`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}\n`);
   
-  // Initialize cron jobs
-  initCronJobs();
+  // Initialize distributed background job system & repeatable schedules
+  initBackgroundSystem().catch(err => console.error('❌ Failed to initialize background system:', err));
 
   // Seed admin automatically on startup using environment variables
   const User = require('./models/User');
@@ -221,12 +218,13 @@ const gracefulShutdown = async (signal) => {
   httpServer.close(async () => {
     console.log('🚪 HTTP server closed.');
     try {
+      await shutdownBackgroundSystem();
       const mongoose = require('mongoose');
       await mongoose.connection.close(false);
       console.log('📦 MongoDB connection closed cleanly.');
       process.exit(0);
     } catch (err) {
-      console.error('❌ Error closing MongoDB connection:', err);
+      console.error('❌ Error during graceful shutdown:', err);
       process.exit(1);
     }
   });

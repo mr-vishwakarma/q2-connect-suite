@@ -5,6 +5,7 @@ const Student = require('../models/Student');
 const Room = require('../models/Room');
 const Notification = require('../models/Notification');
 const { sendStudentCredentials, sendAdminNewStudentRegisteredNotification } = require('../utils/email');
+const { addEmailJob } = require('../queues/queueManager');
 
 // @desc    Get all students (with optional hostel filter)
 // @route   GET /api/students
@@ -236,21 +237,44 @@ const createStudent = async (req, res) => {
       if (orgId && !req.tenant?.isSuperAdmin) {
         roomQuery.organizationId = orgId;
       }
-      const roomDoc = await Room.findOne(roomQuery).session(session);
-      if (roomDoc) {
-        const updatedRoom = await Room.findOneAndUpdate(
-          { _id: roomDoc._id, occupiedCount: { $lt: roomDoc.capacity } },
-          { $inc: { occupiedCount: 1 } },
-          { session, new: true }
-        );
-        if (!updatedRoom) {
-          await session.abortTransaction();
-          session.endSession();
+      const updatedRoom = await Room.findOneAndUpdate(
+        {
+          ...roomQuery,
+          $expr: {
+            $lt: [{ $ifNull: ['$occupiedCount', 0] }, '$capacity'],
+          },
+        },
+        [
+          {
+            $set: {
+              occupiedCount: { $add: [{ $ifNull: ['$occupiedCount', 0] }, 1] },
+              status: {
+                $cond: {
+                  if: { $gte: [{ $add: [{ $ifNull: ['$occupiedCount', 0] }, 1] }, '$capacity'] },
+                  then: 'full',
+                  else: 'available',
+                },
+              },
+            },
+          },
+        ],
+        { session, new: true }
+      );
+
+      if (!updatedRoom) {
+        const existingRoom = await Room.findOne(roomQuery).session(session);
+        await session.abortTransaction();
+        session.endSession();
+        if (!existingRoom) {
           return res.status(400).json({
             success: false,
-            message: `Room ${roomNo} in ${hostel} is already fully occupied (capacity: ${roomDoc.capacity})`,
+            message: `Room ${roomNo} in ${hostel} does not exist`,
           });
         }
+        return res.status(400).json({
+          success: false,
+          message: `Room ${roomNo} in ${hostel} is already fully occupied (capacity: ${existingRoom.capacity})`,
+        });
       }
     }
 
@@ -329,9 +353,9 @@ const createStudent = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Asynchronously notify admin via email
+    // Asynchronously notify admin via queue
     const adminEmail = req.user?.email || 'abhi1006@q2connect.com';
-    sendAdminNewStudentRegisteredNotification({
+    addEmailJob('ADMIN_NEW_STUDENT_REGISTERED', {
       to: adminEmail,
       studentName: name,
       studentEmail: email.toLowerCase(),
@@ -339,7 +363,7 @@ const createStudent = async (req, res) => {
       studentHostel: hostel,
       studentPhone: phone,
       username: username,
-    }).catch(err => console.warn('[students.controller] Admin notification email failed:', err.message));
+    }).catch(err => console.warn('[students.controller] Admin notification email queue warning:', err.message));
 
     return res.status(201).json({
       success: true,
@@ -349,6 +373,9 @@ const createStudent = async (req, res) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: 'A student or user with this email or username already exists' });
+    }
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -381,31 +408,61 @@ const updateStudent = async (req, res) => {
     const oldRoom = student.roomNo;
     const oldHostel = student.hostel;
     if (roomNo && hostel && (roomNo !== oldRoom || hostel !== oldHostel)) {
-      // Safe decrement on old room (only if occupiedCount > 0)
+      // Safe atomic decrement on old room (only if occupiedCount > 0)
       if (oldRoom && oldHostel) {
         await Room.findOneAndUpdate(
           { roomNumber: oldRoom, hostel: oldHostel, organizationId: student.organizationId, occupiedCount: { $gt: 0 } },
-          { $inc: { occupiedCount: -1 } },
+          [
+            {
+              $set: {
+                occupiedCount: { $max: [{ $subtract: [{ $ifNull: ['$occupiedCount', 1] }, 1] }, 0] },
+                status: 'available',
+              },
+            },
+          ],
           { session }
         );
       }
-      // Atomic increment on new room (verify capacity)
+      // Atomic increment on new room with live capacity guard
       const newRoomQuery = { roomNumber: roomNo, hostel, organizationId: student.organizationId };
-      const newRoomDoc = await Room.findOne(newRoomQuery).session(session);
-      if (newRoomDoc) {
-        const updatedNewRoom = await Room.findOneAndUpdate(
-          { _id: newRoomDoc._id, occupiedCount: { $lt: newRoomDoc.capacity } },
-          { $inc: { occupiedCount: 1 } },
-          { session, new: true }
-        );
-        if (!updatedNewRoom) {
-          await session.abortTransaction();
-          session.endSession();
+      const updatedNewRoom = await Room.findOneAndUpdate(
+        {
+          ...newRoomQuery,
+          $expr: {
+            $lt: [{ $ifNull: ['$occupiedCount', 0] }, '$capacity'],
+          },
+        },
+        [
+          {
+            $set: {
+              occupiedCount: { $add: [{ $ifNull: ['$occupiedCount', 0] }, 1] },
+              status: {
+                $cond: {
+                  if: { $gte: [{ $add: [{ $ifNull: ['$occupiedCount', 0] }, 1] }, '$capacity'] },
+                  then: 'full',
+                  else: 'available',
+                },
+              },
+            },
+          },
+        ],
+        { session, new: true }
+      );
+
+      if (!updatedNewRoom) {
+        const existingNewRoom = await Room.findOne(newRoomQuery).session(session);
+        await session.abortTransaction();
+        session.endSession();
+        if (!existingNewRoom) {
           return res.status(400).json({
             success: false,
-            message: `Room ${roomNo} in ${hostel} is already fully occupied (capacity: ${newRoomDoc.capacity})`,
+            message: `Room ${roomNo} in ${hostel} does not exist`,
           });
         }
+        return res.status(400).json({
+          success: false,
+          message: `Room ${roomNo} in ${hostel} is already fully occupied (capacity: ${existingNewRoom.capacity})`,
+        });
       }
     }
 
@@ -465,7 +522,14 @@ const deleteStudent = async (req, res) => {
     if (student.roomNo && student.hostel) {
       await Room.findOneAndUpdate(
         { roomNumber: student.roomNo, hostel: student.hostel, organizationId: student.organizationId, occupiedCount: { $gt: 0 } },
-        { $inc: { occupiedCount: -1 } },
+        [
+          {
+            $set: {
+              occupiedCount: { $max: [{ $subtract: [{ $ifNull: ['$occupiedCount', 1] }, 1] }, 0] },
+              status: 'available',
+            },
+          },
+        ],
         { session }
       );
     }
@@ -825,21 +889,44 @@ const approveAndRegisterStudent = async (req, res) => {
       if (orgId && !req.tenant?.isSuperAdmin) {
         roomQuery.organizationId = orgId;
       }
-      const roomDoc = await Room.findOne(roomQuery).session(session);
-      if (roomDoc) {
-        const updatedRoom = await Room.findOneAndUpdate(
-          { _id: roomDoc._id, occupiedCount: { $lt: roomDoc.capacity } },
-          { $inc: { occupiedCount: 1 } },
-          { session, new: true }
-        );
-        if (!updatedRoom) {
-          await session.abortTransaction();
-          session.endSession();
+      const updatedRoom = await Room.findOneAndUpdate(
+        {
+          ...roomQuery,
+          $expr: {
+            $lt: [{ $ifNull: ['$occupiedCount', 0] }, '$capacity'],
+          },
+        },
+        [
+          {
+            $set: {
+              occupiedCount: { $add: [{ $ifNull: ['$occupiedCount', 0] }, 1] },
+              status: {
+                $cond: {
+                  if: { $gte: [{ $add: [{ $ifNull: ['$occupiedCount', 0] }, 1] }, '$capacity'] },
+                  then: 'full',
+                  else: 'available',
+                },
+              },
+            },
+          },
+        ],
+        { session, new: true }
+      );
+
+      if (!updatedRoom) {
+        const existingRoom = await Room.findOne(roomQuery).session(session);
+        await session.abortTransaction();
+        session.endSession();
+        if (!existingRoom) {
           return res.status(400).json({
             success: false,
-            message: `Room ${roomNo} in ${finalHostel} is already fully occupied (capacity: ${roomDoc.capacity})`,
+            message: `Room ${roomNo} in ${finalHostel} does not exist`,
           });
         }
+        return res.status(400).json({
+          success: false,
+          message: `Room ${roomNo} in ${finalHostel} is already fully occupied (capacity: ${existingRoom.capacity})`,
+        });
       }
     }
 
@@ -932,9 +1019,9 @@ const approveAndRegisterStudent = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Send asynchronous confirmation email to Admin
+    // Send asynchronous confirmation email to Admin via queue
     const adminEmail = req.user?.email || 'abhi1006@q2connect.com';
-    sendAdminNewStudentRegisteredNotification({
+    addEmailJob('ADMIN_NEW_STUDENT_REGISTERED', {
       to: adminEmail,
       studentName: finalName,
       studentEmail: finalEmail,
@@ -942,7 +1029,7 @@ const approveAndRegisterStudent = async (req, res) => {
       studentHostel: finalHostel,
       studentPhone: finalPhone,
       username: finalUsername,
-    }).catch(e => console.warn('Admin registration confirmation email failed:', e.message));
+    }).catch(e => console.warn('Admin registration confirmation email queue warning:', e.message));
 
     return res.status(200).json({
       success: true,
@@ -953,6 +1040,9 @@ const approveAndRegisterStudent = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
     console.error('approveAndRegisterStudent error:', error);
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: 'A student or user with this email or username already exists' });
+    }
     return res.status(500).json({ success: false, message: error.message });
   }
 };

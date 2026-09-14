@@ -15,9 +15,18 @@ const transporter = nodemailer.createTransport({
  * @param {object} options - { to, subject, html, text }
  */
 const sendEmail = async ({ to, subject, html, text }) => {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.MOCK_EMAIL === 'true' ||
+    !process.env.SMTP_PASS ||
+    process.env.SMTP_USER === 'your_gmail@gmail.com'
+  ) {
+    console.log(`📧 [Simulated Email] Delivered to: ${to} (Subject: ${subject})`);
+    return { messageId: `mock-${Date.now()}` };
+  }
   try {
     const info = await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
+      from: process.env.EMAIL_FROM || 'Q2 Connect Suite <noreply@q2connect.com>',
       to,
       subject,
       html,

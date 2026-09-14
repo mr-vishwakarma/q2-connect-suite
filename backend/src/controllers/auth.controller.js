@@ -641,6 +641,9 @@ const registerStudent = async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: 'An account with this email or username already exists' });
+    }
     return res.status(500).json({ success: false, message: error.message || 'Registration failed' });
   }
 };
