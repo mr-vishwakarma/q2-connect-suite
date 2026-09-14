@@ -11,9 +11,11 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { IndianRupee, Calendar, Check, AlertCircle, Download, Receipt } from 'lucide-react';
+import { IndianRupee, Calendar, Check, AlertCircle, Download, Receipt, CreditCard, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { toast } from 'react-toastify';
 import { downloadReceipt, ReceiptData } from '@/lib/receiptPdf';
+import { openRazorpayCheckout } from '@/utils/razorpay';
 
 interface Fee {
   id: string; month: string; amount: number; paid_date: string | null;
@@ -41,6 +43,7 @@ export default function FeeHistory() {
   const [fees, setFees] = useState<Fee[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [payingFeeId, setPayingFeeId] = useState<string | null>(null);
   const [settings, setSettings] = useState({ lateFeePerDay: 20, gracePeriodDays: 5 });
 
   useEffect(() => {
@@ -140,6 +143,51 @@ export default function FeeHistory() {
     downloadReceipt(d);
   };
 
+  const handlePayOnline = async (fee: Fee) => {
+    try {
+      setPayingFeeId(fee.id);
+      const orderRes = await api.post('/payments/create-order', { feeId: fee.id });
+      if (!orderRes.data?.success || !orderRes.data?.data) {
+        throw new Error(orderRes.data?.message || 'Failed to initialize payment order');
+      }
+
+      const orderData = orderRes.data.data;
+
+      await openRazorpayCheckout(
+        {
+          orderId: orderData.orderId,
+          amountPaise: orderData.amountPaise,
+          currency: orderData.currency,
+          keyId: orderData.keyId,
+          studentName: student?.name,
+          description: `Hostel Fee for ${fee.month}`,
+        },
+        async (response) => {
+          try {
+            const verifyRes = await api.post('/payments/verify', response);
+            if (verifyRes.data?.success) {
+              toast.success(`Payment successful! Receipt: ${verifyRes.data.data?.invoiceNumber || 'Issued'}`);
+              await fetchAll();
+            } else {
+              toast.error(verifyRes.data?.message || 'Payment verification failed');
+            }
+          } catch (verifyErr: any) {
+            toast.error(verifyErr.response?.data?.message || 'Error verifying payment with server');
+          } finally {
+            setPayingFeeId(null);
+          }
+        },
+        (dismissErr) => {
+          setPayingFeeId(null);
+          console.log('[Razorpay] Checkout modal dismissed:', dismissErr?.message);
+        }
+      );
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Payment failed to initiate');
+      setPayingFeeId(null);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <DashboardLayout title="My Fees" isAdmin={false}>
@@ -164,7 +212,7 @@ export default function FeeHistory() {
             {fees.length === 0 ? <div className="text-center py-8 text-muted-foreground">No fee records yet</div> : (
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader><TableRow><TableHead>Month</TableHead><TableHead>Amount</TableHead><TableHead>Late</TableHead><TableHead>Discount</TableHead><TableHead>Paid</TableHead><TableHead>Balance</TableHead><TableHead>Due Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow><TableHead>Month</TableHead><TableHead>Amount</TableHead><TableHead>Late</TableHead><TableHead>Discount</TableHead><TableHead>Paid</TableHead><TableHead>Balance</TableHead><TableHead>Due Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {fees.map(f => {
                       const bal = Math.max(0, f.amount + (f.late_fee || 0) - (f.discount || 0) - (f.paid_amount || 0));
@@ -181,6 +229,32 @@ export default function FeeHistory() {
                             {f.status === 'paid' ? <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Paid</Badge>
                               : f.status === 'partial' ? <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">Partial</Badge>
                               : <Badge variant="destructive">Unpaid</Badge>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {f.status !== 'paid' && bal > 0 ? (
+                              <Button
+                                size="sm"
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-2.5 py-1 h-7"
+                                disabled={payingFeeId === f.id}
+                                onClick={() => handlePayOnline(f)}
+                              >
+                                {payingFeeId === f.id ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    Processing
+                                  </>
+                                ) : (
+                                  <>
+                                    <CreditCard className="w-3 h-3 mr-1" />
+                                    Pay Online
+                                  </>
+                                )}
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground font-medium flex items-center justify-end gap-1">
+                                <Check className="w-3.5 h-3.5 text-green-500" /> Settled
+                              </span>
+                            )}
                           </TableCell>
                         </TableRow>
                       );

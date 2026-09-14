@@ -410,6 +410,12 @@ const collectPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Fee for this month is already fully paid' });
     }
 
+    const numAmount = Number(amount) || 0;
+    const numLateFee = Number(lateFee) || 0;
+    const numDiscount = Number(discount) || 0;
+    const numSecDeposit = Number(securityDeposit) || 0;
+    const numReceived = Number(receivedAmount) || 0;
+
     if (!feeRow) {
       const newFees = await Fee.create([{
         studentId,
@@ -417,9 +423,9 @@ const collectPayment = async (req, res) => {
         hostelId: student.hostelId || null,
         hostel: actualHostel,
         month,
-        amount,
-        lateFee,
-        discount,
+        amount: numAmount || (numReceived - numSecDeposit),
+        lateFee: numLateFee,
+        discount: numDiscount,
         status: 'unpaid',
         paymentMode
       }], { session, ordered: true });
@@ -427,13 +433,13 @@ const collectPayment = async (req, res) => {
     } else {
       feeRow = await Fee.findByIdAndUpdate(
         feeRow._id,
-        { lateFee, discount, amount },
+        { lateFee: numLateFee, discount: numDiscount, amount: numAmount || feeRow.amount },
         { new: true, session }
       );
     }
 
-    const feeCore = Math.max(0, receivedAmount - securityDeposit);
-    const totalDue = amount + lateFee - discount;
+    const feeCore = Math.max(0, numReceived - numSecDeposit);
+    const totalDue = (numAmount || feeRow.amount || 0) + numLateFee - numDiscount;
 
     // 2. Create the fee payment record with organization and idempotency tracking
     const payments = await FeePayment.create([{
@@ -445,9 +451,9 @@ const collectPayment = async (req, res) => {
       receiptNo,
       receiptUrl,
       amount: feeCore,
-      lateFee,
-      discount,
-      securityDeposit,
+      lateFee: numLateFee,
+      discount: numDiscount,
+      securityDeposit: numSecDeposit,
       paymentMode,
       paymentDate: new Date(),
       adminId: req.user._id,
@@ -459,13 +465,13 @@ const collectPayment = async (req, res) => {
     const payment = payments[0];
 
     // 3. Security deposit tracking
-    if (securityDeposit > 0) {
+    if (numSecDeposit > 0) {
       await SecurityDeposit.create([{
         studentId,
         organizationId: orgId || null,
         hostelId: student.hostelId || null,
         hostel: actualHostel,
-        amount: securityDeposit,
+        amount: numSecDeposit,
         collectedDate: new Date(),
         status: 'collected',
         paymentMode,

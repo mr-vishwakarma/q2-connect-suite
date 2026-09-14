@@ -29,6 +29,8 @@ const ratingRoutes = require('./routes/rating.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const superAdminRoutes = require('./routes/superAdmin.routes');
 const expensesRoutes = require('./routes/expenses.routes');
+const paymentRoutes = require('./routes/payment.routes');
+const webhookRoutes = require('./routes/webhook.routes');
 const { requestLogger } = require('./middleware/requestLogger.middleware');
 
 // Connect to MongoDB
@@ -78,8 +80,15 @@ app.use(cors({
 // Analytics Logger Middleware
 app.use(requestLogger);
 
-// Body parsing
-app.use(express.json({ limit: '10mb' }));
+// Body parsing with rawBody capture for cryptographic signature verification (Razorpay webhooks)
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Data sanitization against NoSQL query injection
@@ -129,6 +138,8 @@ app.use('/api/rating', ratingRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/expenses', expensesRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // 404 handler
 app.use((req, res) => {
