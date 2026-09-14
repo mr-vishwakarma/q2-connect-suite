@@ -31,7 +31,9 @@ const superAdminRoutes = require('./routes/superAdmin.routes');
 const expensesRoutes = require('./routes/expenses.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const webhookRoutes = require('./routes/webhook.routes');
+const healthRoutes = require('./routes/health.routes');
 const { requestLogger } = require('./middleware/requestLogger.middleware');
+const { requestIdMiddleware } = require('./middleware/requestId.middleware');
 
 // Connect to MongoDB
 connectDB();
@@ -40,6 +42,9 @@ const app = express();
 
 // Trust proxy required for express-rate-limit behind a reverse proxy (like Render)
 app.set('trust proxy', 1);
+
+// Correlation ID middleware (Phase G observability & tracing)
+app.use(requestIdMiddleware);
 
 // Compress all responses
 app.use(compression());
@@ -115,10 +120,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ success: true, message: 'Q2 Connect Suite API is running 🚀', env: process.env.NODE_ENV });
-});
+// Health check & diagnostic routes (Phase G: Liveness & Readiness Probes)
+app.use('/api/health', healthRoutes);
+app.use('/health', healthRoutes);
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -143,7 +147,15 @@ app.use('/api/webhooks', webhookRoutes);
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 'ROUTE_NOT_FOUND',
+      message: `Route ${req.originalUrl} not found`,
+    },
+    message: `Route ${req.originalUrl} not found`,
+    requestId: req.requestId,
+  });
 });
 
 // Centralized Global Error Handler
@@ -175,7 +187,7 @@ app.use((err, req, res, next) => {
   }
 
   if (process.env.NODE_ENV !== 'production' && statusCode === 500) {
-    console.error('[UNHANDLED ERROR]', err.stack);
+    console.error(`[UNHANDLED ERROR][${req.requestId || 'no_req_id'}]`, err.stack);
   }
 
   res.status(statusCode).json({
@@ -186,6 +198,7 @@ app.use((err, req, res, next) => {
       ...(process.env.NODE_ENV === 'development' && statusCode === 500 ? { stack: err.stack } : {}),
     },
     message, // Backwards compatibility with existing frontends checking res.data.message
+    requestId: req.requestId,
   });
 });
 

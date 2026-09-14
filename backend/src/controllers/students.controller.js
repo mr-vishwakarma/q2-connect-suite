@@ -6,16 +6,15 @@ const Room = require('../models/Room');
 const Notification = require('../models/Notification');
 const { sendStudentCredentials, sendAdminNewStudentRegisteredNotification } = require('../utils/email');
 const { addEmailJob } = require('../queues/queueManager');
+const { parsePagination, getPaginationMeta } = require('../utils/pagination');
 
 // @desc    Get all students (with optional hostel filter)
 // @route   GET /api/students
 // @access  Admin
 const getAllStudents = async (req, res) => {
   try {
-    const { hostel, search, page = 1, limit = 50 } = req.query;
-    
-    const skipAmount = (parseInt(page) - 1) * parseInt(limit);
-    const limitAmount = parseInt(limit);
+    const { hostel, search } = req.query;
+    const { page, limit: limitAmount, skip: skipAmount } = parsePagination(req.query, 50);
 
     const studentMatch = { isActive: { $ne: false } };
     

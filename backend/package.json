@@ -17,6 +17,9 @@
     "test:jobs": "node src/scripts/test_phase_d_distributed_jobs.js",
     "test:media": "node src/scripts/test_phase_e_media_pipeline.js",
     "test:payments": "node src/scripts/test_phase_f_payments.js",
+    "test:hardening": "node src/scripts/test_phase_g_hardening.js",
+    "test:integrity": "node src/scripts/validate_data_integrity.js",
+    "test:load": "node src/scripts/run_phase_g_load_test.js",
     "test": "node src/scripts/test_p0_security.js"
   },
   "dependencies": {

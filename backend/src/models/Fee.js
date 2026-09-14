@@ -31,5 +31,6 @@ feeSchema.index({ organizationId: 1, dueDate: 1, status: 1 });
 feeSchema.index({ organizationId: 1, status: 1 });
 feeSchema.index({ organizationId: 1, hostelId: 1, month: 1 });
 feeSchema.index({ organizationId: 1, status: 1, lastReminderSentAt: 1 });
+feeSchema.index({ status: 1, dueDate: 1 });
 
 module.exports = mongoose.model('Fee', feeSchema);

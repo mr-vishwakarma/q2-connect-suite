@@ -1,0 +1,71 @@
+name: Q2 Connect Suite CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-validation:
+    name: Frontend Typecheck & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: TypeScript Typecheck
+        run: npx tsc --noEmit
+
+      - name: Vite Production Build
+        run: npm run build
+
+  backend-security-and-lint:
+    name: Backend Security & P0 Regression
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Backend Dependencies
+        run: npm ci
+
+      - name: Secret Leak Prevention Scan
+        run: |
+          echo "Scanning repository for leaked private keys or live API secrets..."
+          if git grep -i -E "sk_live|rzp_live|AIzaSy|-----BEGIN PRIVATE KEY-----" -- ':!*.example' ':!*test*' ':!*.md'; then
+            echo "❌ CRITICAL: Potential live secret detected in tracked code."
+            exit 1
+          else
+            echo "✅ Zero exposed secrets detected."
+          fi
+
+      - name: Run P0 Security Tests
+        run: npm run test:p0
+        env:
+          ADMIN_REGISTRATION_SECRET: dummy_ci_admin_secret_12345
+          JWT_SECRET: dummy_ci_jwt_secret_12345
+          JWT_REFRESH_SECRET: dummy_ci_jwt_refresh_secret_12345
