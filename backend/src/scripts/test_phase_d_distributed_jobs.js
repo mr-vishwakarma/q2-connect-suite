@@ -235,8 +235,8 @@ async function runPhaseDTestSuite() {
       lastReminderSentAt: null,
     });
 
-    // 1. Run Fee Reminder Dispatcher (bounded streaming)
-    const scanMetrics = await runFeeReminderDispatcher();
+    // 1. Run Fee Reminder Dispatcher (bounded streaming for test organization)
+    const scanMetrics = await runFeeReminderDispatcher({ organizationId: testOrg._id });
     assert(scanMetrics.scannedCount >= 1, `Dispatcher scanned overdue fees via bounded cursor (Scanned: ${scanMetrics.scannedCount})`);
     assert(scanMetrics.durationMs >= 0, `Dispatcher completed in bounded time (${scanMetrics.durationMs}ms)`);
 

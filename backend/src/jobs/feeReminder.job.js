@@ -32,16 +32,26 @@ async function runFeeReminderDispatcher(options = {}) {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     // Stream overdue and unpaid fees with projection
-    const feeCursor = Fee.find({
+    const filter = {
       status: { $in: ['unpaid', 'partial'] },
       $or: [
         { lastReminderSentAt: null },
         { lastReminderSentAt: { $lt: twentyFourHoursAgo } },
       ],
-    })
+    };
+    if (options.organizationId) {
+      filter.organizationId = options.organizationId;
+    }
+
+    let feeQuery = Fee.find(filter)
       .select('_id studentId organizationId hostel month amount dueDate status lastReminderSentAt')
-      .lean()
-      .cursor({ batchSize: 250 });
+      .lean();
+
+    if (options.limit && typeof options.limit === 'number') {
+      feeQuery = feeQuery.limit(options.limit);
+    }
+
+    const feeCursor = feeQuery.cursor({ batchSize: 250 });
 
     for await (const fee of feeCursor) {
       scannedCount++;

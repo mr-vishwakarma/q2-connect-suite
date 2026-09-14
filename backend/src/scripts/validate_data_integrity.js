@@ -197,14 +197,24 @@ async function runDataIntegrityCheck() {
 
   // Check 12: Cross-Tenant Reference Mismatches (Student Org !== Room Org)
   {
-    const studentsWithRooms = await Student.find({ roomNo: { $exists: true, $ne: null } }).select('_id organizationId hostelId roomNo').lean();
+    const allRooms = await Room.find({}).select('roomNumber hostelId organizationId').lean();
+    const roomOrgMap = new Map();
+    for (const r of allRooms) {
+      if (r.hostelId && r.roomNumber) {
+        roomOrgMap.set(`${r.hostelId}_${r.roomNumber}`, String(r.organizationId));
+      }
+    }
+
+    const studentCursor = Student.find({ roomNo: { $exists: true, $ne: null }, hostelId: { $exists: true, $ne: null } })
+      .select('organizationId hostelId roomNo')
+      .cursor({ batchSize: 1000 });
+
     let crossTenantMismatches = 0;
-    for (const st of studentsWithRooms) {
-      if (st.organizationId && st.roomNo) {
-        const room = await Room.findOne({ roomNumber: st.roomNo, hostelId: st.hostelId }).lean();
-        if (room && room.organizationId && String(room.organizationId) !== String(st.organizationId)) {
-          crossTenantMismatches++;
-        }
+    for await (const st of studentCursor) {
+      const key = `${st.hostelId}_${st.roomNo}`;
+      const roomOrg = roomOrgMap.get(key);
+      if (roomOrg && roomOrg !== String(st.organizationId)) {
+        crossTenantMismatches++;
       }
     }
     recordCheck('G20.12', 'Zero Cross-Tenant Reference Mismatches', crossTenantMismatches === 0, crossTenantMismatches);
