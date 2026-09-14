@@ -6,7 +6,8 @@ const { adminOnly } = require('../middleware/admin.middleware');
 const { getComplaints, createComplaint, updateComplaint } = require('../controllers/complaints.controller');
 const { getSuggestions, createSuggestion, updateSuggestion } = require('../controllers/suggestions.controller');
 
-router.use(protect, resolveTenantContext);
+router.use('/complaints', protect, resolveTenantContext);
+router.use('/suggestions', protect, resolveTenantContext);
 
 // Complaints
 router.get('/complaints', getComplaints);

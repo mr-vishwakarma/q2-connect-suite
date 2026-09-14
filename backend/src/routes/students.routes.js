@@ -29,6 +29,7 @@ router.post('/approve-and-register/:id', adminOnly, approveAndRegisterStudent);
 router.post('/reject-registration/:id', adminOnly, rejectRegistration);
 router.get('/', adminOrWarden, getAllStudents);
 router.post('/', adminOnly, createStudent);
+router.post('/register', adminOnly, createStudent);
 router.get('/:id', getStudent); // admin or own student
 router.put('/:id', adminOnly, updateStudent);
 router.delete('/:id', adminOnly, deleteStudent);

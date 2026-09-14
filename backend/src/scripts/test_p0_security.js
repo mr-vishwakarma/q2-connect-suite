@@ -96,16 +96,24 @@ async function runP0SecurityTests() {
   }
 
   // Connect to DB for remaining tests
-  if (!process.env.MONGODB_URI) {
-    console.error('❌ Cannot run remaining tests: MONGODB_URI is not set in backend/.env');
+  const mongoUri = process.env.MONGODB_URI || (process.env.CI ? 'mongodb://127.0.0.1:27017/q2connect_test' : null);
+  if (!mongoUri) {
+    console.error('❌ Cannot run remaining tests: MONGODB_URI is not set in backend/.env or environment');
     process.exit(1);
   }
 
-  await mongoose.connect(process.env.MONGODB_URI);
+  try {
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 8000 });
+  } catch (connErr) {
+    console.error(`❌ Cannot run remaining tests: Failed to connect to MongoDB at ${mongoUri}:`, connErr.message);
+    process.exit(1);
+  }
 
   // Set test admin secret if not configured
   const testSecret = process.env.ADMIN_REGISTRATION_SECRET || 'test_security_secret_phase_a';
   process.env.ADMIN_REGISTRATION_SECRET = testSecret;
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test_jwt_secret_phase_a_12345';
+  process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test_jwt_refresh_secret_phase_a_12345';
 
   // Boot Express app on TEST_PORT
   const express = require('express');

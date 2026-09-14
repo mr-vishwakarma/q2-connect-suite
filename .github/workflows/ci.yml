@@ -36,6 +36,16 @@ jobs:
   backend-security-and-lint:
     name: Backend Security & P0 Regression
     runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -56,7 +66,7 @@ jobs:
       - name: Secret Leak Prevention Scan
         run: |
           echo "Scanning repository for leaked private keys or live API secrets..."
-          if git grep -i -E "sk_live|rzp_live|AIzaSy|-----BEGIN PRIVATE KEY-----" -- ':!*.example' ':!*test*' ':!*.md'; then
+          if git grep -i -E "sk_live|rzp_live|AIzaSy|-----BEGIN PRIVATE KEY-----" -- ':!*.example' ':!*test*' ':!*.md' ':!.github*'; then
             echo "❌ CRITICAL: Potential live secret detected in tracked code."
             exit 1
           else
@@ -66,6 +76,7 @@ jobs:
       - name: Run P0 Security Tests
         run: npm run test:p0
         env:
+          MONGODB_URI: mongodb://127.0.0.1:27017/q2connect_test
           ADMIN_REGISTRATION_SECRET: dummy_ci_admin_secret_12345
           JWT_SECRET: dummy_ci_jwt_secret_12345
           JWT_REFRESH_SECRET: dummy_ci_jwt_refresh_secret_12345

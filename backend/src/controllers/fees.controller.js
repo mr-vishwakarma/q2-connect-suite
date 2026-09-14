@@ -322,13 +322,16 @@ const collectPayment = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
+  let idempotencyKey = null;
+  let orgId = null;
+
   try {
     const {
       studentId, hostel, month, amount, lateFee, discount, securityDeposit,
       receivedAmount, paymentMode, notes, receiptNo, receiptUrl, idempotencyKey: bodyIdempotencyKey
     } = req.body;
 
-    const idempotencyKey = req.headers['idempotency-key'] || bodyIdempotencyKey;
+    idempotencyKey = req.headers['idempotency-key'] || bodyIdempotencyKey;
 
     if (!studentId || !month || !receivedAmount || !paymentMode || !receiptNo) {
       await session.abortTransaction();
@@ -336,7 +339,7 @@ const collectPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    const orgId = req.organizationId || req.tenant?.organizationId;
+    orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
 
     if (!isSuperAdmin && !orgId) {
@@ -500,8 +503,29 @@ const collectPayment = async (req, res) => {
 
     return res.status(201).json({ success: true, data: payment });
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     session.endSession();
+    if (error.code === 11000 || error.code === 112 || (error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError')) || (error.message && error.message.includes('Write conflict'))) {
+      if (idempotencyKey) {
+        // Wait briefly for concurrent winning transaction to commit
+        await new Promise((r) => setTimeout(r, 150));
+        const existingPayment = await FeePayment.findOne({
+          idempotencyKey,
+          ...(orgId ? { organizationId: orgId } : {})
+        });
+        if (existingPayment) {
+          return res.status(200).json({
+            success: true,
+            data: existingPayment,
+            idempotent: true,
+            message: 'Payment already recorded successfully (idempotent response)'
+          });
+        }
+      }
+      return res.status(409).json({ success: false, message: 'Concurrent write conflict or duplicate receipt detected' });
+    }
     console.error('Error in collectPayment:', error);
     return res.status(500).json({ success: false, message: error.message });
   }

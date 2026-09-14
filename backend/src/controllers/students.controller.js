@@ -137,21 +137,24 @@ const createStudent = async (req, res) => {
   try {
     const { name, username, email, phone, parentPhone, roomNo, hostel, fees, startDate, validDate, password, initialFeePaid } = req.body;
 
-    if (!name || !username || !email || !password) {
+    if (!name || !email) {
       await session.abortTransaction();
-      return res.status(400).json({ success: false, message: 'name, username, email, password are required' });
+      return res.status(400).json({ success: false, message: 'name and email are required' });
     }
+
+    const finalUsername = username || (email ? email.toLowerCase().split('@')[0] + Math.floor(100 + Math.random() * 900) : `std_${Date.now()}`);
+    const finalPassword = password || phone || 'Student@123';
 
     const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
 
     // Check for existing user/username
     let user;
-    const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username }] }).session(session);
+    const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username: finalUsername }] }).session(session);
     if (existingUser) {
       if (existingUser.registrationStatus === 'pending_approval' && existingUser.email === email.toLowerCase()) {
         existingUser.name = name;
-        existingUser.username = username;
-        existingUser.password = password;
+        existingUser.username = finalUsername;
+        existingUser.password = finalPassword;
         existingUser.role = 'student';
         existingUser.registrationStatus = 'active';
         existingUser.hostels = [hostel];
@@ -168,8 +171,8 @@ const createStudent = async (req, res) => {
       const users = await User.create([{
         name,
         email: email.toLowerCase(),
-        username,
-        password,
+        username: finalUsername,
+        password: finalPassword,
         role: 'student',
         registrationStatus: 'active',
         hostels: [hostel],
@@ -197,7 +200,7 @@ const createStudent = async (req, res) => {
       organizationId: orgId || null,
       hostelId: hostelDoc?._id || null,
       name,
-      username,
+      username: finalUsername,
       email: email.toLowerCase(),
       phone,
       parentPhone,
@@ -370,12 +373,17 @@ const createStudent = async (req, res) => {
       data: { user: user.toJSON(), student }
     });
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     session.endSession();
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'A student or user with this email or username already exists' });
     }
-    return res.status(500).json({ success: false, message: error.message });
+    if (error.code === 112 || (error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError')) || (error.message && error.message.includes('WriteConflict'))) {
+      return res.status(409).json({ success: false, message: 'Write conflict during concurrent registration. Room or user was concurrently modified.' });
+    }
+    return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
 
