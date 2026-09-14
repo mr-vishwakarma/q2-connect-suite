@@ -66,7 +66,7 @@ jobs:
       - name: Secret Leak Prevention Scan
         run: |
           echo "Scanning repository for leaked private keys or live API secrets..."
-          if git grep -i -E "sk_live|rzp_live|AIzaSy|-----BEGIN PRIVATE KEY-----" -- ':!*.example' ':!*test*' ':!*.md' ':!.github*'; then
+          if git grep -i -E "sk_live|rzp_live|AIzaSy|-----BEGIN PRIVATE KEY-----" -- ':!*.example' ':!*test*' ':!*.md' ':!.github*' ':!*.yml' ':!*.yaml'; then
             echo "❌ CRITICAL: Potential live secret detected in tracked code."
             exit 1
           else

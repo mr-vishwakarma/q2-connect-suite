@@ -15,6 +15,9 @@ try {
   dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
 } catch (e) {}
 
+const http = require('http');
+const path = require('path');
+const { spawn } = require('child_process');
 const mongoose = require('mongoose');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
@@ -34,7 +37,7 @@ const Notification = require('../models/Notification');
 const LaundrySlot = require('../models/LaundrySlot');
 const MenuRating = require('../models/MenuRating');
 
-const BASE_URL = 'http://localhost:5000/api';
+const BASE_URL = 'http://127.0.0.1:5000/api';
 
 async function runPhaseCTestSuite() {
   console.log('============================================================');
@@ -43,6 +46,7 @@ async function runPhaseCTestSuite() {
 
   let passed = 0;
   let failed = 0;
+  let serverProcess = null;
 
   function assert(condition, testName, details = '') {
     if (condition) {
@@ -58,6 +62,44 @@ async function runPhaseCTestSuite() {
     const mongoUri = process.env.MONGODB_URI;
     if (!mongoUri) {
       throw new Error('MONGODB_URI is required to run performance regression suite.');
+    }
+
+    // Ensure backend server is running on port 5000
+    const isServerRunning = await new Promise((resolve) => {
+      const req = http.get('http://127.0.0.1:5000/api/health/live', (res) => {
+        resolve(res.statusCode === 200);
+      });
+      req.on('error', () => resolve(false));
+      req.setTimeout(1000, () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+
+    if (!isServerRunning) {
+      console.log('⏳ Spawning backend server on port 5000 for performance suite...');
+      serverProcess = spawn('node', [path.join(__dirname, '../app.js')], {
+        env: { ...process.env, PORT: '5000', NODE_ENV: 'test' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      let ready = false;
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          const res = await axios.get('http://127.0.0.1:5000/api/health/live', { timeout: 1000 });
+          if (res.status === 200) {
+            ready = true;
+            break;
+          }
+        } catch (e) {}
+      }
+
+      if (!ready) {
+        if (serverProcess) serverProcess.kill();
+        throw new Error('Failed to start backend server on port 5000 within 15s');
+      }
+      console.log('✅ Backend server is ready on port 5000.\n');
     }
 
     console.log('[Setup] Connecting to MongoDB Atlas...');
@@ -322,6 +364,10 @@ async function runPhaseCTestSuite() {
     await mongoose.disconnect();
     console.log('📦 Cleaned up and disconnected from MongoDB Atlas.\n');
 
+    if (serverProcess) {
+      serverProcess.kill('SIGTERM');
+      await new Promise((r) => setTimeout(r, 500));
+    }
   } catch (err) {
     console.error('❌ Critical Test Suite Exception:', err.response?.data || err.message);
     failed++;
