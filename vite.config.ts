@@ -36,14 +36,31 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-              return 'vendor';
+            if (id.includes('three') || id.includes('@react-three')) {
+              return 'vendor-three';
             }
-            if (id.includes('lucide-react') || id.includes('framer-motion') || id.includes('clsx') || id.includes('tailwind-merge')) {
-              return 'ui';
+            if (id.includes('xlsx')) {
+              return 'vendor-sheets';
             }
-            if (id.includes('recharts') || id.includes('jspdf') || id.includes('xlsx')) {
-              return 'data';
+            if (id.includes('jspdf') || id.includes('html2canvas')) {
+              return 'vendor-pdf';
+            }
+            if (id.includes('recharts')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('@tanstack/react-query')) {
+              return 'vendor-query';
+            }
+            if (id.includes('lucide-react') || id.includes('framer-motion') || id.includes('@radix-ui')) {
+              return 'vendor-ui';
+            }
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/react-router-dom/') ||
+              id.includes('/react-router/')
+            ) {
+              return 'vendor-react';
             }
           }
         }

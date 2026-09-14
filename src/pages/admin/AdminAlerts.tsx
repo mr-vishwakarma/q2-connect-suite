@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { api } from '@/lib/api';
-import { io, Socket } from 'socket.io-client';
 import { AlertTriangle, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -139,18 +138,6 @@ export default function AdminAlerts() {
       fetchAlertStudents();
     }
   }, [user, isAdmin, selectedHostel, fetchAlertStudents]);
-
-  useEffect(() => {
-    if (!user || !isAdmin) return;
-
-    const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
-      withCredentials: true,
-    });
-
-    return () => {
-      newSocket.disconnect();
-    };
-  }, [user, isAdmin, selectedHostel]);
 
   const [filterType, setFilterType] = useState<'all' | 'unpaid' | 'critical' | 'warning'>('all');
 

@@ -5,7 +5,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { dashboardService } from '@/services/api';
 import { useQuery } from '@tanstack/react-query';
-import { io, Socket } from 'socket.io-client';
 import {
   Users,
   MessageSquare,
@@ -69,7 +68,6 @@ export default function AdminDashboard() {
   const { user, profile, isAdmin, loading: authLoading } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
-  const [socket, setSocket] = useState<Socket | null>(null);
 
   const { data: dashboardData } = useQuery({
     queryKey: ['adminDashboard', selectedHostel],
@@ -109,19 +107,6 @@ export default function AdminDashboard() {
     averageRating: 0,
     totalRatings: 0,
   };
-
-  useEffect(() => {
-    if (!user || !isAdmin) return;
-
-    const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
-      withCredentials: true,
-    });
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.disconnect();
-    };
-  }, [user, isAdmin, selectedHostel]);
 
   // Manager display name
   const managerName = profile?.name || user?.email?.split('@')[0] || 'Manager';

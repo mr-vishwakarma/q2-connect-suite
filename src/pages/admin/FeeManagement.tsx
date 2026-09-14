@@ -8,7 +8,6 @@ import { useHostel } from '@/contexts/HostelContext';
 import { useAuth } from '@/hooks/useAuth';
 import { feeService, settingsService } from '@/services/api';
 import { Student, Fee, Payment, SecurityDeposit, Deposit } from '@/types';
-import { io } from 'socket.io-client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -131,16 +130,6 @@ export default function FeeManagement() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  useEffect(() => {
-    if (!profile) return;
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
-      withCredentials: true,
-    });
-    return () => {
-      socket.disconnect();
-    };
-  }, [selectedHostel, fetchData, profile]);
 
   // Build matrix records with enhanced status classification
   const records: MatrixStudentRecord[] = useMemo(() => {

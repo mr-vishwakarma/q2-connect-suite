@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
-import { io } from 'socket.io-client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -109,16 +108,6 @@ export default function FeeHistory() {
   }, []);
 
   useEffect(() => { if (user) fetchAll(); }, [user, fetchAll]);
-
-  useEffect(() => {
-    if (!student) return;
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', { withCredentials: true });
-    
-    // Listen for updates if necessary
-    // socket.on('fees-updated', fetchAll);
-
-    return () => { socket.disconnect(); };
-  }, [student, fetchAll]);
 
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount) + Number(p.security_deposit), 0);
   const totalPending = fees.reduce((s, f) => s + Math.max(0, f.amount + (f.late_fee || 0) - (f.discount || 0) - (f.paid_amount || 0)), 0);

@@ -2,8 +2,7 @@ import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useEffect, useState, useCallback } from 'react';
 import { useHostel } from '@/contexts/HostelContext';
 import { useAuth } from '@/hooks/useAuth';
-import { api } from '@/lib/api';
-import { io } from 'socket.io-client';
+import { api, getSocket } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -105,11 +104,16 @@ export default function Notifications() {
   // Real-time updates
   useEffect(() => {
     if (!user || !isAdmin) return;
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', { withCredentials: true });
+    const socket = getSocket();
+    if (!socket.connected) {
+      socket.connect();
+    }
     
     socket.on('notifications-updated', fetchNotifications);
 
-    return () => { socket.disconnect(); };
+    return () => {
+      socket.off('notifications-updated', fetchNotifications);
+    };
   }, [user, isAdmin, selectedHostel, fetchNotifications]);
 
   const handleSendNotification = async () => {

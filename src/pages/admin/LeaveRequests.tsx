@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { api } from '@/lib/api';
-import { io } from 'socket.io-client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,16 +84,6 @@ export default function LeaveRequests() {
 
   useEffect(() => {
     if (user && isAdmin) fetchRequests();
-  }, [user, isAdmin, selectedHostel, fetchRequests]);
-
-  useEffect(() => {
-    if (!user || !isAdmin) return;
-    const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', { withCredentials: true });
-    
-    // Optionally listen to events to refetch data
-    // socket.on('mess-requests-updated', fetchRequests);
-
-    return () => { socket.disconnect(); };
   }, [user, isAdmin, selectedHostel, fetchRequests]);
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {

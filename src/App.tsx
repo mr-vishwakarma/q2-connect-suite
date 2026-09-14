@@ -85,7 +85,16 @@ const SystemHealth = lazy(() => import("./pages/super-admin/SystemHealth"));
 const PlatformReports = lazy(() => import("./pages/super-admin/PlatformReports"));
 const PlatformSettings = lazy(() => import("./pages/super-admin/PlatformSettings"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const adminTitles: Record<string, string> = {
   "/admin/dashboard": "",

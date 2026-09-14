@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, ReactNode } from 'react';
 import { api, getSocket, disconnectSocket } from '@/lib/api';
 
 export interface User {
@@ -71,12 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [features, setFeatures] = useState<Record<string, boolean>>({});
 
-  const hasFeature = (featureKey: string): boolean => {
+  const hasFeature = useCallback((featureKey: string): boolean => {
     if (isSuperAdmin || user?.isSuperAdmin || user?.role === 'super_admin') return true;
     const coreFeatures = ['student_management', 'room_management', 'fee_management', 'reports'];
     if (coreFeatures.includes(featureKey)) return true;
     return !!features[featureKey];
-  };
+  }, [isSuperAdmin, user, features]);
 
   const fetchProfile = async () => {
     try {
@@ -404,24 +404,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const authContextValue = useMemo(() => ({
+    user,
+    loading,
+    isAdmin,
+    isSuperAdmin,
+    isPrimaryAdmin,
+    profile,
+    features,
+    hasFeature,
+    signIn,
+    signInWithGoogle,
+    requestGoogleRegistration,
+    completeGoogleSetup,
+    signUp,
+    signOut,
+    refreshProfile
+  }), [
+    user,
+    loading,
+    isAdmin,
+    isSuperAdmin,
+    isPrimaryAdmin,
+    profile,
+    features,
+    hasFeature
+  ]);
+
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      isAdmin,
-      isSuperAdmin,
-      isPrimaryAdmin,
-      profile,
-      features,
-      hasFeature,
-      signIn,
-      signInWithGoogle,
-      requestGoogleRegistration,
-      completeGoogleSetup,
-      signUp,
-      signOut,
-      refreshProfile
-    }}>
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );
