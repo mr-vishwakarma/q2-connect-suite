@@ -15,6 +15,7 @@
     "test:tenant": "node src/scripts/test_phase_b_multitenant.js",
     "test:perf": "node src/scripts/test_phase_c_performance.js",
     "test:jobs": "node src/scripts/test_phase_d_distributed_jobs.js",
+    "test:media": "node src/scripts/test_phase_e_media_pipeline.js",
     "test": "node src/scripts/test_p0_security.js"
   },
   "dependencies": {

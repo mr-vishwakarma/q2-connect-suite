@@ -11,6 +11,8 @@ import { Loader2, Camera, User, Mail, Phone, Home, Calendar, LogOut, ShieldCheck
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
+import { uploadMedia } from '@/utils/uploadService';
+
 export default function Profile() {
   const { profile: authProfile, refreshProfile, signOut } = useAuth();
   const navigate = useNavigate();
@@ -25,38 +27,51 @@ export default function Profile() {
     email: '',
     phone: '',
     parentPhone: '',
+    roomNo: '',
+    hostel: '',
+    fees: 0,
+    startDate: '',
+    validDate: '',
     address: '',
     dob: '',
+    studentCode: '',
     profilePhoto: '',
     profilePhotoFileId: '',
   });
 
   useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await api.get('/students/me');
+        if (response.data?.success && response.data.data) {
+          const student = response.data.data;
+          setFormData({
+            name: student.name || '',
+            username: student.username || '',
+            email: student.email || '',
+            phone: student.phone || '',
+            parentPhone: student.parentPhone || '',
+            roomNo: student.roomNo || '',
+            hostel: student.hostel || '',
+            fees: student.fees || 0,
+            startDate: student.startDate ? new Date(student.startDate).toISOString().split('T')[0] : '',
+            validDate: student.validDate ? new Date(student.validDate).toISOString().split('T')[0] : '',
+            address: student.address || '',
+            dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
+            studentCode: student.studentCode || '',
+            profilePhoto: student.profilePhoto || '',
+            profilePhotoFileId: student.profilePhotoFileId || '',
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchProfile();
   }, []);
-
-  const fetchProfile = async () => {
-    try {
-      const response = await api.get('/auth/me');
-      const { user, student } = response.data;
-      
-      setFormData({
-        name: student?.name || user?.name || '',
-        username: user?.username || '',
-        email: user?.email || '',
-        phone: student?.phone || '',
-        parentPhone: student?.parentPhone || '',
-        address: student?.address || '',
-        dob: student?.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
-        profilePhoto: student?.profilePhoto || '',
-        profilePhotoFileId: student?.profilePhotoFileId || '',
-      });
-    } catch (error) {
-      toast.error('Failed to load profile');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -68,7 +83,7 @@ export default function Profile() {
     try {
       await api.put('/students/profile', formData);
       await refreshProfile();
-      toast.success('Profile updated successfully');
+      toast.success('Profile updated successfully!');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to update profile');
     } finally {
@@ -80,30 +95,25 @@ export default function Profile() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('File size should be less than 10MB');
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error('Profile photo size should be less than 3MB');
       return;
     }
 
     setUploading(true);
-    const data = new FormData();
-    data.append('file', file);
-
     try {
-      const response = await api.post('/upload/file', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const { url, fileId } = await uploadMedia(file, {
+        category: 'PROFILE_PHOTO',
       });
-      
-      const { url, fileId } = response.data;
-      
+
       setFormData(prev => ({ ...prev, profilePhoto: url, profilePhotoFileId: fileId }));
-      
+
       // Auto-save the photo update
       await api.put('/students/profile', { ...formData, profilePhoto: url, profilePhotoFileId: fileId });
       await refreshProfile();
       toast.success('Profile photo updated!');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to upload photo');
+      toast.error(error.response?.data?.message || error.message || 'Failed to upload photo');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
