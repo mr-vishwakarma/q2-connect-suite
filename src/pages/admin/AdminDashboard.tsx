@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -79,40 +79,48 @@ export default function AdminDashboard() {
     enabled: !!(user && isAdmin),
   });
 
-  const stats: DashboardStats = dashboardData?.stats || {
-    totalStudents: 0,
-    totalComplaints: 0,
-    totalSuggestions: 0,
-    studentsTrend: '+0%',
-    complaintsTrend: '+0%',
-    suggestionsTrend: '+0%',
-  };
+  const dashboardDerived = useMemo(() => {
+    const stats: DashboardStats = dashboardData?.stats || {
+      totalStudents: 0,
+      totalComplaints: 0,
+      totalSuggestions: 0,
+      studentsTrend: '+0%',
+      complaintsTrend: '+0%',
+      suggestionsTrend: '+0%',
+    };
+    const complaintsSummary = dashboardData?.complaintsSummary || { today: 0, thisWeek: 0, thisMonth: 0 };
+    const recentComplaints: RecentComplaint[] = dashboardData?.recentComplaints || [];
+    const recentSuggestions: RecentSuggestion[] = dashboardData?.recentSuggestions || [];
+    const complaintsData = dashboardData?.complaintsData || [];
+    const allocation = dashboardData?.allocationDistribution || {
+      total: stats.totalStudents || 0,
+      allocated: stats.totalStudents || 0,
+      pending: 0,
+      vacant: 0,
+    };
+    const ratingSummary = dashboardData?.ratingSummary || { averageRating: 0, totalRatings: 0 };
+    const totalAllocCapacity = (allocation.allocated + allocation.pending + allocation.vacant) || (stats.totalStudents || 1);
+    const allocatedPct = totalAllocCapacity > 0 ? Math.round((allocation.allocated / totalAllocCapacity) * 100) : 0;
+    const pendingPct = totalAllocCapacity > 0 ? Math.round((allocation.pending / totalAllocCapacity) * 100) : 0;
+    const vacantPct = totalAllocCapacity > 0 ? Math.round((allocation.vacant / totalAllocCapacity) * 100) : 0;
+    const donutData = [
+      { name: 'Allocated', value: allocation.allocated || (stats.totalStudents ? stats.totalStudents : 1), color: '#3b82f6' },
+      { name: 'Pending', value: allocation.pending || 0, color: '#a855f7' },
+      { name: 'Vacant', value: allocation.vacant || 0, color: '#64748b' },
+    ];
+    return { stats, complaintsSummary, recentComplaints, recentSuggestions, complaintsData, allocation, ratingSummary, totalAllocCapacity, allocatedPct, pendingPct, vacantPct, donutData };
+  }, [dashboardData]);
 
-  const complaintsSummary = dashboardData?.complaintsSummary || {
-    today: 0,
-    thisWeek: 0,
-    thisMonth: 0,
-  };
+  const { stats, complaintsSummary, recentComplaints, recentSuggestions, complaintsData, allocation, ratingSummary, totalAllocCapacity, allocatedPct, pendingPct, vacantPct, donutData } = dashboardDerived;
 
-  const recentComplaints: RecentComplaint[] = dashboardData?.recentComplaints || [];
-  const recentSuggestions: RecentSuggestion[] = dashboardData?.recentSuggestions || [];
-  const complaintsData = dashboardData?.complaintsData || [];
-  const allocation = dashboardData?.allocationDistribution || {
-    total: stats.totalStudents || 0,
-    allocated: stats.totalStudents || 0,
-    pending: 0,
-    vacant: 0,
-  };
-  const ratingSummary = dashboardData?.ratingSummary || {
-    averageRating: 0,
-    totalRatings: 0,
-  };
+  // Manager display name — recomputes only when profile/user changes
+  const managerName = useMemo(
+    () => profile?.name || user?.email?.split('@')[0] || 'Manager',
+    [profile?.name, user?.email]
+  );
 
-  // Manager display name
-  const managerName = profile?.name || user?.email?.split('@')[0] || 'Manager';
-
-  // Category Icon helper
-  const getCategoryIcon = (category?: string) => {
+  // Category Icon helper — stable function reference
+  const getCategoryIcon = useCallback((category?: string) => {
     const cat = (category || 'Room').toLowerCase();
     if (cat.includes('water')) return <Droplets className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400" />;
     if (cat.includes('wifi')) return <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />;
@@ -120,19 +128,7 @@ export default function AdminDashboard() {
     if (cat.includes('clean')) return <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />;
     if (cat.includes('mess') || cat.includes('food')) return <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" />;
     return <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400" />;
-  };
-
-  // Donut data calculation
-  const totalAllocCapacity = (allocation.allocated + allocation.pending + allocation.vacant) || (stats.totalStudents || 1);
-  const allocatedPct = totalAllocCapacity > 0 ? Math.round((allocation.allocated / totalAllocCapacity) * 100) : 0;
-  const pendingPct = totalAllocCapacity > 0 ? Math.round((allocation.pending / totalAllocCapacity) * 100) : 0;
-  const vacantPct = totalAllocCapacity > 0 ? Math.round((allocation.vacant / totalAllocCapacity) * 100) : 0;
-
-  const donutData = [
-    { name: 'Allocated', value: allocation.allocated || (stats.totalStudents ? stats.totalStudents : 1), color: '#3b82f6' },
-    { name: 'Pending', value: allocation.pending || 0, color: '#a855f7' },
-    { name: 'Vacant', value: allocation.vacant || 0, color: '#64748b' },
-  ];
+  }, []);
 
   return (
     <div className="space-y-3 sm:space-y-4 md:space-y-5 pb-8 max-w-7xl mx-auto">

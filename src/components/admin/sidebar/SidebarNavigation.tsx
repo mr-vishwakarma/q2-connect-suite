@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo, memo } from 'react';
 import {
   LayoutDashboard,
   UserPlus,
@@ -50,7 +50,7 @@ export interface SidebarNavigationProps {
   onNavigate?: () => void;
 }
 
-export function SidebarNavigation({ isCollapsed = false, onNavigate }: SidebarNavigationProps) {
+function SidebarNavigationInner({ isCollapsed = false, onNavigate }: SidebarNavigationProps) {
   const { user, isAdmin, hasFeature } = useAuth();
   const { selectedHostel } = useHostel();
   const [alertCount, setAlertCount] = useState(0);
@@ -72,10 +72,13 @@ export function SidebarNavigation({ isCollapsed = false, onNavigate }: SidebarNa
     }
   }, [user, isAdmin, selectedHostel, fetchAlertCount]);
 
-  const visibleLinks = ADMIN_NAV_LINKS.filter((link) => {
-    if (!('featureKey' in link) || !link.featureKey) return true;
-    return hasFeature(link.featureKey);
-  });
+  // Only recompute when hasFeature reference changes (i.e. when auth state changes)
+  const visibleLinks = useMemo(() =>
+    ADMIN_NAV_LINKS.filter((link) => {
+      if (!('featureKey' in link) || !link.featureKey) return true;
+      return hasFeature(link.featureKey);
+    }),
+  [hasFeature]);
 
   return (
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
@@ -96,3 +99,6 @@ export function SidebarNavigation({ isCollapsed = false, onNavigate }: SidebarNa
     </nav>
   );
 }
+
+// Wrap in memo — sidebar nav should not re-render when layout toggles mobile drawer
+export const SidebarNavigation = memo(SidebarNavigationInner);

@@ -22,6 +22,25 @@ export interface Profile {
   hostel?: string | null;
 }
 
+// Batch all auth fields into one object so login/logout triggers 1 re-render, not 6.
+interface AuthState {
+  user: User | null;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
+  isPrimaryAdmin: boolean;
+  profile: Profile | null;
+  features: Record<string, boolean>;
+}
+
+const LOGGED_OUT_STATE: AuthState = {
+  user: null,
+  isAdmin: false,
+  isSuperAdmin: false,
+  isPrimaryAdmin: false,
+  profile: null,
+  features: {},
+};
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -64,24 +83,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // enforced server-side by row-level security policies (via the has_role() helper)
 // and by JWT + role checks inside edge functions.
 
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  // Single state object — batches all fields into one update → 1 re-render on login/logout
+  const [authState, setAuthState] = useState<AuthState>(LOGGED_OUT_STATE);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [isPrimaryAdmin, setIsPrimaryAdmin] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [features, setFeatures] = useState<Record<string, boolean>>({});
+
+  const { user, isAdmin, isSuperAdmin, isPrimaryAdmin, profile, features } = authState;
 
   const hasFeature = useCallback((featureKey: string): boolean => {
-    if (isSuperAdmin || user?.isSuperAdmin || user?.role === 'super_admin') return true;
+    if (authState.isSuperAdmin || authState.user?.isSuperAdmin || authState.user?.role === 'super_admin') return true;
     const coreFeatures = ['student_management', 'room_management', 'fee_management', 'reports'];
     if (coreFeatures.includes(featureKey)) return true;
-    return !!features[featureKey];
-  }, [isSuperAdmin, user, features]);
+    return !!authState.features[featureKey];
+  }, [authState]);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const response = await api.get('/auth/me');
       if (response.data?.success) {
@@ -96,36 +112,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isSuperAdmin: userData.isSuperAdmin || userData.role === 'super_admin',
         };
 
-        setUser(mappedUser);
-        setIsSuperAdmin(userData.role === 'super_admin' || !!userData.isSuperAdmin);
-        setIsAdmin(userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin);
-        setIsPrimaryAdmin(userData.role === 'admin' || userData.role === 'super_admin');
-        if (userFeatures && typeof userFeatures === 'object') {
-          setFeatures(userFeatures);
-        }
+        const newProfile: Profile = student
+          ? {
+              id: student._id || student.id,
+              user_id: userData._id || userData.id,
+              name: student.name,
+              email: student.email,
+              username: student.username,
+              profilePhoto: student.profilePhoto,
+              room_no: student.roomNo || student.room_no || null,
+              fees: student.fees ?? null,
+              hostel: student.hostel || null,
+            }
+          : {
+              id: userData._id,
+              user_id: userData._id,
+              name: userData.name,
+              email: userData.email,
+              username: userData.username,
+              profilePhoto: userData.profilePhoto,
+            };
 
-        if (student) {
-          setProfile({
-            id: student._id || student.id,
-            user_id: userData._id || userData.id,
-            name: student.name,
-            email: student.email,
-            username: student.username,
-            profilePhoto: student.profilePhoto,
-            room_no: student.roomNo || student.room_no || null,
-            fees: student.fees ?? null,
-            hostel: student.hostel || null,
-          });
-        } else {
-          setProfile({
-            id: userData._id,
-            user_id: userData._id,
-            name: userData.name,
-            email: userData.email,
-            username: userData.username,
-            profilePhoto: userData.profilePhoto,
-          });
-        }
+        // Single setState → 1 re-render
+        setAuthState({
+          user: mappedUser,
+          isSuperAdmin: userData.role === 'super_admin' || !!userData.isSuperAdmin,
+          isAdmin: userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin,
+          isPrimaryAdmin: userData.role === 'admin' || userData.role === 'super_admin',
+          profile: newProfile,
+          features: (userFeatures && typeof userFeatures === 'object') ? userFeatures : {},
+        });
 
         // Connect Socket.io client
         try {
@@ -143,19 +159,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clean up if invalid/expired tokens
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
-      setUser(null);
-      setProfile(null);
-      setIsAdmin(false);
-      setIsPrimaryAdmin(false);
+      setAuthState(LOGGED_OUT_STATE);
       disconnectSocket();
     }
-  };
+  }, []);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (localStorage.getItem('accessToken')) {
       await fetchProfile();
     }
-  };
+  }, [fetchProfile]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -170,10 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for unauthorized events from axios interceptor
     const handleUnauthorized = () => {
-      setUser(null);
-      setProfile(null);
-      setIsAdmin(false);
-      setIsPrimaryAdmin(false);
+      setAuthState(LOGGED_OUT_STATE);
       disconnectSocket();
     };
 
@@ -181,9 +191,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener('auth:unauthorized', handleUnauthorized);
     };
-  }, []);
+  }, [fetchProfile]);
 
-  const handleAuthSuccess = (data: any) => {
+  const handleAuthSuccess = useCallback((data: any) => {
     const { accessToken, refreshToken, user: userData, student } = data;
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
@@ -197,33 +207,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSuperAdmin: userData.role === 'super_admin' || !!userData.isSuperAdmin,
     };
 
-    setUser(mappedUser);
-    setIsSuperAdmin(userData.role === 'super_admin' || !!userData.isSuperAdmin);
-    setIsAdmin(userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin);
-    setIsPrimaryAdmin(userData.role === 'admin' || userData.role === 'super_admin');
+    const newProfile: Profile = student
+      ? {
+          id: student._id || student.id,
+          user_id: userData._id || userData.id,
+          name: student.name,
+          email: student.email,
+          username: student.username,
+          profilePhoto: student.profilePhoto,
+          room_no: student.roomNo || student.room_no || null,
+          fees: student.fees ?? null,
+          hostel: student.hostel || null,
+        }
+      : {
+          id: userData._id || userData.id,
+          user_id: userData._id || userData.id,
+          name: userData.name,
+          email: userData.email,
+          username: userData.username,
+          profilePhoto: userData.profilePhoto,
+        };
 
-    if (student) {
-      setProfile({
-        id: student._id || student.id,
-        user_id: userData._id || userData.id,
-        name: student.name,
-        email: student.email,
-        username: student.username,
-        profilePhoto: student.profilePhoto,
-        room_no: student.roomNo || student.room_no || null,
-        fees: student.fees ?? null,
-        hostel: student.hostel || null,
-      });
-    } else {
-      setProfile({
-        id: userData._id || userData.id,
-        user_id: userData._id || userData.id,
-        name: userData.name,
-        email: userData.email,
-        username: userData.username,
-        profilePhoto: userData.profilePhoto,
-      });
-    }
+    // Single setState → 1 re-render on login
+    setAuthState({
+      user: mappedUser,
+      isSuperAdmin: userData.role === 'super_admin' || !!userData.isSuperAdmin,
+      isAdmin: userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin,
+      isPrimaryAdmin: userData.role === 'admin' || userData.role === 'super_admin',
+      profile: newProfile,
+      features: {},
+    });
 
     // Connect Socket
     try {
@@ -237,7 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return mappedUser;
-  };
+  }, []);
 
   const signIn = async (
     identifier: string,
@@ -396,7 +409,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
       await api.post('/auth/logout', { refreshToken });
@@ -405,13 +418,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
-      setUser(null);
-      setProfile(null);
-      setIsAdmin(false);
-      setIsPrimaryAdmin(false);
+      // Single setState → 1 re-render on logout
+      setAuthState(LOGGED_OUT_STATE);
       disconnectSocket();
     }
-  };
+  }, []);
 
   const authContextValue = useMemo(() => ({
     user,
@@ -430,14 +441,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     refreshProfile
   }), [
-    user,
+    authState,
     loading,
-    isAdmin,
-    isSuperAdmin,
-    isPrimaryAdmin,
-    profile,
-    features,
-    hasFeature
+    hasFeature,
+    signIn,
+    signInWithGoogle,
+    requestGoogleRegistration,
+    completeGoogleSetup,
+    signUp,
+    signOut,
+    refreshProfile
   ]);
 
   return (

@@ -117,9 +117,9 @@ export default function AllStudents() {
     room_no: '',
     fees: '',
     username: '',
+    startDate: undefined as Date | undefined,
+    endDate: undefined as Date | undefined,
   });
-  const [editStartDate, setEditStartDate] = useState<Date | undefined>();
-  const [editEndDate, setEditEndDate] = useState<Date | undefined>();
 
   // Approval Workflow State
   const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active');
@@ -145,7 +145,7 @@ export default function AllStudents() {
 
   const fetchStudents = useCallback(async (signal?: AbortSignal) => {
     try {
-      setIsLoading(prev => prev);
+      setIsLoading(true);
       const response = await api.get('/students', { 
         params: { 
           hostel: selectedHostel, 
@@ -259,9 +259,9 @@ export default function AllStudents() {
       room_no: student.room_no || '',
       fees: student.fees?.toString() || '',
       username: student.username || '',
+      startDate: student.start_date ? new Date(student.start_date) : undefined,
+      endDate: student.valid_date ? new Date(student.valid_date) : undefined,
     });
-    setEditStartDate(student.start_date ? new Date(student.start_date) : undefined);
-    setEditEndDate(student.valid_date ? new Date(student.valid_date) : undefined);
     setIsDialogOpen(true);
   };
 
@@ -277,8 +277,8 @@ export default function AllStudents() {
         roomNo: editForm.room_no,
         fees: parseFloat(editForm.fees) || null,
         username: editForm.username.toLowerCase(),
-        startDate: editStartDate ? format(editStartDate, 'yyyy-MM-dd') : null,
-        validDate: editEndDate ? format(editEndDate, 'yyyy-MM-dd') : null,
+        startDate: editForm.startDate ? format(editForm.startDate, 'yyyy-MM-dd') : null,
+        validDate: editForm.endDate ? format(editForm.endDate, 'yyyy-MM-dd') : null,
       });
 
       toast.success('Student updated successfully');

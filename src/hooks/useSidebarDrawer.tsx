@@ -17,25 +17,15 @@ export function useSidebarDrawer() {
     return false;
   });
 
-  // Track if viewport is desktop (>= 1024px)
-  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth >= DESKTOP_BREAKPOINT;
-    }
-    return true;
-  });
-
   useEffect(() => {
     const handleResize = () => {
-      const desktop = window.innerWidth >= DESKTOP_BREAKPOINT;
-      setIsDesktop(desktop);
-      // If resizing to desktop, close mobile drawer
-      if (desktop) {
+      // Close mobile drawer when switching to desktop — no isDesktop state needed.
+      if (window.innerWidth >= DESKTOP_BREAKPOINT) {
         setIsMobileOpen(false);
       }
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize, { passive: true });
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -75,8 +65,7 @@ export function useSidebarDrawer() {
     closeSidebar: closeMobile,
     isCollapsed,
     toggleCollapse,
-    isDesktop,
-    shouldOverlay: !isDesktop,
     toggle: toggleMobile,
   };
 }
+

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { HostelSelector } from './HostelSelector';
@@ -12,7 +13,7 @@ interface AdminTopBarProps {
   showMenu?: boolean;
 }
 
-export function AdminTopBar({
+function AdminTopBarInner({
   title,
   subtitle,
   onMenuToggle,
@@ -76,3 +77,6 @@ export function AdminTopBar({
     </header>
   );
 }
+
+// Memo — title/subtitle prop changes drive re-renders, not auth state changes
+export const AdminTopBar = memo(AdminTopBarInner);

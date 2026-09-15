@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { api, getSocket } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -77,27 +77,36 @@ export function NotificationBell() {
     };
   }, [user]);
 
-  const markAsRead = async (id: string) => {
+  const markAsRead = useCallback(async (id: string) => {
+    // Optimistic update — no refetch needed
+    setNotifications(prev =>
+      prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+    );
     try {
       await api.put(`/notifications/${id}/read`);
-      fetchNotifications();
     } catch (err) {
+      // Rollback on failure
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, is_read: false } : n)
+      );
       console.error('Error marking read:', err);
     }
-  };
+  }, []);
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     if (!user) return;
-    
+    // Optimistic update — no refetch needed
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     try {
       await api.put('/notifications/read-all');
-      fetchNotifications();
     } catch (err) {
+      // Rollback: refetch to get true state
+      fetchNotifications();
       console.error('Error marking all read:', err);
     }
-  };
+  }, [user, fetchNotifications]);
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = useMemo(() => (type: string) => {
     switch (type) {
       case 'warning':
         return <AlertTriangle className="w-4 h-4 text-warning" />;
@@ -108,9 +117,9 @@ export function NotificationBell() {
       default:
         return <Info className="w-4 h-4 text-primary" />;
     }
-  };
+  }, []);
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = useMemo(() => notifications.filter(n => !n.is_read).length, [notifications]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
