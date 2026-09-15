@@ -1,8 +1,8 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
-import { CollectPaymentDialog } from './components/CollectPaymentDialog';
+import { CollectPaymentDialog, PaymentFormState } from './components/CollectPaymentDialog';
 import { StudentProfileHistory } from './components/StudentProfileHistory';
 import { StudentFeeMatrix, MatrixStudentRecord, FeeStatusType } from './components/StudentFeeMatrix';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHostel } from '@/contexts/HostelContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -72,24 +72,21 @@ export default function FeeManagement() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-
-  // Payment form state
-  const [pMonth, setPMonth] = useState(format(new Date(), 'MMMM yyyy'));
-  const [pAmount, setPAmount] = useState<number>(0);
-  const [pLateFee, setPLateFee] = useState<number>(0);
-  const [pDiscount, setPDiscount] = useState<number>(0);
-  const [pDeposit, setPDeposit] = useState<number>(0);
-  const [pReceived, setPReceived] = useState<number>(0);
-  const [pMode, setPMode] = useState<'cash' | 'upi' | 'bank'>('upi');
-  const [pNotes, setPNotes] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [paymentInitialValues, setPaymentInitialValues] = useState<PaymentFormState>({
+    pMonth: format(new Date(), 'MMMM yyyy'),
+    pAmount: 0, pLateFee: 0, pDiscount: 0, pDeposit: 0, pReceived: 0,
+    pMode: 'upi', pNotes: '',
+  });
 
   const currentMonth = format(new Date(), 'MMMM yyyy');
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-      setCurrentPage(1);
+      // startTransition: large filteredRecords recomputation is non-urgent
+      startTransition(() => {
+        setDebouncedSearch(searchQuery);
+        setCurrentPage(1);
+      });
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -242,21 +239,22 @@ export default function FeeManagement() {
   const openCollect = (s: Student) => {
     setSelectedStudent(s);
     const monthly = s.fees || 0;
-    setPMonth(selectedMonth);
-    setPAmount(monthly);
-
     const cf = fees.find((f) => f.student_id === s.id && f.month === selectedMonth);
+    let lateFee = 0;
     if (cf?.due_date) {
       const overdue = differenceInDays(new Date(), new Date(cf.due_date));
-      setPLateFee(overdue > gracePeriodSetting ? (overdue - gracePeriodSetting) * lateFeeSetting : 0);
-    } else {
-      setPLateFee(0);
+      lateFee = overdue > gracePeriodSetting ? (overdue - gracePeriodSetting) * lateFeeSetting : 0;
     }
-    setPDiscount(0);
-    setPDeposit(0);
-    setPReceived(monthly);
-    setPMode('upi');
-    setPNotes('');
+    setPaymentInitialValues({
+      pMonth: selectedMonth,
+      pAmount: monthly,
+      pLateFee: lateFee,
+      pDiscount: 0,
+      pDeposit: 0,
+      pReceived: monthly,
+      pMode: 'upi',
+      pNotes: '',
+    });
     setShowPaymentDialog(true);
   };
 
@@ -265,13 +263,12 @@ export default function FeeManagement() {
     setShowProfileDialog(true);
   };
 
-  const handleSubmitPayment = async () => {
+  const handleSubmitPayment = async (form: PaymentFormState) => {
     if (!selectedStudent) return;
-    if (pReceived <= 0) {
+    if (form.pReceived <= 0) {
       toast.error('Enter amount received');
-      return;
+      throw new Error('Invalid amount');
     }
-    setSubmitting(true);
 
     try {
       const receipt_no = genReceiptNo();
@@ -283,14 +280,14 @@ export default function FeeManagement() {
         student_id: selectedStudent.id,
         receipt_no,
         payment_date: new Date().toISOString(),
-        month: pMonth,
-        amount: pReceived,
-        payment_mode: pMode,
+        month: form.pMonth,
+        amount: form.pReceived,
+        payment_mode: form.pMode,
         admin_name: profile?.name || '',
-        notes: pNotes,
-        late_fee: pLateFee,
-        discount: pDiscount,
-        security_deposit: pDeposit,
+        notes: form.pNotes,
+        late_fee: form.pLateFee,
+        discount: form.pDiscount,
+        security_deposit: form.pDeposit,
       });
 
       const receiptData: HistoryReceiptData = {
@@ -315,14 +312,14 @@ export default function FeeManagement() {
       await api.post('/fees/collect', {
         studentId: selectedStudent.id,
         hostel: selectedHostel,
-        month: pMonth,
-        amount: pAmount,
-        lateFee: pLateFee,
-        discount: pDiscount,
-        securityDeposit: pDeposit,
-        receivedAmount: pReceived,
-        paymentMode: pMode,
-        notes: pNotes,
+        month: form.pMonth,
+        amount: form.pAmount,
+        lateFee: form.pLateFee,
+        discount: form.pDiscount,
+        securityDeposit: form.pDeposit,
+        receivedAmount: form.pReceived,
+        paymentMode: form.pMode,
+        notes: form.pNotes,
         receiptNo: receipt_no,
         receiptUrl,
       });
@@ -335,8 +332,7 @@ export default function FeeManagement() {
     } catch (e: unknown) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : 'Failed to record payment');
-    } finally {
-      setSubmitting(false);
+      throw e; // re-throw so dialog can reset submitting state
     }
   };
 
@@ -884,25 +880,9 @@ export default function FeeManagement() {
         open={showPaymentDialog}
         onOpenChange={setShowPaymentDialog}
         selectedStudent={selectedStudent}
-        pMonth={pMonth}
-        setPMonth={setPMonth}
+        initialValues={paymentInitialValues}
         monthOptions={MONTH_OPTIONS}
-        pAmount={pAmount}
-        setPAmount={setPAmount}
-        pLateFee={pLateFee}
-        setPLateFee={setPLateFee}
-        pDiscount={pDiscount}
-        setPDiscount={setPDiscount}
-        pDeposit={pDeposit}
-        setPDeposit={setPDeposit}
-        pReceived={pReceived}
-        setPReceived={setPReceived}
-        pMode={pMode}
-        setPMode={setPMode}
-        pNotes={pNotes}
-        setPNotes={setPNotes}
         onSubmit={handleSubmitPayment}
-        submitting={submitting}
       />
 
       {/* Expanded Student Profile & Payment History Modal */}

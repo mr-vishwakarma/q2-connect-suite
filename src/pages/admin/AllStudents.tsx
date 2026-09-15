@@ -1,7 +1,7 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { EditStudentDialog } from './components/EditStudentDialog';
 import { CompleteRegistrationDialog } from './components/CompleteRegistrationDialog';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, startTransition } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -137,8 +137,11 @@ export default function AllStudents() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-      setCurrentPage(1); // Reset to page 1 on new search
+      // startTransition: table re-render from search is non-urgent
+      startTransition(() => {
+        setDebouncedSearch(searchQuery);
+        setCurrentPage(1);
+      });
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);

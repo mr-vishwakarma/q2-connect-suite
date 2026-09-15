@@ -1,3 +1,9 @@
+/**
+ * CollectPaymentDialog — self-contained payment form.
+ * All payment form state lives HERE (not in the 924-line parent).
+ * Keystroke events in this dialog no longer trigger FeeManagement re-renders.
+ */
+import { useState, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -6,43 +12,54 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Check, Receipt } from 'lucide-react';
 
+interface PaymentFormState {
+  pMonth: string;
+  pAmount: number;
+  pLateFee: number;
+  pDiscount: number;
+  pDeposit: number;
+  pReceived: number;
+  pMode: 'cash' | 'upi' | 'bank';
+  pNotes: string;
+}
+
 interface CollectPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedStudent: any;
-  pMonth: string;
-  setPMonth: (v: string) => void;
+  initialValues: PaymentFormState;
   monthOptions: string[];
-  pAmount: number;
-  setPAmount: (v: number) => void;
-  pLateFee: number;
-  setPLateFee: (v: number) => void;
-  pDiscount: number;
-  setPDiscount: (v: number) => void;
-  pDeposit: number;
-  setPDeposit: (v: number) => void;
-  pReceived: number;
-  setPReceived: (v: number) => void;
-  pMode: 'cash' | 'upi' | 'bank';
-  setPMode: (v: 'cash' | 'upi' | 'bank') => void;
-  pNotes: string;
-  setPNotes: (v: string) => void;
-  onSubmit: () => void;
-  submitting: boolean;
+  onSubmit: (form: PaymentFormState) => Promise<void>;
 }
+
+export type { PaymentFormState };
 
 export function CollectPaymentDialog({
   open, onOpenChange, selectedStudent,
-  pMonth, setPMonth, monthOptions,
-  pAmount, setPAmount,
-  pLateFee, setPLateFee,
-  pDiscount, setPDiscount,
-  pDeposit, setPDeposit,
-  pReceived, setPReceived,
-  pMode, setPMode,
-  pNotes, setPNotes,
-  onSubmit, submitting
+  initialValues, monthOptions, onSubmit,
 }: CollectPaymentDialogProps) {
+  // All form state is local to this dialog — parent never re-renders on field change
+  const [form, setForm] = useState<PaymentFormState>(initialValues);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Reset form state whenever dialog opens with new initialValues
+  useEffect(() => {
+    if (open) setForm(initialValues);
+  }, [open, initialValues]);
+
+  const set = useCallback(<K extends keyof PaymentFormState>(key: K, value: PaymentFormState[K]) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await onSubmit(form);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
@@ -59,7 +76,7 @@ export function CollectPaymentDialog({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Fee Month</Label>
-                <Select value={pMonth} onValueChange={setPMonth}>
+                <Select value={form.pMonth} onValueChange={(v) => set('pMonth', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {monthOptions.map(m => (
@@ -70,28 +87,28 @@ export function CollectPaymentDialog({
               </div>
               <div>
                 <Label>Monthly Fee (₹)</Label>
-                <Input type="number" value={pAmount} onChange={(e) => setPAmount(Number(e.target.value))} />
+                <Input type="number" value={form.pAmount} onChange={(e) => set('pAmount', Number(e.target.value))} />
               </div>
               <div>
                 <Label>Late Fee (₹)</Label>
-                <Input type="number" value={pLateFee} onChange={(e) => setPLateFee(Number(e.target.value))} />
+                <Input type="number" value={form.pLateFee} onChange={(e) => set('pLateFee', Number(e.target.value))} />
               </div>
               <div>
                 <Label>Discount (₹)</Label>
-                <Input type="number" value={pDiscount} onChange={(e) => setPDiscount(Number(e.target.value))} />
+                <Input type="number" value={form.pDiscount} onChange={(e) => set('pDiscount', Number(e.target.value))} />
               </div>
               <div>
                 <Label>Security Deposit (₹)</Label>
-                <Input type="number" value={pDeposit} onChange={(e) => setPDeposit(Number(e.target.value))} />
+                <Input type="number" value={form.pDeposit} onChange={(e) => set('pDeposit', Number(e.target.value))} />
               </div>
               <div>
                 <Label>Amount Received (₹)</Label>
-                <Input type="number" value={pReceived} onChange={(e) => setPReceived(Number(e.target.value))} />
+                <Input type="number" value={form.pReceived} onChange={(e) => set('pReceived', Number(e.target.value))} />
               </div>
             </div>
             <div>
               <Label>Payment Mode</Label>
-              <Select value={pMode} onValueChange={(v: 'cash' | 'upi' | 'bank') => setPMode(v)}>
+              <Select value={form.pMode} onValueChange={(v: 'cash' | 'upi' | 'bank') => set('pMode', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
@@ -102,14 +119,14 @@ export function CollectPaymentDialog({
             </div>
             <div>
               <Label>Notes (optional)</Label>
-              <Textarea value={pNotes} onChange={(e) => setPNotes(e.target.value)} rows={2} />
+              <Textarea value={form.pNotes} onChange={(e) => set('pNotes', e.target.value)} rows={2} />
             </div>
             <div className="p-3 bg-secondary rounded-lg text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Total Due:</span><span className="text-foreground font-medium">₹{(pAmount + pLateFee - pDiscount).toLocaleString('en-IN')}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">+ Deposit:</span><span className="text-foreground font-medium">₹{pDeposit.toLocaleString('en-IN')}</span></div>
-              <div className="flex justify-between text-primary font-bold mt-1"><span>Receiving:</span><span>₹{pReceived.toLocaleString('en-IN')}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Total Due:</span><span className="text-foreground font-medium">₹{(form.pAmount + form.pLateFee - form.pDiscount).toLocaleString('en-IN')}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">+ Deposit:</span><span className="text-foreground font-medium">₹{form.pDeposit.toLocaleString('en-IN')}</span></div>
+              <div className="flex justify-between text-primary font-bold mt-1"><span>Receiving:</span><span>₹{form.pReceived.toLocaleString('en-IN')}</span></div>
             </div>
-            <Button className="w-full" onClick={onSubmit} disabled={submitting}>
+            <Button className="w-full" onClick={handleSubmit} disabled={submitting}>
               {submitting ? 'Recording...' : <><Check className="w-4 h-4 mr-2" />Confirm & Download Receipt</>}
             </Button>
           </div>
