@@ -17,6 +17,9 @@ export interface Profile {
   email: string | null;
   username: string | null;
   profilePhoto?: string;
+  room_no?: string | null;
+  fees?: number | null;
+  hostel?: string | null;
 }
 
 interface AuthContextType {
@@ -103,12 +106,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (student) {
           setProfile({
-            id: student._id,
-            user_id: userData._id,
+            id: student._id || student.id,
+            user_id: userData._id || userData.id,
             name: student.name,
             email: student.email,
             username: student.username,
             profilePhoto: student.profilePhoto,
+            room_no: student.roomNo || student.room_no || null,
+            fees: student.fees ?? null,
+            hostel: student.hostel || null,
           });
         } else {
           setProfile({
@@ -204,6 +210,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: student.email,
         username: student.username,
         profilePhoto: student.profilePhoto,
+        room_no: student.roomNo || student.room_no || null,
+        fees: student.fees ?? null,
+        hostel: student.hostel || null,
       });
     } else {
       setProfile({

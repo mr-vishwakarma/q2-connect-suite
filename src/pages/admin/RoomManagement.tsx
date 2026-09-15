@@ -81,8 +81,6 @@ export default function RoomManagement() {
     } catch (err) {
       console.error('Error fetching rooms:', err);
       toast.error('Failed to load rooms');
-    } finally {
-      setLoading(false);
     }
   }, [selectedHostel]);
 
@@ -104,10 +102,18 @@ export default function RoomManagement() {
     }
   }, [selectedHostel]);
 
-  useEffect(() => {
-    fetchRooms();
-    fetchStudents();
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      await Promise.all([fetchRooms(), fetchStudents()]);
+    } finally {
+      setLoading(false);
+    }
   }, [fetchRooms, fetchStudents]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleAddRoom = async () => {
     if (!newRoom.room_number) {

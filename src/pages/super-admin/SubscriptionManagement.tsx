@@ -18,10 +18,13 @@ import { Badge } from '@/components/ui/badge';
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { toast } from 'react-toastify';
 
+import { useDebounce } from '@/hooks/useDebounce';
+
 export default function SubscriptionManagement() {
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1, limit: 20 });
@@ -29,24 +32,25 @@ export default function SubscriptionManagement() {
   const [extendDays, setExtendDays] = useState(14);
 
   useEffect(() => {
-    fetchSubscriptions(currentPage);
-  }, [currentPage, statusFilter]);
+    setCurrentPage(1);
+  }, [debouncedSearch]);
 
-  const fetchSubscriptions = async (page = 1) => {
+  const fetchSubscriptions = async (page = 1, signal?: AbortSignal) => {
     try {
       setIsLoading(true);
       const params: any = { page, limit: 20 };
       if (statusFilter !== 'ALL') params.status = statusFilter;
-      if (searchTerm) params.search = searchTerm;
+      if (debouncedSearch) params.search = debouncedSearch;
 
-      const res = await superAdminService.getSubscriptions(params);
+      const res = await superAdminService.getSubscriptions(params, { signal });
       if (res.success && res.data) {
         setSubscriptions(res.data.subscriptions || []);
         if (res.data.pagination) {
           setPagination(res.data.pagination);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') return;
       console.error('Failed to load subscriptions:', error);
       toast.error('Failed to load subscriptions');
     } finally {
@@ -54,10 +58,16 @@ export default function SubscriptionManagement() {
     }
   };
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchSubscriptions(currentPage, controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [currentPage, statusFilter, debouncedSearch]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1);
-    fetchSubscriptions(1);
   };
 
   const handleExtendTrial = async () => {

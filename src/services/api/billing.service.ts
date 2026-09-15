@@ -98,11 +98,19 @@ export interface BillingHistoryPayment {
   };
 }
 
+let plansCache: { data: SaaSPlan[]; timestamp: number } | null = null;
+const PLANS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL for SaaS pricing plans
+
 export const billingService = {
-  // 1. Get Plan Catalog
-  getPlans: async (): Promise<SaaSPlan[]> => {
+  // 1. Get Plan Catalog (Cached)
+  getPlans: async (forceRefresh = false): Promise<SaaSPlan[]> => {
+    if (!forceRefresh && plansCache && Date.now() - plansCache.timestamp < PLANS_CACHE_TTL_MS) {
+      return plansCache.data;
+    }
     const res = await api.get('/billing/plans');
-    return res.data?.data || [];
+    const plans = res.data?.data || [];
+    plansCache = { data: plans, timestamp: Date.now() };
+    return plans;
   },
 
   // 2. Get Organization's Current Subscription & Entitlements

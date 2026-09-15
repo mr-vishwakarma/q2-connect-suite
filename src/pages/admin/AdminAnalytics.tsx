@@ -37,7 +37,13 @@ export default function AdminAnalytics() {
       const response = await api.get('/analytics');
       return response.data?.data;
     },
-    refetchInterval: 30000 // Refetch every 30s
+    refetchInterval: (query) => {
+      // Stop polling if query encountered an error or if browser tab is hidden
+      if (query.state.error) return false;
+      if (typeof document !== 'undefined' && document.hidden) return false;
+      return 30000;
+    },
+    refetchIntervalInBackground: false,
   });
 
   if (isLoading) {

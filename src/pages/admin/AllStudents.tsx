@@ -139,11 +139,11 @@ export default function AllStudents() {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery);
       setCurrentPage(1); // Reset to page 1 on new search
-    }, 500);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const fetchStudents = useCallback(async () => {
+  const fetchStudents = useCallback(async (signal?: AbortSignal) => {
     try {
       setIsLoading(prev => prev);
       const response = await api.get('/students', { 
@@ -152,8 +152,8 @@ export default function AllStudents() {
           search: debouncedSearch,
           page: currentPage,
           limit: 20,
-          _t: Date.now() 
-        } 
+        },
+        signal,
       });
       if (response.data?.success) {
         const mapped = response.data.data
@@ -173,7 +173,10 @@ export default function AllStudents() {
         setStudents(mapped);
         setTotalPages(response.data.totalPages || 1);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+        return;
+      }
       console.error('Error fetching students:', error);
       toast.error('Failed to fetch students');
     } finally {
@@ -188,14 +191,13 @@ export default function AllStudents() {
       const res = await api.get('/students/pending-registrations', {
         params: {
           hostel: branchParam === 'All' ? undefined : branchParam,
-          _t: Date.now(),
         },
       });
       if (res.data?.success) {
         setPendingRegistrations(res.data.data || []);
       }
-    } catch (err) {
-      console.error('Failed to load pending registrations:', err);
+    } catch (error) {
+      console.error('Error fetching pending registrations:', error);
     } finally {
       setIsPendingLoading(false);
     }
@@ -203,7 +205,11 @@ export default function AllStudents() {
 
   useEffect(() => {
     if (user && isAdmin) {
-      fetchStudents();
+      const controller = new AbortController();
+      fetchStudents(controller.signal);
+      return () => {
+        controller.abort();
+      };
     }
   }, [user, isAdmin, fetchStudents]);
 

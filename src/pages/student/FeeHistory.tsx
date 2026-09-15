@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
+import { settingsService } from '@/services/api/settings.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ interface StudentData {
 }
 
 export default function FeeHistory() {
-  const { user, loading: authLoading, isAdmin } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [student, setStudent] = useState<StudentData | null>(null);
   const [fees, setFees] = useState<Fee[]>([]);
@@ -51,33 +52,38 @@ export default function FeeHistory() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [sRes, fRes, pRes] = await Promise.all([
+      const studentHostel = profile?.hostel || 'Q2';
+      const [sRes, fRes, pRes, settingsRes] = await Promise.all([
         api.get('/students/me'),
         api.get('/fees'),
-        api.get('/fees/payments')
+        api.get('/fees/payments'),
+        settingsService.getHostelSettings(studentHostel),
       ]);
 
       if (sRes.data?.success) {
+        const studentData = sRes.data.data;
         setStudent({
-          id: sRes.data.data._id,
-          name: sRes.data.data.name,
-          username: sRes.data.data.username,
-          room_no: sRes.data.data.roomNo,
-          fees: sRes.data.data.fees,
-          hostel: sRes.data.data.hostel,
+          id: studentData._id,
+          name: studentData.name,
+          username: studentData.username,
+          room_no: studentData.roomNo,
+          fees: studentData.fees,
+          hostel: studentData.hostel,
         });
 
-        // Fetch settings for the student's hostel
-        try {
-          const settingsRes = await api.get(`/settings/${sRes.data.data.hostel}`);
-          if (settingsRes.data?.success) {
+        if (studentData.hostel && studentData.hostel !== studentHostel) {
+          const freshSettings = await settingsService.getHostelSettings(studentData.hostel);
+          if (freshSettings.success && freshSettings.data) {
             setSettings({
-              lateFeePerDay: settingsRes.data.data.lateFeePerDay,
-              gracePeriodDays: settingsRes.data.data.gracePeriodDays,
+              lateFeePerDay: freshSettings.data.lateFeePerDay ?? 20,
+              gracePeriodDays: freshSettings.data.gracePeriodDays ?? 5,
             });
           }
-        } catch (e) {
-          console.error('Could not fetch settings', e);
+        } else if (settingsRes.success && settingsRes.data) {
+          setSettings({
+            lateFeePerDay: settingsRes.data.lateFeePerDay ?? 20,
+            gracePeriodDays: settingsRes.data.gracePeriodDays ?? 5,
+          });
         }
       } else {
         setStudent(null);

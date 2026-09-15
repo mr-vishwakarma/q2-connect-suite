@@ -21,10 +21,13 @@ import { superAdminService } from '@/services/api/superAdmin.service';
 import { SaasUserListItem } from '@/types';
 import { toast } from 'react-toastify';
 
+import { useDebounce } from '@/hooks/useDebounce';
+
 export default function UserManagement() {
   const [users, setUsers] = useState<SaasUserListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,10 +37,10 @@ export default function UserManagement() {
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchUsers(currentPage);
-  }, [currentPage, roleFilter, statusFilter]);
+    setCurrentPage(1);
+  }, [debouncedSearch]);
 
-  const fetchUsers = async (page = 1) => {
+  const fetchUsers = async (page = 1, signal?: AbortSignal) => {
     try {
       setIsLoading(true);
       const params: any = { page, limit: 20 };
@@ -47,16 +50,17 @@ export default function UserManagement() {
         if (statusFilter === 'SUSPENDED') params.isActive = false;
         if (statusFilter === 'LOCKED') params.isLocked = true;
       }
-      if (searchTerm) params.search = searchTerm;
+      if (debouncedSearch) params.search = debouncedSearch;
 
-      const res = await superAdminService.getUsers(params);
+      const res = await superAdminService.getUsers(params, { signal });
       if (res.success && res.data) {
         setUsers(res.data.users || []);
         if (res.data.pagination) {
           setPagination(res.data.pagination);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') return;
       console.error('Failed to load users:', error);
       toast.error('Failed to load user directory');
     } finally {
@@ -64,10 +68,16 @@ export default function UserManagement() {
     }
   };
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchUsers(currentPage, controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [currentPage, roleFilter, statusFilter, debouncedSearch]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1);
-    fetchUsers(1);
   };
 
   const handleToggleStatus = async (user: SaasUserListItem) => {

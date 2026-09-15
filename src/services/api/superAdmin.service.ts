@@ -55,8 +55,11 @@ export const superAdminService = {
   },
 
   // 3. Hostel Management
-  async getHostels(params?: { organizationId?: string; search?: string; page?: number; limit?: number }): Promise<ApiResponse<{ hostels: any[]; pagination: any } | HostelBranch[]>> {
-    const res = await api.get('/super-admin/hostels', { params });
+  async getHostels(
+    params?: { organizationId?: string; search?: string; page?: number; limit?: number },
+    options?: { signal?: AbortSignal }
+  ): Promise<ApiResponse<{ hostels: any[]; pagination: any } | HostelBranch[]>> {
+    const res = await api.get('/super-admin/hostels', { params, signal: options?.signal });
     return res.data;
   },
 
@@ -65,14 +68,17 @@ export const superAdminService = {
     return res.data;
   },
 
-  async createHostel(payload: Partial<HostelBranch>): Promise<ApiResponse<HostelBranch>> {
+  async createHostel(payload: any): Promise<ApiResponse<HostelBranch>> {
     const res = await api.post('/super-admin/hostels', payload);
     return res.data;
   },
 
   // 4. Global User Management
-  async getUsers(params?: { search?: string; role?: string; isActive?: string | boolean; page?: number; limit?: number }): Promise<ApiResponse<{ users: SaasUserListItem[]; pagination: any }>> {
-    const res = await api.get('/super-admin/users', { params });
+  async getUsers(
+    params?: { search?: string; role?: string; isActive?: string | boolean; page?: number; limit?: number },
+    options?: { signal?: AbortSignal }
+  ): Promise<ApiResponse<{ users: SaasUserListItem[]; pagination: any }>> {
+    const res = await api.get('/super-admin/users', { params, signal: options?.signal });
     return res.data;
   },
 
@@ -118,8 +124,11 @@ export const superAdminService = {
   },
 
   // 6. Subscriptions
-  async getSubscriptions(params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<ApiResponse<{ subscriptions: any[]; pagination: any }>> {
-    const res = await api.get('/super-admin/subscriptions', { params });
+  async getSubscriptions(
+    params?: { status?: string; search?: string; page?: number; limit?: number },
+    options?: { signal?: AbortSignal }
+  ): Promise<ApiResponse<{ subscriptions: any[]; pagination: any }>> {
+    const res = await api.get('/super-admin/subscriptions', { params, signal: options?.signal });
     return res.data;
   },
 

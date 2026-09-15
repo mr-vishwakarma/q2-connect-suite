@@ -19,23 +19,22 @@ import { superAdminService } from '@/services/api/superAdmin.service';
 import { HostelMetricsData } from '@/types';
 import { toast } from 'react-toastify';
 
+import { useDebounce } from '@/hooks/useDebounce';
+
 export default function HostelList() {
   const [hostels, setHostels] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<HostelMetricsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 300);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [genderFilter, setGenderFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1, limit: 20 });
 
   useEffect(() => {
-    fetchMetrics();
-  }, []);
-
-  useEffect(() => {
-    fetchHostels(currentPage);
-  }, [currentPage, statusFilter, genderFilter]);
+    setCurrentPage(1);
+  }, [debouncedSearch]);
 
   const fetchMetrics = async () => {
     try {
@@ -48,15 +47,15 @@ export default function HostelList() {
     }
   };
 
-  const fetchHostels = async (page = 1) => {
+  const fetchHostels = async (page = 1, signal?: AbortSignal) => {
     try {
       setIsLoading(true);
       const params: any = { page, limit: 20 };
       if (statusFilter !== 'ALL') params.status = statusFilter;
       if (genderFilter !== 'ALL') params.genderType = genderFilter;
-      if (searchTerm) params.search = searchTerm;
+      if (debouncedSearch) params.search = debouncedSearch;
 
-      const res = await superAdminService.getHostels(params);
+      const res = await superAdminService.getHostels(params, { signal });
       if (res.success && res.data) {
         if (Array.isArray(res.data)) {
           setHostels(res.data);
@@ -68,7 +67,8 @@ export default function HostelList() {
           }
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') return;
       console.error('Failed to load hostels:', error);
       toast.error('Failed to load hostels');
     } finally {
@@ -76,10 +76,20 @@ export default function HostelList() {
     }
   };
 
+  useEffect(() => {
+    fetchMetrics();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchHostels(currentPage, controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [currentPage, statusFilter, genderFilter, debouncedSearch]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1);
-    fetchHostels(1);
   };
 
   const filteredHostels = hostels.filter((h) => {

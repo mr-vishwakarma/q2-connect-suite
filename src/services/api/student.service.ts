@@ -2,8 +2,11 @@ import { api } from '@/lib/api';
 import { ApiResponse, Student, StudentAlert, StudentRegistrationPayload } from '@/types';
 
 export const studentService = {
-  async getStudents(params?: { hostel?: string; search?: string; page?: number; limit?: number }): Promise<ApiResponse<any>> {
-    const res = await api.get('/students', { params });
+  async getStudents(
+    params?: { hostel?: string; search?: string; page?: number; limit?: number },
+    options?: { signal?: AbortSignal }
+  ): Promise<ApiResponse<any>> {
+    const res = await api.get('/students', { params, signal: options?.signal });
     return res.data;
   },
 
