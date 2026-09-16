@@ -12,6 +12,29 @@ export interface SidebarNavItemProps {
   onNavigate?: () => void;
 }
 
+const routePreloaders: Record<string, () => Promise<unknown>> = {
+  '/admin/dashboard': () => import('@/pages/admin/AdminDashboard'),
+  '/admin/students': () => import('@/pages/admin/AllStudents'),
+  '/admin/fees': () => import('@/pages/admin/FeeManagement'),
+  '/admin/payments': () => import('@/pages/admin/PaymentManagement'),
+  '/admin/rooms': () => import('@/pages/admin/RoomManagement'),
+  '/admin/attendance': () => import('@/pages/admin/AttendanceManagement'),
+  '/admin/billing': () => import('@/pages/admin/Billing'),
+};
+
+const prefetchedRoutes = new Set<string>();
+
+function prefetchRoute(to: string) {
+  if (prefetchedRoutes.has(to)) return;
+  const loader = routePreloaders[to];
+  if (loader) {
+    prefetchedRoutes.add(to);
+    loader().catch(() => {
+      prefetchedRoutes.delete(to);
+    });
+  }
+}
+
 export function SidebarNavItem({
   to,
   icon: Icon,
@@ -27,6 +50,8 @@ export function SidebarNavItem({
     <div className="relative group">
       <Link
         to={to}
+        onMouseEnter={() => prefetchRoute(to)}
+        onFocus={() => prefetchRoute(to)}
         onClick={() => {
           onNavigate?.();
         }}

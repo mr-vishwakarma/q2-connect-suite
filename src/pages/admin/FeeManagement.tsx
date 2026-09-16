@@ -30,7 +30,6 @@ import {
   LayoutGrid, List, Clock, AlertTriangle, ArrowUpRight, Percent, Building2
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays, addMonths, addDays } from 'date-fns';
-import * as XLSX from 'xlsx';
 import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptData, getHistoryReceiptBlob } from '@/lib/receiptPdf';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -341,7 +340,7 @@ export default function FeeManagement() {
         receiptUrl,
       });
 
-      downloadHistoryReceipt(receiptData);
+      await downloadHistoryReceipt(receiptData);
 
       toast.success('Payment recorded and receipt generated');
       setShowPaymentDialog(false);
@@ -353,7 +352,7 @@ export default function FeeManagement() {
     }
   };
 
-  const downloadHistoryForStudent = (s: Student) => {
+  const downloadHistoryForStudent = async (s: Student) => {
     const studentPayments = payments.filter((p) => p.student_id === s.id);
     if (studentPayments.length === 0) {
       toast.error(`No payment receipts found for ${s.name}`);
@@ -366,10 +365,11 @@ export default function FeeManagement() {
       hostel: selectedHostel,
       payments: studentPayments,
     };
-    downloadHistoryReceipt(data);
+    await downloadHistoryReceipt(data);
   };
 
-  const exportXLS = () => {
+  const exportXLS = async () => {
+    const XLSX = await import('xlsx');
     const uniqueMonths = Array.from(new Set(payments.map((p) => p.month))).filter(Boolean);
     uniqueMonths.sort((a, b) => new Date(`1 ${a}`).getTime() - new Date(`1 ${b}`).getTime());
 

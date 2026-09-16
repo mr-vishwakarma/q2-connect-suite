@@ -1,5 +1,3 @@
-import jsPDF from 'jspdf';
-
 export interface ReceiptData {
   receipt_no: string;
   payment_date: string;
@@ -20,7 +18,8 @@ export interface ReceiptData {
 
 const HOSTEL_ADDR = 'Plot No. 8, Manak Vihar, Bhopal • +91 9691160716 • q2hostel@gmail.com';
 
-export function generateReceiptPDF(r: ReceiptData): jsPDF {
+export async function generateReceiptPDF(r: ReceiptData) {
+  const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   let y = 40;
@@ -60,53 +59,53 @@ export function generateReceiptPDF(r: ReceiptData): jsPDF {
   row('User ID:', r.username);
   row('Room No:', r.room_no || 'N/A');
   row('Fee Month:', r.month);
+  row('Payment Mode:', r.payment_mode.toUpperCase());
+  if (r.admin_name) row('Received By:', r.admin_name);
 
-  y += 10;
-  doc.setDrawColor(200);
-  doc.line(40, y, W - 40, y);
-  y += 20;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('Description', 40, y);
-  doc.text('Amount (INR)', W - 40, y, { align: 'right' });
   y += 6;
+  doc.setDrawColor(220);
   doc.line(40, y, W - 40, y);
   y += 18;
 
-  const lineItem = (l: string, amt: number, sign: 1 | -1 = 1) => {
+  const item = (desc: string, amt: number, isMinus = false) => {
+    if (amt <= 0) return;
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(l, 40, y);
-    const val = (sign < 0 ? '- ' : '') + amt.toLocaleString('en-IN');
-    doc.text(val, W - 40, y, { align: 'right' });
+    doc.text(desc, 40, y);
+    doc.setFont('helvetica', 'bold');
+    const txt = `${isMinus ? '-' : ''}Rs. ${amt.toLocaleString('en-IN')}`;
+    doc.text(txt, W - 40, y, { align: 'right' });
     y += 18;
   };
 
-  lineItem(`Monthly Fee (${r.month})`, r.monthly_fee);
-  if (r.late_fee > 0) lineItem('Late Fee', r.late_fee);
-  if (r.security_deposit > 0) lineItem('Security Deposit', r.security_deposit);
-  if (r.discount > 0) lineItem('Discount', r.discount, -1);
+  item('Monthly Hostel Fee', r.monthly_fee);
+  item('Security Deposit', r.security_deposit);
+  item('Late Fee', r.late_fee);
+  item('Discount / Concession', r.discount, true);
 
-  y += 4;
-  doc.line(40, y, W - 40, y);
-  y += 20;
+  y += 6;
+  doc.setFillColor(245, 245, 245);
+  doc.rect(40, y, W - 80, 28, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text('Amount Paid', 40, y);
-  doc.text(`Rs. ${r.amount_paid.toLocaleString('en-IN')}`, W - 40, y, { align: 'right' });
-  y += 22;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text(`Payment Mode: ${r.payment_mode.toUpperCase()}`, 40, y);
-  y += 16;
-  if (r.admin_name) { doc.text(`Collected By: ${r.admin_name}`, 40, y); y += 16; }
-  if (r.notes) { doc.text(`Notes: ${r.notes}`, 40, y); y += 16; }
+  doc.setTextColor(15, 23, 42);
+  doc.text('TOTAL AMOUNT PAID', 50, y + 18);
+  doc.text(`Rs. ${r.amount_paid.toLocaleString('en-IN')}`, W - 50, y + 18, { align: 'right' });
+  y += 44;
 
+  if (r.notes) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Notes: ${r.notes}`, 40, y);
+    y += 20;
+  }
+
+  // Footer
   y = doc.internal.pageSize.getHeight() - 60;
   doc.setDrawColor(200);
   doc.line(40, y, W - 40, y);
   y += 18;
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
   doc.text('This is a system-generated receipt from Q2 Group of Hostels. Keep it safe for your records.', 40, y);
@@ -114,12 +113,10 @@ export function generateReceiptPDF(r: ReceiptData): jsPDF {
   return doc;
 }
 
-export function downloadReceipt(r: ReceiptData) {
-  const doc = generateReceiptPDF(r);
+export async function downloadReceipt(r: ReceiptData) {
+  const doc = await generateReceiptPDF(r);
   doc.save(`Receipt-${r.receipt_no}.pdf`);
 }
-
-import autoTable from 'jspdf-autotable';
 
 export interface HistoryReceiptData {
   student_name: string;
@@ -135,7 +132,11 @@ export interface HistoryReceiptData {
   }>;
 }
 
-export function generateHistoryReceipt(data: HistoryReceiptData): jsPDF {
+export async function generateHistoryReceipt(data: HistoryReceiptData) {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   let y = 40;
@@ -212,12 +213,12 @@ export function generateHistoryReceipt(data: HistoryReceiptData): jsPDF {
   return doc;
 }
 
-export function downloadHistoryReceipt(data: HistoryReceiptData) {
-  const doc = generateHistoryReceipt(data);
+export async function downloadHistoryReceipt(data: HistoryReceiptData) {
+  const doc = await generateHistoryReceipt(data);
   doc.save(`History-${data.username}-${Date.now()}.pdf`);
 }
 
-export function getHistoryReceiptBlob(data: HistoryReceiptData): Blob {
-  const doc = generateHistoryReceipt(data);
+export async function getHistoryReceiptBlob(data: HistoryReceiptData): Promise<Blob> {
+  const doc = await generateHistoryReceipt(data);
   return doc.output('blob');
 }

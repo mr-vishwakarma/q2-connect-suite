@@ -51,6 +51,9 @@ export default defineConfig({
             if (id.includes('@tanstack/react-query')) {
               return 'vendor-query';
             }
+            if (id.includes('socket.io-client')) {
+              return 'vendor-socket';
+            }
             if (id.includes('lucide-react') || id.includes('framer-motion') || id.includes('@radix-ui')) {
               return 'vendor-ui';
             }

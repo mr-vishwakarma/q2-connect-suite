@@ -119,7 +119,7 @@ export default function FeeHistory() {
   const totalPending = fees.reduce((s, f) => s + Math.max(0, f.amount + (f.late_fee || 0) - (f.discount || 0) - (f.paid_amount || 0)), 0);
   const lastPayment = payments[0];
 
-  const downloadFor = (p: Payment) => {
+  const downloadFor = async (p: Payment) => {
     if (p.receiptUrl) {
       window.open(p.receiptUrl, '_blank');
       return;
@@ -134,7 +134,7 @@ export default function FeeHistory() {
       amount_paid: Number(p.amount) + Number(p.security_deposit),
       payment_mode: p.payment_mode, admin_name: p.admin_name, notes: p.notes,
     };
-    downloadReceipt(d);
+    await downloadReceipt(d);
   };
 
   if (authLoading || loading) {
