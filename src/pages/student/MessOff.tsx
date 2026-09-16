@@ -1,5 +1,5 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,6 +15,8 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+
+const MessStatusChart = lazy(() => import('./components/MessStatusChart'));
 
 interface LeaveRequest {
   id: string;
@@ -211,34 +213,9 @@ export default function MessOff() {
             </CardHeader>
             <CardContent>
               {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(222 47% 10%)',
-                        border: '1px solid hsl(222 47% 18%)',
-                        borderRadius: '8px',
-                        color: '#ffffff',
-                      }}
-                      itemStyle={{ color: '#ffffff' }}
-                    />
-                    <Legend formatter={(value) => <span style={{ color: '#ffffff', fontWeight: 500 }}>{value}</span>} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <Suspense fallback={<div className="h-[250px] flex items-center justify-center text-muted-foreground animate-pulse">Loading chart...</div>}>
+                  <MessStatusChart chartData={chartData} />
+                </Suspense>
               ) : (
                 <div className="h-[250px] flex items-center justify-center text-muted-foreground">
                   No requests yet

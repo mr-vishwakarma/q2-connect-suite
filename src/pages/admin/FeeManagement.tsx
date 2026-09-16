@@ -314,7 +314,7 @@ export default function FeeManagement() {
         payments: studentPayments,
       };
 
-      const pdfBlob = getHistoryReceiptBlob(receiptData);
+      const pdfBlob = await getHistoryReceiptBlob(receiptData);
       const formData = new FormData();
       formData.append('file', pdfBlob, `receipt-${receipt_no}.pdf`);
       formData.append('folder', `/q2-connect/receipts/students/${selectedStudent.username}`);
