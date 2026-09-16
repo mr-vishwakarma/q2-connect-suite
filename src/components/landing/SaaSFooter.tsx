@@ -10,7 +10,15 @@ export function SaaSFooter() {
           <div className="space-y-3 md:col-span-1">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/40 flex items-center justify-center p-1">
-                <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain" />
+                <img
+                  src="/q2-logo.png"
+                  alt="Q2 Logo"
+                  width={32}
+                  height={32}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-contain"
+                />
               </div>
               <span className="text-base font-black text-foreground">Q2 Group of Hostels</span>
             </div>

@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 
 import { uploadMedia } from '@/utils/uploadService';
+import { getAvatarUrl } from '@/utils/imageUtils';
 
 export default function Profile() {
   const { profile: authProfile, refreshProfile, signOut } = useAuth();
@@ -142,7 +143,14 @@ export default function Profile() {
               <div className="relative group">
                 <div className="w-24 h-24 rounded-full border-4 border-background overflow-hidden bg-secondary flex items-center justify-center shadow-sm">
                   {formData.profilePhoto ? (
-                    <img src={formData.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+                    <img
+                      src={getAvatarUrl(formData.profilePhoto, 192)}
+                      alt="Profile"
+                      width={96}
+                      height={96}
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <User className="w-10 h-10 text-muted-foreground" />
                   )}

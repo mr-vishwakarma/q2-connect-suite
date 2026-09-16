@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'react-toastify';
+import { getAvatarUrl } from '@/utils/imageUtils';
 
 interface GoogleInitialDetailsModalProps {
   isOpen: boolean;
@@ -73,8 +74,11 @@ export const GoogleInitialDetailsModal: React.FC<GoogleInitialDetailsModalProps>
           <div className="my-4 flex items-center gap-3 rounded-xl bg-secondary/50 p-3 border border-border/60">
             {googleProfile?.picture ? (
               <img
-                src={googleProfile.picture}
+                src={getAvatarUrl(googleProfile.picture, 80)}
                 alt={googleProfile.name}
+                width={40}
+                height={40}
+                decoding="async"
                 className="h-10 w-10 rounded-full border border-border object-cover"
               />
             ) : (

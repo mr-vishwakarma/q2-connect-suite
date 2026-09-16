@@ -1,4 +1,5 @@
 import React from 'react';
+import { getAvatarUrl } from '@/utils/imageUtils';
 import { motion } from 'framer-motion';
 import { Building2, User, CheckCircle2, Clock, AlertTriangle, Calendar, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -231,8 +232,12 @@ export function StudentFeeMatrix({ records, onSelectStudent, selectedMonth }: St
                             >
                               {s.profile_photo ? (
                                 <img
-                                  src={s.profile_photo}
+                                  src={getAvatarUrl(s.profile_photo, 80)}
                                   alt={s.name}
+                                  width={40}
+                                  height={40}
+                                  loading="lazy"
+                                  decoding="async"
                                   className="w-full h-full object-cover rounded-full"
                                   onError={(e) => {
                                     (e.currentTarget as HTMLElement).style.display = 'none';

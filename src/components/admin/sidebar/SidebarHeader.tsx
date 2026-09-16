@@ -26,7 +26,14 @@ export function SidebarHeader({
           transition={{ duration: 0.3 }}
           className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden"
         >
-          <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain" />
+          <img
+            src="/q2-logo.png"
+            alt="Q2 Logo"
+            width={40}
+            height={40}
+            decoding="async"
+            className="w-full h-full object-contain"
+          />
         </motion.div>
         {!isCollapsed && (
           <div className="overflow-hidden whitespace-nowrap">

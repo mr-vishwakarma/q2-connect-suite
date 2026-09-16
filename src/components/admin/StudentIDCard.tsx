@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { Building2, User, Bed, Calendar, IndianRupee } from 'lucide-react';
 import { format } from 'date-fns';
+import { getAvatarUrl } from '@/utils/imageUtils';
 
 export interface StudentIDCardProps {
   name: string;
@@ -105,8 +106,12 @@ export const StudentIDCard = forwardRef<HTMLDivElement, StudentIDCardProps>(({
           <div className="w-full h-full rounded-full overflow-hidden bg-zinc-900 border-2 border-background flex items-center justify-center">
             {profilePhoto ? (
               <img
-                src={profilePhoto}
+                src={getAvatarUrl(profilePhoto, 224)}
                 alt={name || 'Student Photo'}
+                width={112}
+                height={112}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
                 crossOrigin="anonymous"
               />

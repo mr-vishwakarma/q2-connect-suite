@@ -52,7 +52,14 @@ export function Navbar() {
               whileTap={{ scale: 0.95 }}
               className="w-12 h-12 flex items-center justify-center overflow-hidden"
             >
-              <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain" />
+              <img
+                src="/q2-logo.png"
+                alt="Q2 Logo"
+                width={48}
+                height={48}
+                decoding="async"
+                className="w-full h-full object-contain"
+              />
             </motion.div>
           </Link>
 

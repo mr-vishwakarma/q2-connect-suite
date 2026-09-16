@@ -188,6 +188,9 @@ export default function AdminDashboard() {
               <img
                 src="/assets/hostel-3d-building.png"
                 alt="Hostel 3D View"
+                width={176}
+                height={144}
+                decoding="async"
                 className="relative z-10 w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)]"
                 loading="eager"
               />

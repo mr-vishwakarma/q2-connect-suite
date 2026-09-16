@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'react-toastify';
 import { Eye, EyeOff, User, Lock, CheckCircle2, Sparkles, ArrowRight } from 'lucide-react';
+import { getAvatarUrl } from '@/utils/imageUtils';
 
 interface GoogleStep2ModalProps {
   isOpen: boolean;
@@ -98,8 +99,11 @@ export function GoogleStep2Modal({
           <div className="flex items-center gap-3 relative z-10">
             {googleProfile.picture ? (
               <img
-                src={googleProfile.picture}
+                src={getAvatarUrl(googleProfile.picture, 96)}
                 alt={googleProfile.name}
+                width={48}
+                height={48}
+                decoding="async"
                 className="w-12 h-12 rounded-full border-2 border-white/80 shadow-md object-cover shrink-0"
               />
             ) : (

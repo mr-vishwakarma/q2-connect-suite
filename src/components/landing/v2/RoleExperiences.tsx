@@ -189,6 +189,10 @@ export function RoleExperiences({ onOpenAuth }: RoleExperiencesProps) {
                   <img
                     src={activeRole === 'student' ? '/assets/student-lifestyle.jpg' : '/assets/hostel-lifestyle.jpg'}
                     alt="Q2 Platform Preview"
+                    width={600}
+                    height={176}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-44 object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-4">

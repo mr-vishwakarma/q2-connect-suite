@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { toast } from 'react-toastify';
+import { getAvatarUrl } from '@/utils/imageUtils';
 
 interface Applicant {
   id: string;
@@ -192,8 +193,12 @@ export function CompleteRegistrationDialog({
           <div className="p-3 bg-secondary/60 rounded-xl border border-border/80 flex items-center gap-3">
             {applicant.picture ? (
               <img
-                src={applicant.picture}
+                src={getAvatarUrl(applicant.picture, 80)}
                 alt={applicant.name}
+                width={40}
+                height={40}
+                loading="lazy"
+                decoding="async"
                 className="w-10 h-10 rounded-full border border-border object-cover shrink-0"
               />
             ) : (

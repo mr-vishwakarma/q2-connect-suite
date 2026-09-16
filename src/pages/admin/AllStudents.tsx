@@ -1,6 +1,7 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { EditStudentDialog } from './components/EditStudentDialog';
 import { CompleteRegistrationDialog } from './components/CompleteRegistrationDialog';
+import { getAvatarUrl } from '@/utils/imageUtils';
 import { useCallback, useEffect, useRef, useState, startTransition } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -465,8 +466,12 @@ export default function AllStudents() {
                           <div className="flex items-center gap-2.5">
                             {applicant.picture ? (
                               <img
-                                src={applicant.picture}
+                                src={getAvatarUrl(applicant.picture, 64)}
                                 alt={applicant.name}
+                                width={32}
+                                height={32}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-8 h-8 rounded-full border border-border object-cover shrink-0"
                               />
                             ) : (

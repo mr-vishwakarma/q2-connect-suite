@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, Menu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { getAvatarUrl } from '@/utils/imageUtils';
 
 interface TopBarProps {
   title: string;
@@ -17,7 +18,14 @@ export function TopBar({ title, onMenuToggle, showMenu }: TopBarProps) {
     <header className="h-14 sm:h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-3 sm:px-6 sticky top-0 z-30">
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* On mobile, show Logo instead of hamburger menu since we will use bottom nav */}
-        <img src="/q2-logo.png" alt="Q2 Logo" className="w-8 h-8 object-contain md:hidden shrink-0" />
+        <img
+          src="/q2-logo.png"
+          alt="Q2 Logo"
+          width={32}
+          height={32}
+          decoding="async"
+          className="w-8 h-8 object-contain md:hidden shrink-0"
+        />
         <h1 className="text-base sm:text-xl font-semibold text-foreground truncate">{title}</h1>
       </div>
 
@@ -38,7 +46,14 @@ export function TopBar({ title, onMenuToggle, showMenu }: TopBarProps) {
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-full gradient-primary flex items-center justify-center overflow-hidden hover:opacity-80 transition-opacity active:scale-95"
           >
             {profile?.profilePhoto ? (
-              <img src={profile.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+              <img
+                src={getAvatarUrl(profile.profilePhoto, 72)}
+                alt="Profile"
+                width={36}
+                height={36}
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
             ) : (
               <span className="text-primary-foreground font-medium text-xs sm:text-sm">
                 {profile?.name?.charAt(0).toUpperCase() || 'U'}

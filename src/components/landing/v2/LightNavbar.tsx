@@ -42,7 +42,14 @@ export function LightNavbar({ onOpenAuth, onOpenLead }: LightNavbarProps) {
         {/* Brand Logo */}
         <a href="#" className="flex items-center gap-3 group select-none">
           <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-200/80 p-1 flex items-center justify-center shrink-0 group-hover:border-purple-300 transition-colors">
-            <img src="/q2-logo.png" alt="Q2 Group of Hostels" className="w-full h-full object-contain" />
+            <img
+              src="/q2-logo.png"
+              alt="Q2 Group of Hostels"
+              width={40}
+              height={40}
+              decoding="async"
+              className="w-full h-full object-contain"
+            />
           </div>
           <div className="flex flex-col text-left">
             <span className="font-extrabold text-slate-900 text-lg tracking-tight leading-none group-hover:text-purple-600 transition-colors">

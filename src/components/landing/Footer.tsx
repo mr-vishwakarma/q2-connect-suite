@@ -46,7 +46,15 @@ export function Footer() {
                 }}
                 className="w-12 h-12 flex items-center justify-center overflow-hidden"
               >
-                <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain" />
+                <img
+                  src="/q2-logo.png"
+                  alt="Q2 Logo"
+                  width={48}
+                  height={48}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-contain"
+                />
               </motion.div>
               <span className="text-foreground font-bold text-xl">Q2 Group of Hostels</span>
             </Link>

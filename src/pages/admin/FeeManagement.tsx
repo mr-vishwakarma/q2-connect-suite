@@ -33,6 +33,7 @@ import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenc
 import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptData, getHistoryReceiptBlob } from '@/lib/receiptPdf';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { getAvatarUrl } from '@/utils/imageUtils';
 
 const generateMonthOptions = () => {
   const options = [];
@@ -719,7 +720,15 @@ export default function FeeManagement() {
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-xs font-bold shrink-0 overflow-hidden">
                                 {s.profile_photo ? (
-                                  <img src={s.profile_photo} alt={s.name} className="w-full h-full object-cover" />
+                                  <img
+                                    src={getAvatarUrl(s.profile_photo, 64)}
+                                    alt={s.name}
+                                    width={32}
+                                    height={32}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-full h-full object-cover"
+                                  />
                                 ) : (
                                   s.name.substring(0, 2).toUpperCase()
                                 )}
@@ -800,7 +809,15 @@ export default function FeeManagement() {
                       <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-xs font-bold shrink-0 overflow-hidden">
                           {s.profile_photo ? (
-                            <img src={s.profile_photo} alt={s.name} className="w-full h-full object-cover" />
+                            <img
+                              src={getAvatarUrl(s.profile_photo, 72)}
+                              alt={s.name}
+                              width={36}
+                              height={36}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             s.name.substring(0, 2).toUpperCase()
                           )}

@@ -22,6 +22,10 @@ export default defineConfig({
         theme_color: '#000000',
         background_color: '#000000',
         display: 'standalone'
+      },
+      workbox: {
+        // Exclude heavy isolated bundles from initial PWA precache so they load strictly on demand
+        globIgnores: ['**/vendor-three-*.js', '**/vendor-pdf-*.js', '**/vendor-sheets-*.js'],
       }
     })
   ],

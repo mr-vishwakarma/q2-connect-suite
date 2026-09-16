@@ -59,7 +59,14 @@ export function SaaSHeader() {
             className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-purple-800 p-0.5 flex items-center justify-center shadow-lg shadow-primary/25"
           >
             <div className="w-full h-full bg-background rounded-[10px] flex items-center justify-center p-1.5 overflow-hidden">
-              <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain" />
+              <img
+                src="/q2-logo.png"
+                alt="Q2 Logo"
+                width={36}
+                height={36}
+                decoding="async"
+                className="w-full h-full object-contain"
+              />
             </div>
           </motion.div>
           <div className="flex flex-col">

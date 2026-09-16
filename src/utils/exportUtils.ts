@@ -1,20 +1,19 @@
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import * as XLSX from 'xlsx';
-
 /**
- * Export table data to PDF
+ * Export table data to PDF using dynamic import to preserve bundle size
  * @param title Document title
  * @param headers Array of column headers
  * @param data Array of arrays containing row data
  * @param filename File name (without extension)
  */
-export const exportToPDF = (
+export const exportToPDF = async (
   title: string,
   headers: string[],
   data: any[][],
   filename: string = 'export'
 ) => {
+  const { default: jsPDF } = await import('jspdf');
+  await import('jspdf-autotable');
+
   const doc = new jsPDF();
   
   doc.setFontSize(18);
@@ -36,16 +35,18 @@ export const exportToPDF = (
 };
 
 /**
- * Export table data to Excel (XLSX)
+ * Export table data to Excel (XLSX) using dynamic import to preserve bundle size
  * @param headers Array of column headers
  * @param data Array of objects containing row data (keys must match headers)
  * @param filename File name (without extension)
  */
-export const exportToExcel = (
+export const exportToExcel = async (
   headers: string[],
   data: any[],
   filename: string = 'export'
 ) => {
+  const XLSX = await import('xlsx');
+
   // Create worksheet
   const ws = XLSX.utils.json_to_sheet(data, { header: headers });
   

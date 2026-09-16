@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { getAvatarUrl } from '@/utils/imageUtils';
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -67,7 +68,14 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
           onClick={handleLinkClick}
         >
           <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
-            <img src="/q2-logo.png" alt="Q2 Logo" className="w-full h-full object-contain drop-shadow-sm" />
+            <img
+              src="/q2-logo.png"
+              alt="Q2 Logo"
+              width={40}
+              height={40}
+              decoding="async"
+              className="w-full h-full object-contain drop-shadow-sm"
+            />
           </div>
           {!isCollapsed && (
             <motion.div
@@ -147,7 +155,14 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
         <div className={cn("flex items-center rounded-xl bg-sidebar-accent/30", isCollapsed ? "justify-center p-2" : "gap-3 px-4 py-3")}>
           <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center shrink-0 overflow-hidden">
             {profile?.profilePhoto ? (
-              <img src={profile.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+              <img
+                src={getAvatarUrl(profile.profilePhoto, 80)}
+                alt="Profile"
+                width={40}
+                height={40}
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
             ) : (
               <span className="text-primary-foreground font-medium text-sm">
                 {profile?.name?.charAt(0).toUpperCase() || 'U'}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { getAvatarUrl } from '@/utils/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -128,8 +129,12 @@ export function StudentProfileHistory({
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 border-2 border-primary/30 flex items-center justify-center text-primary shrink-0 overflow-hidden shadow-md">
                 {selectedStudent.profile_photo ? (
                   <img
-                    src={selectedStudent.profile_photo}
+                    src={getAvatarUrl(selectedStudent.profile_photo, 128)}
                     alt={selectedStudent.name}
+                    width={64}
+                    height={64}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                   />
                 ) : (
