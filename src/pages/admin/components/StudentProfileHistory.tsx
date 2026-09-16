@@ -70,44 +70,53 @@ export function StudentProfileHistory({
   else if (totalOccupants === 3) roomType = 'Triple Sharing';
   else if (totalOccupants >= 4) roomType = `${totalOccupants}-Bed Sharing`;
 
-  // Financial totals
-  const totalPaidOverall = selectedStudentPayments.reduce(
-    (sum, p) => sum + Number(p.amount || 0) + Number(p.security_deposit || 0),
-    0
-  );
+  // Financial totals (Memoized)
+  const totalPaidOverall = React.useMemo(() => {
+    return selectedStudentPayments.reduce(
+      (sum, p) => sum + Number(p.amount || 0) + Number(p.security_deposit || 0),
+      0
+    );
+  }, [selectedStudentPayments]);
 
-  const totalPendingBalance = selectedStudentFees
-    .filter((f) => f.status !== 'paid')
-    .reduce((sum, f) => sum + Math.max(0, f.amount + (f.late_fee || 0) - (f.discount || 0) - (f.paid_amount || 0)), 0);
+  const totalPendingBalance = React.useMemo(() => {
+    return selectedStudentFees
+      .filter((f) => f.status !== 'paid')
+      .reduce((sum, f) => sum + Math.max(0, f.amount + (f.late_fee || 0) - (f.discount || 0) - (f.paid_amount || 0)), 0);
+  }, [selectedStudentFees]);
 
   // Latest payment info
-  const latestPayment = selectedStudentPayments.length > 0 ? selectedStudentPayments[0] : null;
+  const latestPayment = React.useMemo(() => {
+    return selectedStudentPayments.length > 0 ? selectedStudentPayments[0] : null;
+  }, [selectedStudentPayments]);
 
   // Status computation for the current month
   const currentMonthName = format(new Date(), 'MMMM yyyy');
-  const currentFeeRecord = selectedStudentFees.find((f) => f.month === currentMonthName);
+  const currentFeeRecord = React.useMemo(() => {
+    return selectedStudentFees.find((f) => f.month === currentMonthName);
+  }, [selectedStudentFees, currentMonthName]);
 
   const isExpired = selectedStudent.valid_date ? new Date(selectedStudent.valid_date) < new Date() : false;
 
-  let feeStatusBadge = (
-    <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs px-3 py-1">
-      <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> PAID
-    </Badge>
-  );
-
-  if (isExpired || (currentFeeRecord && currentFeeRecord.status === 'unpaid') || (!currentFeeRecord && totalPendingBalance > 0)) {
-    feeStatusBadge = (
-      <Badge variant="destructive" className="text-xs px-3 py-1">
-        <AlertCircle className="w-3.5 h-3.5 mr-1" /> PENDING
+  const feeStatusBadge = React.useMemo(() => {
+    if (isExpired || (currentFeeRecord && currentFeeRecord.status === 'unpaid') || (!currentFeeRecord && totalPendingBalance > 0)) {
+      return (
+        <Badge variant="destructive" className="text-xs px-3 py-1">
+          <AlertCircle className="w-3.5 h-3.5 mr-1" /> PENDING
+        </Badge>
+      );
+    } else if (currentFeeRecord?.status === 'partial') {
+      return (
+        <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs px-3 py-1">
+          <Clock className="w-3.5 h-3.5 mr-1" /> PARTIAL
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs px-3 py-1">
+        <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> PAID
       </Badge>
     );
-  } else if (currentFeeRecord?.status === 'partial') {
-    feeStatusBadge = (
-      <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs px-3 py-1">
-        <Clock className="w-3.5 h-3.5 mr-1" /> PARTIAL
-      </Badge>
-    );
-  }
+  }, [isExpired, currentFeeRecord, totalPendingBalance]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

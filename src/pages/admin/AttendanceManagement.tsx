@@ -321,7 +321,18 @@ export default function AttendanceManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredStudents.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, idx) => (
+                  <TableRow key={idx} className="border-border animate-pulse">
+                    <TableCell><div className="h-4 w-32 bg-secondary/60 rounded" /></TableCell>
+                    <TableCell><div className="h-4 w-12 bg-secondary/60 rounded" /></TableCell>
+                    <TableCell><div className="h-4 w-24 bg-secondary/60 rounded" /></TableCell>
+                    <TableCell><div className="h-4 w-16 bg-secondary/60 rounded" /></TableCell>
+                    <TableCell><div className="h-4 w-20 bg-secondary/60 rounded" /></TableCell>
+                    <TableCell className="text-right"><div className="h-8 w-24 bg-secondary/60 rounded ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              ) : filteredStudents.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-12 text-muted-foreground text-xs">
                     No residents found matching criteria.
@@ -333,7 +344,7 @@ export default function AttendanceManagement() {
                   const currentStatus = attendanceRecords[uId] || 'unmarked';
 
                   return (
-                    <TableRow key={student._id} className="border-border hover:bg-secondary/30">
+                    <TableRow key={student._id} className="border-border hover:bg-secondary/30 content-visibility-auto">
                       <TableCell className="font-semibold text-foreground text-sm">
                         {student.name}
                       </TableCell>

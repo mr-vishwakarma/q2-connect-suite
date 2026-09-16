@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Plus, Receipt, Trash2, Calendar, DollarSign, Tag, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { expenseService } from '@/services/api/expense.service';
 import { useHostel } from '@/contexts/HostelContext';
 import { Expense } from '@/types';
@@ -17,6 +24,9 @@ export default function ExpenseManagement() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalExpenses, setTotalExpenses] = useState(0);
 
   const [form, setForm] = useState({
     category: 'ELECTRICITY',
@@ -26,23 +36,31 @@ export default function ExpenseManagement() {
     paymentMode: 'UPI',
   });
 
-  useEffect(() => {
-    fetchExpenses();
-  }, [selectedHostel]);
-
-  const fetchExpenses = async () => {
+  const fetchExpenses = useCallback(async (targetPage = page) => {
     try {
       setIsLoading(true);
-      const res = await expenseService.getExpenses({ hostel: selectedHostel });
+      const res = await expenseService.getExpenses({ 
+        hostel: selectedHostel,
+        page: targetPage,
+        limit: 20,
+      });
       if (res.success && res.data) {
         setExpenses(res.data);
+        if ((res as any).totalPages !== undefined) {
+          setTotalPages((res as any).totalPages || 1);
+          setTotalExpenses((res as any).total || res.data.length);
+        }
       }
     } catch (error) {
       console.error('Failed to load expenses:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedHostel, page]);
+
+  useEffect(() => {
+    fetchExpenses(page);
+  }, [page, fetchExpenses]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +100,9 @@ export default function ExpenseManagement() {
     }
   };
 
-  const totalExpense = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const totalExpense = useMemo(() => {
+    return expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  }, [expenses]);
 
   return (
     <div className="space-y-6">
@@ -90,7 +110,7 @@ export default function ExpenseManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Expense Tracker & Cashflow</h1>
-          <p className="text-sm text-muted-foreground">Log utility bills, staff salaries, repairs, and daily operational expenditures.</p>
+          <p className="text-sm text-muted-foreground">Log utility bills, staff salaries, repairs, and daily operational expenditures ({totalExpenses} Records).</p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
           <Plus className="w-4 h-4 mr-2" />
@@ -106,7 +126,7 @@ export default function ExpenseManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">₹{totalExpense.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">{expenses.length} Records total</p>
+            <p className="text-xs text-muted-foreground mt-1">{totalExpenses || expenses.length} Records total</p>
           </CardContent>
         </Card>
 
@@ -151,7 +171,7 @@ export default function ExpenseManagement() {
               <tbody className="divide-y divide-border/50">
                 {expenses.length > 0 ? (
                   expenses.map((exp) => (
-                    <tr key={exp._id || exp.id} className="hover:bg-secondary/20 transition-colors">
+                    <tr key={exp._id || exp.id} className="hover:bg-secondary/20 transition-colors content-visibility-auto">
                       <td className="p-4 text-xs font-mono text-muted-foreground">
                         {new Date(exp.date).toLocaleDateString()}
                       </td>
@@ -192,6 +212,39 @@ export default function ExpenseManagement() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-border flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                Page {page} of {totalPages} ({totalExpenses} Total Records)
+              </span>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => {
+                        const prev = Math.max(1, page - 1);
+                        setPage(prev);
+                        fetchExpenses(prev);
+                      }}
+                      className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => {
+                        const next = Math.min(totalPages, page + 1);
+                        setPage(next);
+                        fetchExpenses(next);
+                      }}
+                      className={page === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
 

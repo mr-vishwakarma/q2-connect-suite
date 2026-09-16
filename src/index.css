@@ -189,3 +189,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(222 47% 25%);
 }
+
+/* FP-4 Content Visibility Optimizations for Large Tables and Lists */
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 48px;
+}
+
+.content-visibility-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 120px;
+}
+

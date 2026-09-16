@@ -267,7 +267,7 @@ export default function HostelList() {
                   const occupancyPercent = capacity > 0 ? Math.min(100, Math.round((occupied / capacity) * 100)) : 0;
 
                   return (
-                    <tr key={hostel._id || hostel.id} className="hover:bg-secondary/20 transition-colors">
+                    <tr key={hostel._id || hostel.id} className="hover:bg-secondary/20 transition-colors content-visibility-auto">
                       <td className="px-5 py-4">
                         <div className="font-semibold text-foreground">{hostel.name}</div>
                         <div className="text-xs text-muted-foreground font-mono">Code: {hostel.code || 'N/A'}</div>

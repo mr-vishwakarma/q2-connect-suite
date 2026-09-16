@@ -1,5 +1,5 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useHostel } from '@/contexts/HostelContext';
 import { useAuth } from '@/hooks/useAuth';
 import { api, getSocket } from '@/lib/api';
@@ -24,6 +24,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { toast } from 'react-toastify';
 import { Bell, Plus, Trash2, Send, Users, AlertTriangle, Info, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -51,6 +58,9 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalNotifications, setTotalNotifications] = useState(0);
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [newNotification, setNewNotification] = useState({
     title: '',
@@ -59,12 +69,19 @@ export default function Notifications() {
     recipient: 'all',
   });
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (targetPage = page) => {
     try {
       setLoading(true);
-      const response = await api.get('/notifications', { params: { hostel: selectedHostel } });
+      const response = await api.get('/notifications', { 
+        params: { 
+          hostel: selectedHostel,
+          page: targetPage,
+          limit: 20,
+        } 
+      });
       if (response.data?.success) {
-        const formatted = response.data.data.map((n: any) => ({
+        const rawData = response.data.data || [];
+        const formatted = rawData.map((n: any) => ({
           id: n._id,
           user_id: n.userId?._id,
           hostel: n.hostel,
@@ -75,6 +92,10 @@ export default function Notifications() {
           created_at: n.createdAt,
         }));
         setNotifications(formatted);
+        if (response.data.totalPages !== undefined) {
+          setTotalPages(response.data.totalPages || 1);
+          setTotalNotifications(response.data.total || formatted.length);
+        }
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -82,7 +103,7 @@ export default function Notifications() {
     } finally {
       setLoading(false);
     }
-  }, [selectedHostel]);
+  }, [selectedHostel, page]);
 
   const fetchStudents = useCallback(async () => {
     try {
@@ -178,7 +199,7 @@ export default function Notifications() {
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = useMemo(() => notifications.filter(n => !n.is_read).length, [notifications]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -192,7 +213,7 @@ export default function Notifications() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Sent</p>
-                  <p className="text-2xl font-bold text-foreground">{notifications.length}</p>
+                  <p className="text-2xl font-bold text-foreground">{totalNotifications || notifications.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -260,7 +281,7 @@ export default function Notifications() {
                   </TableHeader>
                   <TableBody>
                     {notifications.map((notification) => (
-                      <TableRow key={notification.id}>
+                      <TableRow key={notification.id} className="content-visibility-auto">
                         <TableCell>{getTypeBadge(notification.type)}</TableCell>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
@@ -290,6 +311,39 @@ export default function Notifications() {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="p-4 border-t border-border flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  Page {page} of {totalPages} ({totalNotifications} Total)
+                </span>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => {
+                          const prev = Math.max(1, page - 1);
+                          setPage(prev);
+                          fetchNotifications(prev);
+                        }}
+                        className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => {
+                          const next = Math.min(totalPages, page + 1);
+                          setPage(next);
+                          fetchNotifications(next);
+                        }}
+                        className={page === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
               </div>
             )}
           </CardContent>

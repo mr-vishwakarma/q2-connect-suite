@@ -460,7 +460,7 @@ export default function AllStudents() {
                   </TableHeader>
                   <TableBody>
                     {pendingRegistrations.map((applicant) => (
-                      <TableRow key={applicant.id} className="border-border hover:bg-secondary/40">
+                      <TableRow key={applicant.id} className="border-border hover:bg-secondary/40 content-visibility-auto">
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2.5">
                             {applicant.picture ? (
@@ -548,7 +548,7 @@ export default function AllStudents() {
               filteredStudents.map((student) => {
                 const status = getStudentStatus(student.valid_date);
                 return (
-                  <Card key={student.id} className="bg-card border-border">
+                  <Card key={student.id} className="bg-card border-border content-visibility-card">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
@@ -623,7 +623,7 @@ export default function AllStudents() {
                   {filteredStudents.map((student) => {
                     const status = getStudentStatus(student.valid_date);
                     return (
-                      <TableRow key={student.id} className="border-border hover:bg-secondary/30">
+                      <TableRow key={student.id} className="border-border hover:bg-secondary/30 content-visibility-auto">
                         <TableCell className="font-semibold text-foreground">{student.name}</TableCell>
                         <TableCell className="text-foreground font-medium">{student.username || '-'}</TableCell>
                         <TableCell className="text-foreground font-medium hidden lg:table-cell">{student.phone || '-'}</TableCell>

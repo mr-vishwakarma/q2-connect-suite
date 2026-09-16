@@ -128,15 +128,32 @@ export default function FeeManagement() {
     fetchData();
   }, [fetchData]);
 
-  // Build matrix records with enhanced status classification
+  // Build matrix records with enhanced status classification (O(N) with Hash Indexing)
   const records: MatrixStudentRecord[] = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const next7Days = addDays(today, 7);
 
+    // O(1) Lookup Maps
+    const feesByStudent = new Map<string, typeof fees>();
+    const currentFeeByStudent = new Map<string, (typeof fees)[0]>();
+
+    for (let i = 0; i < fees.length; i++) {
+      const f = fees[i];
+      let list = feesByStudent.get(f.student_id);
+      if (!list) {
+        list = [];
+        feesByStudent.set(f.student_id, list);
+      }
+      list.push(f);
+      if (f.month === selectedMonth) {
+        currentFeeByStudent.set(f.student_id, f);
+      }
+    }
+
     return students.map((s) => {
-      const currentFee = fees.find((f) => f.student_id === s.id && f.month === selectedMonth);
-      const studentFees = fees.filter((f) => f.student_id === s.id);
+      const currentFee = currentFeeByStudent.get(s.id);
+      const studentFees = feesByStudent.get(s.id) || [];
       const isExpired = s.valid_date ? new Date(s.valid_date) < today : false;
 
       const pending = studentFees

@@ -107,7 +107,7 @@ export default function OrganizationList() {
                 {filteredOrgs.map((org) => {
                   const orgId = org._id || org.id;
                   return (
-                    <tr key={orgId} className="hover:bg-secondary/20 transition-colors">
+                    <tr key={orgId} className="hover:bg-secondary/20 transition-colors content-visibility-auto">
                       <td className="p-4 font-medium text-foreground">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center font-bold text-amber-500">

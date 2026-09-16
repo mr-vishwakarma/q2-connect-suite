@@ -280,7 +280,7 @@ export default function PaymentManagement() {
                     (!p.refundedAmountRupees || p.refundedAmountRupees < p.amountRupees);
 
                   return (
-                    <TableRow key={p._id} className="border-border/60 hover:bg-secondary/30 transition-colors">
+                    <TableRow key={p._id} className="border-border/60 hover:bg-secondary/30 transition-colors content-visibility-auto">
                       <TableCell className="text-foreground text-xs whitespace-nowrap">
                         {p.createdAt ? format(parseISO(p.createdAt), 'dd MMM yyyy, HH:mm') : 'N/A'}
                       </TableCell>

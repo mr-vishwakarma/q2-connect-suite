@@ -187,6 +187,24 @@ export default function RoomManagement() {
 
   const unassignedStudents = useMemo(() => students.filter(s => !s.room_no), [students]);
   const availableRooms = useMemo(() => rooms.filter(r => r.status === 'available'), [rooms]);
+
+  // Pre-index students by room number to prevent O(R * S) quadratic filtering inside table rows
+  const studentsByRoom = useMemo(() => {
+    const map = new Map<string, Student[]>();
+    for (let i = 0; i < students.length; i++) {
+      const s = students[i];
+      if (s.room_no) {
+        let list = map.get(s.room_no);
+        if (!list) {
+          list = [];
+          map.set(s.room_no, list);
+        }
+        list.push(s);
+      }
+    }
+    return map;
+  }, [students]);
+
   const { totalCapacity, totalOccupied } = useMemo(() => {
     let cap = 0;
     let occ = 0;
@@ -297,9 +315,9 @@ export default function RoomManagement() {
                   </TableHeader>
                   <TableBody>
                     {rooms.map((room) => {
-                      const roomStudents = students.filter(s => s.room_no === room.room_number);
+                      const roomStudents = studentsByRoom.get(room.room_number) || [];
                       return (
-                        <TableRow key={room.id}>
+                        <TableRow key={room.id} className="border-border hover:bg-secondary/30 transition-colors content-visibility-auto">
                           <TableCell className="font-semibold text-foreground">{room.room_number}</TableCell>
                           <TableCell className="text-foreground font-medium">{room.capacity}</TableCell>
                           <TableCell className="text-foreground font-medium">{room.occupied_count}</TableCell>

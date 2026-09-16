@@ -2,7 +2,7 @@ import { api } from '@/lib/api';
 import { ApiResponse, Expense } from '@/types';
 
 export const expenseService = {
-  async getExpenses(params?: { hostel?: string; category?: string; month?: string }): Promise<ApiResponse<Expense[]>> {
+  async getExpenses(params?: { hostel?: string; category?: string; month?: string; page?: number; limit?: number }): Promise<ApiResponse<Expense[]>> {
     const res = await api.get('/expenses', { params });
     return res.data;
   },
