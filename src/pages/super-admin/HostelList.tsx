@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   GitFork,
   Search,
@@ -32,11 +32,7 @@ export default function HostelList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1, limit: 20 });
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearch]);
-
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async () => {
     try {
       const res = await superAdminService.getHostelMetrics();
       if (res.success && res.data) {
@@ -45,9 +41,9 @@ export default function HostelList() {
     } catch (error) {
       console.error('Failed to load hostel metrics:', error);
     }
-  };
+  }, []);
 
-  const fetchHostels = async (page = 1, signal?: AbortSignal) => {
+  const fetchHostels = useCallback(async (page = 1, signal?: AbortSignal) => {
     try {
       setIsLoading(true);
       const params: any = { page, limit: 20 };
@@ -74,11 +70,11 @@ export default function HostelList() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter, genderFilter, debouncedSearch]);
 
   useEffect(() => {
     fetchMetrics();
-  }, []);
+  }, [fetchMetrics]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,22 +82,24 @@ export default function HostelList() {
     return () => {
       controller.abort();
     };
-  }, [currentPage, statusFilter, genderFilter, debouncedSearch]);
+  }, [currentPage, fetchHostels]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
   };
 
-  const filteredHostels = hostels.filter((h) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      (h.name && h.name.toLowerCase().includes(term)) ||
-      (h.code && h.code.toLowerCase().includes(term)) ||
-      (h.organizationId?.name && h.organizationId.name.toLowerCase().includes(term)) ||
-      (h.address && h.address.toLowerCase().includes(term))
-    );
-  });
+  const filteredHostels = useMemo(() => {
+    return hostels.filter((h) => {
+      if (!searchTerm) return true;
+      const term = searchTerm.toLowerCase();
+      return (
+        (h.name && h.name.toLowerCase().includes(term)) ||
+        (h.code && h.code.toLowerCase().includes(term)) ||
+        (h.organizationId?.name && h.organizationId.name.toLowerCase().includes(term)) ||
+        (h.address && h.address.toLowerCase().includes(term))
+      );
+    });
+  }, [hostels, searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -193,7 +191,10 @@ export default function HostelList() {
           <Input
             placeholder="Search hostels by name, code, tenant or city..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
             className="pl-9 bg-card"
           />
         </form>
@@ -201,7 +202,10 @@ export default function HostelList() {
         <div className="flex items-center gap-2">
           <select
             value={genderFilter}
-            onChange={(e) => setGenderFilter(e.target.value)}
+            onChange={(e) => {
+              setGenderFilter(e.target.value);
+              setCurrentPage(1);
+            }}
             className="h-10 px-3 rounded-md bg-card border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="ALL">All Types</option>
@@ -212,7 +216,10 @@ export default function HostelList() {
 
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
             className="h-10 px-3 rounded-md bg-card border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="ALL">All Status</option>

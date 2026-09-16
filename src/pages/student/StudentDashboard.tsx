@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
@@ -69,7 +69,7 @@ export default function StudentDashboard() {
   }, [user, fetchDashboardData]);
 
   // Download Student ID Card as high-resolution PNG image
-  const handleDownloadIDCard = async () => {
+  const handleDownloadIDCard = useCallback(async () => {
     const cardElem = document.getElementById('student-id-card-element');
     if (!cardElem) return;
     try {
@@ -91,10 +91,10 @@ export default function StudentDashboard() {
       console.error('Download ID card error:', err);
       toast.error('Failed to download image. You can use Print ID Card instead.');
     }
-  };
+  }, [studentData?.name, user?.name]);
 
   // Print Student ID Card
-  const handlePrintIDCard = () => {
+  const handlePrintIDCard = useCallback(() => {
     const cardElem = document.getElementById('student-id-card-element');
     if (!cardElem) return;
     const printWindow = window.open('', '_blank', 'width=600,height=800');
@@ -128,7 +128,18 @@ export default function StudentDashboard() {
       </html>
     `);
     printWindow.document.close();
-  };
+  }, [studentData?.name, user?.name]);
+
+  const statCards = useMemo(() => [
+    { title: 'Leave Requests', value: stats.leaveRequests, icon: CalendarCheck, color: 'text-primary', bg: 'bg-primary/10 shadow-sm' },
+    { title: 'Approved', value: stats.approvedRequests, icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10 shadow-sm' },
+    { title: 'Complaints', value: stats.complaints, icon: MessageSquare, color: 'text-amber-500', bg: 'bg-amber-500/10 shadow-sm' },
+    { title: 'Suggestions', value: stats.suggestions, icon: Lightbulb, color: 'text-blue-500', bg: 'bg-blue-500/10 shadow-sm' },
+  ], [stats]);
+
+  const isValidDate = useMemo(() => {
+    return studentData?.valid_date ? new Date(studentData.valid_date) >= new Date() : true;
+  }, [studentData?.valid_date]);
 
   if (loading) {
     return (
@@ -137,15 +148,6 @@ export default function StudentDashboard() {
       </DashboardLayout>
     );
   }
-
-  const statCards = [
-    { title: 'Leave Requests', value: stats.leaveRequests, icon: CalendarCheck, color: 'text-primary', bg: 'bg-primary/10 shadow-sm' },
-    { title: 'Approved', value: stats.approvedRequests, icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10 shadow-sm' },
-    { title: 'Complaints', value: stats.complaints, icon: MessageSquare, color: 'text-amber-500', bg: 'bg-amber-500/10 shadow-sm' },
-    { title: 'Suggestions', value: stats.suggestions, icon: Lightbulb, color: 'text-blue-500', bg: 'bg-blue-500/10 shadow-sm' },
-  ];
-
-  const isValidDate = studentData?.valid_date ? new Date(studentData.valid_date) >= new Date() : true;
 
   return (
     <DashboardLayout title="Dashboard" isAdmin={false}>

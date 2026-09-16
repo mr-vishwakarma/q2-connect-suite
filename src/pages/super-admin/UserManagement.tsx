@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Users,
   Search,
@@ -36,11 +36,7 @@ export default function UserManagement() {
   const [newRole, setNewRole] = useState('');
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearch]);
-
-  const fetchUsers = async (page = 1, signal?: AbortSignal) => {
+  const fetchUsers = useCallback(async (page = 1, signal?: AbortSignal) => {
     try {
       setIsLoading(true);
       const params: any = { page, limit: 20 };
@@ -66,7 +62,7 @@ export default function UserManagement() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [roleFilter, statusFilter, debouncedSearch]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -74,7 +70,7 @@ export default function UserManagement() {
     return () => {
       controller.abort();
     };
-  }, [currentPage, roleFilter, statusFilter, debouncedSearch]);
+  }, [currentPage, fetchUsers]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,7 +158,10 @@ export default function UserManagement() {
           <Input
             placeholder="Search by name, email, or username..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
             className="pl-9 bg-card"
           />
         </form>

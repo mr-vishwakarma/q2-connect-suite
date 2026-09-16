@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Building2,
@@ -22,11 +22,7 @@ export default function SuperAdminDashboard() {
   const [stats, setStats] = useState<SuperAdminDashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       setIsLoading(true);
       const res = await superAdminService.getDashboardStats();
@@ -38,9 +34,13 @@ export default function SuperAdminDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const kpis = [
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const kpis = useMemo(() => [
     {
       title: 'Active Organizations',
       value: stats?.activeOrganizations ?? '--',
@@ -73,7 +73,7 @@ export default function SuperAdminDashboard() {
       color: 'text-purple-500',
       bg: 'bg-purple-500/10 border-purple-500/20',
     },
-  ];
+  ], [stats]);
 
   return (
     <div className="space-y-6">

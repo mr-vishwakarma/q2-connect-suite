@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   CreditCard,
   Search,
@@ -31,11 +31,7 @@ export default function SubscriptionManagement() {
   const [extendingSub, setExtendingSub] = useState<any | null>(null);
   const [extendDays, setExtendDays] = useState(14);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearch]);
-
-  const fetchSubscriptions = async (page = 1, signal?: AbortSignal) => {
+  const fetchSubscriptions = useCallback(async (page = 1, signal?: AbortSignal) => {
     try {
       setIsLoading(true);
       const params: any = { page, limit: 20 };
@@ -56,7 +52,7 @@ export default function SubscriptionManagement() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter, debouncedSearch]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,7 +60,7 @@ export default function SubscriptionManagement() {
     return () => {
       controller.abort();
     };
-  }, [currentPage, statusFilter, debouncedSearch]);
+  }, [currentPage, fetchSubscriptions]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,7 +123,10 @@ export default function SubscriptionManagement() {
           <Input
             placeholder="Search subscriptions by organization or plan..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
             className="pl-9 bg-card"
           />
         </form>

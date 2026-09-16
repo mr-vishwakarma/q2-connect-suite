@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useHostel } from '@/contexts/HostelContext';
 import { roomService, studentService } from '@/services/api';
@@ -185,10 +185,17 @@ export default function RoomManagement() {
     }
   };
 
-  const unassignedStudents = students.filter(s => !s.room_no);
-  const availableRooms = rooms.filter(r => r.status === 'available');
-  const totalCapacity = rooms.reduce((sum, r) => sum + r.capacity, 0);
-  const totalOccupied = rooms.reduce((sum, r) => sum + r.occupied_count, 0);
+  const unassignedStudents = useMemo(() => students.filter(s => !s.room_no), [students]);
+  const availableRooms = useMemo(() => rooms.filter(r => r.status === 'available'), [rooms]);
+  const { totalCapacity, totalOccupied } = useMemo(() => {
+    let cap = 0;
+    let occ = 0;
+    for (let i = 0; i < rooms.length; i++) {
+      cap += rooms[i].capacity || 0;
+      occ += rooms[i].occupied_count || 0;
+    }
+    return { totalCapacity: cap, totalOccupied: occ };
+  }, [rooms]);
 
   return (
     <div className="space-y-6 animate-fade-in">

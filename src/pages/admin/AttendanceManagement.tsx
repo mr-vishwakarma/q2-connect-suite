@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   UserCheck,
@@ -148,23 +148,44 @@ export default function AttendanceManagement() {
     a.click();
   };
 
-  const filteredStudents = students.filter((s) => {
-    const uId = s.userId || s._id;
-    const currentStatus = attendanceRecords[uId] || 'unmarked';
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.roomNo && s.roomNo.includes(searchQuery));
-    if (!matchesSearch) return false;
+  const { presentCount, absentCount, messOffCount, totalCount, attendanceRate } = useMemo(() => {
+    let present = 0;
+    let absent = 0;
+    let messOff = 0;
+    for (let i = 0; i < students.length; i++) {
+      const s = students[i];
+      const status = attendanceRecords[s.userId || s._id];
+      if (status === 'present') present++;
+      else if (status === 'absent') absent++;
+      else if (status === 'mess_off') messOff++;
+    }
+    const total = students.length;
+    const rate = total > 0 ? ((present / total) * 100).toFixed(1) : '0';
+    return {
+      presentCount: present,
+      absentCount: absent,
+      messOffCount: messOff,
+      totalCount: total,
+      attendanceRate: rate,
+    };
+  }, [students, attendanceRecords]);
 
-    if (filterStatus === 'present') return currentStatus === 'present';
-    if (filterStatus === 'absent') return currentStatus === 'absent';
-    if (filterStatus === 'mess_off') return currentStatus === 'mess_off';
-    return true;
-  });
+  const filteredStudents = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return students.filter((s) => {
+      const uId = s.userId || s._id;
+      const currentStatus = attendanceRecords[uId] || 'unmarked';
+      const matchesSearch = !query || 
+        (s.name && s.name.toLowerCase().includes(query)) || 
+        (s.roomNo && s.roomNo.includes(query));
+      if (!matchesSearch) return false;
 
-  const presentCount = students.filter((s) => attendanceRecords[s.userId || s._id] === 'present').length;
-  const absentCount = students.filter((s) => attendanceRecords[s.userId || s._id] === 'absent').length;
-  const messOffCount = students.filter((s) => attendanceRecords[s.userId || s._id] === 'mess_off').length;
-  const totalCount = students.length;
-  const attendanceRate = totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : '0';
+      if (filterStatus === 'present') return currentStatus === 'present';
+      if (filterStatus === 'absent') return currentStatus === 'absent';
+      if (filterStatus === 'mess_off') return currentStatus === 'mess_off';
+      return true;
+    });
+  }, [students, attendanceRecords, searchQuery, filterStatus]);
 
   return (
     <div className="space-y-6">
