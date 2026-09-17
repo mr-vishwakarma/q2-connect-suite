@@ -34,7 +34,11 @@ export default function OrganizationList() {
       setIsLoading(true);
       const res = await superAdminService.getOrganizations();
       if (res.success && res.data) {
-        setOrganizations(res.data);
+        if (Array.isArray(res.data)) {
+          setOrganizations(res.data);
+        } else if (Array.isArray((res.data as any).organizations)) {
+          setOrganizations((res.data as any).organizations);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch organizations:', error);

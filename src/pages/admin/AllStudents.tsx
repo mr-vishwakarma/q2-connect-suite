@@ -33,6 +33,7 @@ import {
   Phone,
   Mail,
   RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import {
@@ -130,6 +131,8 @@ export default function AllStudents() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [registeringApplicant, setRegisteringApplicant] = useState<PendingApplicant | null>(null);
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
       navigate('/login?role=admin');
@@ -150,6 +153,7 @@ export default function AllStudents() {
   const fetchStudents = useCallback(async (signal?: AbortSignal) => {
     try {
       setIsLoading(true);
+      setFetchError(null);
       const response = await api.get('/students', { 
         params: { 
           hostel: selectedHostel, 
@@ -160,29 +164,35 @@ export default function AllStudents() {
         signal,
       });
       if (response.data?.success) {
-        const mapped = response.data.data
-          .filter((s: any) => !deletedIdsRef.current.has(s._id))
+        const rawList = Array.isArray(response.data.data) ? response.data.data : [];
+        const mapped = rawList
+          .filter((s: any) => s && !deletedIdsRef.current.has(s._id))
           .map((s: any) => ({
             id: s._id,
-            user_id: s.userId,
-            name: s.name,
+            user_id: typeof s.userId === 'object' ? (s.userId?._id || '') : (s.userId || ''),
+            name: s.name || '',
             phone: s.phone || '',
             room_no: s.roomNo || '',
-            fees: s.fees || 0,
+            fees: typeof s.fees === 'number' ? s.fees : 0,
             start_date: s.startDate || '',
             valid_date: s.validDate || '',
-            username: s.username,
-            created_at: s.createdAt,
+            username: s.username || '',
+            created_at: s.createdAt || '',
           }));
         setStudents(mapped);
         setTotalPages(response.data.totalPages || 1);
+        setFetchError(null);
+      } else {
+        setFetchError(response.data?.message || 'Failed to fetch students');
       }
     } catch (error: any) {
       if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
         return;
       }
       console.error('Error fetching students:', error);
-      toast.error('Failed to fetch students');
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to fetch students';
+      setFetchError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -538,7 +548,26 @@ export default function AllStudents() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {/* Mobile Card View */}
+          {fetchError ? (
+            <Card className="bg-destructive/10 border-destructive/20 mb-4">
+              <CardContent className="py-8 text-center space-y-3">
+                <AlertCircle className="w-10 h-10 text-destructive mx-auto" />
+                <h3 className="font-bold text-foreground text-sm">Failed to Load Students</h3>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">{fetchError}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchStudents()}
+                  className="border-destructive/30 hover:bg-destructive/10 text-destructive gap-2 text-xs"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Retry Loading
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Mobile Card View */}
           <div className="block md:hidden space-y-3">
             {filteredStudents.length === 0 ? (
               <Card className="bg-card border-border">
@@ -716,6 +745,8 @@ export default function AllStudents() {
               </Pagination>
             </div>
           )}
+            </>
+          )}
         </motion.div>
       )}
 
@@ -724,10 +755,10 @@ export default function AllStudents() {
         onOpenChange={setIsDialogOpen}
         editForm={editForm}
         setEditForm={setEditForm}
-        editStartDate={editStartDate}
-        setEditStartDate={setEditStartDate}
-        editEndDate={editEndDate}
-        setEditEndDate={setEditEndDate}
+        editStartDate={editForm.startDate}
+        setEditStartDate={(date) => setEditForm(prev => ({ ...prev, startDate: date }))}
+        editEndDate={editForm.endDate}
+        setEditEndDate={(date) => setEditForm(prev => ({ ...prev, endDate: date }))}
         onSubmit={handleEditSubmit}
         submitting={isSubmitting}
       />

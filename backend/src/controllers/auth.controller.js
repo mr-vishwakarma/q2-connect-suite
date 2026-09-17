@@ -19,6 +19,37 @@ const generateTokens = (userId) => {
 };
 
 /**
+ * Resolves active organization and enabled features for a given user.
+ */
+const resolveUserFeaturesAndOrg = async (userId) => {
+  const Membership = require('../models/Membership');
+  const OrganizationFeature = require('../models/OrganizationFeature');
+
+  let featuresMap = {};
+  let organization = null;
+
+  try {
+    const membership = await Membership.findOne({ userId, status: 'ACTIVE' })
+      .populate('organizationId')
+      .lean();
+
+    if (membership && membership.organizationId) {
+      organization = membership.organizationId;
+      const orgFeatures = await OrganizationFeature.find({ organizationId: organization._id, enabled: true })
+        .select('featureKey')
+        .lean();
+      orgFeatures.forEach((f) => {
+        featuresMap[f.featureKey] = true;
+      });
+    }
+  } catch (err) {
+    console.error('Error resolving user features and organization:', err);
+  }
+
+  return { organization, features: featuresMap };
+};
+
+/**
  * Authoritative Google ID Token verification.
  * Strictly verifies signature, issuer, audience, and expiry with Google's public keys.
  * Fails closed if token is invalid or if GOOGLE_CLIENT_ID is unconfigured.
@@ -158,11 +189,11 @@ const handleUnifiedLogin = async (req, res, defaultPortal) => {
     if (user.refreshTokens.length > 5) user.refreshTokens.shift(); // keep latest 5
     await user.save({ validateBeforeSave: false });
 
-    // Fetch student profile if student
-    let studentProfile = null;
-    if (user.role === 'student' && user.studentId) {
-      studentProfile = await Student.findById(user.studentId);
-    }
+    // Fetch student profile and organization features in parallel
+    const [resolvedOrgFeatures, studentProfile] = await Promise.all([
+      resolveUserFeaturesAndOrg(user._id),
+      (user.role === 'student' && user.studentId) ? Student.findById(user.studentId).lean() : Promise.resolve(null),
+    ]);
 
     await logAuditAction({
       req,
@@ -180,6 +211,8 @@ const handleUnifiedLogin = async (req, res, defaultPortal) => {
       refreshToken,
       user: user.toJSON(),
       student: studentProfile,
+      organization: resolvedOrgFeatures.organization,
+      features: resolvedOrgFeatures.features,
     });
   } catch (error) {
     console.error('Unified login error:', error);
@@ -321,10 +354,10 @@ const googleLogin = async (req, res) => {
       if (user.refreshTokens.length > 5) user.refreshTokens.shift();
       await user.save({ validateBeforeSave: false });
 
-      let studentProfile = null;
-      if (user.role === 'student' && user.studentId) {
-        studentProfile = await Student.findById(user.studentId);
-      }
+      const [resolvedOrgFeatures, studentProfile] = await Promise.all([
+        resolveUserFeaturesAndOrg(user._id),
+        (user.role === 'student' && user.studentId) ? Student.findById(user.studentId).lean() : Promise.resolve(null),
+      ]);
 
       return res.status(200).json({
         success: true,
@@ -334,6 +367,8 @@ const googleLogin = async (req, res) => {
         refreshToken,
         user: user.toJSON(),
         student: studentProfile,
+        organization: resolvedOrgFeatures.organization,
+        features: resolvedOrgFeatures.features,
       });
     }
 
@@ -555,6 +590,8 @@ const completeGoogleSetup = async (req, res) => {
     user.refreshTokens.push(refreshToken);
     await user.save({ validateBeforeSave: false });
 
+    const resolvedOrgFeatures = await resolveUserFeaturesAndOrg(user._id);
+
     return res.status(201).json({
       success: true,
       message: 'Account configured and profile linked successfully!',
@@ -562,6 +599,8 @@ const completeGoogleSetup = async (req, res) => {
       refreshToken,
       user: user.toJSON(),
       student,
+      organization: resolvedOrgFeatures.organization,
+      features: resolvedOrgFeatures.features,
     });
   } catch (error) {
     console.error('Complete Google Setup error:', error);
@@ -783,38 +822,19 @@ const logout = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
   try {
-    const Membership = require('../models/Membership');
-    const OrganizationFeature = require('../models/OrganizationFeature');
-
-    const studentPromise = (req.user.role === 'student' && req.user.studentId)
-      ? Student.findById(req.user.studentId).lean()
-      : Promise.resolve(null);
-
-    const membershipPromise = Membership.findOne({ userId: req.user._id, status: 'ACTIVE' })
-      .populate('organizationId')
-      .lean();
-
-    const [studentProfile, membership] = await Promise.all([studentPromise, membershipPromise]);
-
-    let featuresMap = {};
-    let organization = null;
-
-    if (membership && membership.organizationId) {
-      organization = membership.organizationId;
-      const orgFeatures = await OrganizationFeature.find({ organizationId: organization._id, enabled: true })
-        .select('featureKey')
-        .lean();
-      orgFeatures.forEach((f) => {
-        featuresMap[f.featureKey] = true;
-      });
-    }
+    const [studentProfile, resolvedOrgFeatures] = await Promise.all([
+      (req.user.role === 'student' && req.user.studentId)
+        ? Student.findById(req.user.studentId).lean()
+        : Promise.resolve(null),
+      resolveUserFeaturesAndOrg(req.user._id),
+    ]);
 
     return res.status(200).json({
       success: true,
       user: req.user,
       student: studentProfile,
-      organization,
-      features: featuresMap,
+      organization: resolvedOrgFeatures.organization,
+      features: resolvedOrgFeatures.features,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

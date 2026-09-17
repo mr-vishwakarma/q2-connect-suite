@@ -94,6 +94,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (authState.isSuperAdmin || authState.user?.isSuperAdmin || authState.user?.role === 'super_admin') return true;
     const coreFeatures = ['student_management', 'room_management', 'fee_management', 'reports'];
     if (coreFeatures.includes(featureKey)) return true;
+    if (authState.features && Object.keys(authState.features).length > 0) {
+      return !!authState.features[featureKey];
+    }
+    if (authState.isAdmin) {
+      const defaultAdminFeatures = [
+        'student_management',
+        'room_management',
+        'fee_management',
+        'security_deposit',
+        'expense_management',
+        'attendance',
+        'mess_management',
+        'laundry',
+        'complaints',
+        'reports',
+        'notifications',
+        'advanced_analytics',
+      ];
+      return defaultAdminFeatures.includes(featureKey);
+    }
     return !!authState.features[featureKey];
   }, [authState]);
 
@@ -235,7 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin,
       isPrimaryAdmin: userData.role === 'admin' || userData.role === 'super_admin',
       profile: newProfile,
-      features: {},
+      features: (data.features && typeof data.features === 'object') ? data.features : {},
     });
 
     // Connect Socket
@@ -284,6 +304,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (response.data?.success) {
         const mappedUser = handleAuthSuccess(response.data);
+        if (!response.data.features || Object.keys(response.data.features).length === 0) {
+          await fetchProfile();
+        }
         return { error: null, user: mappedUser };
       }
       return { error: new Error('Login failed') };
@@ -346,6 +369,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data?.success && (data?.status === 'active' || !data?.status)) {
         const mappedUser = handleAuthSuccess(data);
+        if (!data.features || Object.keys(data.features).length === 0) {
+          await fetchProfile();
+        }
         return { error: null, user: mappedUser, status: 'active' };
       }
 
@@ -384,6 +410,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.post('/auth/complete-google-setup', payload);
       if (response.data?.success) {
         const mappedUser = handleAuthSuccess(response.data);
+        if (!response.data.features || Object.keys(response.data.features).length === 0) {
+          await fetchProfile();
+        }
         return { error: null, user: mappedUser };
       }
       return { error: new Error('Profile setup failed') };

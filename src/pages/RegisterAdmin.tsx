@@ -77,7 +77,13 @@ export default function RegisterAdmin() {
       // Create admin user with username@q2hostel.local email format
       const email = `${username.toLowerCase().trim()}@q2hostel.local`;
       
-      const { error: signUpError } = await signUp(email, password, username);
+      const { error: signUpError } = await signUp({
+        email,
+        password,
+        username,
+        name: username,
+        role: 'admin',
+      });
 
       if (signUpError) {
         toast.error(signUpError.message);
