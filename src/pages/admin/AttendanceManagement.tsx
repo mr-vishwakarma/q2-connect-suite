@@ -145,7 +145,10 @@ export default function AttendanceManagement() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `attendance-${selectedHostel}-${selectedDate}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const { presentCount, absentCount, messOffCount, totalCount, attendanceRate } = useMemo(() => {

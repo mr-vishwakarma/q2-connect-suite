@@ -55,9 +55,11 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
     }
   }, [messages, isLoading]);
 
-  // Focus input when opened
+  // Focus input when opened with timer cleanup
   useEffect(() => {
-    if (isOpen) setTimeout(() => inputRef.current?.focus(), 300);
+    if (!isOpen) return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 300);
+    return () => clearTimeout(timer);
   }, [isOpen]);
 
   const sendMessage = useCallback(async () => {

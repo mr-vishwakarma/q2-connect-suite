@@ -37,6 +37,7 @@ import {
   Pie,
   Cell,
 } from 'recharts';
+import { WidgetErrorBoundary } from '@/components/common/WidgetErrorBoundary';
 
 interface DashboardStats {
   totalStudents: number;
@@ -55,6 +56,7 @@ interface RecentComplaint {
   category?: string;
   tag?: string;
   isNew?: boolean;
+  room_no?: string;
 }
 
 interface RecentSuggestion {
@@ -200,6 +202,7 @@ export default function AdminDashboard() {
       </motion.div>
 
       {/* 2. 3 METRIC STAT CARDS ROW (Maintains 3-column row on mobile) */}
+      <WidgetErrorBoundary title="Dashboard Metrics">
       <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
         {/* Card 1: Total Students */}
         <motion.div
@@ -279,10 +282,12 @@ export default function AdminDashboard() {
           </div>
         </motion.div>
       </div>
+      </WidgetErrorBoundary>
 
       {/* 3. ROW 2: NEW COMPLAINTS + DAILY COMPLAINTS (2-Column Row on Mobile!) */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
         {/* NEW COMPLAINTS CARD */}
+        <WidgetErrorBoundary title="New Complaints">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -309,44 +314,26 @@ export default function AdminDashboard() {
             </CardHeader>
 
             <CardContent className="p-2.5 sm:p-3.5 pt-0 flex-1 flex flex-col justify-between space-y-2">
-              <div className="space-y-2 flex-1 overflow-y-auto max-h-[190px] sm:max-h-[220px]">
+              {/* Complaints List (Limited to 2 items on mobile for compact fit) */}
+              <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[140px]">
                 {recentComplaints.length > 0 ? (
-                  recentComplaints.slice(0, 2).map((item) => (
+                  recentComplaints.map((item) => (
                     <div
                       key={item._id}
                       onClick={() => navigate('/admin/complaints')}
-                      className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-secondary/30 hover:bg-secondary/60 border border-border/40 transition-all cursor-pointer space-y-1.5"
+                      className="p-2 rounded-lg bg-secondary/30 hover:bg-secondary/60 border border-border/40 transition-all cursor-pointer"
                     >
-                      <div className="flex items-start gap-1.5 sm:gap-2">
-                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-secondary/70 border border-border/40 flex items-center justify-center shrink-0 mt-0.5">
-                          {getCategoryIcon(item.category)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1">
-                            <p className="text-[11px] sm:text-xs font-semibold text-foreground truncate">
-                              {item.title}
-                            </p>
-                            {item.isNew && (
-                              <span className="bg-red-500 text-white text-[8px] font-bold px-1 py-0.2 rounded-full uppercase tracking-wider shrink-0">
-                                New
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[9px] sm:text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
-                            {item.description || 'No description provided.'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-1 border-t border-border/20 text-[8px] sm:text-[10px] text-muted-foreground">
-                        <span className="flex items-center gap-0.5">
-                          <Calendar className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                          {new Date(item.createdAt).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                          })}
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] sm:text-xs font-semibold text-foreground truncate">
+                          {item.title}
                         </span>
-                        <span className="px-1.5 py-0.2 rounded bg-secondary text-secondary-foreground font-medium border border-border/40 text-[8px] sm:text-[9px]">
+                        <span className="text-[8px] sm:text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium shrink-0">
+                          {item.category || 'General'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">
+                        <span>Room {item.room_no || 'N/A'}</span>
+                        <span className="text-[8px] sm:text-[9px] px-1 py-0.2 rounded bg-secondary text-foreground/70">
                           {item.tag || item.category || 'Room'}
                         </span>
                       </div>
@@ -370,8 +357,10 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </motion.div>
+        </WidgetErrorBoundary>
 
         {/* DAILY COMPLAINTS CHART CARD */}
+        <WidgetErrorBoundary title="Daily Complaints Chart">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -469,11 +458,13 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </motion.div>
+        </WidgetErrorBoundary>
       </div>
 
       {/* 4. ROW 3: DISTRIBUTION + NEW SUGGESTIONS (2-Column Row on Mobile!) */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
         {/* DISTRIBUTION CARD */}
+        <WidgetErrorBoundary title="Student Distribution">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -561,8 +552,10 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </motion.div>
+        </WidgetErrorBoundary>
 
         {/* NEW SUGGESTIONS CARD */}
+        <WidgetErrorBoundary title="New Suggestions">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -625,9 +618,11 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
         </motion.div>
+        </WidgetErrorBoundary>
       </div>
 
       {/* 5. ROW 4: MENU RATINGS OVERVIEW CARD */}
+      <WidgetErrorBoundary title="Menu Ratings Overview">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -695,6 +690,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </motion.div>
+      </WidgetErrorBoundary>
     </div>
   );
 }

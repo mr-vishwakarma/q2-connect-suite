@@ -15,6 +15,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { WidgetErrorBoundary } from '@/components/common/WidgetErrorBoundary';
 
 const MessStatusChart = lazy(() => import('./components/MessStatusChart'));
 
@@ -212,15 +213,17 @@ export default function MessOff() {
               <CardTitle className="text-foreground">Request Status Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              {chartData.length > 0 ? (
-                <Suspense fallback={<div className="h-[250px] flex items-center justify-center text-muted-foreground animate-pulse">Loading chart...</div>}>
-                  <MessStatusChart chartData={chartData} />
-                </Suspense>
-              ) : (
-                <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                  No requests yet
-                </div>
-              )}
+              <WidgetErrorBoundary title="Request Status Chart">
+                {chartData.length > 0 ? (
+                  <Suspense fallback={<div className="h-[250px] flex items-center justify-center text-muted-foreground animate-pulse">Loading chart...</div>}>
+                    <MessStatusChart chartData={chartData} />
+                  </Suspense>
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                    No requests yet
+                  </div>
+                )}
+              </WidgetErrorBoundary>
             </CardContent>
           </Card>
 

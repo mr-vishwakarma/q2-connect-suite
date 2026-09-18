@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DollarSign, TrendingUp, AlertTriangle, Clock, ArrowUpRight, MessageSquare, CheckCircle, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -63,9 +63,20 @@ export function FeeIntelligence() {
 
   const stats = MONTH_STATS[selectedMonth];
 
+  const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (broadcastTimerRef.current) {
+        clearTimeout(broadcastTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleBroadcast = () => {
     setShowBroadcastToast(true);
-    setTimeout(() => setShowBroadcastToast(false), 3000);
+    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+    broadcastTimerRef.current = setTimeout(() => setShowBroadcastToast(false), 3000);
   };
 
   return (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { SaaSHeader } from '@/components/landing/SaaSHeader';
 import { SaaSFooter } from '@/components/landing/SaaSFooter';
@@ -54,11 +54,21 @@ export default function Contact() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const submitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (submitTimerRef.current) {
+        clearTimeout(submitTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     // Simulate submission
-    setTimeout(() => {
+    submitTimerRef.current = setTimeout(() => {
       setIsSubmitting(false);
       toast.success('Message sent successfully! We will get back to you soon.');
       setFormData({ name: '', email: '', phone: '', message: '' });

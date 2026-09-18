@@ -17,6 +17,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import { WidgetErrorBoundary } from '@/components/common/WidgetErrorBoundary';
 import { 
   Users, 
   Activity, 
@@ -179,6 +180,7 @@ export default function AdminAnalytics() {
         </Card>
 
         {/* Database Stats */}
+        <WidgetErrorBoundary title="Database Overview">
         <Card className="bg-card border-border col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -212,8 +214,10 @@ export default function AdminAnalytics() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+        </WidgetErrorBoundary>
 
         {/* Top Endpoints */}
+        <WidgetErrorBoundary title="Top API Endpoints">
         <Card className="bg-card border-border lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -249,6 +253,7 @@ export default function AdminAnalytics() {
             </div>
           </CardContent>
         </Card>
+        </WidgetErrorBoundary>
       </div>
     </div>
   );

@@ -91,7 +91,7 @@ export default function FeeManagement() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isMounted?: () => boolean) => {
     try {
       const [response, settingsResponse] = await Promise.all([
         feeService.getFeeDashboard({
@@ -101,6 +101,8 @@ export default function FeeManagement() {
         }),
         settingsService.getHostelSettings(selectedHostel),
       ]);
+
+      if (isMounted && !isMounted()) return;
 
       if (response.success && response.data) {
         const { students, fees, payments, deposits, totalPages, total } = response.data;
@@ -117,15 +119,22 @@ export default function FeeManagement() {
         setGracePeriodSetting(settingsResponse.data.gracePeriodDays || 5);
       }
     } catch (e) {
+      if (isMounted && !isMounted()) return;
       console.error(e);
       toast.error('Failed to load fee data');
     } finally {
-      setLoading(false);
+      if (!isMounted || isMounted()) {
+        setLoading(false);
+      }
     }
   }, [selectedHostel, currentPage]);
 
   useEffect(() => {
-    fetchData();
+    let active = true;
+    fetchData(() => active);
+    return () => {
+      active = false;
+    };
   }, [fetchData]);
 
   // Build matrix records with enhanced status classification (O(N) with Hash Indexing)

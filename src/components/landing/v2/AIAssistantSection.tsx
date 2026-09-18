@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, Bot, User, CornerDownRight, CheckCircle2, TrendingUp, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -81,10 +81,21 @@ export function AIAssistantSection() {
 
   const current = PRESETS[selectedPresetIndex];
 
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleSelectQuery = (idx: number) => {
     if (idx === selectedPresetIndex) return;
     setIsTyping(true);
-    setTimeout(() => {
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
       setSelectedPresetIndex(idx);
       setIsTyping(false);
     }, 300);

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
+import { notifyApiError } from '@/utils/errorHandling';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
@@ -9,6 +10,7 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000,
 });
 
 // Interceptor to add auth token
@@ -44,7 +46,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Check if error is 401 (Unauthorized) and not already retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedRequestsQueue.push({ resolve, reject });
@@ -91,28 +93,59 @@ api.interceptors.response.use(
       }
     }
 
+    // Deduplicate and notify for systemic network or server-side failure modes
+    const status = error.response?.status;
+    const isSystemic = status === 429 || (status && status >= 500) || error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED';
+    if (isSystemic) {
+      notifyApiError(error);
+    }
+
     return Promise.reject(error);
   }
 );
 
-// Socket.io helper
+// Socket.io helper with reconnection, tab visibility, and memory cleanup
 let socket: Socket | null = null;
+let visibilityListenerAttached = false;
 
 export const getSocket = (): Socket => {
-  if (socket) return socket;
-
   const token = localStorage.getItem('accessToken');
+
+  if (socket) {
+    if (token && socket.auth && (socket.auth as any).token !== token) {
+      socket.auth = { token };
+    }
+    return socket;
+  }
+
   socket = io(SOCKET_URL, {
     auth: { token },
     transports: ['websocket', 'polling'],
     autoConnect: false,
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 15000,
   });
+
+  // Single tab visibility listener to manage socket reconnection without duplicate listeners
+  if (!visibilityListenerAttached && typeof document !== 'undefined') {
+    visibilityListenerAttached = true;
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && socket && !socket.connected && localStorage.getItem('accessToken')) {
+        socket.auth = { token: localStorage.getItem('accessToken') };
+        socket.connect();
+      }
+    });
+  }
 
   return socket;
 };
 
 export const disconnectSocket = () => {
   if (socket) {
+    socket.removeAllListeners();
     socket.disconnect();
     socket = null;
   }

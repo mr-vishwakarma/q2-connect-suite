@@ -10,6 +10,8 @@ import { HostelProvider, useHostel } from "@/contexts/HostelContext";
 import { ProtectedAdminRoute } from "@/components/auth/ProtectedAdminRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import ScrollToTop from "@/components/ScrollToTop";
+import { GlobalErrorBoundary } from "@/components/common/GlobalErrorBoundary";
+import { OfflineBanner } from "@/components/common/OfflineBanner";
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { user, isSuperAdmin, isAdmin, loading } = useAuth();
@@ -179,11 +181,13 @@ function SuperAdminShell() {
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const App = () => (
+  <GlobalErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
       <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID || "not-configured"}>
       <AuthProvider>
         <HostelProvider>
+          <OfflineBanner />
           <Toaster />
           <ToastContainer position="top-right" autoClose={3000} theme="dark" />
           <BrowserRouter>
@@ -270,6 +274,7 @@ const App = () => (
       </GoogleOAuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
+  </GlobalErrorBoundary>
 );
 
 export default App;

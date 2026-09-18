@@ -24,8 +24,20 @@ export default defineConfig({
         display: 'standalone'
       },
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\/.*/],
         // Exclude heavy isolated bundles from initial PWA precache so they load strictly on demand
         globIgnores: ['**/vendor-three-*.js', '**/vendor-pdf-*.js', '**/vendor-sheets-*.js'],
+        runtimeCaching: [
+          {
+            // Strictly NEVER cache API responses in ServiceWorker CacheStorage
+            urlPattern: /^\/api\/.*/i,
+            handler: 'NetworkOnly',
+          }
+        ]
       }
     })
   ],

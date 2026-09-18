@@ -112,7 +112,10 @@ export default function CashflowAnalyzer() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `cashflow-${selectedHostel}-${selectedMonth}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (

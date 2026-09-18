@@ -1,5 +1,5 @@
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -43,6 +43,14 @@ export default function AdminAlerts() {
   const navigate = useNavigate();
   const [alertStudents, setAlertStudents] = useState<AlertStudent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const reminderTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    return () => {
+      reminderTimersRef.current.forEach((t) => clearTimeout(t));
+      reminderTimersRef.current = [];
+    };
+  }, []);
 
   const fetchAlertStudents = useCallback(async () => {
     try {
@@ -161,8 +169,11 @@ export default function AdminAlerts() {
       return;
     }
     toast.success(`Broadcasting reminders to ${overdueWithPhones.length} residents...`);
+    reminderTimersRef.current.forEach((t) => clearTimeout(t));
+    reminderTimersRef.current = [];
     overdueWithPhones.slice(0, 3).forEach((s, idx) => {
-      setTimeout(() => handleWhatsAppReminder(s), idx * 1000);
+      const timer = setTimeout(() => handleWhatsAppReminder(s), idx * 1000);
+      reminderTimersRef.current.push(timer);
     });
   };
 
@@ -193,7 +204,10 @@ export default function AdminAlerts() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `alerts-${selectedHostel}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const getStatusBadge = (student: AlertStudent) => {
