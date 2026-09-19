@@ -326,7 +326,13 @@ const createStudent = async (req, res) => {
         }], { session, ordered: true });
       } else {
         // Create UNPAID Fee record so status shows Unpaid and pending balance reflects monthly fee
-        const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
+        let rentDueDay = hostelDoc?.settings?.monthlyRentDueDay;
+        if (!rentDueDay) {
+          const Settings = require('../models/Settings');
+          const settingDoc = await Settings.findOne({ ...(orgId ? { organizationId: orgId } : {}), hostel });
+          rentDueDay = settingDoc?.monthlyRentDueDay || 5;
+        }
+        const dueDate = new Date(now.getFullYear(), now.getMonth(), Math.min(rentDueDay, 28));
         await Fee.create([{
           studentId: student._id,
           organizationId: orgId || null,
@@ -540,14 +546,27 @@ const deleteStudent = async (req, res) => {
         { session }
       );
     }
+    // Non-destructive deactivation: preserve all financial/statutory audit records
+    student.isActive = false;
+    student.status = 'FORMER_RESIDENT';
+    student.roomNo = null;
+    student.checkoutDate = new Date();
+    await student.save({ session });
+
     if (student.userId) {
-      await User.findByIdAndDelete(student.userId, { session });
+      await User.findByIdAndUpdate(
+        student.userId,
+        { isActive: false, refreshTokens: [] },
+        { session }
+      );
     }
-    await Student.findByIdAndDelete(student._id, { session });
 
     await session.commitTransaction();
     session.endSession();
-    return res.status(200).json({ success: true, message: 'Student deleted successfully' });
+    return res.status(200).json({
+      success: true,
+      message: 'Student account deactivated, room bed released, and financial history preserved successfully'
+    });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -981,7 +1000,13 @@ const approveAndRegisterStudent = async (req, res) => {
           notes: 'Initial registration fee collection',
         }], { session, ordered: true });
       } else {
-        const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
+        let rentDueDay = hostelDoc?.settings?.monthlyRentDueDay;
+        if (!rentDueDay) {
+          const Settings = require('../models/Settings');
+          const settingDoc = await Settings.findOne({ ...(orgId ? { organizationId: orgId } : {}), hostel: finalHostel });
+          rentDueDay = settingDoc?.monthlyRentDueDay || 5;
+        }
+        const dueDate = new Date(now.getFullYear(), now.getMonth(), Math.min(rentDueDay, 28));
         await Fee.create([{
           studentId: student._id,
           organizationId: orgId || null,

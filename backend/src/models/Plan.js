@@ -8,7 +8,7 @@ const planSchema = new mongoose.Schema(
     priceMonthly: { type: Number, required: true, default: 0 },
     priceYearly: { type: Number, required: true, default: 0 },
     limits: {
-      maxStudents: { type: Number, default: 100 },
+      maxStudents: { type: Number, default: 0 }, // 0 or null denotes unlimited students
       maxRooms: { type: Number, default: 50 },
       maxHostels: { type: Number, default: 1 },
       maxStaff: { type: Number, default: 5 },

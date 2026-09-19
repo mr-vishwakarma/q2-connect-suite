@@ -23,8 +23,19 @@ const userService = {
       filter.role = query.role;
     }
 
-    if (query.status && query.status !== 'all') {
-      filter.isActive = query.status === 'active';
+    if (query.isActive !== undefined) {
+      filter.isActive = query.isActive === 'true' || query.isActive === true;
+    } else if (query.status && query.status !== 'all') {
+      const normalized = String(query.status).toLowerCase();
+      if (normalized === 'active') {
+        filter.isActive = true;
+      } else if (normalized === 'suspended' || normalized === 'inactive') {
+        filter.isActive = false;
+      }
+    }
+
+    if (query.isLocked === 'true' || query.isLocked === true) {
+      filter.lockUntil = { $gt: new Date() };
     }
 
     if (query.organizationId && query.organizationId !== 'all') {

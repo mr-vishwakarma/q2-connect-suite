@@ -124,6 +124,18 @@ const resolveTenantContext = async (req, res, next) => {
       activeHostelId = membership.hostelAccess[0];
     }
 
+    // Check active hostel status if an explicit hostel is scoped
+    if (activeHostelId) {
+      const hostelDoc = await Hostel.findById(activeHostelId).select('status').lean();
+      if (hostelDoc && (hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
+        return res.status(403).json({
+          success: false,
+          code: 'HOSTEL_SUSPENDED',
+          message: 'This hostel property has been suspended or deactivated.',
+        });
+      }
+    }
+
     // Load enabled features for organization
     const orgFeatures = organization ? await OrganizationFeature.find({ organizationId: organization._id, enabled: true }).lean() : [];
     const featuresMap = {};

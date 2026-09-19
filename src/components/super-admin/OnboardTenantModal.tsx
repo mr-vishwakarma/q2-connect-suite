@@ -6,6 +6,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { INDIAN_STATES, getCitiesForState } from '@/constants/locations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -237,8 +245,20 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
         toast.error('Valid Contact Email is required');
         return false;
       }
-      if (formData.aadhaarNumber && formData.aadhaarNumber.replace(/\D/g, '').length !== 12) {
-        toast.error('Aadhaar number must be exactly 12 digits');
+      if (!formData.state?.trim()) {
+        toast.error('State is required');
+        return false;
+      }
+      if (!formData.city?.trim()) {
+        toast.error('City is required');
+        return false;
+      }
+      if (!formData.aadhaarNumber || formData.aadhaarNumber.replace(/\D/g, '').length !== 12) {
+        toast.error('Statutory KYC: A valid 12-digit Aadhaar Number is required');
+        return false;
+      }
+      if (!formData.aadhaarDocument) {
+        toast.error('Statutory KYC: Aadhaar card document upload is mandatory for onboarding verification');
         return false;
       }
       return true;
@@ -547,30 +567,54 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-1">
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    placeholder="Hyderabad"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  />
+                  <Label htmlFor="state">State</Label>
+                  <Select
+                    value={formData.state}
+                    onValueChange={(val) => setFormData((prev) => ({ ...prev, state: val, city: '' }))}
+                  >
+                    <SelectTrigger id="state" className="h-9 text-xs">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {INDIAN_STATES.map((st) => (
+                        <SelectItem key={st} value={st} className="text-xs">
+                          {st}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
                 <div className="space-y-1.5 sm:col-span-1">
-                  <Label htmlFor="state">State / Pincode</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="state"
-                      placeholder="Telangana"
-                      value={formData.state}
-                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    />
-                    <Input
-                      placeholder="500081"
-                      className="w-24"
-                      value={formData.pincode}
-                      onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-                    />
-                  </div>
+                  <Label htmlFor="city">City</Label>
+                  <Select
+                    value={formData.city}
+                    onValueChange={(val) => setFormData((prev) => ({ ...prev, city: val }))}
+                    disabled={!formData.state}
+                  >
+                    <SelectTrigger id="city" className="h-9 text-xs">
+                      <SelectValue placeholder={formData.state ? 'Select City' : 'Select state first'} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {getCitiesForState(formData.state).map((ct) => (
+                        <SelectItem key={ct} value={ct} className="text-xs">
+                          {ct}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-1">
+                  <Label htmlFor="pincode">Pincode</Label>
+                  <Input
+                    id="pincode"
+                    placeholder="500081"
+                    maxLength={6}
+                    className="h-9 text-xs"
+                    value={formData.pincode}
+                    onChange={(e) => setFormData({ ...formData, pincode: e.target.value.replace(/\D/g, '') })}
+                  />
                 </div>
               </div>
             </div>
@@ -911,23 +955,9 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                   Living Operations & Rules Configuration
                 </Label>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <Label htmlFor="rentDue" className="text-xs">Rent Due Day</Label>
-                    <select
-                      id="rentDue"
-                      className="w-full h-8 px-2 bg-background border border-input rounded text-xs"
-                      value={formData.monthlyRentDueDay}
-                      onChange={(e) => setFormData({ ...formData, monthlyRentDueDay: Number(e.target.value) })}
-                    >
-                      <option value={1}>1st of month</option>
-                      <option value={5}>5th of month</option>
-                      <option value={10}>10th of month</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="graceDays" className="text-xs">Grace Period</Label>
+                    <Label htmlFor="graceDays" className="text-xs">Grace Period (Days)</Label>
                     <Input
                       id="graceDays"
                       type="number"
@@ -960,7 +990,7 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div className="space-y-1">
                     <Label htmlFor="curfew" className="text-xs">Night Curfew Timing</Label>
                     <Input
@@ -980,17 +1010,6 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                       className="h-8 text-xs"
                       value={formData.laundrySlotsPerWeek}
                       onChange={(e) => setFormData({ ...formData, laundrySlotsPerWeek: Number(e.target.value) })}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="rebate" className="text-xs">Mess Off Rebate / Day (₹)</Label>
-                    <Input
-                      id="rebate"
-                      type="number"
-                      className="h-8 text-xs"
-                      value={formData.messRebatePerDay}
-                      onChange={(e) => setFormData({ ...formData, messRebatePerDay: Number(e.target.value) })}
                     />
                   </div>
                 </div>

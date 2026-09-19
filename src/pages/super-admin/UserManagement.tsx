@@ -17,6 +17,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { SaasUserListItem } from '@/types';
 import { toast } from 'react-toastify';
@@ -35,6 +45,22 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState<SaasUserListItem | null>(null);
   const [newRole, setNewRole] = useState('');
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [isConfirmActionLoading, setIsConfirmActionLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    actionLabel: string;
+    isDestructive?: boolean;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    actionLabel: '',
+    isDestructive: false,
+    onConfirm: async () => {},
+  });
 
   const fetchUsers = useCallback(async (page = 1, signal?: AbortSignal) => {
     try {
@@ -76,19 +102,32 @@ export default function UserManagement() {
     e.preventDefault();
   };
 
-  const handleToggleStatus = async (user: SaasUserListItem) => {
-    const action = user.isActive ? 'suspend' : 'activate';
-    if (!confirm(`Are you sure you want to ${action} user "${user.name}"?`)) return;
-
-    try {
-      const res = await superAdminService.updateUserStatus(user._id, !user.isActive, 'Super Admin manual action');
-      if (res.success) {
-        toast.success(`User ${action}d successfully`);
-        fetchUsers(currentPage);
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || `Failed to ${action} user`);
-    }
+  const handleToggleStatus = (user: SaasUserListItem) => {
+    const isSuspending = user.isActive;
+    setConfirmDialog({
+      isOpen: true,
+      title: isSuspending ? `Suspend User "${user.name}"?` : `Activate User "${user.name}"?`,
+      description: isSuspending
+        ? `Suspending this account will immediately revoke all login sessions and prevent "${user.name}" (${user.email}) from accessing the system.`
+        : `Activating this account will allow "${user.name}" (${user.email}) to log in again.`,
+      actionLabel: isSuspending ? 'Yes, Suspend Account' : 'Yes, Activate Account',
+      isDestructive: isSuspending,
+      onConfirm: async () => {
+        try {
+          setIsConfirmActionLoading(true);
+          const res = await superAdminService.updateUserStatus(user._id, !user.isActive, 'Super Admin manual action');
+          if (res.success) {
+            toast.success(`User ${isSuspending ? 'suspended' : 'activated'} successfully`);
+            fetchUsers(currentPage);
+            setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+          }
+        } catch (error: any) {
+          toast.error(error?.response?.data?.message || 'Failed to update user status');
+        } finally {
+          setIsConfirmActionLoading(false);
+        }
+      },
+    });
   };
 
   const handleUnlock = async (user: SaasUserListItem) => {
@@ -103,18 +142,29 @@ export default function UserManagement() {
     }
   };
 
-  const handleRevokeSessions = async (user: SaasUserListItem) => {
-    if (!confirm(`Force logout and revoke all active sessions for "${user.name}"?`)) return;
-
-    try {
-      const res = await superAdminService.revokeUserSessions(user._id);
-      if (res.success) {
-        toast.success(`Active sessions revoked for "${user.name}"`);
-        fetchUsers(currentPage);
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to revoke sessions');
-    }
+  const handleRevokeSessions = (user: SaasUserListItem) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: `Revoke All Sessions for "${user.name}"?`,
+      description: `This will forcefully invalidate all active JWT refresh tokens and browser sessions for "${user.name}" (${user.email}). They will need to log in again.`,
+      actionLabel: 'Revoke Sessions',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          setIsConfirmActionLoading(true);
+          const res = await superAdminService.revokeUserSessions(user._id);
+          if (res.success) {
+            toast.success(`Active sessions revoked for "${user.name}"`);
+            fetchUsers(currentPage);
+            setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+          }
+        } catch (error: any) {
+          toast.error(error?.response?.data?.message || 'Failed to revoke sessions');
+        } finally {
+          setIsConfirmActionLoading(false);
+        }
+      },
+    });
   };
 
   const handleOpenRoleModal = (user: SaasUserListItem) => {
@@ -404,6 +454,35 @@ export default function UserManagement() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog for Destructive User Operations */}
+      <AlertDialog
+        open={confirmDialog.isOpen}
+        onOpenChange={(open) => !open && setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription className="pt-1 text-sm text-muted-foreground">
+              {confirmDialog.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isConfirmActionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDialog.onConfirm}
+              disabled={isConfirmActionLoading}
+              className={
+                confirmDialog.isDestructive
+                  ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+              }
+            >
+              {isConfirmActionLoading ? 'Processing...' : confirmDialog.actionLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

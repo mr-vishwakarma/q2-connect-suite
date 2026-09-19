@@ -27,6 +27,18 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Account is deactivated' });
     }
 
+    if (user.role !== 'super_admin' && !user.isSuperAdmin && user.activeOrganizationId) {
+      const Organization = require('../models/Organization');
+      const org = await Organization.findById(user.activeOrganizationId).select('status').lean();
+      if (org && org.status === 'SUSPENDED') {
+        return res.status(403).json({
+          success: false,
+          code: 'TENANT_SUSPENDED',
+          message: 'This organization account has been suspended. Please contact platform administration.',
+        });
+      }
+    }
+
     req.user = user;
     next();
   } catch (error) {

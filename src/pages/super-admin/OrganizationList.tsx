@@ -9,11 +9,29 @@ import {
   CheckCircle2,
   GitFork,
   Users,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { OnboardTenantModal } from '@/components/super-admin/OnboardTenantModal';
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { Organization } from '@/types';
@@ -23,7 +41,10 @@ export default function OrganizationList() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [suspendTargetOrg, setSuspendTargetOrg] = useState<Organization | null>(null);
+  const [isSuspendingAction, setIsSuspendingAction] = useState(false);
 
   useEffect(() => {
     fetchOrganizations();
@@ -47,25 +68,33 @@ export default function OrganizationList() {
     }
   };
 
-  const handleToggleSuspend = async (org: Organization) => {
-    const isSuspending = org.status !== 'SUSPENDED';
+  const handleConfirmSuspendToggle = async () => {
+    if (!suspendTargetOrg) return;
+    const isSuspending = suspendTargetOrg.status !== 'SUSPENDED';
     try {
-      const res = await superAdminService.suspendOrganization(org._id || org.id, isSuspending);
+      setIsSuspendingAction(true);
+      const res = await superAdminService.suspendOrganization(suspendTargetOrg._id || suspendTargetOrg.id, isSuspending);
       if (res.success) {
-        toast.success(`Organization ${isSuspending ? 'suspended' : 'activated'}`);
+        toast.success(`Organization '${suspendTargetOrg.name}' ${isSuspending ? 'suspended' : 'activated'} successfully`);
+        setSuspendTargetOrg(null);
         fetchOrganizations();
       }
     } catch (error) {
       toast.error('Failed to update organization status');
+    } finally {
+      setIsSuspendingAction(false);
     }
   };
 
-  const filteredOrgs = organizations.filter(
-    (o) =>
+  const filteredOrgs = organizations.filter((o) => {
+    const matchesSearch =
       o.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       o.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      o.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      o.contactEmail.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="space-y-6">
@@ -81,15 +110,31 @@ export default function OrganizationList() {
         </Button>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-        <Input
-          placeholder="Search by name, slug or email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9 bg-card"
-        />
+      {/* Filter & Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full max-w-md">
+          <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, slug or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 bg-card"
+          />
+        </div>
+
+        <div className="w-full sm:w-48">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="bg-card">
+              <SelectValue placeholder="Filter by Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Statuses</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
+              <SelectItem value="TRIAL">Trial</SelectItem>
+              <SelectItem value="SUSPENDED">Suspended</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Organizations Table Card */}
@@ -164,8 +209,9 @@ export default function OrganizationList() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleToggleSuspend(org)}
-                            className={org.status === 'SUSPENDED' ? 'text-emerald-400' : 'text-destructive'}
+                            onClick={() => setSuspendTargetOrg(org)}
+                            className={org.status === 'SUSPENDED' ? 'text-emerald-400 hover:text-emerald-300' : 'text-destructive hover:text-destructive/80'}
+                            title={org.status === 'SUSPENDED' ? 'Activate Organization' : 'Suspend Organization'}
                           >
                             {org.status === 'SUSPENDED' ? <CheckCircle2 className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                           </Button>
@@ -179,6 +225,59 @@ export default function OrganizationList() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog for Tenant Suspension / Activation */}
+      <AlertDialog open={!!suspendTargetOrg} onOpenChange={(open) => !open && setSuspendTargetOrg(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                suspendTargetOrg?.status === 'SUSPENDED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-destructive/10 text-destructive'
+              }`}>
+                {suspendTargetOrg?.status === 'SUSPENDED' ? (
+                  <CheckCircle2 className="w-5 h-5" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5" />
+                )}
+              </div>
+              <AlertDialogTitle>
+                {suspendTargetOrg?.status === 'SUSPENDED'
+                  ? `Activate "${suspendTargetOrg?.name}"?`
+                  : `Suspend "${suspendTargetOrg?.name}"?`}
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="pt-2 text-sm">
+              {suspendTargetOrg?.status === 'SUSPENDED' ? (
+                <>
+                  Activating this organization will restore portal access for its administrators, wardens, and students across all registered branches.
+                </>
+              ) : (
+                <>
+                  <strong className="text-destructive font-semibold">Critical Impact:</strong> Suspending this organization will immediately invalidate all active user sessions and refresh tokens. No students, staff, or administrators from this tenant will be allowed to log in until reactivated.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSuspendingAction}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSuspendToggle}
+              disabled={isSuspendingAction}
+              className={
+                suspendTargetOrg?.status === 'SUSPENDED'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+              }
+            >
+              {isSuspendingAction
+                ? 'Processing...'
+                : suspendTargetOrg?.status === 'SUSPENDED'
+                ? 'Yes, Activate Organization'
+                : 'Yes, Suspend Organization'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Real-world Multi-Stage Onboarding Wizard Modal */}
       <OnboardTenantModal

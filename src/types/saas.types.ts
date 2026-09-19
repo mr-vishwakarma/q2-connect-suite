@@ -387,7 +387,10 @@ export interface SecurityOverview {
   securityEvents: Array<{
     _id: string;
     action: string;
+    description?: string;
     actorName: string;
+    actorRole?: string;
+    result?: 'SUCCESS' | 'FAILURE' | 'DENIED' | string;
     entityType: string;
     entityId: string;
     ipAddress?: string;
@@ -405,7 +408,9 @@ export interface SystemHealthData {
     status: 'CONNECTED' | 'DISCONNECTED';
     readyState: number;
     pingLatencyMs: number;
+    latencyMs?: number;
     connectedHost: string;
+    host?: string;
   };
   memory: {
     rssMb: number;

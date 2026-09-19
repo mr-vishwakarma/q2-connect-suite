@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'react-toastify';
-import { Settings as SettingsIcon, Save, Clock, IndianRupee } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Clock, IndianRupee, Calendar } from 'lucide-react';
 import { useHostel } from '@/contexts/HostelContext';
 import { api } from '@/lib/api';
 
@@ -12,6 +12,7 @@ export default function AdminSettings() {
   const { selectedHostel } = useHostel();
   const [lateFeePerDay, setLateFeePerDay] = useState<number>(20);
   const [gracePeriodDays, setGracePeriodDays] = useState<number>(5);
+  const [monthlyRentDueDay, setMonthlyRentDueDay] = useState<number>(5);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -22,6 +23,9 @@ export default function AdminSettings() {
       if (res.data?.success) {
         setLateFeePerDay(res.data.data.lateFeePerDay);
         setGracePeriodDays(res.data.data.gracePeriodDays);
+        if (res.data.data.monthlyRentDueDay) {
+          setMonthlyRentDueDay(res.data.data.monthlyRentDueDay);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -40,7 +44,8 @@ export default function AdminSettings() {
       setSaving(true);
       await api.put(`/settings/${selectedHostel}`, {
         lateFeePerDay,
-        gracePeriodDays
+        gracePeriodDays,
+        monthlyRentDueDay,
       });
       toast.success('Settings updated successfully');
     } catch (error) {
@@ -97,6 +102,23 @@ export default function AdminSettings() {
             />
             <p className="text-xs text-muted-foreground">
               Amount charged for each day past the grace period.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-primary" />
+              Monthly Rent Due Day (Day of Month)
+            </Label>
+            <Input 
+              type="number" 
+              min="1"
+              max="31"
+              value={monthlyRentDueDay}
+              onChange={(e) => setMonthlyRentDueDay(Number(e.target.value))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Day of every month on which student rent becomes due (e.g. 1st, 5th, or 10th).
             </p>
           </div>
 

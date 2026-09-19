@@ -209,16 +209,23 @@ const organizationService = {
     // 5. Create Primary Administrator Account & Organization Owner Membership
     let adminUser = null;
     if (adminEmail && data.adminPassword) {
+      const crypto = require('crypto');
+      const activationToken = crypto.randomBytes(32).toString('hex');
+      const activationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
       adminUser = await User.create({
         name: data.adminName ? data.adminName.trim() : `${data.name} Administrator`,
         email: adminEmail,
         username: data.adminUsername ? data.adminUsername.trim() : adminEmail.split('@')[0],
         password: data.adminPassword,
+        phone: data.adminPhone || data.phone || '',
         role: 'admin',
         activeOrganizationId: org._id,
         activeHostelId: mainHostel._id,
         hostels: [mainHostel.code],
         isActive: true,
+        activationToken,
+        activationExpires,
       });
 
       await Membership.create({
@@ -228,6 +235,25 @@ const organizationService = {
         hostelAccess: ['all'],
         status: 'ACTIVE',
       });
+
+      // Dispatch welcome & onboarding completion email
+      try {
+        const { sendHostelOnboardingWelcomeEmail } = require('../utils/email');
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+        const setupUrl = `${frontendUrl}/login?email=${encodeURIComponent(adminEmail)}&activated=true`;
+
+        await sendHostelOnboardingWelcomeEmail({
+          to: adminEmail,
+          name: adminUser.name,
+          orgName: org.name,
+          branchName: mainHostel.name,
+          role: 'Organization Owner & Administrator',
+          setupUrl,
+          tempPassword: data.adminPassword,
+        });
+      } catch (emailErr) {
+        console.warn(`[organization.service] Onboarding email failed: ${emailErr.message}`);
+      }
     }
 
     // Link creator user if super admin
@@ -262,6 +288,17 @@ const organizationService = {
       { new: true }
     );
     if (!org) throw new Error('Organization not found');
+
+    if (isSuspended) {
+      // Immediate security enforcement: revoke all active refresh tokens for all users in this tenant
+      await User.updateMany({ activeOrganizationId: id }, { $set: { refreshTokens: [] } });
+      // Deactivate associated hostel branches
+      await Hostel.updateMany({ organizationId: id }, { $set: { status: 'INACTIVE' } });
+    } else {
+      // Reactivate associated hostel branches
+      await Hostel.updateMany({ organizationId: id, status: 'INACTIVE' }, { $set: { status: 'ACTIVE' } });
+    }
+
     return org;
   },
 };

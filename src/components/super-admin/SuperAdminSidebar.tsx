@@ -100,8 +100,14 @@ export function SuperAdminSidebar({
       {/* Header */}
       <div className="p-5 flex items-center justify-between border-b border-border/50 relative">
         <Link to="/super-admin/dashboard" onClick={onClose} className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg text-white font-black text-xl shrink-0">
-            <Shield className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-1">
+            <img
+              src="/q2-logo.png"
+              alt="Q2 Platform"
+              width={36}
+              height={36}
+              className="w-full h-full object-contain"
+            />
           </div>
           {!isCollapsed && (
             <div className="overflow-hidden">

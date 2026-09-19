@@ -148,11 +148,72 @@ const sendAdminNewStudentRegisteredNotification = async ({ to, studentName, stud
   }
 };
 
+/**
+ * Send welcome & onboarding completion email to newly onboarded hostel admin
+ * @param {object} options - { to, name, orgName, branchName, role, setupUrl, tempPassword }
+ */
+const sendHostelOnboardingWelcomeEmail = async ({
+  to,
+  name,
+  orgName,
+  branchName,
+  role = 'Organization Administrator',
+  setupUrl,
+  tempPassword,
+}) => {
+  const subject = `Welcome to Q2 Connect Suite — Onboarding Complete for ${orgName}`;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+  const activationUrl = setupUrl || `${frontendUrl}/login`;
+
+  const text = `Welcome to Q2 Connect Suite!\n\nHello ${name},\n\nYour organization "${orgName}" (${branchName}) has been successfully onboarded.\n\nYour Administrator Account:\nEmail: ${to}\nTemporary Password: ${tempPassword || 'Set via activation link'}\n\nAccess your dashboard:\n${activationUrl}\n\nBest regards,\nQ2 Connect Suite Platform Operations Team`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="color: #f59e0b; font-size: 24px; margin: 0;">Q2 Connect Suite</h1>
+        <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Smart Multi-Branch Hostel Management Platform</p>
+      </div>
+      
+      <h2 style="color: #0f172a; font-size: 18px; margin-bottom: 12px;">Organization Onboarding Complete 🎉</h2>
+      <p style="font-size: 14px; line-height: 1.6;">Hello <strong>${name}</strong>,</p>
+      <p style="font-size: 14px; line-height: 1.6;">
+        Welcome to Q2 Connect Suite! Your organization <strong>${orgName}</strong> and primary branch <strong>${branchName}</strong> have been configured and provisioned.
+      </p>
+
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 20px 0;">
+        <p style="margin: 4px 0; font-size: 13px;"><strong>Organization:</strong> ${orgName}</p>
+        <p style="margin: 4px 0; font-size: 13px;"><strong>Initial Branch:</strong> ${branchName}</p>
+        <p style="margin: 4px 0; font-size: 13px;"><strong>Assigned Role:</strong> ${role}</p>
+        <p style="margin: 4px 0; font-size: 13px;"><strong>Login Email:</strong> ${to}</p>
+        ${tempPassword ? `<p style="margin: 4px 0; font-size: 13px;"><strong>Temporary Password:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${tempPassword}</code></p>` : ''}
+      </div>
+
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="${activationUrl}" style="display: inline-block; padding: 12px 28px; background-color: #f59e0b; color: #000000; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
+          Access Your Admin Dashboard
+        </a>
+      </div>
+
+      <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+        Need assistance setting up your room tariffs or staff credentials? Contact support at support@q2connect.com.
+      </p>
+    </div>
+  `;
+
+  try {
+    return await sendEmail({ to, subject, html, text });
+  } catch (err) {
+    console.warn(`[email] Onboarding welcome email failed: ${err.message}`);
+    return null;
+  }
+};
+
 module.exports = { 
   sendEmail, 
   sendStudentCredentials, 
   sendMessRequestUpdate, 
   sendPasswordResetEmail,
-  sendAdminNewStudentRegisteredNotification
+  sendAdminNewStudentRegisteredNotification,
+  sendHostelOnboardingWelcomeEmail,
 };
 

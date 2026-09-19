@@ -6,6 +6,7 @@ const settingsSchema = new mongoose.Schema({
   hostel: { type: String, trim: true, default: 'Q2', required: true },
   lateFeePerDay: { type: Number, default: 20 },
   gracePeriodDays: { type: Number, default: 5 },
+  monthlyRentDueDay: { type: Number, default: 5, min: 1, max: 31 },
 }, { timestamps: true });
 
 // Ensure unique settings document per organization + hostel

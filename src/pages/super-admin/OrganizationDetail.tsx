@@ -147,41 +147,61 @@ export default function OrganizationDetail() {
       </div>
 
       {/* Overview Cards & Quotas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-border/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Subscription Plan</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl font-bold text-amber-400">{org.subscription?.planId?.name || 'Starter Plan'}</div>
-            <p className="text-xs text-muted-foreground mt-1">Billing: {org.subscription?.billingCycle || 'Monthly'}</p>
-          </CardContent>
-        </Card>
+      {(() => {
+        const isYearly = org.subscription?.billingCycle?.toLowerCase() === 'yearly' || org.subscription?.billingCycle?.toLowerCase() === 'annual';
+        const planObj = org.subscription?.planId as any;
+        const price = isYearly 
+          ? (planObj?.priceYearly ?? planObj?.price)
+          : (planObj?.priceMonthly ?? planObj?.price);
+        const displayPrice = price !== undefined && price !== null ? `₹${Number(price).toLocaleString('en-IN')}` : null;
+        const maxStudents = planObj?.limits?.maxStudents;
+        const isUnlimitedStudents = !maxStudents || maxStudents <= 0;
 
-        {/* Student Quota Meter */}
-        <Card className="border-border/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Student Quota</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1.5">
-            <div className="flex justify-between items-baseline">
-              <span className="text-xl font-bold text-foreground">{org.studentCount || 0}</span>
-              <span className="text-xs text-muted-foreground font-mono">Max {org.subscription?.planId?.limits?.maxStudents || 100}</span>
-            </div>
-            <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  ((org.studentCount || 0) / (org.subscription?.planId?.limits?.maxStudents || 100)) > 0.85
-                    ? 'bg-rose-500'
-                    : 'bg-emerald-500'
-                }`}
-                style={{
-                  width: `${Math.min(100, ((org.studentCount || 0) / (org.subscription?.planId?.limits?.maxStudents || 100)) * 100)}%`,
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Subscription Plan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-amber-400">{planObj?.name || 'Starter Plan'}</div>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-muted-foreground">Billing: {org.subscription?.billingCycle || 'Monthly'}</p>
+                  {displayPrice && (
+                    <span className="text-xs font-semibold text-emerald-400 font-mono">
+                      {displayPrice} / {isYearly ? 'yr' : 'mo'}
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Student Quota Meter */}
+            <Card className="border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Student Quota</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xl font-bold text-foreground">{org.studentCount || 0}</span>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {isUnlimitedStudents ? 'Unlimited' : `Max ${maxStudents}`}
+                  </span>
+                </div>
+                <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      !isUnlimitedStudents && ((org.studentCount || 0) / maxStudents) > 0.85
+                        ? 'bg-rose-500'
+                        : 'bg-emerald-500'
+                    }`}
+                    style={{
+                      width: `${isUnlimitedStudents ? 100 : Math.min(100, ((org.studentCount || 0) / maxStudents) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
         {/* Branch Quota Meter */}
         <Card className="border-border/60">
@@ -204,18 +224,20 @@ export default function OrganizationDetail() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Tenant Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-sm">
-              {org.status}
-            </Badge>
-            <p className="text-xs text-muted-foreground mt-1 truncate">{org.contactEmail}</p>
-          </CardContent>
-        </Card>
-      </div>
+            <Card className="border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Tenant Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-sm">
+                  {org.status}
+                </Badge>
+                <p className="text-xs text-muted-foreground mt-1 truncate">{org.contactEmail}</p>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Statutory KYC & Aadhaar Verification Card */}
       <Card className="border-border/60">

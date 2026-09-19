@@ -24,6 +24,12 @@ const organizationSchema = new mongoose.Schema(
       enum: ['TRIAL', 'ACTIVE', 'PAST_DUE', 'SUSPENDED', 'CANCELLED', 'ARCHIVED'],
       default: 'TRIAL',
     },
+    kycVerificationStatus: {
+      type: String,
+      enum: ['PENDING', 'VERIFIED', 'REJECTED'],
+      default: 'PENDING',
+    },
+    kycVerifiedAt: { type: Date },
     subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription' },
     settings: {
       currency: { type: String, default: 'INR' },

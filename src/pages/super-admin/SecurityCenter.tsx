@@ -198,15 +198,29 @@ export default function SecurityCenter() {
                     className="p-3 rounded-lg bg-secondary/20 border border-border/50 text-xs space-y-1"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-foreground">{ev.action}</span>
-                      <span className="text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {ev.description || ev.action?.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-muted-foreground font-mono">
                         {new Date(ev.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <div className="text-muted-foreground flex items-center gap-2">
-                      <span>Actor: {ev.actorName || 'System / Admin'}</span>
-                      &bull;
-                      <span>Entity: {ev.entityType}</span>
+                    <div className="text-muted-foreground flex items-center gap-2 flex-wrap">
+                      <span>Actor: {ev.actorName || 'System / Admin'} {ev.actorRole ? `(${ev.actorRole})` : ''}</span>
+                      <span>&bull;</span>
+                      <span>Target: {ev.entityType}</span>
+                      {ev.result && (
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] px-1.5 py-0 h-4 ${
+                            ev.result === 'SUCCESS'
+                              ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                              : 'text-rose-400 border-rose-500/30 bg-rose-500/10'
+                          }`}
+                        >
+                          {ev.result}
+                        </Badge>
+                      )}
                     </div>
                     {ev.ipAddress && (
                       <div className="text-muted-foreground font-mono text-[11px] flex items-center gap-1">

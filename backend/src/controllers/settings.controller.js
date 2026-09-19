@@ -31,6 +31,7 @@ const getSettings = async (req, res) => {
         hostel,
         lateFeePerDay: 20,
         gracePeriodDays: 5,
+        monthlyRentDueDay: 5,
       });
     }
     
@@ -45,7 +46,7 @@ const getSettings = async (req, res) => {
 const updateSettings = async (req, res) => {
   try {
     const { hostel } = req.params;
-    const { lateFeePerDay, gracePeriodDays } = req.body;
+    const { lateFeePerDay, gracePeriodDays, monthlyRentDueDay } = req.body;
     const orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
 
@@ -62,10 +63,10 @@ const updateSettings = async (req, res) => {
 
     const hostelDoc = orgId ? await Hostel.findOne({ organizationId: orgId, code: hostel }) : null;
 
-    const updateDoc = {
-      lateFeePerDay,
-      gracePeriodDays,
-    };
+    const updateDoc = {};
+    if (lateFeePerDay !== undefined) updateDoc.lateFeePerDay = lateFeePerDay;
+    if (gracePeriodDays !== undefined) updateDoc.gracePeriodDays = gracePeriodDays;
+    if (monthlyRentDueDay !== undefined) updateDoc.monthlyRentDueDay = Number(monthlyRentDueDay);
     if (hostelDoc) updateDoc.hostelId = hostelDoc._id;
     if (orgId) updateDoc.organizationId = orgId;
 

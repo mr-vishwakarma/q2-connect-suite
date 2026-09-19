@@ -19,6 +19,11 @@ const userSchema = new mongoose.Schema(
     hostels: [{ type: String }],
     // Link to student profile if role is student
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
+    phone: { type: String, trim: true },
+    isPhoneVerified: { type: Boolean, default: false },
+    isEmailVerified: { type: Boolean, default: false },
+    activationToken: { type: String },
+    activationExpires: { type: Date },
     isActive: { type: Boolean, default: true },
     refreshTokens: [{ type: String }],
     resetPasswordToken: { type: String },

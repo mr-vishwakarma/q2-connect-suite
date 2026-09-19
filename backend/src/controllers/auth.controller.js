@@ -182,6 +182,34 @@ const handleUnifiedLogin = async (req, res, defaultPortal) => {
       user.lockUntil = null;
     }
 
+    // Authoritative check: Prevent suspended organization or deactivated hostel access
+    if (user.role !== 'super_admin' && !user.isSuperAdmin) {
+      const Organization = require('../models/Organization');
+      const Hostel = require('../models/Hostel');
+
+      if (user.activeOrganizationId) {
+        const orgDoc = await Organization.findById(user.activeOrganizationId).select('status name').lean();
+        if (orgDoc && orgDoc.status === 'SUSPENDED') {
+          return res.status(403).json({
+            success: false,
+            code: 'TENANT_SUSPENDED',
+            message: 'This organization account has been suspended. Please contact platform administration.',
+          });
+        }
+      }
+
+      if (user.activeHostelId) {
+        const hostelDoc = await Hostel.findById(user.activeHostelId).select('status name').lean();
+        if (hostelDoc && (hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
+          return res.status(403).json({
+            success: false,
+            code: 'HOSTEL_SUSPENDED',
+            message: 'This hostel property has been deactivated or suspended. Please contact administration.',
+          });
+        }
+      }
+    }
+
     const { accessToken, refreshToken } = generateTokens(user._id);
 
     // Store refresh token
@@ -788,6 +816,38 @@ const refreshToken = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid refresh token' });
     }
 
+    if (!user.isActive) {
+      return res.status(401).json({ success: false, message: 'Account is deactivated' });
+    }
+
+    // Check organization and hostel suspension on token refresh
+    if (user.role !== 'super_admin' && !user.isSuperAdmin) {
+      const Organization = require('../models/Organization');
+      const Hostel = require('../models/Hostel');
+
+      if (user.activeOrganizationId) {
+        const orgDoc = await Organization.findById(user.activeOrganizationId).select('status').lean();
+        if (orgDoc && orgDoc.status === 'SUSPENDED') {
+          return res.status(403).json({
+            success: false,
+            code: 'TENANT_SUSPENDED',
+            message: 'This organization account has been suspended.',
+          });
+        }
+      }
+
+      if (user.activeHostelId) {
+        const hostelDoc = await Hostel.findById(user.activeHostelId).select('status').lean();
+        if (hostelDoc && (hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
+          return res.status(403).json({
+            success: false,
+            code: 'HOSTEL_SUSPENDED',
+            message: 'This hostel property has been suspended.',
+          });
+        }
+      }
+    }
+
     // Rotate refresh token
     user.refreshTokens = user.refreshTokens.filter((t) => t !== token);
     const { accessToken, refreshToken: newRefreshToken } = generateTokens(user._id);
@@ -822,6 +882,33 @@ const logout = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
   try {
+    if (req.user.role !== 'super_admin' && !req.user.isSuperAdmin) {
+      const Organization = require('../models/Organization');
+      const Hostel = require('../models/Hostel');
+
+      if (req.user.activeOrganizationId) {
+        const orgDoc = await Organization.findById(req.user.activeOrganizationId).select('status').lean();
+        if (orgDoc && orgDoc.status === 'SUSPENDED') {
+          return res.status(403).json({
+            success: false,
+            code: 'TENANT_SUSPENDED',
+            message: 'This organization account has been suspended.',
+          });
+        }
+      }
+
+      if (req.user.activeHostelId) {
+        const hostelDoc = await Hostel.findById(req.user.activeHostelId).select('status').lean();
+        if (hostelDoc && (hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
+          return res.status(403).json({
+            success: false,
+            code: 'HOSTEL_SUSPENDED',
+            message: 'This hostel property has been suspended.',
+          });
+        }
+      }
+    }
+
     const [studentProfile, resolvedOrgFeatures] = await Promise.all([
       (req.user.role === 'student' && req.user.studentId)
         ? Student.findById(req.user.studentId).lean()

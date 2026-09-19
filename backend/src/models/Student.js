@@ -22,6 +22,13 @@ const studentSchema = new mongoose.Schema(
     profilePhotoFileId: { type: String }, // ImageKit fileId for deletion
     studentCode: { type: String, trim: true }, // e.g., Q2S2026001
     isActive: { type: Boolean, default: true },
+    status: {
+      type: String,
+      enum: ['ACTIVE', 'FORMER_RESIDENT', 'SUSPENDED', 'ALUMNI'],
+      default: 'ACTIVE',
+    },
+    isLegalHold: { type: Boolean, default: false },
+    checkoutDate: { type: Date },
   },
   { timestamps: true }
 );
