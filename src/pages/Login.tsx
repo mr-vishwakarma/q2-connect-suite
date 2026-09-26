@@ -14,7 +14,6 @@ import { BuildingBackground } from '@/components/shared/BuildingBackground';
 import { RoleSelector } from '@/components/auth/RoleSelector';
 import { WorkspaceSelector } from '@/components/auth/WorkspaceSelector';
 import { useAuth } from '@/hooks/useAuth';
-import { useHostel } from '@/contexts/HostelContext';
 import { toast } from 'react-toastify';
 import {
   Eye,
@@ -90,7 +89,6 @@ export default function Login() {
   const [showWorkspaceSelect, setShowWorkspaceSelect] = useState(false);
 
   const { signIn, signInWithGoogle, requestGoogleRegistration, signUp, user, isAdmin } = useAuth();
-  const { selectedHostel, setSelectedHostel } = useHostel();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -682,23 +680,7 @@ export default function Login() {
                     /* SIGN IN MODE */
                     <div className="space-y-4">
                       <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Hostel Branch Selector for Admin */}
-                        {selectedRole === 'admin' && (
-                          <div className="space-y-1.5">
-                            <Label>Select Hostel Property</Label>
-                            <Select value={selectedHostel} onValueChange={setSelectedHostel}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Choose branch" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Q2">Q2 Girls Hostel - Gachibowli</SelectItem>
-                                <SelectItem value="Q2.0">Q2 Girls Hostel - Kondapur</SelectItem>
-                                <SelectItem value="Q2.1">Q2 Girls Hostel - Madhapur</SelectItem>
-                                <SelectItem value="All">All Hostels (HQ Scope)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
+
 
                         <div className="space-y-1.5">
                           <Label htmlFor="identifier">
