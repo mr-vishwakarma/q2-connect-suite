@@ -198,9 +198,9 @@ const handleUnifiedLogin = async (req, res, defaultPortal) => {
         }
       }
 
-      if (user.activeHostelId) {
+      if (user.role !== 'admin' && user.activeHostelId) {
         const hostelDoc = await Hostel.findById(user.activeHostelId).select('status name').lean();
-        if (hostelDoc && (hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
+        if (hostelDoc && (hostelDoc.status === 'SUSPENDED' || hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
           return res.status(403).json({
             success: false,
             code: 'HOSTEL_SUSPENDED',
@@ -638,82 +638,15 @@ const completeGoogleSetup = async (req, res) => {
 
 // @desc    Student self-registration
 // @route   POST /api/auth/register
-// @access  Public
+// @access  Public (Deprecated - Supervised Admin Registration Enforced)
 const registerStudent = async (req, res) => {
-  try {
-    const { name, email, username, phone, password, hostel = 'Q2' } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
-    }
-
-    const normalizedEmail = email.toLowerCase().trim();
-    const normalizedUsername = (username || normalizedEmail.split('@')[0]).trim();
-
-    // Check uniqueness
-    const existingUser = await User.findOne({
-      $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
-    });
-    if (existingUser) {
-      return res.status(409).json({ success: false, message: 'An account with this email or username already exists' });
-    }
-
-    // Check if student profile already existed without a User account
-    let student = await Student.findOne({ email: normalizedEmail });
-
-    const user = new User({
-      name: name.trim(),
-      email: normalizedEmail,
-      username: normalizedUsername,
-      password,
-      role: 'student',
-      authProvider: 'local',
-      hostels: [hostel],
-    });
-
-    if (student) {
-      user.studentId = student._id;
-      await user.save();
-      student.userId = user._id;
-      await student.save();
-    } else {
-      await user.save();
-      student = await Student.create({
-        userId: user._id,
-        name: user.name,
-        username: user.username,
-        email: normalizedEmail,
-        phone: phone || '',
-        hostel,
-        fees: 0,
-      });
-      user.studentId = student._id;
-      await user.save({ validateBeforeSave: false });
-    }
-
-    const { accessToken, refreshToken } = generateTokens(user._id);
-    user.refreshTokens.push(refreshToken);
-    await user.save({ validateBeforeSave: false });
-
-    return res.status(201).json({
-      success: true,
-      message: 'Account created successfully',
-      accessToken,
-      refreshToken,
-      user: user.toJSON(),
-      student,
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    if (error.code === 11000) {
-      return res.status(409).json({ success: false, message: 'An account with this email or username already exists' });
-    }
-    return res.status(500).json({ success: false, message: error.message || 'Registration failed' });
-  }
+  return res.status(403).json({
+    success: false,
+    message: 'Public self-registration is disabled. Student enrollment is supervised directly by hostel administrators at the front desk.',
+  });
 };
+
+
 
 // @desc    Register admin (first-time bootstrap setup or authenticated admin staff creation)
 // @route   POST /api/auth/register-admin
@@ -836,9 +769,9 @@ const refreshToken = async (req, res) => {
         }
       }
 
-      if (user.activeHostelId) {
+      if (user.role !== 'admin' && user.activeHostelId) {
         const hostelDoc = await Hostel.findById(user.activeHostelId).select('status').lean();
-        if (hostelDoc && (hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
+        if (hostelDoc && (hostelDoc.status === 'SUSPENDED' || hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
           return res.status(403).json({
             success: false,
             code: 'HOSTEL_SUSPENDED',
@@ -897,9 +830,9 @@ const getMe = async (req, res) => {
         }
       }
 
-      if (req.user.activeHostelId) {
+      if (req.user.role !== 'admin' && req.user.activeHostelId) {
         const hostelDoc = await Hostel.findById(req.user.activeHostelId).select('status').lean();
-        if (hostelDoc && (hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
+        if (hostelDoc && (hostelDoc.status === 'SUSPENDED' || hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
           return res.status(403).json({
             success: false,
             code: 'HOSTEL_SUSPENDED',

@@ -5,7 +5,12 @@ const hostelSchema = new mongoose.Schema(
     organizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', required: true },
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, uppercase: true },
+    slug: { type: String, trim: true, lowercase: true },
     address: { type: String, trim: true },
+    city: { type: String, trim: true },
+    state: { type: String, trim: true },
+    country: { type: String, trim: true, default: 'India' },
+    pincode: { type: String, trim: true },
     capacity: { type: Number, default: 0 },
     floors: { type: Number, default: 1 },
     totalRooms: { type: Number, default: 10 },
@@ -16,7 +21,7 @@ const hostelSchema = new mongoose.Schema(
     wardenName: { type: String, trim: true },
     wardenPhone: { type: String, trim: true },
     emergencyContact: { type: String, trim: true },
-    status: { type: String, enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'], default: 'ACTIVE' },
+    status: { type: String, enum: ['ACTIVE', 'SUSPENDED', 'INACTIVE', 'ARCHIVED'], default: 'ACTIVE' },
     settings: {
       lateFeePerDay: { type: Number, default: 20 },
       gracePeriodDays: { type: Number, default: 5 },
@@ -31,11 +36,21 @@ const hostelSchema = new mongoose.Schema(
       parentConsentRequired: { type: Boolean, default: true },
     },
     isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date },
   },
   { timestamps: true }
 );
 
+// Pre-save hook: auto-generate slug from name if not provided
+hostelSchema.pre('save', function (next) {
+  if (!this.slug && this.name) {
+    this.slug = this.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  }
+  next();
+});
+
 hostelSchema.index({ organizationId: 1, code: 1 }, { unique: true });
+hostelSchema.index({ organizationId: 1, slug: 1 });
 hostelSchema.index({ organizationId: 1, status: 1 });
 hostelSchema.index({ isDeleted: 1, createdAt: -1 });
 

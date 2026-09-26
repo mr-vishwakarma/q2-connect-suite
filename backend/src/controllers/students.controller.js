@@ -147,6 +147,81 @@ const createStudent = async (req, res) => {
 
     const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
 
+    // Resolve hostelDoc canonically (by hostelId or code/name)
+    const Hostel = require('../models/Hostel');
+    let hostelDoc = null;
+    if (req.body.hostelId && mongoose.Types.ObjectId.isValid(req.body.hostelId)) {
+      hostelDoc = await Hostel.findById(req.body.hostelId).session(session);
+    }
+    if (!hostelDoc && hostel) {
+      hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel }).session(session);
+      if (!hostelDoc) {
+        hostelDoc = await Hostel.findOne({ organizationId: orgId, name: hostel }).session(session);
+      }
+    }
+
+    if (!hostelDoc) {
+      const defaultHostelId = req.tenant?.hostelId || req.user.activeHostelId;
+      if (defaultHostelId && mongoose.Types.ObjectId.isValid(defaultHostelId)) {
+        hostelDoc = await Hostel.findById(defaultHostelId).session(session);
+      } else if (Array.isArray(req.user.hostels) && req.user.hostels.length > 0) {
+        hostelDoc = await Hostel.findOne({ organizationId: orgId, code: req.user.hostels[0] }).session(session);
+      }
+    }
+
+    if (hostelDoc && (hostelDoc.status === 'SUSPENDED' || hostelDoc.status === 'INACTIVE')) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        code: 'HOSTEL_SUSPENDED',
+        message: `Cannot register residents into branch '${hostelDoc.name}' because it is currently suspended or inactive.`,
+      });
+    }
+
+    // Verify Admin has legitimate authority over this specific hostel branch in the database
+    const isSuperAdmin = req.user.role === 'super_admin' || req.user.isSuperAdmin || req.tenant?.isSuperAdmin;
+    if (!isSuperAdmin && hostelDoc) {
+      const allowedHostels = req.tenant?.hostelAccess || req.user.hostels || [];
+      const hasAllAccess = allowedHostels.includes('all');
+      const hasBranchAccess =
+        hasAllAccess ||
+        allowedHostels.includes(hostelDoc.code) ||
+        allowedHostels.includes(hostelDoc._id.toString()) ||
+        (req.user.activeHostelId && req.user.activeHostelId.toString() === hostelDoc._id.toString());
+
+      if (!hasBranchAccess) {
+        await session.abortTransaction();
+        return res.status(403).json({
+          success: false,
+          code: 'UNAUTHORIZED_BRANCH_ACCESS',
+          message: `You are not authorized to enroll students into '${hostelDoc.name}'. You can only register students for your assigned hostel branch.`,
+        });
+      }
+    }
+
+    // Check Organization SaaS Subscription Plan Limits
+    if (orgId) {
+      const Subscription = require('../models/Subscription');
+      const sub = await Subscription.findOne({
+        organizationId: orgId,
+        status: { $in: ['ACTIVE', 'TRIAL'] },
+      }).populate('planId').session(session);
+
+      if (sub?.planId?.limits?.maxStudents && sub.planId.limits.maxStudents > 0) {
+        const studentCount = await Student.countDocuments({ organizationId: orgId, isActive: true }).session(session);
+        if (studentCount >= sub.planId.limits.maxStudents) {
+          await session.abortTransaction();
+          return res.status(403).json({
+            success: false,
+            code: 'PLAN_LIMIT_EXCEEDED',
+            message: `Current subscription plan (${sub.planId.name}) maximum student limit of ${sub.planId.limits.maxStudents} reached. Please upgrade to enroll more students.`,
+          });
+        }
+      }
+    }
+
+    const resolvedBranchCode = hostelDoc ? hostelDoc.code : (hostel || 'Q2');
+
     // Check for existing user/username
     let user;
     const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username: finalUsername }] }).session(session);
@@ -157,7 +232,11 @@ const createStudent = async (req, res) => {
         existingUser.password = finalPassword;
         existingUser.role = 'student';
         existingUser.registrationStatus = 'active';
-        existingUser.hostels = [hostel];
+        existingUser.status = 'ACTIVE';
+        existingUser.mustChangePassword = true;
+        existingUser.temporaryPasswordIssuedAt = new Date();
+        existingUser.hostels = [resolvedBranchCode];
+        existingUser.activeHostelId = hostelDoc ? hostelDoc._id : null;
         if (orgId) existingUser.activeOrganizationId = orgId;
         if (existingUser.authProvider === 'google') existingUser.authProvider = 'both';
         await existingUser.save({ session });
@@ -167,7 +246,7 @@ const createStudent = async (req, res) => {
         return res.status(409).json({ success: false, message: 'Email or username already exists' });
       }
     } else {
-      // Create User account
+      // Create User account with temporary password & mustChangePassword
       const users = await User.create([{
         name,
         email: email.toLowerCase(),
@@ -175,22 +254,22 @@ const createStudent = async (req, res) => {
         password: finalPassword,
         role: 'student',
         registrationStatus: 'active',
-        hostels: [hostel],
+        status: 'ACTIVE',
+        mustChangePassword: true,
+        temporaryPasswordIssuedAt: new Date(),
+        hostels: [resolvedBranchCode],
+        activeHostelId: hostelDoc ? hostelDoc._id : null,
         activeOrganizationId: orgId || null,
       }], { session, ordered: true });
       user = users[0];
     }
-
-    // Resolve hostelId
-    const Hostel = require('../models/Hostel');
-    const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel }).session(session);
 
     // Generate studentCode if not provided (e.g. Q2S2026001)
     let finalStudentCode = req.body.studentCode;
     if (!finalStudentCode) {
       const year = new Date(startDate || Date.now()).getFullYear();
       const count = await Student.countDocuments({ organizationId: orgId }).session(session);
-      const cleanHostel = (hostel || 'Q2').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const cleanHostel = resolvedBranchCode.toUpperCase().replace(/[^A-Z0-9]/g, '');
       finalStudentCode = `${cleanHostel}S${year}${String(count + 1).padStart(3, '0')}`;
     }
 
@@ -205,7 +284,7 @@ const createStudent = async (req, res) => {
       phone,
       parentPhone,
       roomNo,
-      hostel,
+      hostel: resolvedBranchCode,
       fees: fees || 0,
       startDate,
       validDate,
@@ -556,7 +635,7 @@ const deleteStudent = async (req, res) => {
     if (student.userId) {
       await User.findByIdAndUpdate(
         student.userId,
-        { isActive: false, refreshTokens: [] },
+        { isActive: false, status: 'DEACTIVATED', refreshTokens: [] },
         { session }
       );
     }

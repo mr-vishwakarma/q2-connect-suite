@@ -1,14 +1,35 @@
 const nodemailer = require('nodemailer');
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_PORT === '465',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+/**
+ * Get configured Nodemailer transporter with trimmed/sanitized credentials
+ */
+const getTransporter = () => {
+  const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const user = (process.env.SMTP_USER || '').trim();
+  // Strip any spaces in the app password (e.g. 'abcd efgh ijkl mnop' -> 'abcdefghijklmnop')
+  const pass = (process.env.SMTP_PASS || '').replace(/\s+/g, '').trim();
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+};
+
+/**
+ * Verify SMTP connection health
+ */
+const verifySmtpConnection = async () => {
+  try {
+    const transporter = getTransporter();
+    await transporter.verify();
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message, code: err.code };
+  }
+};
 
 /**
  * Send a plain email
@@ -25,6 +46,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
     return { messageId: `mock-${Date.now()}` };
   }
   try {
+    const transporter = getTransporter();
     const info = await transporter.sendMail({
       from: process.env.EMAIL_FROM || 'Q2 Connect Suite <noreply@q2connect.com>',
       to,
@@ -32,10 +54,10 @@ const sendEmail = async ({ to, subject, html, text }) => {
       html,
       text,
     });
-    console.log(`📧 Email sent: ${info.messageId}`);
+    console.log(`📧 Email sent successfully to ${to} (MessageId: ${info.messageId})`);
     return info;
   } catch (error) {
-    console.error(`❌ Email error: ${error.message}`);
+    console.error(`❌ Email delivery error to ${to}: ${error.message} [Code: ${error.code || 'UNKNOWN'}]`);
     throw error;
   }
 };
@@ -203,12 +225,25 @@ const sendHostelOnboardingWelcomeEmail = async ({
   try {
     return await sendEmail({ to, subject, html, text });
   } catch (err) {
-    console.warn(`[email] Onboarding welcome email failed: ${err.message}`);
+    console.error(`❌ [email] Onboarding welcome email failed delivery to ${to}: ${err.message}`);
+    console.warn(`\n============================================================`);
+    console.warn(`🚨 ONBOARDING CREDENTIALS DELIVERY FALLBACK NOTICE:`);
+    console.warn(`Organization:   ${orgName} (${branchName})`);
+    console.warn(`Admin Email:    ${to}`);
+    console.warn(`Activation/URL: ${activationUrl}`);
+    if (tempPassword) {
+      console.warn(`Temporary Pass: ${tempPassword}`);
+    }
+    console.warn(`SMTP Error:     ${err.message}`);
+    console.warn(`Action Required: Verify SMTP_PASS app password in backend/.env`);
+    console.warn(`============================================================\n`);
     return null;
   }
 };
 
 module.exports = { 
+  getTransporter,
+  verifySmtpConnection,
   sendEmail, 
   sendStudentCredentials, 
   sendMessRequestUpdate, 

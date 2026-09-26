@@ -13,13 +13,24 @@ export const api = axios.create({
   timeout: 30000,
 });
 
-// Interceptor to add auth token
+// Interceptor to add auth token and tenant branch context
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    const activeHostelId = sessionStorage.getItem('selectedHostelId') || localStorage.getItem('selectedHostelId');
+    if (activeHostelId && config.headers) {
+      config.headers['x-hostel-id'] = activeHostelId;
+    }
+
+    const activeOrgId = sessionStorage.getItem('selectedOrganizationId') || localStorage.getItem('selectedOrganizationId');
+    if (activeOrgId && config.headers) {
+      config.headers['x-organization-id'] = activeOrgId;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

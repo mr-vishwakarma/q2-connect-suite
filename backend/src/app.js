@@ -33,6 +33,7 @@ const paymentRoutes = require('./routes/payment.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const healthRoutes = require('./routes/health.routes');
 const billingRoutes = require('./routes/billing.routes');
+const hostelsRoutes = require('./routes/hostels.routes');
 const { requestLogger } = require('./middleware/requestLogger.middleware');
 const { requestIdMiddleware } = require('./middleware/requestId.middleware');
 
@@ -68,6 +69,7 @@ app.use(cors({
     
     const isAllowed = 
       origin.startsWith('http://localhost') ||
+      origin.startsWith('http://127.0.0.1') ||
       origin.endsWith('.vercel.app') ||
       origin.endsWith('.lovable.app') ||
       origin.endsWith('.lovableproject.com') ||
@@ -146,6 +148,7 @@ app.use('/api/expenses', expensesRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/subscriptions', billingRoutes);
+app.use('/api/hostels', hostelsRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // 404 handler

@@ -88,22 +88,39 @@ const getSubscriptionStatus = async (req, res) => {
 
     let subscription = await Subscription.findOne({ organizationId }).populate('planId');
 
-    // If no subscription exists, default to active plan on organization or initial trial
+    // If no subscription exists, safely find or create default subscription
     if (!subscription) {
-      const org = await Organization.findById(organizationId).populate('currentPlan');
-      const defaultPlan = org?.currentPlan || (await Plan.findOne({ code: 'STARTER' })) || (await Plan.findOne());
+      const org = await Organization.findById(organizationId).lean();
+      let defaultPlan = null;
+      if (org && org.subscriptionId) {
+        const existingSub = await Subscription.findById(org.subscriptionId).populate('planId').lean();
+        if (existingSub && existingSub.planId) {
+          subscription = existingSub;
+        }
+      }
 
-      subscription = {
-        organizationId,
-        planId: defaultPlan,
-        status: 'TRIAL',
-        billingCycle: 'MONTHLY',
-        amount: defaultPlan?.priceMonthly || 0,
-        currency: 'INR',
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 14 * 24 * 3600 * 1000), // 14-day trial
-        usage: { studentCount: 0, roomCount: 0, hostelCount: 0, staffCount: 0 },
-      };
+      if (!subscription) {
+        defaultPlan = (await Plan.findOne({ code: 'ENTERPRISE' }).lean()) ||
+          (await Plan.findOne({ code: 'PROFESSIONAL' }).lean()) ||
+          (await Plan.findOne({ code: 'STARTER' }).lean()) ||
+          (await Plan.findOne().lean());
+
+        subscription = {
+          organizationId,
+          planId: defaultPlan,
+          status: 'ACTIVE',
+          billingCycle: 'MONTHLY',
+          amount: defaultPlan?.priceMonthly || 0,
+          currency: 'INR',
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+          usage: { studentCount: 0, roomCount: 0, hostelCount: 0, staffCount: 0 },
+        };
+      }
+    } else if (!subscription.planId) {
+      // Guard against stale plan reference
+      const fallbackPlan = (await Plan.findOne({ code: 'STARTER' })) || (await Plan.findOne());
+      subscription.planId = fallbackPlan;
     }
 
     return res.status(200).json({

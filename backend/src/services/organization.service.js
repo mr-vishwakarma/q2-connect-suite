@@ -11,28 +11,46 @@ const { DEFAULT_FEATURES } = require('../constants/saas.constants');
 
 const organizationService = {
   async getAllOrganizations(query = {}) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 15));
+    const skip = (page - 1) * limit;
+
     const filter = { isDeleted: false };
-    if (query.status) filter.status = query.status;
+    if (query.status && query.status !== 'ALL') filter.status = query.status;
     if (query.search) {
+      const searchRegex = { $regex: query.search.trim(), $options: 'i' };
       filter.$or = [
-        { name: { $regex: query.search, $options: 'i' } },
-        { slug: { $regex: query.search, $options: 'i' } },
-        { contactEmail: { $regex: query.search, $options: 'i' } },
+        { name: searchRegex },
+        { slug: searchRegex },
+        { contactEmail: searchRegex },
       ];
     }
 
-    const organizations = await Organization.find(filter)
-      .populate('subscriptionId')
-      .sort({ createdAt: -1, _id: -1 })
-      .lean();
+    const [organizations, total] = await Promise.all([
+      Organization.find(filter)
+        .populate('subscriptionId')
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Organization.countDocuments(filter),
+    ]);
 
     if (organizations.length === 0) {
-      return [];
+      return {
+        organizations: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+        },
+      };
     }
 
     const orgIds = organizations.map((o) => o._id);
 
-    // High-performance batch aggregation: 3 parallel DB queries instead of 3 * N queries
+    // High-performance batch aggregation scoped only to the current page
     const [hostelGroups, studentGroups, roomGroups] = await Promise.all([
       Hostel.aggregate([
         { $match: { organizationId: { $in: orgIds }, isDeleted: false } },
@@ -48,7 +66,6 @@ const organizationService = {
       ]),
     ]);
 
-    // O(1) in-memory Hash Maps
     const hostelMap = new Map(hostelGroups.map((g) => [String(g._id), g.count]));
     const studentMap = new Map(studentGroups.map((g) => [String(g._id), g.count]));
     const roomMap = new Map(roomGroups.map((g) => [String(g._id), g.count]));
@@ -64,7 +81,15 @@ const organizationService = {
       };
     });
 
-    return orgsWithMetrics;
+    return {
+      organizations: orgsWithMetrics,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   },
 
   async getOrganizationById(id) {

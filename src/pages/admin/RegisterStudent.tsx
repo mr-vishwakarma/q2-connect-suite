@@ -37,6 +37,7 @@ import {
   Wand2,
   CheckCircle2,
   Copy,
+  Building2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -53,7 +54,7 @@ interface Room {
 
 function RegisterStudentContent() {
   const { user, isAdmin, loading } = useAuth();
-  const { selectedHostel, setSelectedHostel } = useHostel();
+  const { selectedHostel, selectedHostelId, currentBranch } = useHostel();
   const navigate = useNavigate();
 
   // Active view: 'form' (Image 1) or 'preview' (Image 2)
@@ -91,9 +92,6 @@ function RegisterStudentContent() {
   const [selectedApplicantId, setSelectedApplicantId] = useState<string>(applicantIdParam || '');
 
   const idCardRef = useRef<HTMLDivElement>(null);
-
-  // Available branches list for pills in header
-  const branchPills: ('Q2' | 'Q2.0' | 'Q2.1')[] = ['Q2', 'Q2.0', 'Q2.1'];
 
   const applyApplicantData = useCallback((applicant: any) => {
     if (!applicant) return;
@@ -146,7 +144,10 @@ function RegisterStudentContent() {
   // Fetch available rooms
   const fetchRooms = useCallback(async () => {
     try {
-      const response = await api.get('/rooms', { params: { hostel: selectedHostel, limit: 100 } });
+      const params: any = { limit: 100 };
+      if (selectedHostelId) params.hostelId = selectedHostelId;
+      if (selectedHostel) params.hostel = selectedHostel;
+      const response = await api.get('/rooms', { params });
       if (response.data?.success && Array.isArray(response.data.data)) {
         const mapped = response.data.data.map((r: any) => ({
           id: r._id || r.id,
@@ -161,17 +162,17 @@ function RegisterStudentContent() {
       console.error('Error fetching rooms:', err);
       setRooms([]);
     }
-  }, [selectedHostel]);
+  }, [selectedHostel, selectedHostelId]);
 
   useEffect(() => {
     fetchRooms();
   }, [fetchRooms]);
 
-  // Reset selected room whenever selectedHostel changes
+  // Reset selected room whenever selectedHostel or selectedHostelId changes
   useEffect(() => {
     setSelectedRoomId('');
     setRoomError('');
-  }, [selectedHostel]);
+  }, [selectedHostel, selectedHostelId]);
 
   // Validate room selection
   const validateRoom = (roomId: string) => {
@@ -284,6 +285,7 @@ function RegisterStudentContent() {
         roomNo: roomNumber,
         fees: formData.fees ? parseFloat(formData.fees) : 0,
         hostel: selectedHostel,
+        hostelId: selectedHostelId,
         startDate: startDate ? format(startDate, 'yyyy-MM-dd') : null,
         validDate: endDate ? format(endDate, 'yyyy-MM-dd') : null,
         email: email,
@@ -428,27 +430,15 @@ function RegisterStudentContent() {
           )}
         </nav>
 
-        {/* Branch Pills Switcher */}
-        <div className="hidden sm:flex items-center self-start sm:self-auto">
-          <div className="flex items-center bg-[#121622] p-1 rounded-xl border border-white/5 shadow-inner">
-            {branchPills.map((branch) => {
-              const isActive = (selectedHostel || 'Q2') === branch;
-              return (
-                <button
-                  key={branch}
-                  type="button"
-                  onClick={() => setSelectedHostel(branch as any)}
-                  className={cn(
-                    'px-3.5 py-1 text-xs font-semibold rounded-lg transition-all duration-200',
-                    isActive
-                      ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
-                      : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                  )}
-                >
-                  {branch}
-                </button>
-              );
-            })}
+        {/* Active Verified Branch Badge (Locked to active hostel to prevent cross-branch conflicts) */}
+        <div className="flex items-center self-start sm:self-auto">
+          <div className="flex items-center gap-2 bg-[#121622] px-3.5 py-1.5 rounded-xl border border-white/10 shadow-inner text-xs font-semibold text-zinc-300">
+            <Building2 className="w-3.5 h-3.5 text-red-500 shrink-0" />
+            <span className="text-zinc-400">Assigned Branch:</span>
+            <span className="text-white font-bold">{currentBranch?.name || selectedHostel || 'Active Branch'}</span>
+            <span className="text-[10px] bg-red-600/20 text-red-400 px-2 py-0.5 rounded-md font-mono border border-red-500/30">
+              Verified
+            </span>
           </div>
         </div>
       </div>
@@ -544,7 +534,7 @@ function RegisterStudentContent() {
                     Register New Student
                   </h2>
                   <p className="text-[11px] sm:text-xs text-zinc-400 mt-0.5 truncate">
-                    Add a new student to <span className="text-red-500 font-semibold">Hostel: {selectedHostel}</span>
+                    Add a new student to <span className="text-red-500 font-semibold">{currentBranch?.name || selectedHostel}</span> (Branch Code: {currentBranch?.code || selectedHostel})
                   </p>
                 </div>
               </div>

@@ -25,6 +25,14 @@ const userSchema = new mongoose.Schema(
     activationToken: { type: String },
     activationExpires: { type: Date },
     isActive: { type: Boolean, default: true },
+    status: {
+      type: String,
+      enum: ['ACTIVE', 'SUSPENDED', 'INVITED', 'DEACTIVATED'],
+      default: 'ACTIVE',
+      index: true,
+    },
+    mustChangePassword: { type: Boolean, default: false },
+    temporaryPasswordIssuedAt: { type: Date },
     refreshTokens: [{ type: String }],
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
@@ -64,6 +72,16 @@ userSchema.index({ lockUntil: 1 });
 userSchema.methods.isLocked = function () {
   return !!(this.lockUntil && this.lockUntil > Date.now());
 };
+
+// Synchronize status and isActive
+userSchema.pre('save', function (next) {
+  if (this.isModified('status')) {
+    this.isActive = this.status === 'ACTIVE' || this.status === 'INVITED';
+  } else if (this.isModified('isActive') && !this.isModified('status')) {
+    this.status = this.isActive ? 'ACTIVE' : 'DEACTIVATED';
+  }
+  next();
+});
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {

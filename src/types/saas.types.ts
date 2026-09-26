@@ -400,31 +400,58 @@ export interface SecurityOverview {
 }
 
 export interface SystemHealthData {
-  timestamp: string;
-  status: 'HEALTHY' | 'DEGRADED' | 'DOWN';
-  environment: string;
-  uptimeSeconds: number;
+  timestamp: string | Date;
+  status: 'OPERATIONAL' | 'HEALTHY' | 'DEGRADED' | 'DOWN';
+  environment: string | {
+    nodeVersion?: string;
+    platform?: string;
+    arch?: string;
+    env?: string;
+  };
+  uptimeSeconds?: number;
+  uptime?: {
+    processSeconds: number;
+    formatted: string;
+  };
+  dependencies?: {
+    core?: { database?: string };
+    degraded?: { redis?: string; backgroundQueues?: string };
+  };
   database: {
-    status: 'CONNECTED' | 'DISCONNECTED';
+    status: 'CONNECTED' | 'DISCONNECTED' | 'HEALTHY' | 'DEGRADED';
     readyState: number;
     pingLatencyMs: number;
     latencyMs?: number;
     connectedHost: string;
     host?: string;
+    name?: string;
+    collectionsCount?: number;
   };
   memory: {
     rssMb: number;
+    rssMB?: number;
     heapTotalMb: number;
+    heapTotalMB?: number;
     heapUsedMb: number;
+    heapUsedMB?: number;
     externalMb: number;
+    externalMB?: number;
+    systemFreeMB?: number;
+    systemTotalMB?: number;
   };
-  integrations: {
+  integrations?: {
     mongodbAtlas: string;
     paymentGateway: string;
     cloudStorage: string;
     cronJobs: string;
   };
-  nodeVersion: string;
+  services?: Record<string, {
+    configured?: boolean;
+    status?: string;
+    classification?: string;
+    metrics?: any;
+  }>;
+  nodeVersion?: string;
 }
 
 export interface PlatformSettings {

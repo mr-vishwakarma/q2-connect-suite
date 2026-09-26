@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Organization = require('../models/Organization');
 const Membership = require('../models/Membership');
 const OrganizationFeature = require('../models/OrganizationFeature');
@@ -124,10 +125,17 @@ const resolveTenantContext = async (req, res, next) => {
       activeHostelId = membership.hostelAccess[0];
     }
 
-    // Check active hostel status if an explicit hostel is scoped
-    if (activeHostelId) {
-      const hostelDoc = await Hostel.findById(activeHostelId).select('status').lean();
-      if (hostelDoc && (hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
+    // Check active hostel status if an explicit hostel is scoped (allow Admins / Super Admins to manage/reactivate)
+    const isAdminOrSuper = req.user.role === 'super_admin' || req.user.isSuperAdmin || req.user.role === 'admin' || (membership && ['OWNER', 'ADMIN', 'ORGANIZATION_OWNER'].includes(membership.role));
+    if (activeHostelId && !isAdminOrSuper) {
+      let hostelDoc = null;
+      if (mongoose.Types.ObjectId.isValid(activeHostelId)) {
+        hostelDoc = await Hostel.findById(activeHostelId).select('status').lean();
+      } else {
+        const orgQuery = organization ? { organizationId: organization._id } : {};
+        hostelDoc = await Hostel.findOne({ ...orgQuery, code: String(activeHostelId).toUpperCase() }).select('status').lean();
+      }
+      if (hostelDoc && (hostelDoc.status === 'SUSPENDED' || hostelDoc.status === 'INACTIVE' || hostelDoc.status === 'ARCHIVED')) {
         return res.status(403).json({
           success: false,
           code: 'HOSTEL_SUSPENDED',

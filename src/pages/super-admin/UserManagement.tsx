@@ -68,9 +68,11 @@ export default function UserManagement() {
       const params: any = { page, limit: 20 };
       if (roleFilter !== 'ALL') params.role = roleFilter;
       if (statusFilter !== 'ALL') {
-        if (statusFilter === 'ACTIVE') params.isActive = true;
-        if (statusFilter === 'SUSPENDED') params.isActive = false;
-        if (statusFilter === 'LOCKED') params.isLocked = true;
+        if (statusFilter === 'LOCKED') {
+          params.isLocked = true;
+        } else {
+          params.status = statusFilter;
+        }
       }
       if (debouncedSearch) params.search = debouncedSearch;
 
@@ -241,9 +243,11 @@ export default function UserManagement() {
             }}
             className="h-10 px-3 rounded-md bg-card border border-border text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           >
-            <option value="ALL">All Status</option>
+            <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
+            <option value="INVITED">Invited</option>
             <option value="SUSPENDED">Suspended</option>
+            <option value="DEACTIVATED">Deactivated</option>
             <option value="LOCKED">Security Locked</option>
           </select>
         </div>
@@ -319,12 +323,16 @@ export default function UserManagement() {
                         <Badge
                           variant="outline"
                           className={
-                            user.isActive
+                            (user as any).status === 'ACTIVE' || (!(user as any).status && user.isActive)
                               ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10 w-fit'
+                              : (user as any).status === 'INVITED'
+                              ? 'border-blue-500/30 text-blue-400 bg-blue-500/10 w-fit'
+                              : (user as any).status === 'SUSPENDED'
+                              ? 'border-amber-500/30 text-amber-400 bg-amber-500/10 w-fit'
                               : 'border-red-500/30 text-red-400 bg-red-500/10 w-fit'
                           }
                         >
-                          {user.isActive ? 'Active' : 'Suspended'}
+                          {(user as any).status || (user.isActive ? 'ACTIVE' : 'DEACTIVATED')}
                         </Badge>
                         {user.isLocked && (
                           <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-500/10 w-fit">

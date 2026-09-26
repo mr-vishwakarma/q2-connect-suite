@@ -10,11 +10,14 @@ const systemHealthService = {
     let dbStatus = 'DISCONNECTED';
     let dbPingMs = 0;
 
+    let collectionsCount = 0;
     try {
       if (mongoose.connection.readyState === 1) {
         await mongoose.connection.db.admin().ping();
         dbPingMs = Date.now() - startTime;
         dbStatus = 'HEALTHY';
+        const collections = await mongoose.connection.db.listCollections().toArray();
+        collectionsCount = collections.length;
       } else {
         dbStatus = 'CONNECTING';
       }
@@ -41,6 +44,10 @@ const systemHealthService = {
 
     // 5. External Services Configuration Check
     const services = {
+      razorpay: {
+        configured: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
+        status: process.env.RAZORPAY_KEY_ID ? 'CONFIGURED' : 'NOT_CONFIGURED',
+      },
       imageKit: {
         configured: Boolean(process.env.IMAGEKIT_PUBLIC_KEY && process.env.IMAGEKIT_PRIVATE_KEY),
         status: process.env.IMAGEKIT_PUBLIC_KEY ? 'CONFIGURED' : 'NOT_CONFIGURED',
@@ -93,6 +100,7 @@ const systemHealthService = {
         name: mongoose.connection.name || 'q2-connect',
         host: mongoose.connection.host || 'localhost',
         connectedHost: mongoose.connection.host || 'localhost',
+        collectionsCount,
       },
       memory: {
         rssMB: toMB(memUsage.rss),

@@ -23,15 +23,15 @@ const userService = {
       filter.role = query.role;
     }
 
-    if (query.isActive !== undefined) {
-      filter.isActive = query.isActive === 'true' || query.isActive === true;
-    } else if (query.status && query.status !== 'all') {
-      const normalized = String(query.status).toLowerCase();
-      if (normalized === 'active') {
-        filter.isActive = true;
-      } else if (normalized === 'suspended' || normalized === 'inactive') {
-        filter.isActive = false;
+    if (query.status && query.status !== 'all') {
+      const upper = String(query.status).toUpperCase();
+      if (['ACTIVE', 'SUSPENDED', 'INVITED', 'DEACTIVATED'].includes(upper)) {
+        filter.status = upper;
+      } else if (upper === 'INACTIVE') {
+        filter.status = 'DEACTIVATED';
       }
+    } else if (query.isActive !== undefined) {
+      filter.isActive = query.isActive === 'true' || query.isActive === true;
     }
 
     if (query.isLocked === 'true' || query.isLocked === true) {
@@ -108,9 +108,27 @@ const userService = {
     };
   },
 
-  async updateUserStatus(id, isActive) {
+  async updateUserStatus(id, statusOrIsActive) {
     const user = await User.findById(id);
     if (!user) throw new Error('User not found');
+
+    let newStatus = 'ACTIVE';
+    let isActive = true;
+
+    if (typeof statusOrIsActive === 'boolean') {
+      isActive = statusOrIsActive;
+      newStatus = isActive ? 'ACTIVE' : 'DEACTIVATED';
+    } else if (typeof statusOrIsActive === 'string') {
+      const upper = statusOrIsActive.toUpperCase();
+      const validStatuses = ['ACTIVE', 'SUSPENDED', 'INVITED', 'DEACTIVATED'];
+      if (validStatuses.includes(upper)) {
+        newStatus = upper;
+        isActive = upper === 'ACTIVE' || upper === 'INVITED';
+      } else {
+        isActive = upper === 'TRUE';
+        newStatus = isActive ? 'ACTIVE' : 'DEACTIVATED';
+      }
+    }
 
     // Protect Super Admin accounts from accidental self-deactivation
     if (user.isSuperAdmin && !isActive) {
@@ -120,9 +138,10 @@ const userService = {
       }
     }
 
-    user.isActive = Boolean(isActive);
+    user.status = newStatus;
+    user.isActive = isActive;
     if (!isActive) {
-      user.refreshTokens = []; // Revoke active sessions on deactivation
+      user.refreshTokens = []; // Revoke active sessions on deactivation or suspension
     }
     await user.save();
 
