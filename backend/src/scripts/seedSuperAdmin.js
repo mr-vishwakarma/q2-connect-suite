@@ -1,7 +1,3 @@
-const dns = require('dns');
-// On Windows, Node.js querySrv can fail with default ISP DNS. Use Google & Cloudflare DNS.
-dns.setServers(['8.8.8.8', '1.1.1.1']);
-
 const mongoose = require('mongoose');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -10,7 +6,8 @@ const User = require('../models/User');
 const Organization = require('../models/Organization');
 
 async function seedSuperAdmin() {
-  const uri = process.env.MONGODB_URI;
+  const directAtlasUri = 'mongodb://mayurvish:Mayur2003%21%40%23%24@ac-6pitufb-shard-00-00.pqjcnsk.mongodb.net:27017,ac-6pitufb-shard-00-01.pqjcnsk.mongodb.net:27017,ac-6pitufb-shard-00-02.pqjcnsk.mongodb.net:27017/q2connect?ssl=true&replicaSet=atlas-rxulwo-shard-0&authSource=admin&retryWrites=true&w=majority';
+  const uri = directAtlasUri || process.env.MONGODB_URI;
   if (!uri) {
     console.error('❌ MONGODB_URI is not defined in .env');
     process.exit(1);

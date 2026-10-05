@@ -17,7 +17,7 @@ export interface PaginatedResponse<T = any> {
   };
 }
 
-export type HostelType = 'Q2' | 'Q2.0' | 'Q2.1' | 'All';
+export type HostelType = string;
 
 export type UserRole = 'admin' | 'student' | 'warden';
 

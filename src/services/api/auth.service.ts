@@ -2,8 +2,23 @@ import { api } from '@/lib/api';
 import { ApiResponse, AuthResponse, User } from '@/types';
 
 export const authService = {
-  async login(credentials: { email?: string; username?: string; password: string; isAdminLogin?: boolean }): Promise<ApiResponse<AuthResponse>> {
+  async login(credentials: { email?: string; username?: string; password: string; isAdminLogin?: boolean; portal?: string }): Promise<ApiResponse<AuthResponse>> {
     const res = await api.post('/auth/login', credentials);
+    return res.data;
+  },
+
+  async superAdminLogin(credentials: { email?: string; username?: string; password: string }): Promise<ApiResponse<AuthResponse>> {
+    const res = await api.post('/auth/super-admin/login', { ...credentials, portal: 'SUPER_ADMIN' });
+    return res.data;
+  },
+
+  async adminLogin(credentials: { email?: string; username?: string; password: string }): Promise<ApiResponse<AuthResponse>> {
+    const res = await api.post('/auth/admin/login', { ...credentials, portal: 'ADMIN' });
+    return res.data;
+  },
+
+  async studentLogin(credentials: { email?: string; username?: string; password: string }): Promise<ApiResponse<AuthResponse>> {
+    const res = await api.post('/auth/login', { ...credentials, portal: 'STUDENT' });
     return res.data;
   },
 

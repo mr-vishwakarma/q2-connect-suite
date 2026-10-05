@@ -5,44 +5,115 @@ import { GoogleLogin } from '@react-oauth/google';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SaaSHeader } from '@/components/landing/SaaSHeader';
-import { SaaSFooter } from '@/components/landing/SaaSFooter';
-import { BuildingBackground } from '@/components/shared/BuildingBackground';
-import { RoleSelector } from '@/components/auth/RoleSelector';
 import { WorkspaceSelector } from '@/components/auth/WorkspaceSelector';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'react-toastify';
 import {
   Eye,
   EyeOff,
-  ShieldAlert,
+  ShieldCheck,
   Building2,
   GraduationCap,
-  ArrowLeft,
   Lock,
   Mail,
   User as UserIcon,
-  Phone,
+  ArrowRight,
+  Shield,
   KeyRound,
-  CheckCircle2,
-  AlertTriangle,
-  Sparkles,
-  UserPlus,
-  Hourglass,
-  Clock,
+  RefreshCw,
+  Info,
 } from 'lucide-react';
 import { GoogleStep2Modal } from '@/components/auth/GoogleStep2Modal';
 import { GoogleInitialDetailsModal } from '@/components/auth/GoogleInitialDetailsModal';
+import { api } from '@/lib/api';
+
+type AuthRole = 'super_admin' | 'admin' | 'student';
+
+const normalizeRole = (role: string | null): AuthRole => {
+  if (!role) return 'admin';
+  const clean = role.toLowerCase().trim();
+  if (clean === 'super_admin' || clean === 'superadmin' || clean === 'platform') return 'super_admin';
+  if (clean === 'admin' || clean === 'hostel_admin' || clean === 'warden') return 'admin';
+  if (clean === 'student' || clean === 'resident') return 'student';
+  return 'admin';
+};
+
+interface RoleConfig {
+  id: AuthRole;
+  label: string;
+  badge: string;
+  title: string;
+  subtitle: string;
+  identifierLabel: string;
+  identifierPlaceholder: string;
+  identifierIcon: typeof Mail | typeof UserIcon | typeof GraduationCap;
+  ctaText: string;
+  securityFooter: string;
+  icon: typeof ShieldCheck | typeof Building2 | typeof GraduationCap;
+}
+
+const ROLE_CONFIGS: Record<AuthRole, RoleConfig> = {
+  super_admin: {
+    id: 'super_admin',
+    label: 'Super Admin',
+    badge: 'PLATFORM CONTROL',
+    title: 'Platform Administration',
+    subtitle: 'Sign in with platform credentials to access multi-tenant infrastructure',
+    identifierLabel: 'Administrator Email',
+    identifierPlaceholder: 'superadmin@q2connect.com',
+    identifierIcon: Mail,
+    ctaText: 'Sign In to Platform',
+    securityFooter: 'SECURE PLATFORM ACCESS',
+    icon: ShieldCheck,
+  },
+  admin: {
+    id: 'admin',
+    label: 'Hostel Admin',
+    badge: 'OPERATIONS HUB',
+    title: 'Hostel Management Portal',
+    subtitle: 'Manage property rooms, fee ledgers & staff operations',
+    identifierLabel: 'Email or Staff Username',
+    identifierPlaceholder: 'admin@q2hostels.com or username',
+    identifierIcon: UserIcon,
+    ctaText: 'Sign In to Hostel Hub',
+    securityFooter: 'SECURE HOSTEL ACCESS',
+    icon: Building2,
+  },
+  student: {
+    id: 'student',
+    label: 'Student',
+    badge: 'RESIDENT ACCESS',
+    title: 'Student Resident Portal',
+    subtitle: 'Access assigned room details, fee invoices & gate pass requests',
+    identifierLabel: 'Student User ID or Email',
+    identifierPlaceholder: 'e.g. nikhil or resident@q2hostels.com',
+    identifierIcon: GraduationCap,
+    ctaText: 'Sign In to Resident App',
+    securityFooter: 'STUDENT RESIDENT ACCESS',
+    icon: GraduationCap,
+  },
+};
 
 export default function Login() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialRole = searchParams.get('role') as 'super_admin' | 'admin' | 'student' | null;
+  const initialRole = normalizeRole(searchParams.get('role'));
 
-  const [selectedRole, setSelectedRole] = useState<'super_admin' | 'admin' | 'student' | null>(initialRole);
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<AuthRole>(initialRole);
+
+  // Sign In credentials
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // MFA / OTP step state
+  const [mfaData, setMfaData] = useState<{
+    required: boolean;
+    mfaToken?: string;
+    destinationMasked?: string;
+  } | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // Google Step 2 Completion State (After Admin Approval)
   const [showGoogleStep2, setShowGoogleStep2] = useState(false);
@@ -54,53 +125,26 @@ export default function Login() {
   const [initialGoogleProfile, setInitialGoogleProfile] = useState<any>(null);
   const [initialCredential, setInitialCredential] = useState('');
 
-  // Pending Admin Approval State Notice
-  const [pendingApprovalNotice, setPendingApprovalNotice] = useState<{
-    name?: string;
-    email?: string;
-    hostel?: string;
-    phone?: string;
-  } | null>(null);
-
-  // Sign In credentials
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Student Registration fields
-  const [regName, setRegName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regUsername, setRegUsername] = useState('');
-  const [regPhone, setRegPhone] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regHostel, setRegHostel] = useState('Q2');
-
-  // Account Lockout / Security State
-  const [lockoutInfo, setLockoutInfo] = useState<{
-    isLocked?: boolean;
-    lockMinutes?: number;
-    remainingAttempts?: number;
-    message?: string;
-  } | null>(null);
-
   // Workspace selection state
   const [workspaces, setWorkspaces] = useState<any[]>([]);
   const [showWorkspaceSelect, setShowWorkspaceSelect] = useState(false);
 
-  const { signIn, signInWithGoogle, requestGoogleRegistration, signUp, user, isAdmin } = useAuth();
+  const { signIn, signInWithGoogle, requestGoogleRegistration, user, isAdmin } = useAuth();
   const navigate = useNavigate();
 
+  // Sync role when URL search parameter changes
   useEffect(() => {
-    const roleParam = searchParams.get('role') as 'super_admin' | 'admin' | 'student' | null;
+    const roleParam = searchParams.get('role');
     if (roleParam) {
-      setSelectedRole(roleParam);
+      const normalized = normalizeRole(roleParam);
+      setSelectedRole(normalized);
     }
   }, [searchParams]);
 
+  // Authenticated redirect guard: if already logged in and visiting without query, route to verified portal
   useEffect(() => {
     const roleParam = searchParams.get('role');
-    if (user && !roleParam && !selectedRole) {
+    if (user && !roleParam) {
       if (user.role === 'super_admin' || user.isSuperAdmin) {
         navigate('/super-admin/dashboard', { replace: true });
       } else if (user.role === 'admin' || isAdmin) {
@@ -109,31 +153,137 @@ export default function Login() {
         navigate('/student/dashboard', { replace: true });
       }
     }
-  }, [user, isAdmin, selectedRole, searchParams, navigate]);
+  }, [user, isAdmin, searchParams, navigate]);
 
-  const handleRoleSelect = (role: 'super_admin' | 'admin' | 'student') => {
-    setSelectedRole(role);
-    setSearchParams({ role });
-    setLockoutInfo(null);
-  };
+  // OTP resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
-  const handleBackToRoles = () => {
-    setSelectedRole(null);
-    setSearchParams({});
-    setIdentifier('');
+  const handleRoleChange = (newRole: AuthRole) => {
+    if (selectedRole === newRole) return;
+    setSelectedRole(newRole);
+    setSearchParams({ role: newRole }, { replace: true });
     setPassword('');
-    setIsRegistering(false);
-    setLockoutInfo(null);
+    setMfaData(null);
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
-    if (!credentialResponse?.credential) {
-      toast.error('Google Sign In did not return a credential.');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!identifier.trim() || !password) {
+      toast.error('Please enter your credentials', { toastId: 'auth-login-error' });
       return;
     }
 
     setIsLoading(true);
-    setLockoutInfo(null);
+
+    try {
+      const { error, user: loggedUser } = await signIn(
+        identifier.trim(),
+        password,
+        selectedRole
+      );
+
+      setIsLoading(false);
+
+      if (error) {
+        // Check if backend challenged for MFA / OTP
+        if (error.code === 'MFA_REQUIRED' || error.requiresMfa) {
+          setMfaData({
+            required: true,
+            mfaToken: error.mfaToken,
+            destinationMasked: error.destinationMasked || identifier.trim(),
+          });
+          setResendCooldown(45);
+          toast.info('Two-factor authentication code sent. Please enter the OTP.', { toastId: 'auth-mfa-info' });
+          return;
+        }
+
+        // Show single error toast with unique toastId to prevent duplicate toasts
+        toast.error(error.message || 'Authentication failed', { toastId: 'auth-login-error' });
+        return;
+      }
+
+      toast.success('Welcome back to Q2!', { toastId: 'auth-login-success' });
+
+      // AUTHORITATIVE DESTINATION: Derived strictly from verified server-side role
+      const verifiedRole = loggedUser?.role;
+      const isSuper = Boolean(loggedUser?.isSuperAdmin || verifiedRole === 'super_admin');
+
+      if (isSuper) {
+        navigate('/super-admin/dashboard', { replace: true });
+      } else if (verifiedRole === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/student/dashboard', { replace: true });
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      const msg = err?.response?.data?.message || err?.message || 'Authentication failed';
+      toast.error(msg, { toastId: 'auth-login-error' });
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.trim().length < 6) {
+      toast.error('Please enter the 6-digit OTP verification code', { toastId: 'auth-login-error' });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await api.post('/auth/verify-otp', {
+        mfaToken: mfaData?.mfaToken,
+        otp: otpCode.trim(),
+        portal: selectedRole === 'super_admin' ? 'SUPER_ADMIN' : selectedRole === 'admin' ? 'ADMIN' : 'STUDENT',
+      });
+
+      setIsLoading(false);
+      if (response.data?.success) {
+        toast.success('Identity verified!', { toastId: 'auth-login-success' });
+        const u = response.data.user;
+        if (u?.isSuperAdmin || u?.role === 'super_admin') {
+          navigate('/super-admin/dashboard', { replace: true });
+        } else if (u?.role === 'admin') {
+          navigate('/admin/dashboard', { replace: true });
+        } else {
+          navigate('/student/dashboard', { replace: true });
+        }
+      } else {
+        toast.error(response.data?.message || 'Verification failed', { toastId: 'auth-login-error' });
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      toast.error(err.response?.data?.message || err.message || 'Invalid or expired verification code', { toastId: 'auth-login-error' });
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    try {
+      await api.post('/auth/resend-otp', {
+        mfaToken: mfaData?.mfaToken,
+      });
+      setResendCooldown(60);
+      toast.success('A new verification code has been dispatched.', { toastId: 'auth-mfa-info' });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to resend code', { toastId: 'auth-login-error' });
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    if (!credentialResponse?.credential) {
+      toast.error('Google Sign In did not return a credential.', { toastId: 'auth-login-error' });
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
       const portal = selectedRole || 'student';
@@ -141,53 +291,46 @@ export default function Login() {
       setIsLoading(false);
 
       if (result.error) {
-        toast.error(result.error.message || 'Google authentication failed');
+        toast.error(result.error.message || 'Google authentication failed', { toastId: 'auth-login-error' });
         return;
       }
 
-      // 1. Brand new resident registering -> Open Initial Details Modal (Step 1)
       if (result.status === 'new_resident' && result.requiresInitialDetails) {
         setInitialGoogleProfile(result.googleProfile);
         setInitialCredential(credentialResponse.credential);
         setShowInitialModal(true);
-        toast.info('Google account verified! Please enter your phone number & preferred hostel branch.');
+        toast.info('Google account verified! Please enter your phone number & preferred hostel branch.', { toastId: 'auth-google-info' });
         return;
       }
 
-      // 2. Application submitted, pending admin review
       if (result.status === 'pending_approval') {
-        setPendingApprovalNotice({
-          name: result.pendingUser?.name || 'Resident',
-          email: result.pendingUser?.email || '',
-          hostel: result.pendingUser?.hostel || 'Q2 Girls Hostel',
-          phone: result.pendingUser?.phone || '',
-        });
-        toast.info(result.message || 'Your registration request is pending admin approval.');
+        toast.info(result.message || 'Your registration request is pending admin approval.', { toastId: 'auth-google-info' });
         return;
       }
 
-      // 3. Approved by admin -> Prompt to set permanent username & password (Step 2)
       if (result.status === 'approved' && result.canCompleteSetup) {
         setGoogleSetupToken(result.setupToken || '');
         setGoogleProfileData(result.googleProfile);
         setShowGoogleStep2(true);
-        toast.success('Congratulations! Your application has been approved. Please choose your username and password.');
+        toast.success('Congratulations! Your application has been approved. Please choose your password.', { toastId: 'auth-google-info' });
         return;
       }
 
-      // 4. Active resident/admin -> Log directly in to authorized requested portal
       const loggedUser = result.user;
-      toast.success(`Welcome ${loggedUser?.name || 'back'}! (Authenticated via Google)`);
-      if (portal === 'super_admin') {
+      toast.success(`Welcome ${loggedUser?.name || 'back'}! (Authenticated via Google)`, { toastId: 'auth-login-success' });
+
+      const verifiedRole = loggedUser?.role;
+      const isSuper = Boolean(loggedUser?.isSuperAdmin || verifiedRole === 'super_admin');
+      if (isSuper) {
         navigate('/super-admin/dashboard', { replace: true });
-      } else if (portal === 'admin') {
+      } else if (verifiedRole === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else {
         navigate('/student/dashboard', { replace: true });
       }
     } catch (err: any) {
       setIsLoading(false);
-      toast.error(err?.message || 'Google authentication failed');
+      toast.error(err?.message || 'Google authentication failed', { toastId: 'auth-login-error' });
     }
   };
 
@@ -205,21 +348,14 @@ export default function Login() {
       setShowInitialModal(false);
 
       if (result.error) {
-        toast.error(result.error.message || 'Failed to submit registration request');
+        toast.error(result.error.message || 'Failed to submit registration request', { toastId: 'auth-login-error' });
         return;
       }
 
-      setPendingApprovalNotice({
-        name: details.name,
-        email: initialGoogleProfile?.email,
-        hostel: details.hostel,
-        phone: details.phone,
-      });
-
-      toast.success('Registration request submitted! Awaiting hostel administrator approval.');
+      toast.success('Registration request submitted! Awaiting hostel administrator approval.', { toastId: 'auth-google-info' });
     } catch (err: any) {
       setIsLoading(false);
-      toast.error(err?.message || 'Submission failed');
+      toast.error(err?.message || 'Submission failed', { toastId: 'auth-login-error' });
     }
   };
 
@@ -231,7 +367,6 @@ export default function Login() {
     !activeGoogleClientId.includes('demo')
   );
 
-  // Demo Google Login fallback for local dev when Google Client ID is not configured
   const handleDemoGoogleLogin = async () => {
     let emailToUse = identifier?.includes('@') ? identifier.trim() : '';
     if (!emailToUse) {
@@ -242,7 +377,6 @@ export default function Login() {
     }
     if (!emailToUse.trim()) return;
 
-    // Construct a development mock Google JWT payload
     const normalizedEmail = emailToUse.toLowerCase().trim();
     const mockPayload = {
       sub: `google_oauth_dev_${Date.now()}`,
@@ -255,541 +389,386 @@ export default function Login() {
     await handleGoogleSuccess({ credential: mockToken });
   };
 
-  const renderGoogleButton = (buttonText: string = 'Continue with Google') => {
-    return (
-      <div className="w-full">
-        {hasValidGoogleClientId ? (
-          <div className="flex justify-center w-full [&>div]:!w-full [&>div>iframe]:!w-full">
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => toast.error('Google Sign In failed. Please check Google Console configuration.')}
-              theme="outline"
-              size="large"
-              shape="rectangular"
-              text={isRegistering ? 'signup_with' : 'continue_with'}
-              width="100%"
-            />
-          </div>
-        ) : (
-          <div>
-            <button
-              type="button"
-              onClick={handleDemoGoogleLogin}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-border/80 bg-card hover:bg-secondary/60 text-xs font-semibold text-foreground transition-all shadow-sm group"
-            >
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>{buttonText}</span>
-            </button>
-            <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-              💡 Notice: Add your real Google Client ID to <code className="text-foreground">.env</code> to activate live Google popup.
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!identifier || !password) {
-      toast.error('Please enter your credentials');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const portal = selectedRole || 'student';
-
-      const { error, user: loggedUser } = await signIn(
-        identifier.trim(),
-        password,
-        portal
-      );
-
-      setIsLoading(false);
-
-      if (error) {
-        if (error.isLocked) {
-          setLockoutInfo({
-            isLocked: true,
-            lockMinutes: error.lockMinutes || 15,
-            message: error.message,
-          });
-        } else if (error.remainingAttempts !== undefined) {
-          setLockoutInfo({
-            remainingAttempts: error.remainingAttempts,
-            message: error.message,
-          });
-        }
-        toast.error(error.message || 'You are not authorized to access this portal.');
-      } else {
-        setLockoutInfo(null);
-        toast.success('Welcome back!');
-        if (portal === 'super_admin') {
-          navigate('/super-admin/dashboard', { replace: true });
-        } else if (portal === 'admin') {
-          navigate('/admin/dashboard', { replace: true });
-        } else {
-          navigate('/student/dashboard', { replace: true });
-        }
-      }
-    } catch (err: any) {
-      setIsLoading(false);
-      toast.error(err?.message || 'Authentication failed');
-    }
-  };
-
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!regName || !regEmail || !regPassword) {
-      toast.error('Please fill in Name, Email, and Password');
-      return;
-    }
-    if (regPassword.length < 6) {
-      toast.error('Password must be at least 6 characters long');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const { error, user: loggedUser } = await signUp({
-        name: regName,
-        email: regEmail,
-        username: regUsername || regEmail.split('@')[0],
-        phone: regPhone,
-        password: regPassword,
-        hostel: regHostel,
-        role: 'student',
-      });
-
-      setIsLoading(false);
-      if (error) {
-        toast.error(error.message || 'Registration failed');
-      } else {
-        toast.success('Resident account created successfully! Welcome to Q2.');
-        navigate('/student/dashboard', { replace: true });
-      }
-    } catch (err: any) {
-      setIsLoading(false);
-      toast.error(err?.message || 'Registration failed');
-    }
-  };
+  const config = ROLE_CONFIGS[selectedRole];
+  const CurrentIcon = config.icon;
+  const IdentifierIcon = config.identifierIcon;
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between relative overflow-x-hidden">
-      <BuildingBackground showOnHome={true} />
-      <SaaSHeader />
+    <div className="min-h-screen bg-[#08090C] text-slate-100 flex flex-col justify-center items-center relative overflow-hidden py-12 px-4 selection:bg-red-600 selection:text-white">
+      {/* Background Decorative Thin Circles & Matrix Dots (exact match to reference image) */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {/* Top-left subtle red outline arc */}
+        <div className="absolute top-10 -left-28 w-[420px] h-[420px] rounded-full border border-red-600/15 pointer-events-none" />
+        <div className="absolute top-0 -left-44 w-[560px] h-[560px] rounded-full border border-red-600/[0.08] pointer-events-none" />
 
-      <main className="flex-1 flex items-center justify-center pt-28 pb-16 px-4 z-10">
-        <AnimatePresence mode="wait">
-          {!selectedRole ? (
-            /* Step 1: Role Selection Screen */
-            <motion.div
-              key="role-selector"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3 }}
-              className="w-full"
-            >
-              <RoleSelector onSelectRole={handleRoleSelect} />
-            </motion.div>
-          ) : showWorkspaceSelect ? (
-            /* Step 3: Multi-Tenant Workspace Selector */
-            <motion.div
-              key="workspace-selector"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="w-full"
-            >
-              <WorkspaceSelector
-                userName={identifier || 'Admin'}
-                workspaces={workspaces}
-                onSelectWorkspace={() => {
-                  navigate('/admin/dashboard');
-                }}
-              />
-            </motion.div>
-          ) : (
-            /* Step 2: Tailored Sign-In / Registration Panel */
-            <motion.div
-              key="login-panel"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="w-full max-w-md"
-            >
-              <Card className="bg-card/85 backdrop-blur-2xl border-border/80 shadow-2xl overflow-hidden rounded-2xl">
-                {/* Card Top Role Header */}
-                <CardHeader className="text-center pb-4 relative">
-                  <button
-                    onClick={handleBackToRoles}
-                    className="absolute top-4 left-4 p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Roles</span>
-                  </button>
+        {/* Bottom-right subtle red outline arc */}
+        <div className="absolute -bottom-24 -right-28 w-[420px] h-[420px] rounded-full border border-red-600/15 pointer-events-none" />
+        <div className="absolute -bottom-40 -right-44 w-[560px] h-[560px] rounded-full border border-red-600/[0.08] pointer-events-none" />
 
-                  <div className="pt-2">
-                    <div
-                      className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-3 shadow-md ${
-                        selectedRole === 'super_admin'
-                          ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30'
-                          : selectedRole === 'student'
-                          ? 'bg-sky-500/10 text-sky-400 border border-sky-500/30'
-                          : 'bg-primary/10 text-primary border border-primary/30'
-                      }`}
-                    >
-                      {selectedRole === 'super_admin' ? (
-                        <ShieldAlert className="w-7 h-7" />
-                      ) : selectedRole === 'student' ? (
-                        <GraduationCap className="w-7 h-7" />
-                      ) : (
-                        <Building2 className="w-7 h-7" />
-                      )}
+        {/* Left Matrix Dots */}
+        <div className="absolute top-1/3 left-12 hidden lg:grid grid-cols-6 gap-3.5 opacity-25 pointer-events-none">
+          {Array.from({ length: 36 }).map((_, i) => (
+            <span key={i} className="w-1 h-1 rounded-full bg-slate-400" />
+          ))}
+        </div>
+
+        {/* Right Matrix Dots */}
+        <div className="absolute bottom-1/4 right-12 hidden lg:grid grid-cols-6 gap-3.5 opacity-25 pointer-events-none">
+          {Array.from({ length: 36 }).map((_, i) => (
+            <span key={i} className="w-1 h-1 rounded-full bg-slate-400" />
+          ))}
+        </div>
+      </div>
+
+      <div className="w-full max-w-[500px] z-10">
+        {showWorkspaceSelect ? (
+          /* Multi-Tenant Workspace Selector Step */
+          <motion.div
+            key="workspace-selector"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.25 }}
+            className="w-full"
+          >
+            <WorkspaceSelector
+              userName={identifier || 'Admin'}
+              workspaces={workspaces}
+              onSelectWorkspace={() => navigate('/admin/dashboard')}
+            />
+          </motion.div>
+        ) : (
+          /* Unified Q2 Authentication Card (Exact Reference Architecture) */
+          <motion.div
+            key="unified-auth-card"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="w-full"
+          >
+            {/* Brand Header */}
+            <div className="text-center mb-6">
+              <Link to="/" className="inline-flex items-center gap-3.5 group mb-2 focus:outline-none">
+                <div className="w-11 h-11 rounded-2xl bg-[#14080A] border border-red-500/40 flex items-center justify-center shadow-lg shadow-red-950/40 group-hover:border-red-500 transition-colors">
+                  <span className="text-white font-black text-sm tracking-tight">Q2</span>
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-xl font-black text-white tracking-tight leading-none">
+                    Q2 <span className="text-[#FF1E27] font-extrabold text-sm uppercase tracking-widest">CONNECT</span>
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-widest mt-1">
+                    HOSTEL MANAGEMENT SUITE
+                  </span>
+                </div>
+              </Link>
+              <p className="text-xs text-slate-400 mt-1">
+                Secure access to your verified operating portal
+              </p>
+            </div>
+
+            {/* Main Auth Card Container */}
+            <div className="relative rounded-[24px] bg-[#0E1015] border border-[#1A1D24] shadow-2xl shadow-black/80 backdrop-blur-xl overflow-hidden p-6 sm:p-8">
+              {/* ROLE SWITCHER TABLIST */}
+              <div className="relative mb-6">
+                <div className="flex items-center justify-between text-xs text-slate-300 font-semibold mb-2.5 px-0.5">
+                  <span>Select Workspace Role</span>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">ROLE SWITCHER</span>
+                </div>
+
+                <div
+                  role="tablist"
+                  aria-label="Q2 Portal Role Selector"
+                  className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-[#090A0D] border border-[#1A1D24]"
+                >
+                  {(['super_admin', 'admin', 'student'] as AuthRole[]).map((roleKey) => {
+                    const rConfig = ROLE_CONFIGS[roleKey];
+                    const isSelected = selectedRole === roleKey;
+                    const TabIcon = rConfig.icon;
+                    return (
+                      <button
+                        key={roleKey}
+                        type="button"
+                        role="tab"
+                        id={`tab-${roleKey}`}
+                        aria-selected={isSelected}
+                        aria-controls={`panel-${roleKey}`}
+                        onClick={() => handleRoleChange(roleKey)}
+                        className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all duration-150 border ${
+                          isSelected
+                            ? 'bg-[#1A0B0E] text-white border-red-600 shadow-[0_0_12px_rgba(220,38,38,0.25)]'
+                            : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#14161C]'
+                        }`}
+                      >
+                        <TabIcon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-red-500' : 'text-slate-400'}`} />
+                        <span className="truncate">{rConfig.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* MFA / OTP STEP VIEW */}
+              {mfaData?.required ? (
+                <motion.div
+                  key="mfa-step"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  className="space-y-4"
+                >
+                  <div className="text-center space-y-1 mb-2">
+                    <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto mb-2 shadow-lg">
+                      <KeyRound className="w-6 h-6" />
                     </div>
-
-                    <CardTitle className="text-2xl font-bold text-foreground">
-                      {selectedRole === 'super_admin'
-                        ? 'Platform Administration'
-                        : selectedRole === 'admin'
-                        ? 'Hostel Management Portal'
-                        : isRegistering
-                        ? 'Create Resident Account'
-                        : 'Resident Student Portal'}
-                    </CardTitle>
-                    <CardDescription className="text-xs mt-1">
-                      {selectedRole === 'super_admin'
-                        ? 'Secure platform-level governance access'
-                        : selectedRole === 'admin'
-                        ? 'Manage rooms, ledgers, and resident operations'
-                        : isRegistering
-                        ? 'Register as a new student resident in Q2 Hostels'
-                        : 'Access your room details, fees, and gate passes'}
-                    </CardDescription>
+                    <h2 className="text-xl font-bold text-white tracking-tight">Verify Your Identity</h2>
+                    <p className="text-xs text-slate-400">
+                      Enter the 6-digit authentication code sent to <strong className="text-slate-200">{mfaData.destinationMasked}</strong>
+                    </p>
                   </div>
-                </CardHeader>
 
-                <CardContent className="space-y-4">
-                  {/* Account Lockout Security Alert */}
-                  {lockoutInfo?.isLocked && (
-                    <div className="p-3.5 rounded-xl bg-destructive/15 border border-destructive/30 text-destructive text-xs space-y-1.5 animate-in fade-in slide-in-from-top-1">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-destructive" />
-                        <span>Account Temporarily Locked (Anti-Brute Force Protection)</span>
-                      </div>
-                      <p className="leading-relaxed">{lockoutInfo.message}</p>
-                      <div className="pt-1 text-[11px] font-medium opacity-90">
-                        ⚡ Tip: If you own this email, you can log in immediately via <strong>Google Sign-In</strong> or reset your password.
-                      </div>
+                  <form onSubmit={handleVerifyOtp} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="mfa-otp" className="text-xs font-semibold text-slate-300">
+                        6-Digit Verification Code
+                      </Label>
+                      <Input
+                        id="mfa-otp"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="123456"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                        className="h-12 text-center text-lg tracking-[0.4em] font-mono font-bold bg-[#090A0D] border-[#1E222B] text-white rounded-xl focus:border-red-500"
+                        autoFocus
+                        required
+                      />
                     </div>
-                  )}
 
-                  {/* Failed Attempt Warning Banner */}
-                  {!lockoutInfo?.isLocked && lockoutInfo?.remainingAttempts !== undefined && (
-                    <div className="p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-500 text-xs flex items-center gap-2">
-                      <ShieldAlert className="w-4 h-4 shrink-0" />
-                      <span>{lockoutInfo.message}</span>
+                    <Button
+                      type="submit"
+                      disabled={isLoading || otpCode.length < 6}
+                      className="w-full h-11 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold shadow-lg shadow-red-600/30"
+                    >
+                      {isLoading ? 'Verifying Code...' : 'Confirm & Open Portal'}
+                    </Button>
+
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setMfaData(null)}
+                        className="text-slate-400 hover:text-white transition-colors"
+                      >
+                        ← Back to Sign In
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        disabled={resendCooldown > 0}
+                        className={`flex items-center gap-1 font-semibold ${
+                          resendCooldown > 0 ? 'text-slate-500 cursor-not-allowed' : 'text-red-400 hover:underline'
+                        }`}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${resendCooldown > 0 ? 'animate-spin' : ''}`} />
+                        <span>{resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}</span>
+                      </button>
                     </div>
-                  )}
+                  </form>
+                </motion.div>
+              ) : (
+                /* STANDARD CREDENTIALS LOGIN VIEW (Matching Attached Reference Image) */
+                <div id={`panel-${selectedRole}`} role="tabpanel" aria-labelledby={`tab-${selectedRole}`}>
+                  {/* Role Header Banner */}
+                  <div className="mb-6 flex items-start gap-3.5 text-left">
+                    {/* Icon Box */}
+                    <div className="w-12 h-12 rounded-2xl bg-[#170B0E] border border-red-500/20 flex items-center justify-center text-red-500 shrink-0 mt-0.5 shadow-sm">
+                      <CurrentIcon className="w-6 h-6" />
+                    </div>
 
-                  {/* Pending Admin Approval Banner */}
-                  {pendingApprovalNotice && (
-                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 animate-in fade-in slide-in-from-top-1 text-left">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 font-bold text-amber-600 dark:text-amber-400">
-                          <Hourglass className="w-4 h-4 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
-                          <span>Registration Pending Admin Approval</span>
-                        </div>
-                        <span className="text-[10px] bg-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold px-2 py-0.5 rounded-full">
-                          In Review
-                        </span>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed">
-                        Your application for <strong className="text-foreground">{pendingApprovalNotice.email}</strong> has been submitted and is waiting for approval from <strong className="text-foreground">{pendingApprovalNotice.hostel}</strong> administration.
+                    {/* Titles */}
+                    <div className="flex-1">
+                      <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest block mb-0.5">
+                        {config.badge}
+                      </span>
+                      <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug">
+                        {config.title}
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                        {config.subtitle}
                       </p>
-                      <div className="pt-1 flex items-center justify-between border-t border-amber-500/20 text-[11px] text-muted-foreground">
-                        <span>⚡ Once approved, click "Continue with Google" to choose your password & username.</span>
+                    </div>
+                  </div>
+
+                  {/* Authentication Form */}
+                  <form onSubmit={handleSubmit} className="space-y-4 text-left">
+                    {/* Identifier Input */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="identifier" className="text-xs font-semibold text-slate-200">
+                        {config.identifierLabel}
+                      </Label>
+                      <div className="relative">
+                        <IdentifierIcon className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5 pointer-events-none" />
+                        <Input
+                          id="identifier"
+                          type="text"
+                          placeholder={config.identifierPlaceholder}
+                          value={identifier}
+                          onChange={(e) => setIdentifier(e.target.value)}
+                          className="pl-10 h-11 bg-[#090A0D] border-[#1E222B] text-slate-100 placeholder:text-slate-600 rounded-xl text-xs focus-visible:ring-1 focus-visible:ring-red-500 focus-visible:border-red-500"
+                          required
+                          autoComplete="username"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Password Input */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="password" className="text-xs font-semibold text-slate-200">
+                          Password
+                        </Label>
+                        <Link
+                          to="/forgot-password"
+                          className="text-xs text-slate-400 hover:text-white transition-colors"
+                        >
+                          Forgot Password?
+                        </Link>
+                      </div>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5 pointer-events-none" />
+                        <Input
+                          id="password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="••••••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pl-10 pr-10 h-11 bg-[#090A0D] border-[#1E222B] text-slate-100 placeholder:text-slate-600 rounded-xl text-xs focus-visible:ring-1 focus-visible:ring-red-500 focus-visible:border-red-500"
+                          required
+                          autoComplete="current-password"
+                        />
                         <button
                           type="button"
-                          onClick={() => setPendingApprovalNotice(null)}
-                          className="text-foreground font-semibold hover:underline ml-2"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          className="absolute right-3.5 top-3 text-slate-400 hover:text-white transition-colors p-0.5"
                         >
-                          Dismiss
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
                     </div>
-                  )}
 
-                  {/* Student Mode Switcher: Sign In vs Register */}
+                    {/* Sign In CTA Button (Red Glow matching reference image) */}
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full h-11 rounded-xl bg-gradient-to-r from-[#FF1E27] to-[#E50914] hover:from-[#FF333B] hover:to-[#F4111D] text-white font-bold text-xs shadow-lg shadow-red-600/30 transition-all duration-150 flex items-center justify-center gap-2 mt-3 cursor-pointer"
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Authenticating...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <span>{config.ctaText}</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
+
+                  {/* Divider: OR */}
+                  <div className="relative my-5">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-[#1E222B]" />
+                    </div>
+                    <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-wider">
+                      <span className="bg-[#0E1015] px-3 text-slate-500 font-mono">
+                        OR
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Google OAuth Section (Available for Student Resident Portal) */}
                   {selectedRole === 'student' && (
-                    <div className="flex rounded-xl bg-secondary/60 p-1 border border-border/40 mb-3">
-                      <button
-                        type="button"
-                        onClick={() => { setIsRegistering(false); setLockoutInfo(null); }}
-                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                          !isRegistering ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        Sign In
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setIsRegistering(true); setLockoutInfo(null); }}
-                        className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                          isRegistering ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        New Resident (Sign Up)
-                      </button>
-                    </div>
-                  )}
-
-                  {/* REGISTRATION FORM FOR STUDENTS */}
-                  {selectedRole === 'student' && isRegistering ? (
-                    <div className="space-y-4">
-                      {/* 1-Click Fast Google Registration */}
-                      <div className="space-y-1.5">
-                        {renderGoogleButton('1-Click Sign Up with Google')}
-                        <p className="text-[11px] text-muted-foreground text-center">
-                          ⚡ Instant email verification. You configure username & password in Step 2.
-                        </p>
-                      </div>
-
-                      <div className="relative my-3">
-                        <div className="absolute inset-0 flex items-center">
-                          <span className="w-full border-t border-border/60" />
-                        </div>
-                        <div className="relative flex justify-center text-[10px] uppercase">
-                          <span className="bg-card px-2.5 text-muted-foreground font-semibold">
-                            Or Register Manually
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Manual Registration Form */}
-                      <form onSubmit={handleRegisterSubmit} className="space-y-3">
-                        <div className="space-y-1">
-                          <Label htmlFor="reg-name" className="text-xs font-semibold">Full Name</Label>
-                          <Input
-                            id="reg-name"
-                            type="text"
-                            placeholder="e.g. Priya Sharma"
-                            value={regName}
-                            onChange={(e) => setRegName(e.target.value)}
-                            required
-                            className="h-10"
+                    <div className="mb-4">
+                      {hasValidGoogleClientId ? (
+                        <div className="flex justify-center w-full [&>div]:!w-full [&>div>iframe]:!w-full">
+                          <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={() => toast.error('Google Sign In failed. Please check configuration.', { toastId: 'auth-login-error' })}
+                            theme="filled_black"
+                            size="large"
+                            shape="rectangular"
+                            text="continue_with"
+                            width="100%"
                           />
                         </div>
-
-                        <div className="space-y-1">
-                          <Label htmlFor="reg-email" className="text-xs font-semibold">Email Address</Label>
-                          <Input
-                            id="reg-email"
-                            type="email"
-                            placeholder="e.g. priya@gmail.com"
-                            value={regEmail}
-                            onChange={(e) => setRegEmail(e.target.value)}
-                            required
-                            className="h-10"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <div className="space-y-1">
-                            <Label htmlFor="reg-phone" className="text-xs font-semibold">Mobile Number</Label>
-                            <Input
-                              id="reg-phone"
-                              type="tel"
-                              placeholder="9876543210"
-                              value={regPhone}
-                              onChange={(e) => setRegPhone(e.target.value)}
-                              className="h-10"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs font-semibold">Hostel Branch</Label>
-                            <Select value={regHostel} onValueChange={setRegHostel}>
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Branch" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Q2">Q2 Girls - Gachibowli</SelectItem>
-                                <SelectItem value="Q2.0">Q2 Girls - Kondapur</SelectItem>
-                                <SelectItem value="Q2.1">Q2 Girls - Madhapur</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <Label htmlFor="reg-password" className="text-xs font-semibold">Create Password</Label>
-                          <div className="relative">
-                            <Input
-                              id="reg-password"
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder="At least 6 characters"
-                              value={regPassword}
-                              onChange={(e) => setRegPassword(e.target.value)}
-                              required
-                              className="h-10 pr-9"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-                            >
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                          </div>
-                        </div>
-
-                        <Button
-                          type="submit"
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleDemoGoogleLogin}
                           disabled={isLoading}
-                          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md h-11 rounded-xl mt-2"
+                          className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-[#1E222B] bg-[#090A0D] hover:bg-[#14161C] text-xs font-semibold text-slate-200 transition-all shadow-sm group"
                         >
-                          {isLoading ? 'Creating Account...' : 'Complete Resident Registration'}
-                        </Button>
-                      </form>
-                    </div>
-                  ) : (
-                    /* SIGN IN MODE */
-                    <div className="space-y-4">
-                      <form onSubmit={handleSubmit} className="space-y-4">
-
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="identifier">
-                            {selectedRole === 'super_admin'
-                              ? 'Administrator Email'
-                              : selectedRole === 'admin'
-                              ? 'Email or Staff Username'
-                              : 'Student User ID / Email'}
-                          </Label>
-                          <div className="relative">
-                            {selectedRole === 'super_admin' ? (
-                              <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                            ) : (
-                              <UserIcon className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
-                            )}
-                            <Input
-                              id="identifier"
-                              type="text"
-                              placeholder={
-                                selectedRole === 'super_admin'
-                                  ? 'superadmin@q2connect.com'
-                                  : selectedRole === 'admin'
-                                  ? 'admin@q2hostels.com'
-                                  : 'e.g. kajalsharma / shyam06'
-                              }
-                              value={identifier}
-                              onChange={(e) => setIdentifier(e.target.value)}
-                              className="pl-9 h-11"
-                              required
+                          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                            <path
+                              fill="#4285F4"
+                              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                             />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="password">Password</Label>
-                            <Link
-                              to="/forgot-password"
-                              className="text-[11px] font-semibold text-primary hover:underline"
-                            >
-                              Forgot Password?
-                            </Link>
-                          </div>
-                          <div className="relative">
-                            <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-3.5" />
-                            <Input
-                              id="password"
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder="••••••••••••"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              className="pl-9 pr-9 h-11"
-                              required
+                            <path
+                              fill="#34A853"
+                              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
                             />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground"
-                            >
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                          </div>
-                        </div>
-
-                        <Button
-                          type="submit"
-                          disabled={isLoading}
-                          className={`w-full font-bold shadow-md h-11 rounded-xl ${
-                            selectedRole === 'super_admin'
-                              ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                              : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                          }`}
-                        >
-                          {isLoading ? 'Signing In...' : 'Sign In to Workspace'}
-                        </Button>
-                      </form>
-
-                      {/* Google Authentication Section (for students) */}
-                      {selectedRole === 'student' && (
-                        <div className="pt-1">
-                          <div className="relative my-4">
-                            <div className="absolute inset-0 flex items-center">
-                              <span className="w-full border-t border-border/60" />
-                            </div>
-                            <div className="relative flex justify-center text-[10px] uppercase">
-                              <span className="bg-card px-2.5 text-muted-foreground font-semibold">
-                                Or Continue With Google
-                              </span>
-                            </div>
-                          </div>
-
-                          {renderGoogleButton('Continue with Google')}
-                        </div>
+                            <path
+                              fill="#FBBC05"
+                              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                            />
+                            <path
+                              fill="#EA4335"
+                              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                            />
+                          </svg>
+                          <span>Continue with Google</span>
+                        </button>
                       )}
                     </div>
                   )}
-                </CardContent>
 
-                <CardFooter className="bg-secondary/30 border-t border-border/50 p-4 text-center justify-center flex-col gap-1 text-xs text-muted-foreground">
-                  <span>Need assistance with your account?</span>
-                  <Link to="/contact" className="font-semibold text-foreground hover:text-primary">
-                    Contact Q2 Technical Support
-                  </Link>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+                  {/* Security Badge Footer (Matching Reference Image) */}
+                  <div className="flex flex-col items-center justify-center gap-1 text-center">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 tracking-wider">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>{config.securityFooter}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      AES-256 Bit Encrypted • Role Isolation Enforced
+                    </span>
+                  </div>
+
+                  {/* Student Account Notice */}
+                  {selectedRole === 'student' && (
+                    <div className="mt-3 p-2.5 rounded-xl bg-[#090A0D] border border-[#1A1D24] text-left flex items-start gap-2 text-[11px] text-slate-400">
+                      <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                      <span>
+                        New Resident? Accounts are provisioned by your hostel administrator upon room allocation. Contact your property manager for credentials.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Assistance Footer Link (Matching Reference Image) */}
+            <div className="mt-6 text-center text-xs text-slate-400 space-x-1">
+              <span>Need technical assistance?</span>
+              <Link to="/contact" className="font-semibold text-slate-200 hover:text-white underline underline-offset-4">
+                Contact Q2 Technical Support
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </div>
 
       {/* Google Step 1: Initial Details Modal for New Residents */}
       {showInitialModal && initialGoogleProfile && (
@@ -808,15 +787,13 @@ export default function Login() {
           isOpen={showGoogleStep2}
           setupToken={googleSetupToken}
           googleProfile={googleProfileData}
-          onSuccess={(user) => {
+          onSuccess={(u) => {
             setShowGoogleStep2(false);
             navigate('/student/dashboard', { replace: true });
           }}
           onCancel={() => setShowGoogleStep2(false)}
         />
       )}
-
-      <SaaSFooter />
     </div>
   );
 }

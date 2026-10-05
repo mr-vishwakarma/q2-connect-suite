@@ -58,8 +58,9 @@ function SidebarNavigationInner({ isCollapsed = false, onNavigate }: SidebarNavi
   const fetchAlertCount = useCallback(async () => {
     try {
       const response = await studentService.getAlertsCount({ hostel: selectedHostel });
-      if (response.success && response.data) {
-        setAlertCount(response.data.count || 0);
+      if (response.success) {
+        const count = response.data?.count ?? (response as any).count ?? 0;
+        setAlertCount(count);
       }
     } catch (error) {
       console.error('Error fetching alert count in sidebar:', error);

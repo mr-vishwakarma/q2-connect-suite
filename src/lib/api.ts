@@ -104,10 +104,11 @@ api.interceptors.response.use(
       }
     }
 
-    // Deduplicate and notify for systemic network or server-side failure modes
+    // Deduplicate and notify for systemic network or server-side failure modes (skip auth routes as login components handle their own toasts)
     const status = error.response?.status;
     const isSystemic = status === 429 || (status && status >= 500) || error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED';
-    if (isSystemic) {
+    const isAuthRequest = originalRequest?.url?.includes('/auth/');
+    if (isSystemic && !isAuthRequest) {
       notifyApiError(error);
     }
 

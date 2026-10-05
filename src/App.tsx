@@ -203,6 +203,10 @@ const App = () => (
               <Route path="/contact" element={<PublicOnlyRoute><Contact /></PublicOnlyRoute>} />
               <Route path="/our-team" element={<PublicOnlyRoute><OurTeam /></PublicOnlyRoute>} />
               <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+              <Route path="/admin/login" element={<Navigate to="/login?role=admin" replace />} />
+              <Route path="/student/login" element={<Navigate to="/login?role=student" replace />} />
+              <Route path="/super-admin/login" element={<Navigate to="/login?role=super_admin" replace />} />
+              <Route path="/superadmin/login" element={<Navigate to="/login?role=super_admin" replace />} />
               <Route path="/register-admin" element={<PublicOnlyRoute><RegisterAdmin /></PublicOnlyRoute>} />
               <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
               <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />

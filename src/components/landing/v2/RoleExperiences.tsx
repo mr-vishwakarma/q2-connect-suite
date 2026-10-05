@@ -1,18 +1,20 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Building2, Smartphone, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface RoleExperiencesProps {
-  onOpenAuth: () => void;
+  onOpenAuth?: () => void;
 }
 
 export function RoleExperiences({ onOpenAuth }: RoleExperiencesProps) {
-  const [activeRole, setActiveRole] = useState<'superadmin' | 'admin' | 'student'>('admin');
+  const navigate = useNavigate();
+  const [activeRole, setActiveRole] = useState<'super_admin' | 'admin' | 'student'>('admin');
 
   const roles = [
     {
-      id: 'superadmin' as const,
+      id: 'super_admin' as const,
       label: 'Super Admin',
       icon: ShieldCheck,
       headline: 'Enterprise Control Across All Multi-City Organizations',
@@ -157,7 +159,7 @@ export function RoleExperiences({ onOpenAuth }: RoleExperiencesProps) {
               </div>
 
               <Button
-                onClick={onOpenAuth}
+                onClick={() => navigate(`/login?role=${current.id}`)}
                 className="mt-4 bg-slate-900 hover:bg-purple-600 text-white font-semibold text-xs px-6 h-11 rounded-xl shadow-sm transition-all"
               >
                 <span>{current.buttonText}</span>

@@ -37,6 +37,29 @@ interface AlertStudent {
 
 import { studentService } from '@/services/api';
 
+function formatValidDate(student: { valid_date?: string | null; start_date?: string | null }, dateFormat: string = 'dd-MM-yy'): string {
+  if (student.valid_date) {
+    try {
+      const d = typeof student.valid_date === 'string' ? parseISO(student.valid_date) : new Date(student.valid_date);
+      if (!isNaN(d.getTime())) return format(d, dateFormat);
+    } catch {
+      // fallback
+    }
+  }
+  if (student.start_date) {
+    try {
+      const d = typeof student.start_date === 'string' ? parseISO(student.start_date) : new Date(student.start_date);
+      if (!isNaN(d.getTime())) {
+        d.setDate(d.getDate() + 30);
+        return `${format(d, dateFormat)} (Auto)`;
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return 'Not Set';
+}
+
 export default function AdminAlerts() {
   const { user, isAdmin } = useAuth();
   const { selectedHostel } = useHostel();
@@ -66,14 +89,14 @@ export default function AdminAlerts() {
       }
       
       const mappedStudents = students.map((s: any) => ({
-        id: s._id,
-        user_id: s.userId,
-        name: s.name,
-        phone: s.phone,
-        room_no: s.roomNo,
-        fees: s.fees,
-        valid_date: s.validDate,
-        start_date: s.startDate
+        id: s._id || s.id,
+        user_id: s.userId?._id || s.userId || '',
+        name: s.name || 'Resident',
+        phone: s.phone || null,
+        room_no: s.roomNo || null,
+        fees: typeof s.fees === 'number' ? s.fees : null,
+        valid_date: s.validDate || null,
+        start_date: s.startDate || null,
       }));
 
       const today = new Date();
@@ -87,36 +110,74 @@ export default function AdminAlerts() {
         let feeStatus: 'paid' | 'unpaid' = 'paid';
 
         if (student.valid_date) {
-          const validDate = parseISO(student.valid_date);
-          daysLeft = differenceInDays(validDate, today);
+          try {
+            const validDate = typeof student.valid_date === 'string' ? parseISO(student.valid_date) : new Date(student.valid_date);
+            if (!isNaN(validDate.getTime())) {
+              daysLeft = differenceInDays(validDate, today);
 
-          if (daysLeft < 0) {
-            status = 'expired';
-            daysOverdue = Math.abs(daysLeft);
-            feeStatus = 'unpaid';
-          } else if (daysLeft <= 2) {
-            status = 'critical';
-          } else if (daysLeft <= 5) {
-            status = 'warning';
+              if (daysLeft < 0) {
+                status = 'expired';
+                daysOverdue = Math.abs(daysLeft);
+                feeStatus = 'unpaid';
+              } else if (daysLeft <= 2) {
+                status = 'critical';
+              } else if (daysLeft <= 5) {
+                status = 'warning';
+              }
+            }
+          } catch (err) {
+            console.error('Error parsing valid_date:', student.valid_date, err);
           }
         }
 
-        if (status === 'expired' || status === 'critical' || status === 'warning') {
-          alerts.push({
-            id: student.id,
-            user_id: student.user_id,
-            name: student.name,
-            phone: student.phone,
-            room_no: student.room_no,
-            fees: student.fees,
-            valid_date: student.valid_date,
-            start_date: student.start_date,
-            daysLeft,
-            daysOverdue,
-            status: status || 'expired',
-            feeStatus,
-          });
+        // If valid_date is missing or unset, compute from start_date + 30 days
+        if (status === null) {
+          if (student.start_date) {
+            try {
+              const startDate = typeof student.start_date === 'string' ? parseISO(student.start_date) : new Date(student.start_date);
+              if (!isNaN(startDate.getTime())) {
+                const autoValid = new Date(startDate);
+                autoValid.setDate(autoValid.getDate() + 30);
+                daysLeft = differenceInDays(autoValid, today);
+
+                if (daysLeft < 0) {
+                  status = 'expired';
+                  daysOverdue = Math.abs(daysLeft);
+                  feeStatus = 'unpaid';
+                } else if (daysLeft <= 2) {
+                  status = 'critical';
+                } else if (daysLeft <= 5) {
+                  status = 'warning';
+                }
+              }
+            } catch (err) {
+              console.error('Error parsing start_date:', student.start_date, err);
+            }
+          }
+
+          // If still null, resident validity is unconfigured/expired
+          if (status === null) {
+            status = 'expired';
+            daysOverdue = 0;
+            feeStatus = 'unpaid';
+            daysLeft = -1;
+          }
         }
+
+        alerts.push({
+          id: student.id,
+          user_id: student.user_id,
+          name: student.name,
+          phone: student.phone,
+          room_no: student.room_no,
+          fees: student.fees,
+          valid_date: student.valid_date,
+          start_date: student.start_date,
+          daysLeft,
+          daysOverdue,
+          status: status || 'expired',
+          feeStatus,
+        });
       });
 
       alerts.sort((a, b) => {
@@ -157,7 +218,7 @@ export default function AdminAlerts() {
     const cleanPhone = student.phone.replace(/[^0-9]/g, '');
     const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
     const msg = encodeURIComponent(
-      `Hello ${student.name}, this is a gentle reminder from Q2 Girls Hostel management. Your monthly hostel fee of ₹${student.fees || ''} for Room ${student.room_no || ''} is currently ${student.status === 'expired' ? `overdue by ${student.daysOverdue} days` : `due soon on ${student.valid_date ? format(parseISO(student.valid_date), 'dd MMM yyyy') : ''}`}. Please clear your dues or contact the hostel office. Thank you!`
+      `Hello ${student.name}, this is a gentle reminder from Q2 Girls Hostel management. Your monthly hostel fee of ₹${student.fees || ''} for Room ${student.room_no || ''} is currently ${student.status === 'expired' ? `overdue by ${student.daysOverdue} days` : `due soon on ${formatValidDate(student, 'dd MMM yyyy')}`}. Please clear your dues or contact the hostel office. Thank you!`
     );
     window.open(`https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${msg}`, '_blank');
   };
@@ -192,7 +253,7 @@ export default function AdminAlerts() {
         student.phone || 'N/A',
         student.room_no || 'N/A',
         student.fees ? `₹${student.fees}` : 'N/A',
-        student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A',
+        formatValidDate(student, 'dd-MM-yy'),
         student.status === 'expired' ? 'Expired' : `${student.daysLeft} days left`,
         student.daysOverdue > 0 ? `${student.daysOverdue} days` : '-',
         student.feeStatus === 'paid' ? 'Paid' : 'Unpaid',
@@ -337,7 +398,7 @@ export default function AdminAlerts() {
                     </div>
                     <div>
                       <p className="text-muted-foreground text-xs">Valid Till</p>
-                      <p className="text-foreground text-xs">{student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}</p>
+                      <p className="text-foreground text-xs">{formatValidDate(student, 'dd-MM-yy')}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground text-xs">Days Overdue</p>
@@ -406,7 +467,7 @@ export default function AdminAlerts() {
                         {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : 'N/A'}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {student.valid_date ? format(parseISO(student.valid_date), 'dd-MM-yy') : 'N/A'}
+                        {formatValidDate(student, 'dd-MM-yy')}
                       </TableCell>
                       <TableCell>{getStatusBadge(student)}</TableCell>
                       <TableCell className="text-muted-foreground hidden lg:table-cell">

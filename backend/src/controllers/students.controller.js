@@ -496,10 +496,29 @@ const updateStudent = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
+    const {
+      name,
+      username,
+      phone,
+      parentPhone,
+      email,
+      roomNo,
+      hostel,
+      fees,
+      startDate,
+      validDate,
+      address,
+      dob,
+      profilePhoto,
+    } = req.body;
+
     // Handle room change: update occupancy safely
     const oldRoom = student.roomNo;
     const oldHostel = student.hostel;
-    if (roomNo && hostel && (roomNo !== oldRoom || hostel !== oldHostel)) {
+    const newRoom = roomNo !== undefined ? (roomNo ? String(roomNo).trim() : null) : oldRoom;
+    const newHostel = hostel !== undefined ? (hostel ? String(hostel).trim() : oldHostel) : oldHostel;
+    const isRoomChanging = (newRoom !== oldRoom) || (newHostel !== oldHostel);
+    if (isRoomChanging) {
       // Safe atomic decrement on old room (only if occupiedCount > 0)
       if (oldRoom && oldHostel) {
         await Room.findOneAndUpdate(
@@ -516,8 +535,9 @@ const updateStudent = async (req, res) => {
         );
       }
       // Atomic increment on new room with live capacity guard
-      const newRoomQuery = { roomNumber: roomNo, hostel, organizationId: student.organizationId };
-      const updatedNewRoom = await Room.findOneAndUpdate(
+      if (newRoom && newHostel) {
+        const newRoomQuery = { roomNumber: newRoom, hostel: newHostel, organizationId: student.organizationId };
+        const updatedNewRoom = await Room.findOneAndUpdate(
         {
           ...newRoomQuery,
           $expr: {
@@ -548,26 +568,62 @@ const updateStudent = async (req, res) => {
         if (!existingNewRoom) {
           return res.status(400).json({
             success: false,
-            message: `Room ${roomNo} in ${hostel} does not exist`,
+            message: `Room ${newRoom} in ${newHostel} does not exist`,
           });
         }
         return res.status(400).json({
           success: false,
-          message: `Room ${roomNo} in ${hostel} is already fully occupied (capacity: ${existingNewRoom.capacity})`,
+          message: `Room ${newRoom} in ${newHostel} is already fully occupied (capacity: ${existingNewRoom.capacity})`,
         });
+      }
+    }
+  }
+
+    const updateFields = {};
+    if (name !== undefined) updateFields.name = String(name).trim();
+    if (phone !== undefined) updateFields.phone = phone ? String(phone).trim() : null;
+    if (parentPhone !== undefined) updateFields.parentPhone = parentPhone ? String(parentPhone).trim() : null;
+    if (email !== undefined) updateFields.email = email ? String(email).trim().toLowerCase() : null;
+    if (roomNo !== undefined) updateFields.roomNo = roomNo ? String(roomNo).trim() : null;
+    if (hostel !== undefined) updateFields.hostel = hostel ? String(hostel).trim() : null;
+    if (fees !== undefined) updateFields.fees = (fees !== null && fees !== '') ? Number(fees) : 0;
+    if (startDate !== undefined) updateFields.startDate = startDate ? new Date(startDate) : null;
+    if (validDate !== undefined) updateFields.validDate = validDate ? new Date(validDate) : null;
+    if (address !== undefined) updateFields.address = address ? String(address).trim() : null;
+    if (dob !== undefined) updateFields.dob = dob ? new Date(dob) : null;
+    if (profilePhoto !== undefined) updateFields.profilePhoto = profilePhoto;
+
+    // Check username uniqueness if changing
+    if (username !== undefined && username.trim().toLowerCase() !== student.username) {
+      const cleanUsername = username.trim().toLowerCase();
+      const existingUser = await User.findOne({ username: cleanUsername, _id: { $ne: student.userId } }).session(session);
+      const existingStudent = await Student.findOne({ username: cleanUsername, _id: { $ne: student._id } }).session(session);
+      if (existingUser || existingStudent) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ success: false, message: 'Username is already taken' });
+      }
+      updateFields.username = cleanUsername;
+      if (student.userId) {
+        await User.findByIdAndUpdate(student.userId, { username: cleanUsername }, { session });
+      }
+    }
+
+    // Also update name on User record
+    if (student.userId) {
+      const userUpdates = {};
+      if (name !== undefined) userUpdates.name = String(name).trim();
+      if (email !== undefined && email) userUpdates.email = String(email).trim().toLowerCase();
+      if (Object.keys(userUpdates).length > 0) {
+        await User.findByIdAndUpdate(student.userId, userUpdates, { session });
       }
     }
 
     const updated = await Student.findByIdAndUpdate(
       student._id,
-      { name, phone, parentPhone, roomNo, hostel, fees, startDate, validDate },
+      { $set: updateFields },
       { new: true, runValidators: true, session }
     );
-
-    // Also update name on User record
-    if (name && student.userId) {
-      await User.findByIdAndUpdate(student.userId, { name }, { session });
-    }
 
     await session.commitTransaction();
     session.endSession();
@@ -700,8 +756,11 @@ const studentService = require('../services/student.service');
 const getAlertsCount = async (req, res) => {
   try {
     const { hostel } = req.query;
-    const count = await studentService.getAlertsCount(hostel, req.tenant?.organizationId);
-    return res.status(200).json({ success: true, count });
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+    const targetOrgId = isSuperAdmin ? (orgId || null) : orgId;
+    const count = await studentService.getAlertsCount(hostel, targetOrgId);
+    return res.status(200).json({ success: true, count, data: { count } });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -712,7 +771,10 @@ const getAlertsCount = async (req, res) => {
 const getAlertStudents = async (req, res) => {
   try {
     const { hostel } = req.query;
-    const students = await studentService.getAlertStudents(hostel, req.tenant?.organizationId);
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+    const targetOrgId = isSuperAdmin ? (orgId || null) : orgId;
+    const students = await studentService.getAlertStudents(hostel, targetOrgId);
     return res.status(200).json({ success: true, data: students });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

@@ -46,6 +46,7 @@ coverage/
 
 # Misc
 .vercel
+*.tsbuildinfo
 .netlify
 
 # Seed scripts (contain credentials)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LightNavbar } from '@/components/landing/v2/LightNavbar';
 import { LightHero } from '@/components/landing/v2/LightHero';
 import { ProductStory } from '@/components/landing/v2/ProductStory';
@@ -16,22 +17,25 @@ import { PricingSection } from '@/components/landing/v2/PricingSection';
 import { FAQSection } from '@/components/landing/v2/FAQSection';
 import { FinalCTA } from '@/components/landing/v2/FinalCTA';
 import { LightFooter } from '@/components/landing/v2/LightFooter';
-import { AuthRoleModal } from '@/components/landing/v2/AuthRoleModal';
 import { LeadCaptureModal } from '@/components/landing/v2/LeadCaptureModal';
 
 export default function Index() {
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const navigate = useNavigate();
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
 
   useEffect(() => {
     document.title = 'Q2 Group of Hostels — Smart Hostel Management Platform';
   }, []);
 
+  const handleLoginClick = () => {
+    navigate('/login');
+  };
+
   return (
     <div className="min-h-screen bg-[#FAFBFD] text-slate-900 font-sans selection:bg-purple-600 selection:text-white relative overflow-x-hidden">
       {/* Sticky Navigation */}
       <LightNavbar
-        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenAuth={handleLoginClick}
         onOpenLead={() => setIsLeadModalOpen(true)}
       />
 
@@ -40,7 +44,7 @@ export default function Index() {
         {/* Section 1: Editorial Hero with Signature Live Student Matrix */}
         <LightHero
           onOpenLead={() => setIsLeadModalOpen(true)}
-          onOpenAuth={() => setIsAuthModalOpen(true)}
+          onOpenAuth={handleLoginClick}
         />
 
         {/* Section 2: Product Story (Students → Rooms → Payments → Ops → Analytics) */}
@@ -56,7 +60,7 @@ export default function Index() {
         <SmartOperations />
 
         {/* Section 6: Persona Experiences (Super Admin, Hostel Admin, Student Resident) */}
-        <RoleExperiences onOpenAuth={() => setIsAuthModalOpen(true)} />
+        <RoleExperiences onOpenAuth={handleLoginClick} />
 
         {/* Section 7: AI Intelligence ("Ask your hostel anything" Natural Language Console) */}
         <AIAssistantSection />
@@ -88,14 +92,8 @@ export default function Index() {
 
       {/* Section 16: Enterprise Light SaaS Footer */}
       <LightFooter
-        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenAuth={handleLoginClick}
         onOpenLead={() => setIsLeadModalOpen(true)}
-      />
-
-      {/* Global Role Gateway Authentication Modal */}
-      <AuthRoleModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
       />
 
       {/* Global Lead Capture / Demo Booking Modal */}

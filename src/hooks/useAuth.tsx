@@ -284,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (typeof portalOrIsAdmin === 'boolean') {
         endpoint = portalOrIsAdmin ? '/auth/admin/login' : '/auth/login';
         requestedPortal = portalOrIsAdmin ? 'ADMIN' : 'STUDENT';
-      } else if (portalOrIsAdmin === 'super_admin') {
+      } else if (portalOrIsAdmin === 'super_admin' || (portalOrIsAdmin as string) === 'superadmin') {
         endpoint = '/auth/super-admin/login';
         requestedPortal = 'SUPER_ADMIN';
       } else if (portalOrIsAdmin === 'admin') {

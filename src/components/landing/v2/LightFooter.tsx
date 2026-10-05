@@ -1,11 +1,13 @@
+import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Heart, ArrowUp } from 'lucide-react';
 
 interface LightFooterProps {
-  onOpenAuth: () => void;
+  onOpenAuth?: () => void;
   onOpenLead: () => void;
 }
 
 export function LightFooter({ onOpenAuth, onOpenLead }: LightFooterProps) {
+  const navigate = useNavigate();
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -70,9 +72,9 @@ export function LightFooter({ onOpenAuth, onOpenLead }: LightFooterProps) {
               Portals
             </span>
             <ul className="space-y-2">
-              <li><button onClick={onOpenAuth} className="hover:text-white transition-colors text-left">Super Admin Console</button></li>
-              <li><button onClick={onOpenAuth} className="hover:text-white transition-colors text-left">Hostel Admin Portal</button></li>
-              <li><button onClick={onOpenAuth} className="hover:text-white transition-colors text-left">Resident Mobile App</button></li>
+              <li><button onClick={() => navigate('/login?role=super_admin')} className="hover:text-white transition-colors text-left">Super Admin Console</button></li>
+              <li><button onClick={() => navigate('/login?role=admin')} className="hover:text-white transition-colors text-left">Hostel Admin Portal</button></li>
+              <li><button onClick={() => navigate('/login?role=student')} className="hover:text-white transition-colors text-left">Resident Mobile App</button></li>
               <li><a href="#pricing" className="hover:text-white transition-colors">SaaS Subscriptions</a></li>
               <li><button onClick={onOpenLead} className="hover:text-white transition-colors text-left">Book Assisted Demo</button></li>
             </ul>
