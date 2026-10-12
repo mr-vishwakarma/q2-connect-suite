@@ -236,7 +236,7 @@ export default function FeeManagement() {
 
       // Compute deposit due: required deposit minus collected deposits
       const studentCollectedDeposit = deposits
-        .filter((d) => d.student_id === s.id && d.status === 'collected')
+        .filter((d) => d.student_id === s.id && (d.status === 'collected' || d.status === 'active' || d.status === 'held'))
         .reduce((sum, d) => sum + (d.amount || 0), 0);
       const requiredDeposit = (s as any).security_deposit || 0;
       const depositDue = Math.max(0, requiredDeposit - studentCollectedDeposit);

@@ -38,7 +38,7 @@ export interface SecurityDeposit {
   id: string;
   student_id: string;
   amount: number;
-  status: 'active' | 'refunded' | 'adjusted';
+  status: 'pending' | 'collected' | 'held' | 'active' | 'refunded' | 'adjusted' | 'forfeited';
   collected_date: string | null;
   refund_date: string | null;
 }
