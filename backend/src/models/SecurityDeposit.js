@@ -8,7 +8,7 @@ const securityDepositSchema = new mongoose.Schema(
     hostel: { type: String, trim: true, default: 'Q2', required: true },
     amount: { type: Number, default: 0 },
     paymentMode: { type: String, enum: ['cash', 'upi', 'bank'] },
-    status: { type: String, enum: ['held', 'refunded', 'forfeited'], default: 'held' },
+    status: { type: String, enum: ['pending', 'collected', 'held', 'refunded', 'forfeited'], default: 'pending' },
     collectedDate: { type: Date },
     refundDate: { type: Date },
     notes: { type: String },

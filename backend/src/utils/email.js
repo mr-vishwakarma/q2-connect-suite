@@ -241,11 +241,83 @@ const sendHostelOnboardingWelcomeEmail = async ({
   }
 };
 
+/**
+ * Send branded welcome & account activation email to student
+ * @param {object} options - { to, name, username, studentCode, hostel, activationLink, loginLink }
+ */
+const sendStudentWelcomeEmail = async ({ to, name, username, studentCode, hostel, activationLink, loginLink }) => {
+  const subject = `Welcome to ${hostel || 'Q2'} Hostel — Activate Your Resident Account`;
+  const text = `Welcome to Q2 Connect Suite!\n\nDear ${name},\n\nYour resident admission into ${hostel || 'Q2'} Hostel has been confirmed.\n\nYour Account Details:\n- Resident Name: ${name}\n- Hostel: ${hostel || 'Q2'}\n- User ID: ${username}\n- Student ID: ${studentCode || username}\n\nPlease click the link below to activate your account and securely set your password (valid for 48 hours):\n${activationLink}\n\nOnce activated, you can log in to the Student Portal at:\n${loginLink || 'http://localhost:8080/login?role=student'}\n\nIf you have any questions or need assistance, contact our administration at support@q2connect.com.\n\nBest regards,\n${hostel || 'Q2'} Administration — Q2 Connect Suite`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; background-color: #0f172a; color: #f8fafc; border-radius: 16px; border: 1px solid #1e293b;">
+      <div style="text-align: center; padding-bottom: 24px; border-bottom: 1px solid #334155;">
+        <h1 style="color: #ef4444; font-size: 28px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Q2 CONNECT SUITE</h1>
+        <p style="color: #94a3b8; font-size: 14px; margin: 6px 0 0 0; text-transform: uppercase; letter-spacing: 1px;">Smart Hostel & Resident Management</p>
+      </div>
+
+      <div style="padding: 24px 0;">
+        <h2 style="color: #ffffff; font-size: 20px; margin: 0 0 12px 0;">Welcome, ${name}! 👋</h2>
+        <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
+          Your resident admission into <strong style="color: #ffffff;">${hostel || 'Q2'} Hostel</strong> has been officially confirmed by the administration. Your resident profile and room allocation are now set up.
+        </p>
+
+        <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
+          <p style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px 0; font-weight: 600;">Your Resident Details</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="color: #94a3b8; padding: 6px 0;">Student ID:</td>
+              <td style="color: #ffffff; font-weight: 600; font-family: monospace; text-align: right;">${studentCode || username}</td>
+            </tr>
+            <tr>
+              <td style="color: #94a3b8; padding: 6px 0;">Login User ID:</td>
+              <td style="color: #ffffff; font-weight: 600; font-family: monospace; text-align: right;">${username}</td>
+            </tr>
+            <tr>
+              <td style="color: #94a3b8; padding: 6px 0;">Branch / Hostel:</td>
+              <td style="color: #ffffff; font-weight: 600; text-align: right;">${hostel || 'Q2'}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(99,102,241,0.1)); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
+          <p style="color: #ffffff; font-weight: 600; font-size: 15px; margin: 0 0 8px 0;">Step 1: Set Your Secure Password</p>
+          <p style="color: #94a3b8; font-size: 13px; margin: 0 0 16px 0;">For your security, we do not send passwords via email. Click below to choose your private permanent password.</p>
+          <a href="${activationLink}" style="display: inline-block; background-color: #ef4444; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; box-shadow: 0 4px 12px rgba(239,68,68,0.3);">
+            Activate Account & Set Password
+          </a>
+          <p style="color: #64748b; font-size: 11px; margin: 12px 0 0 0;">This single-use activation link expires in 48 hours.</p>
+        </div>
+
+        <p style="color: #94a3b8; font-size: 13px; line-height: 1.5; margin: 0 0 12px 0;">
+          If the button above does not work, copy and paste this link into your browser:<br/>
+          <a href="${activationLink}" style="color: #38bdf8; word-break: break-all;">${activationLink}</a>
+        </p>
+
+        <div style="border-top: 1px solid #334155; padding-top: 18px; margin-top: 24px;">
+          <p style="color: #94a3b8; font-size: 13px; margin: 0 0 6px 0;">
+            <strong>Step 2: Sign In</strong><br/>
+            After setting your password, sign in at the <a href="${loginLink || 'http://localhost:8080/login?role=student'}" style="color: #ef4444; text-decoration: underline;">Student Portal</a>.
+          </p>
+          <p style="color: #64748b; font-size: 12px; margin: 12px 0 0 0;">
+            Need help? Contact hostel administration or email <a href="mailto:support@q2connect.com" style="color: #94a3b8;">support@q2connect.com</a>.
+          </p>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #1e293b; padding-top: 16px; text-align: center; color: #64748b; font-size: 12px;">
+        <p style="margin: 0;">© ${new Date().getFullYear()} Q2 Connect Suite. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+  return sendEmail({ to, subject, html, text });
+};
+
 module.exports = { 
   getTransporter,
   verifySmtpConnection,
   sendEmail, 
   sendStudentCredentials, 
+  sendStudentWelcomeEmail,
   sendMessRequestUpdate, 
   sendPasswordResetEmail,
   sendAdminNewStudentRegisteredNotification,

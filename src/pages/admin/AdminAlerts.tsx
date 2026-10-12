@@ -420,7 +420,10 @@ export default function AdminAlerts() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => navigate('/admin/fees')}
+                      onClick={() => {
+                        const currentMonth = format(new Date(), 'MMMM yyyy');
+                        navigate(`/admin/fees?studentId=${student.id}&month=${encodeURIComponent(currentMonth)}&action=collect`);
+                      }}
                       className="w-full text-xs"
                     >
                       Collect Fee
@@ -490,7 +493,10 @@ export default function AdminAlerts() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => navigate('/admin/fees')}
+                            onClick={() => {
+                              const currentMonth = format(new Date(), 'MMMM yyyy');
+                              navigate(`/admin/fees?studentId=${student.id}&month=${encodeURIComponent(currentMonth)}&action=collect`);
+                            }}
                             className="text-xs px-2.5 h-8"
                           >
                             Collect

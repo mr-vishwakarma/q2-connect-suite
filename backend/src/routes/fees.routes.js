@@ -4,12 +4,22 @@ const { protect } = require('../middleware/auth.middleware');
 const { resolveTenantContext } = require('../middleware/tenant.middleware');
 const { adminOnly } = require('../middleware/admin.middleware');
 
-const { getFees, createFee, updateFee, generateMonthlyFees, getFeePayments, getFeeManagementDashboard, collectPayment } = require('../controllers/fees.controller');
+const {
+  getFees,
+  createFee,
+  updateFee,
+  generateMonthlyFees,
+  getFeePayments,
+  getFeeManagementDashboard,
+  collectPayment,
+  calculatePayableFeeEndpoint,
+} = require('../controllers/fees.controller');
 
 router.use(protect, resolveTenantContext);
 
-// Dashboard
+// Dashboard & Calculations
 router.get('/dashboard', adminOnly, getFeeManagementDashboard);
+router.get('/calculate', adminOnly, calculatePayableFeeEndpoint);
 
 // Collect payment (atomic operation)
 router.post('/collect', adminOnly, collectPayment);

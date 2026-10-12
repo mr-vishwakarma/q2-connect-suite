@@ -222,6 +222,11 @@ const createStudent = async (req, res) => {
 
     const resolvedBranchCode = hostelDoc ? hostelDoc.code : (hostel || 'Q2');
 
+    // Generate secure single-use activation token for account setup
+    const rawActivationToken = crypto.randomBytes(32).toString('hex');
+    const hashedActivationToken = crypto.createHash('sha256').update(rawActivationToken).digest('hex');
+    const activationExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+
     // Check for existing user/username
     let user;
     const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username: finalUsername }] }).session(session);
@@ -234,6 +239,8 @@ const createStudent = async (req, res) => {
         existingUser.registrationStatus = 'active';
         existingUser.status = 'ACTIVE';
         existingUser.mustChangePassword = true;
+        existingUser.activationToken = hashedActivationToken;
+        existingUser.activationExpires = activationExpires;
         existingUser.temporaryPasswordIssuedAt = new Date();
         existingUser.hostels = [resolvedBranchCode];
         existingUser.activeHostelId = hostelDoc ? hostelDoc._id : null;
@@ -256,6 +263,8 @@ const createStudent = async (req, res) => {
         registrationStatus: 'active',
         status: 'ACTIVE',
         mustChangePassword: true,
+        activationToken: hashedActivationToken,
+        activationExpires: activationExpires,
         temporaryPasswordIssuedAt: new Date(),
         hostels: [resolvedBranchCode],
         activeHostelId: hostelDoc ? hostelDoc._id : null,
@@ -273,6 +282,8 @@ const createStudent = async (req, res) => {
       finalStudentCode = `${cleanHostel}S${year}${String(count + 1).padStart(3, '0')}`;
     }
 
+    const parsedSecurityDeposit = Number(req.body.securityDeposit) >= 0 ? Number(req.body.securityDeposit) : 0;
+
     // Create Student profile
     const students = await Student.create([{
       userId: user._id,
@@ -286,11 +297,26 @@ const createStudent = async (req, res) => {
       roomNo,
       hostel: resolvedBranchCode,
       fees: fees || 0,
+      securityDeposit: parsedSecurityDeposit,
       startDate,
       validDate,
       studentCode: finalStudentCode,
     }], { session, ordered: true });
     const student = students[0];
+
+    // Record pending security deposit if required
+    if (parsedSecurityDeposit > 0) {
+      const SecurityDeposit = require('../models/SecurityDeposit');
+      await SecurityDeposit.create([{
+        organizationId: orgId || null,
+        hostelId: hostelDoc?._id || null,
+        studentId: student._id,
+        hostel: resolvedBranchCode,
+        amount: parsedSecurityDeposit,
+        status: 'pending',
+        notes: 'Required security deposit registered at student enrollment',
+      }], { session, ordered: true });
+    }
 
     // Link student to user
     user.studentId = student._id;
@@ -440,6 +466,20 @@ const createStudent = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
+    // Send single-use time-limited activation welcome email (idempotent BullMQ job)
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
+
+    addEmailJob('STUDENT_WELCOME_ACTIVATION', {
+      to: email.toLowerCase(),
+      studentName: name,
+      studentId: finalStudentCode,
+      username: finalUsername,
+      hostelName: hostelDoc ? hostelDoc.name : resolvedBranchCode,
+      activationLink,
+      supportContact: hostelDoc?.contactPhone || 'support@q2connect.com',
+    }, { jobId: `welcome-activation-${student._id}` }).catch(err => console.warn('[students.controller] Welcome activation email queue warning:', err.message));
+
     // Asynchronously notify admin via queue
     const adminEmail = req.user?.email || 'abhi1006@q2connect.com';
     addEmailJob('ADMIN_NEW_STUDENT_REGISTERED', {
@@ -449,8 +489,8 @@ const createStudent = async (req, res) => {
       studentRoom: roomNo,
       studentHostel: hostel,
       studentPhone: phone,
-      username: username,
-    }).catch(err => console.warn('[students.controller] Admin notification email queue warning:', err.message));
+      username: finalUsername,
+    }, { jobId: `admin-notif-${student._id}` }).catch(err => console.warn('[students.controller] Admin notification email queue warning:', err.message));
 
     return res.status(201).json({
       success: true,

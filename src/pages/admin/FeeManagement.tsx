@@ -3,7 +3,7 @@ import { CollectPaymentDialog, PaymentFormState } from './components/CollectPaym
 import { StudentProfileHistory } from './components/StudentProfileHistory';
 import { StudentFeeMatrix, MatrixStudentRecord, FeeStatusType } from './components/StudentFeeMatrix';
 import { useEffect, useState, useCallback, useMemo, startTransition } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useHostel } from '@/contexts/HostelContext';
 import { useAuth } from '@/hooks/useAuth';
 import { feeService, settingsService } from '@/services/api';
@@ -27,7 +27,8 @@ import { toast } from 'react-toastify';
 import {
   Search, IndianRupee, Calendar, Check, Filter, Download, TrendingUp,
   AlertCircle, Wallet, Users, FileText, Receipt, Plus, User, Printer,
-  LayoutGrid, List, Clock, AlertTriangle, ArrowUpRight, Percent, Building2
+  LayoutGrid, List, Clock, AlertTriangle, ArrowUpRight, Percent, Building2,
+  ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays, addMonths, addDays } from 'date-fns';
 import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptData, getHistoryReceiptBlob } from '@/lib/receiptPdf';
@@ -59,12 +60,33 @@ export default function FeeManagement() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'MMMM yyyy'));
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalStudents, setTotalStudents] = useState(0);
+
+  // Column sorting state (Default: Room Number — Ascending natural order)
+  type SortField = 'room' | 'name' | 'monthlyFee' | 'lateFee' | 'depositDue' | 'totalDue' | 'dueDate' | 'status';
+  const [sortField, setSortField] = useState<SortField>('room');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const naturalRoomCompare = (a?: string | null, b?: string | null) => {
+    const roomA = (a || '').trim();
+    const roomB = (b || '').trim();
+    return roomA.localeCompare(roomB, undefined, { numeric: true, sensitivity: 'base' });
+  };
 
   const [lateFeeSetting, setLateFeeSetting] = useState(20);
   const [gracePeriodSetting, setGracePeriodSetting] = useState(5);
@@ -192,16 +214,48 @@ export default function FeeManagement() {
         status = 'pending';
       }
 
+      let lateFee = currentFee?.late_fee || 0;
+      if (dueDate && currentFee?.status !== 'paid') {
+        const daysDifference = differenceInDays(today, dueDate);
+        if (daysDifference > gracePeriodSetting || isExpired) {
+          status = 'overdue';
+          if (!currentFee?.late_fee) {
+            lateFee = (daysDifference - gracePeriodSetting) * lateFeeSetting;
+          }
+        } else if (dueDate >= today && dueDate <= next7Days) {
+          status = 'upcoming';
+        } else {
+          status = 'pending';
+        }
+      } else if (isExpired && currentFee?.status !== 'paid') {
+        status = 'overdue';
+      } else if (currentFee?.status === 'paid' || (pending === 0 && !isExpired && currentFee)) {
+        status = 'paid';
+        lateFee = currentFee?.late_fee || 0;
+      }
+
+      // Compute deposit due: required deposit minus collected deposits
+      const studentCollectedDeposit = deposits
+        .filter((d) => d.student_id === s.id && d.status === 'collected')
+        .reduce((sum, d) => sum + (d.amount || 0), 0);
+      const requiredDeposit = (s as any).security_deposit || 0;
+      const depositDue = Math.max(0, requiredDeposit - studentCollectedDeposit);
+
+      const totalDue = pending + (status !== 'paid' ? lateFee : 0) + depositDue;
+
       return {
         student: s,
         currentFee,
         isExpired,
         pending,
+        lateFee,
+        depositDue,
+        totalDue,
         status,
         dueDate: currentFee?.due_date || s.valid_date,
       };
     });
-  }, [students, fees, selectedMonth, gracePeriodSetting]);
+  }, [students, fees, deposits, selectedMonth, gracePeriodSetting, lateFeeSetting]);
 
   // Filtered records
   const filteredRecords = useMemo(() => {
@@ -218,6 +272,54 @@ export default function FeeManagement() {
       return matchSearch && matchStatus;
     });
   }, [records, debouncedSearch, filterStatus]);
+
+  // Sorted records applying column sorting with natural room collation and stable secondary sort
+  const sortedRecords = useMemo(() => {
+    return [...filteredRecords].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'room':
+          cmp = naturalRoomCompare(a.student.room_no, b.student.room_no);
+          break;
+        case 'name':
+          cmp = (a.student.name || '').localeCompare(b.student.name || '');
+          break;
+        case 'monthlyFee':
+          cmp = (a.student.fees || 0) - (b.student.fees || 0);
+          break;
+        case 'lateFee':
+          cmp = (a.lateFee || 0) - (b.lateFee || 0);
+          break;
+        case 'depositDue':
+          cmp = (a.depositDue || 0) - (b.depositDue || 0);
+          break;
+        case 'totalDue':
+          cmp = (a.totalDue || 0) - (b.totalDue || 0);
+          break;
+        case 'dueDate': {
+          const timeA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+          const timeB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+          cmp = timeA - timeB;
+          break;
+        }
+        case 'status':
+          cmp = (a.status || '').localeCompare(b.status || '');
+          break;
+        default:
+          cmp = naturalRoomCompare(a.student.room_no, b.student.room_no);
+      }
+
+      // Stable secondary sorting by student name then id
+      if (cmp === 0) {
+        cmp = (a.student.name || '').localeCompare(b.student.name || '');
+      }
+      if (cmp === 0) {
+        cmp = (a.student.id || '').localeCompare(b.student.id || '');
+      }
+
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+  }, [filteredRecords, sortField, sortOrder]);
 
   // Top 6 KPI summary calculations
   const totalExpectedMonth = useMemo(() => students.reduce((s, x) => s + (x.fees || 0), 0), [students]);
@@ -261,28 +363,71 @@ export default function FeeManagement() {
   const overdueCount = useMemo(() => records.filter((r) => r.status === 'overdue').length, [records]);
   const upcomingCount = useMemo(() => records.filter((r) => r.status === 'upcoming').length, [records]);
 
-  // Open Collect Payment dialog
-  const openCollect = (s: Student) => {
+  // Open Collect Payment dialog with authoritative dynamic calculation
+  const openCollect = async (s: Student, monthToSelect?: string) => {
     setSelectedStudent(s);
+    const targetMonth = monthToSelect || selectedMonth;
     const monthly = s.fees || 0;
-    const cf = fees.find((f) => f.student_id === s.id && f.month === selectedMonth);
+
     let lateFee = 0;
-    if (cf?.due_date) {
-      const overdue = differenceInDays(new Date(), new Date(cf.due_date));
-      lateFee = overdue > gracePeriodSetting ? (overdue - gracePeriodSetting) * lateFeeSetting : 0;
+    let depositDue = 0;
+    let outstandingAmount = monthly;
+
+    try {
+      const calcRes = await feeService.calculatePayableFee({
+        studentId: s.id,
+        feeMonth: targetMonth,
+      });
+      if (calcRes.success && calcRes.data) {
+        outstandingAmount = calcRes.data.outstandingAmount > 0 ? calcRes.data.outstandingAmount : calcRes.data.baseFee;
+        lateFee = calcRes.data.applicableLateFee || 0;
+        depositDue = calcRes.data.depositDue || 0;
+      }
+    } catch {
+      const cf = fees.find((f) => f.student_id === s.id && f.month === targetMonth);
+      if (cf?.due_date) {
+        const overdue = differenceInDays(new Date(), new Date(cf.due_date));
+        lateFee = overdue > gracePeriodSetting ? (overdue - gracePeriodSetting) * lateFeeSetting : 0;
+      }
     }
+
     setPaymentInitialValues({
-      pMonth: selectedMonth,
-      pAmount: monthly,
+      pMonth: targetMonth,
+      pAmount: outstandingAmount,
       pLateFee: lateFee,
       pDiscount: 0,
-      pDeposit: 0,
-      pReceived: monthly,
+      pDeposit: depositDue,
+      pReceived: Math.max(0, outstandingAmount + lateFee + depositDue),
       pMode: 'upi',
       pNotes: '',
     });
     setShowPaymentDialog(true);
   };
+
+  // Deep-link integration from alerts & dashboard cards
+  const alertStudentId = searchParams.get('studentId');
+  const alertAction = searchParams.get('action');
+  const alertMonth = searchParams.get('month');
+
+  useEffect(() => {
+    if (alertStudentId && alertAction === 'collect' && students.length > 0) {
+      const target = students.find((s) => s.id === alertStudentId);
+      if (target) {
+        const monthToUse = alertMonth || selectedMonth;
+        const existingFee = fees.find((f) => f.student_id === target.id && f.month === monthToUse);
+        if (existingFee && existingFee.status === 'paid') {
+          toast.info(`Notice: ${target.name}'s fee for ${monthToUse} is already paid.`);
+        }
+        openCollect(target, monthToUse);
+        // Clear query parameters from URL to prevent duplicate modal trigger on refresh
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('action');
+        setSearchParams(newParams, { replace: true });
+      } else if (!loading) {
+        toast.error('Student record referenced in alert could not be found in current branch.');
+      }
+    }
+  }, [alertStudentId, alertAction, alertMonth, students, fees, loading]);
 
   const openProfile = (s: Student) => {
     setSelectedStudent(s);
@@ -692,25 +837,132 @@ export default function FeeManagement() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-secondary/40 border-border">
-                    <TableHead className="text-foreground font-bold">Student</TableHead>
-                    <TableHead className="text-foreground font-bold">User ID</TableHead>
-                    <TableHead className="text-foreground font-bold hidden lg:table-cell">Room</TableHead>
-                    <TableHead className="text-foreground font-bold">Monthly Fee</TableHead>
-                    <TableHead className="text-foreground font-bold">Pending Due</TableHead>
-                    <TableHead className="text-foreground font-bold hidden lg:table-cell">Valid Till</TableHead>
-                    <TableHead className="text-foreground font-bold">Status</TableHead>
-                    <TableHead className="text-foreground font-bold text-right">Actions</TableHead>
+                    <TableHead
+                      onClick={() => handleSort('room')}
+                      className="cursor-pointer select-none text-foreground font-bold hover:text-primary transition-colors py-3"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Room No.</span>
+                        {sortField === 'room' ? (
+                          sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/50 opacity-60" />
+                        )}
+                      </div>
+                    </TableHead>
+
+                    <TableHead
+                      onClick={() => handleSort('name')}
+                      className="cursor-pointer select-none text-foreground font-bold hover:text-primary transition-colors py-3"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Student</span>
+                        {sortField === 'name' ? (
+                          sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/50 opacity-60" />
+                        )}
+                      </div>
+                    </TableHead>
+
+                    <TableHead className="text-foreground font-bold py-3">Fee Month</TableHead>
+
+                    <TableHead
+                      onClick={() => handleSort('monthlyFee')}
+                      className="cursor-pointer select-none text-foreground font-bold hover:text-primary transition-colors py-3"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Monthly Fee</span>
+                        {sortField === 'monthlyFee' ? (
+                          sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/50 opacity-60" />
+                        )}
+                      </div>
+                    </TableHead>
+
+                    <TableHead
+                      onClick={() => handleSort('lateFee')}
+                      className="cursor-pointer select-none text-foreground font-bold hover:text-primary transition-colors py-3"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Late Fee</span>
+                        {sortField === 'lateFee' ? (
+                          sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/50 opacity-60" />
+                        )}
+                      </div>
+                    </TableHead>
+
+                    <TableHead
+                      onClick={() => handleSort('depositDue')}
+                      className="cursor-pointer select-none text-foreground font-bold hover:text-primary transition-colors py-3"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Deposit Due</span>
+                        {sortField === 'depositDue' ? (
+                          sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/50 opacity-60" />
+                        )}
+                      </div>
+                    </TableHead>
+
+                    <TableHead
+                      onClick={() => handleSort('totalDue')}
+                      className="cursor-pointer select-none text-foreground font-bold hover:text-primary transition-colors py-3"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Total Due</span>
+                        {sortField === 'totalDue' ? (
+                          sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/50 opacity-60" />
+                        )}
+                      </div>
+                    </TableHead>
+
+                    <TableHead
+                      onClick={() => handleSort('dueDate')}
+                      className="cursor-pointer select-none text-foreground font-bold hover:text-primary transition-colors py-3 hidden lg:table-cell"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Due Date</span>
+                        {sortField === 'dueDate' ? (
+                          sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/50 opacity-60" />
+                        )}
+                      </div>
+                    </TableHead>
+
+                    <TableHead
+                      onClick={() => handleSort('status')}
+                      className="cursor-pointer select-none text-foreground font-bold hover:text-primary transition-colors py-3"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Status</span>
+                        {sortField === 'status' ? (
+                          sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/50 opacity-60" />
+                        )}
+                      </div>
+                    </TableHead>
+
+                    <TableHead className="text-foreground font-bold text-right py-3">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRecords.length === 0 ? (
+                  {sortedRecords.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
                         No student fee records found matching your filters.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredRecords.map((r) => {
+                    sortedRecords.map((r) => {
                       const s = r.student;
                       let badge = (
                         <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Paid</Badge>
@@ -725,6 +977,9 @@ export default function FeeManagement() {
 
                       return (
                         <TableRow key={s.id} className="border-border/60 hover:bg-secondary/30 transition-colors">
+                          <TableCell className="font-mono text-xs font-bold text-primary">
+                            {s.room_no || 'N/A'}
+                          </TableCell>
                           <TableCell className="font-semibold text-foreground">
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-xs font-bold shrink-0 overflow-hidden">
@@ -742,21 +997,31 @@ export default function FeeManagement() {
                                   s.name.substring(0, 2).toUpperCase()
                                 )}
                               </div>
-                              <span>{s.name}</span>
+                              <div>
+                                <p className="leading-snug">{s.name}</p>
+                                <p className="text-[11px] text-muted-foreground font-mono font-normal">
+                                  @{s.username}
+                                </p>
+                              </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-muted-foreground font-mono text-xs">@{s.username}</TableCell>
-                          <TableCell className="text-foreground font-mono text-xs hidden lg:table-cell">
-                            {s.room_no || 'N/A'}
+                          <TableCell className="text-muted-foreground text-xs font-medium">
+                            {selectedMonth}
                           </TableCell>
                           <TableCell className="text-foreground font-mono font-bold">
                             ₹{(s.fees || 0).toLocaleString('en-IN')}
                           </TableCell>
-                          <TableCell className="text-rose-400 font-mono font-bold">
-                            ₹{r.pending.toLocaleString('en-IN')}
+                          <TableCell className={cn('font-mono font-bold text-xs', (r.lateFee || 0) > 0 ? 'text-amber-400' : 'text-muted-foreground')}>
+                            {(r.lateFee || 0) > 0 ? `₹${(r.lateFee || 0).toLocaleString('en-IN')}` : '₹0'}
+                          </TableCell>
+                          <TableCell className={cn('font-mono font-bold text-xs', (r.depositDue || 0) > 0 ? 'text-blue-400' : 'text-muted-foreground')}>
+                            {(r.depositDue || 0) > 0 ? `₹${(r.depositDue || 0).toLocaleString('en-IN')}` : '₹0'}
+                          </TableCell>
+                          <TableCell className={cn('font-mono font-bold', (r.totalDue || 0) > 0 ? 'text-rose-400' : 'text-emerald-400')}>
+                            ₹{(r.totalDue || 0).toLocaleString('en-IN')}
                           </TableCell>
                           <TableCell className="text-muted-foreground font-mono text-xs hidden lg:table-cell">
-                            {s.valid_date ? format(parseISO(s.valid_date), 'dd MMM yyyy') : 'N/A'}
+                            {r.dueDate ? format(parseISO(r.dueDate), 'dd MMM yyyy') : 'N/A'}
                           </TableCell>
                           <TableCell>{badge}</TableCell>
                           <TableCell className="text-right space-x-1">
@@ -798,7 +1063,7 @@ export default function FeeManagement() {
 
           {/* Mobile List Cards */}
           <div className="md:hidden space-y-3">
-            {filteredRecords.map((r) => {
+            {sortedRecords.map((r) => {
               const s = r.student;
               let badge = (
                 <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Paid</Badge>
@@ -834,7 +1099,7 @@ export default function FeeManagement() {
                         <div>
                           <p className="font-semibold text-foreground text-sm">{s.name}</p>
                           <p className="text-xs text-muted-foreground font-mono">
-                            @{s.username} • Room {s.room_no || 'N/A'}
+                            Room {s.room_no || 'N/A'} • @{s.username}
                           </p>
                         </div>
                       </div>
@@ -843,15 +1108,27 @@ export default function FeeManagement() {
 
                     <div className="grid grid-cols-2 gap-2 text-xs bg-secondary/30 p-2.5 rounded-xl">
                       <div>
-                        <p className="text-muted-foreground">Monthly Fee</p>
+                        <p className="text-muted-foreground">Monthly Rent</p>
                         <p className="text-foreground font-mono font-bold">
                           ₹{(s.fees || 0).toLocaleString('en-IN')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Pending Due</p>
-                        <p className="text-rose-400 font-mono font-bold">
-                          ₹{r.pending.toLocaleString('en-IN')}
+                        <p className="text-muted-foreground">Late Fee</p>
+                        <p className={cn('font-mono font-bold', (r.lateFee || 0) > 0 ? 'text-amber-400' : 'text-muted-foreground')}>
+                          {(r.lateFee || 0) > 0 ? `₹${(r.lateFee || 0).toLocaleString('en-IN')}` : '₹0'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Deposit Due</p>
+                        <p className={cn('font-mono font-bold', (r.depositDue || 0) > 0 ? 'text-blue-400' : 'text-muted-foreground')}>
+                          {(r.depositDue || 0) > 0 ? `₹${(r.depositDue || 0).toLocaleString('en-IN')}` : '₹0'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Total Due</p>
+                        <p className={cn('font-mono font-bold', (r.totalDue || 0) > 0 ? 'text-rose-400' : 'text-emerald-400')}>
+                          ₹{(r.totalDue || 0).toLocaleString('en-IN')}
                         </p>
                       </div>
                     </div>

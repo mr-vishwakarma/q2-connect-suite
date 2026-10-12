@@ -91,7 +91,10 @@ export default function LeaveRequests() {
     const message = adminMessages[id] || null;
     
     try {
-      await api.put(`/mess-requests/${id}`, { status: newStatus, adminMessage: message });
+      const res = await api.put(`/mess-requests/${id}`, { status: newStatus, adminMessage: message });
+      if (res.data?.parentNotificationWarning) {
+        toast.warning(res.data.parentNotificationWarning);
+      }
       toast.success(`Request marked as ${newStatus}`);
       setAdminMessages(prev => {
         const next = { ...prev };

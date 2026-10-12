@@ -70,6 +70,7 @@ function RegisterStudentContent() {
     phone: '',
     parent_phone: '',
     fees: '',
+    securityDeposit: '',
     password: '',
     username: '',
   });
@@ -173,6 +174,29 @@ function RegisterStudentContent() {
     setSelectedRoomId('');
     setRoomError('');
   }, [selectedHostel, selectedHostelId]);
+
+  // Prefill default security deposit from hostel settings if configured
+  useEffect(() => {
+    const fetchHostelSettings = async () => {
+      try {
+        const res = await api.get(`/settings/${selectedHostel}`);
+        if (res.data?.success && res.data.data) {
+          const defaultDeposit = res.data.data.securityDeposit ?? res.data.data.defaultSecurityDeposit;
+          if (defaultDeposit !== undefined && defaultDeposit !== null) {
+            setFormData(prev => ({
+              ...prev,
+              securityDeposit: prev.securityDeposit || String(defaultDeposit)
+            }));
+          }
+        }
+      } catch (err) {
+        // Non-fatal if settings not yet initialized for this branch
+      }
+    };
+    if (selectedHostel) {
+      fetchHostelSettings();
+    }
+  }, [selectedHostel]);
 
   // Validate room selection
   const validateRoom = (roomId: string) => {
@@ -284,6 +308,7 @@ function RegisterStudentContent() {
         parentPhone: formData.parent_phone,
         roomNo: roomNumber,
         fees: formData.fees ? parseFloat(formData.fees) : 0,
+        securityDeposit: formData.securityDeposit ? Math.max(0, parseFloat(formData.securityDeposit)) : 0,
         hostel: selectedHostel,
         hostelId: selectedHostelId,
         startDate: startDate ? format(startDate, 'yyyy-MM-dd') : null,
@@ -313,6 +338,7 @@ function RegisterStudentContent() {
           phone: '',
           parent_phone: '',
           fees: '',
+          securityDeposit: '',
           password: '',
           username: '',
         });
@@ -792,6 +818,28 @@ function RegisterStudentContent() {
                     </div>
                   </div>
 
+                  {/* Security Deposit (₹) */}
+                  <div className="space-y-1 sm:space-y-1.5">
+                    <Label htmlFor="securityDeposit" className="text-[11px] sm:text-xs font-semibold text-zinc-300 flex items-center gap-1 truncate">
+                      <IndianRupee className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400 shrink-0" />
+                      <span>Security Deposit (₹)</span>
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs sm:text-sm font-semibold pointer-events-none">
+                        ₹
+                      </span>
+                      <Input
+                        id="securityDeposit"
+                        type="number"
+                        min="0"
+                        value={formData.securityDeposit}
+                        onChange={(e) => setFormData({ ...formData, securityDeposit: e.target.value })}
+                        placeholder="Enter required security deposit amount"
+                        className="bg-[#181d2a] border-border/40 pl-7 sm:pl-9 h-9 sm:h-10 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:border-red-500"
+                      />
+                    </div>
+                  </div>
+
                   {/* Joining Date */}
                   <div className="space-y-1 sm:space-y-1.5">
                     <Label className="text-[11px] sm:text-xs font-semibold text-zinc-300 flex items-center gap-1 truncate">
@@ -1154,6 +1202,17 @@ function RegisterStudentContent() {
                         </span>
                         <p className="text-sm font-semibold text-white pl-5 font-mono">
                           ₹{parseFloat(formData.fees || '5000').toLocaleString('en-IN')}
+                        </p>
+                      </div>
+
+                      {/* Security Deposit */}
+                      <div className="space-y-1">
+                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
+                          <IndianRupee className="w-3.5 h-3.5 text-zinc-500" />
+                          Security Deposit (₹)
+                        </span>
+                        <p className="text-sm font-semibold text-white pl-5 font-mono">
+                          ₹{parseFloat(formData.securityDeposit || '0').toLocaleString('en-IN')}
                         </p>
                       </div>
 

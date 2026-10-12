@@ -400,19 +400,11 @@ const googleLogin = async (req, res) => {
       });
     }
 
-    // 2. User does NOT exist in DB -> New Resident requesting registration!
-    // Prompt frontend for phone and hostel branch to submit registration to admin
-    return res.status(200).json({
-      success: true,
-      status: 'new_resident',
-      requiresInitialDetails: true,
-      googleProfile: {
-        email: normalizedEmail,
-        name: name || 'Resident',
-        picture: picture || '',
-        googleId,
-        suggestedUsername: (normalizedEmail.split('@')[0] || 'resident').replace(/[^a-zA-Z0-9_]/g, ''),
-      },
+    // 2. User does NOT exist in DB -> Public self-registration disabled (Admin enrollment required)
+    return res.status(403).json({
+      success: false,
+      code: 'SELF_REGISTRATION_DISABLED',
+      message: 'Public student self-registration is disabled. Please visit the hostel office for front desk enrollment. Once registered by admin, you can log in.',
     });
   } catch (error) {
     console.error('Google Auth error:', error);
@@ -420,92 +412,15 @@ const googleLogin = async (req, res) => {
   }
 };
 
-// @desc    Submit new resident registration request via Google Auth (Pending Admin Approval)
+// @desc    Submit new resident registration request via Google Auth (Pending Admin Approval - Deprecated)
 // @route   POST /api/auth/request-google-registration
 // @access  Public
 const requestGoogleRegistration = async (req, res) => {
-  try {
-    const { credential, phone, hostel = 'Q2', name } = req.body;
-    let payload;
-    try {
-      payload = await verifyGoogleCredential(credential);
-    } catch (verifyError) {
-      const statusCode = verifyError.statusCode || 401;
-      return res.status(statusCode).json({
-        success: false,
-        message: verifyError.message || 'Invalid or expired Google token',
-      });
-    }
-
-    const { sub: googleId, email, name: googleName, picture } = payload;
-    const normalizedEmail = email.toLowerCase().trim();
-
-    let user = await User.findOne({ email: normalizedEmail });
-    if (user) {
-      if (user.registrationStatus === 'pending_approval') {
-        return res.status(200).json({
-          success: true,
-          status: 'pending_approval',
-          message: 'Your registration request is already submitted and pending admin approval.',
-        });
-      }
-      if (user.registrationStatus === 'active') {
-        return res.status(400).json({ success: false, message: 'An account with this email is already active. Please sign in.' });
-      }
-    }
-
-    const residentName = name?.trim() || googleName || 'Resident';
-    user = new User({
-      name: residentName,
-      email: normalizedEmail,
-      googleId,
-      authProvider: 'google',
-      role: 'student',
-      hostels: [hostel],
-      registrationStatus: 'pending_approval',
-      registrationDetails: {
-        phone: phone?.trim() || '',
-        hostel,
-        picture: picture || '',
-        submittedAt: new Date(),
-      },
-      isActive: true,
-    });
-
-    await user.save({ validateBeforeSave: false });
-
-    // Create In-App Notification for Admins
-    try {
-      const admins = await User.find({ role: { $in: ['admin', 'super_admin'] }, isActive: true });
-      const notifications = admins.map((admin) => ({
-        userId: admin._id,
-        hostel,
-        title: 'New Resident Registration Request',
-        message: `${residentName} (${normalizedEmail}, Phone: ${phone || 'N/A'}) has requested to join ${hostel}. Awaiting your approval.`,
-        type: 'info',
-      }));
-      if (notifications.length > 0) {
-        await Notification.insertMany(notifications);
-      }
-    } catch (notifErr) {
-      console.error('Error creating admin notification for registration request:', notifErr);
-    }
-
-    return res.status(201).json({
-      success: true,
-      status: 'pending_approval',
-      message: 'Your registration request has been submitted to the hostel administration for approval.',
-      user: {
-        name: residentName,
-        email: normalizedEmail,
-        phone,
-        hostel,
-      },
-    });
-  } catch (error) {
-    console.error('Request Google Registration error:', error);
-    return res.status(500).json({ success: false, message: error.message || 'Registration request failed' });
-  }
+  return res.status(403).json({
+    success: false,
+    code: 'SELF_REGISTRATION_DISABLED',
+    message: 'Public student self-registration is disabled. Student enrollment is supervised directly by hostel administrators at the front desk.',
+  });
 };
 
 // @desc    Complete Google OAuth Step 2 (Choose username, password) after Admin approval
@@ -957,7 +872,7 @@ const requestPasswordReset = async (req, res) => {
   }
 };
 
-// @desc    Reset password using token
+// @desc    Reset password using token (or activate account using single-use activation token)
 // @route   POST /api/auth/reset-password
 // @access  Public
 const resetPassword = async (req, res) => {
@@ -971,25 +886,39 @@ const resetPassword = async (req, res) => {
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() },
+      $or: [
+        {
+          resetPasswordToken: hashedToken,
+          resetPasswordExpires: { $gt: Date.now() },
+        },
+        {
+          activationToken: hashedToken,
+          activationExpires: { $gt: Date.now() },
+        },
+      ],
     });
 
     if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired password reset token' });
+      return res.status(400).json({ success: false, message: 'Invalid or expired activation or password reset token' });
     }
 
     // Set new password (the pre-save hook handles the hashing)
     user.password = newPassword;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
+    user.activationToken = undefined;
+    user.activationExpires = undefined;
+    user.mustChangePassword = false;
+    user.isEmailVerified = true;
+    user.status = 'ACTIVE';
+    user.isActive = true;
     
     // Invalidate refresh tokens to log out other sessions
     user.refreshTokens = [];
 
     await user.save();
 
-    // Auto-login after reset
+    // Auto-login after reset / activation
     const { accessToken, refreshToken } = generateTokens(user._id);
     user.refreshTokens.push(refreshToken);
     await user.save({ validateBeforeSave: false });
@@ -1000,13 +929,17 @@ const resetPassword = async (req, res) => {
       studentProfile = await Student.findById(user.studentId);
     }
 
+    const resolvedOrgFeatures = await resolveUserFeaturesAndOrg(user._id);
+
     return res.status(200).json({ 
       success: true, 
-      message: 'Password has been successfully reset',
+      message: 'Password has been successfully set and account activated',
       accessToken,
       refreshToken,
       user: user.toJSON(),
       student: studentProfile,
+      organization: resolvedOrgFeatures.organization,
+      features: resolvedOrgFeatures.features,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

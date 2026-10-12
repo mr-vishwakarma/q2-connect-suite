@@ -101,7 +101,13 @@ const updateMessRequest = async (req, res) => {
     const updateData = {};
     if (status) updateData.status = status;
     if (adminMessage !== undefined) updateData.adminMessage = adminMessage;
-    if (status && status !== 'pending') updateData.approvedDate = new Date();
+    if (status && status !== 'pending') {
+      updateData.approvedDate = new Date();
+      if (status === 'approved') {
+        updateData.approvedBy = req.user?._id;
+        updateData.approverName = req.user?.name || 'Hostel Admin';
+      }
+    }
 
     const orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
@@ -139,7 +145,45 @@ const updateMessRequest = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Send email (outside transaction)
+    // Parent WhatsApp Notification (Only for APPROVED status)
+    let parentNotificationWarning = null;
+    if (status === 'approved') {
+      try {
+        let studentDoc = null;
+        if (messReq.studentId) {
+          studentDoc = await Student.findById(messReq.studentId).lean();
+        }
+        if (!studentDoc && messReq.userId) {
+          studentDoc = await Student.findOne({ userId: messReq.userId._id }).lean();
+        }
+
+        const parentPhone = studentDoc?.parentPhone || messReq.parentMobile;
+        const studentName = studentDoc?.name || messReq.userId?.name || 'Student';
+
+        if (!parentPhone) {
+          await MessRequest.findByIdAndUpdate(messReq._id, {
+            parentNotificationStatus: 'SKIPPED_NO_PHONE',
+            parentNotificationError: 'No parent/guardian phone registered in student profile',
+          });
+          parentNotificationWarning = 'Parent WhatsApp notification skipped: Guardian contact number is not registered.';
+        } else {
+          const { queueLeaveApprovalNotification } = require('../services/whatsapp.service');
+          queueLeaveApprovalNotification({
+            leaveRequestId: messReq._id,
+            studentName,
+            hostelName: messReq.hostel || 'Q2 Hostel',
+            startDate: messReq.leavingDate ? messReq.leavingDate.toISOString().split('T')[0] : '',
+            endDate: messReq.returnDate ? messReq.returnDate.toISOString().split('T')[0] : '',
+            approverName: req.user?.name || 'Hostel Admin',
+            parentPhone,
+          });
+        }
+      } catch (waErr) {
+        console.error('Error queuing parent WhatsApp notification:', waErr.message);
+      }
+    }
+
+    // Send email to student (outside transaction)
     try {
       if (messReq.userId?.email) {
         await sendMessRequestUpdate({
@@ -155,9 +199,15 @@ const updateMessRequest = async (req, res) => {
       console.error('Email send failed (non-fatal):', emailErr.message);
     }
 
-    return res.status(200).json({ success: true, data: messReq });
+    return res.status(200).json({
+      success: true,
+      data: messReq,
+      parentNotificationWarning,
+    });
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     session.endSession();
     console.error('Error updating mess request:', error);
     return res.status(500).json({ success: false, message: error.message });

@@ -14,6 +14,7 @@ const studentSchema = new mongoose.Schema(
     hostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel' },
     hostel: { type: String },
     fees: { type: Number, default: 0 },
+    securityDeposit: { type: Number, default: 0 },
     startDate: { type: Date },
     validDate: { type: Date },
     address: { type: String, trim: true },

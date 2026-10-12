@@ -11,12 +11,14 @@ const feeService = require('../services/fee.service');
 // @route   GET /api/fees/dashboard
 const getFeeManagementDashboard = async (req, res) => {
   try {
-    const { hostel, page = 1, limit = 100 } = req.query;
+    const { hostel, page = 1, limit = 100, sortBy = 'roomNo', sortOrder = 'asc' } = req.query;
     const data = await feeService.getDashboardData({
       hostel,
       organizationId: req.tenant?.organizationId,
       page,
       limit,
+      sortBy,
+      sortOrder,
     });
 
     return res.status(200).json({
@@ -25,6 +27,34 @@ const getFeeManagementDashboard = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Calculate payable fee breakdown authoritatively
+// @route   GET /api/fees/calculate
+const calculatePayableFeeEndpoint = async (req, res) => {
+  try {
+    const { studentId, hostel, month, feeId, hostelId } = req.query;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    const breakdown = await feeService.calculatePayableFee({
+      studentId,
+      hostelId,
+      feeId,
+      feeMonth: month,
+      organizationId: isSuperAdmin ? null : orgId,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: breakdown,
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
@@ -413,8 +443,16 @@ const collectPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Fee for this month is already fully paid' });
     }
 
-    const numAmount = Number(amount) || 0;
-    const numLateFee = Number(lateFee) || 0;
+    // Calculate authoritative payable breakdown
+    const breakdown = await feeService.calculatePayableFee({
+      studentId: student._id,
+      hostelId: student.hostelId,
+      feeMonth: month,
+      organizationId: orgId,
+    });
+
+    const numAmount = Number(amount) || breakdown.baseFee;
+    const numLateFee = lateFee !== undefined && !isNaN(Number(lateFee)) ? Number(lateFee) : breakdown.applicableLateFee;
     const numDiscount = Number(discount) || 0;
     const numSecDeposit = Number(securityDeposit) || 0;
     const numReceived = Number(receivedAmount) || 0;
@@ -467,18 +505,32 @@ const collectPayment = async (req, res) => {
     }], { session, ordered: true });
     const payment = payments[0];
 
-    // 3. Security deposit tracking
+    // 3. Security deposit tracking: update pending deposit or record new collected deposit
     if (numSecDeposit > 0) {
-      await SecurityDeposit.create([{
+      const pendingDeposit = await SecurityDeposit.findOne({
         studentId,
-        organizationId: orgId || null,
-        hostelId: student.hostelId || null,
-        hostel: actualHostel,
-        amount: numSecDeposit,
-        collectedDate: new Date(),
-        status: 'collected',
-        paymentMode,
-      }], { session, ordered: true });
+        status: 'pending',
+        ...(orgId ? { organizationId: orgId } : {}),
+      }).session(session);
+
+      if (pendingDeposit) {
+        pendingDeposit.status = 'collected';
+        pendingDeposit.amount = numSecDeposit;
+        pendingDeposit.collectedDate = new Date();
+        pendingDeposit.paymentMode = paymentMode;
+        await pendingDeposit.save({ session });
+      } else {
+        await SecurityDeposit.create([{
+          studentId,
+          organizationId: orgId || null,
+          hostelId: student.hostelId || null,
+          hostel: actualHostel,
+          amount: numSecDeposit,
+          collectedDate: new Date(),
+          status: 'collected',
+          paymentMode,
+        }], { session, ordered: true });
+      }
     }
 
     // 4. Extend student validDate if fully paid (best-effort)
@@ -531,4 +583,13 @@ const collectPayment = async (req, res) => {
   }
 };
 
-module.exports = { getFeeManagementDashboard, getFees, createFee, updateFee, generateMonthlyFees, getFeePayments, collectPayment };
+module.exports = {
+  getFeeManagementDashboard,
+  calculatePayableFeeEndpoint,
+  getFees,
+  createFee,
+  updateFee,
+  generateMonthlyFees,
+  getFeePayments,
+  collectPayment,
+};

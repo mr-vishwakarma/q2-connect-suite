@@ -25,6 +25,9 @@ export interface MatrixStudentRecord {
   currentFee?: any;
   isExpired: boolean;
   pending: number;
+  lateFee?: number;
+  depositDue?: number;
+  totalDue?: number;
   status: FeeStatusType;
   dueDate?: string | null;
 }

@@ -122,6 +122,15 @@ async function processEmailJob(job) {
       return { success: true, recipient: to };
     }
 
+    case 'STUDENT_WELCOME_ACTIVATION': {
+      const { to, name, username, studentCode, hostel, activationLink, loginLink } = payload;
+      if (!to || !activationLink) {
+        throw new UnrecoverableError('Missing required welcome activation payload fields (to, activationLink)');
+      }
+      await emailUtils.sendStudentWelcomeEmail({ to, name, username, studentCode, hostel, activationLink, loginLink });
+      return { success: true, recipient: to };
+    }
+
     case 'PASSWORD_RESET': {
       const { to, resetLink } = payload;
       if (!to || !resetLink) {

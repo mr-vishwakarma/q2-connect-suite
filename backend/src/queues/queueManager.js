@@ -113,6 +113,9 @@ async function addEmailJob(jobType, payload, options = {}) {
         case 'STUDENT_CREDENTIALS':
           await emailUtils.sendStudentCredentials(payload);
           break;
+        case 'STUDENT_WELCOME_ACTIVATION':
+          await emailUtils.sendStudentWelcomeEmail(payload);
+          break;
         case 'PASSWORD_RESET':
           await emailUtils.sendPasswordResetEmail(payload);
           break;

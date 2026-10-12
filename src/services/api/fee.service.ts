@@ -12,8 +12,28 @@ export interface FeeDashboardData {
 }
 
 export const feeService = {
-  async getFeeDashboard(params?: { hostel?: string; page?: number; limit?: number }): Promise<ApiResponse<FeeDashboardData>> {
+  async getFeeDashboard(params?: { hostel?: string; page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }): Promise<ApiResponse<FeeDashboardData>> {
     const res = await api.get('/fees/dashboard', { params });
+    return res.data;
+  },
+
+  async calculatePayableFee(params: { studentId: string; feeMonth: string; hostelId?: string }): Promise<ApiResponse<{
+    studentId: string;
+    studentName: string;
+    feeMonth: string;
+    baseFee: number;
+    paidAmount: number;
+    outstandingAmount: number;
+    applicableLateFee: number;
+    overdueDays: number;
+    isOverdue: boolean;
+    dueDate: string | null;
+    discount: number;
+    depositDue: number;
+    totalPayable: number;
+    status: string;
+  }>> {
+    const res = await api.get('/fees/calculate', { params });
     return res.data;
   },
 

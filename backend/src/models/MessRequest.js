@@ -18,6 +18,15 @@ const messRequestSchema = new mongoose.Schema(
     status: { type: String, enum: ['pending', 'approved', 'rejected', 'returned'], default: 'pending' },
     adminMessage: { type: String },
     approvedDate: { type: Date },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    approverName: { type: String },
+    parentNotificationStatus: {
+      type: String,
+      enum: ['NONE', 'QUEUED', 'SENT', 'FAILED', 'SKIPPED_NO_PHONE', 'NOT_CONFIGURED'],
+      default: 'NONE',
+    },
+    parentNotificationSentAt: { type: Date },
+    parentNotificationError: { type: String },
   },
   { timestamps: true }
 );
