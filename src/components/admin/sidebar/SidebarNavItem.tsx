@@ -16,7 +16,6 @@ const routePreloaders: Record<string, () => Promise<unknown>> = {
   '/admin/dashboard': () => import('@/pages/admin/AdminDashboard'),
   '/admin/students': () => import('@/pages/admin/AllStudents'),
   '/admin/fees': () => import('@/pages/admin/FeeManagement'),
-  '/admin/payments': () => import('@/pages/admin/PaymentManagement'),
   '/admin/rooms': () => import('@/pages/admin/RoomManagement'),
   '/admin/attendance': () => import('@/pages/admin/AttendanceManagement'),
   '/admin/billing': () => import('@/pages/admin/Billing'),
