@@ -123,11 +123,11 @@ async function processEmailJob(job) {
     }
 
     case 'STUDENT_WELCOME_ACTIVATION': {
-      const { to, name, username, studentCode, hostel, activationLink, loginLink } = payload;
+      const { to, activationLink } = payload;
       if (!to || !activationLink) {
         throw new UnrecoverableError('Missing required welcome activation payload fields (to, activationLink)');
       }
-      await emailUtils.sendStudentWelcomeEmail({ to, name, username, studentCode, hostel, activationLink, loginLink });
+      await emailUtils.sendStudentWelcomeEmail(payload);
       return { success: true, recipient: to };
     }
 

@@ -245,7 +245,12 @@ const sendHostelOnboardingWelcomeEmail = async ({
  * Send branded welcome & account activation email to student
  * @param {object} options - { to, name, username, studentCode, hostel, activationLink, loginLink }
  */
-const sendStudentWelcomeEmail = async ({ to, name, username, studentCode, hostel, activationLink, loginLink }) => {
+const sendStudentWelcomeEmail = async (options) => {
+  const { to, activationLink, loginLink } = options;
+  const name = options.name || options.studentName || 'Student';
+  const username = options.username || '';
+  const studentCode = options.studentCode || options.studentId || options.username || '';
+  const hostel = options.hostel || options.hostelName || 'Q2';
   const subject = `Welcome to ${hostel || 'Q2'} Hostel — Activate Your Resident Account`;
   const text = `Welcome to Q2 Connect Suite!\n\nDear ${name},\n\nYour resident admission into ${hostel || 'Q2'} Hostel has been confirmed.\n\nYour Account Details:\n- Resident Name: ${name}\n- Hostel: ${hostel || 'Q2'}\n- User ID: ${username}\n- Student ID: ${studentCode || username}\n\nPlease click the link below to activate your account and securely set your password (valid for 48 hours):\n${activationLink}\n\nOnce activated, you can log in to the Student Portal at:\n${loginLink || 'http://localhost:8080/login?role=student'}\n\nIf you have any questions or need assistance, contact our administration at support@q2connect.com.\n\nBest regards,\n${hostel || 'Q2'} Administration — Q2 Connect Suite`;
   const html = `
