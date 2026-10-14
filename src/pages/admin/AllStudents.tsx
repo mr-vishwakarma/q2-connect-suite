@@ -2,6 +2,7 @@ import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { EditStudentDialog } from './components/EditStudentDialog';
 import { CompleteRegistrationDialog } from './components/CompleteRegistrationDialog';
 import { getAvatarUrl } from '@/utils/imageUtils';
+import { formatDateDMY } from '@/utils/dateUtils';
 import { useCallback, useEffect, useRef, useState, startTransition } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -622,11 +623,11 @@ export default function AllStudents() {
                         </div>
                         <div>
                           <p className="text-muted-foreground text-xs">Start</p>
-                          <p className="text-foreground text-xs">{student.start_date ? new Date(student.start_date).toLocaleDateString() : '-'}</p>
+                          <p className="text-foreground text-xs font-mono">{formatDateDMY(student.start_date)}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground text-xs">End</p>
-                          <p className="text-foreground text-xs">{student.valid_date ? new Date(student.valid_date).toLocaleDateString() : '-'}</p>
+                          <p className="text-foreground text-xs font-mono">{formatDateDMY(student.valid_date)}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -669,11 +670,11 @@ export default function AllStudents() {
                         <TableCell className="text-foreground font-semibold">
                           {student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : '-'}
                         </TableCell>
-                        <TableCell className="text-foreground font-medium hidden lg:table-cell">
-                          {student.start_date ? new Date(student.start_date).toLocaleDateString() : '-'}
+                        <TableCell className="text-foreground font-medium font-mono hidden lg:table-cell">
+                          {formatDateDMY(student.start_date)}
                         </TableCell>
-                        <TableCell className="text-foreground font-medium">
-                          {student.valid_date ? new Date(student.valid_date).toLocaleDateString() : '-'}
+                        <TableCell className="text-foreground font-medium font-mono">
+                          {formatDateDMY(student.valid_date)}
                         </TableCell>
                         <TableCell>
                           <span className={cn(

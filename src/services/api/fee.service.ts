@@ -33,7 +33,14 @@ export const feeService = {
     totalPayable: number;
     status: string;
   }>> {
-    const res = await api.get('/fees/calculate', { params });
+    const res = await api.get('/fees/calculate', {
+      params: {
+        studentId: params.studentId,
+        month: params.feeMonth,
+        feeMonth: params.feeMonth,
+        hostelId: params.hostelId,
+      },
+    });
     return res.data;
   },
 

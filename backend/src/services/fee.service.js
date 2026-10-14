@@ -205,11 +205,15 @@ const feeService = {
 
     const fee = await Fee.findOne(feeFilter).lean();
 
-    const baseMonthlyFee = Number(fee ? fee.amount : (student.fees || 0));
+    // Use student's contracted room fee as the authoritative base monthly rent,
+    // or fee.amount if student.fees is not set.
+    const studentContractedFee = Number(student.fees || 0);
+    const baseMonthlyFee = studentContractedFee > 0 ? studentContractedFee : Number(fee?.amount || 0);
     const paidAmount = Number(fee?.paidAmount || 0);
     const discount = Number(fee?.discount || 0);
-    const feeStatus = fee ? fee.status : (baseMonthlyFee === 0 ? 'paid' : 'unpaid');
-    const outstandingBase = Math.max(0, baseMonthlyFee - paidAmount);
+    const isExplicitlyPaid = fee?.status === 'paid';
+    const outstandingBase = isExplicitlyPaid ? 0 : Math.max(0, baseMonthlyFee - paidAmount);
+    let feeStatus = isExplicitlyPaid ? 'paid' : (outstandingBase === 0 ? 'paid' : 'unpaid');
 
     // Determine due date
     let dueDate = null;
@@ -246,17 +250,26 @@ const feeService = {
     let daysOverdue = 0;
     let isOverdue = false;
 
-    if (feeStatus !== 'paid' && outstandingBase > 0) {
+    if (feeStatus === 'paid') {
+      // Preserve historical late fee recorded on settled fee
+      applicableLateFee = Number(fee?.lateFee || 0);
+    } else if (outstandingBase > 0) {
       const msPerDay = 1000 * 60 * 60 * 24;
       const diffDays = Math.floor((today.getTime() - checkDue.getTime()) / msPerDay);
       if (diffDays > 0) {
         daysOverdue = diffDays;
-        isOverdue = true;
         if (diffDays > gracePeriodDays) {
+          isOverdue = true;
           const penaltyDays = diffDays - gracePeriodDays;
           applicableLateFee = penaltyDays * lateFeePerDay;
         }
       }
+      // If fee record already has an explicit/recorded lateFee, honor it if greater
+      if (fee?.lateFee && Number(fee.lateFee) > applicableLateFee) {
+        applicableLateFee = Number(fee.lateFee);
+        isOverdue = true;
+      }
+      feeStatus = isOverdue ? 'overdue' : (paidAmount > 0 ? 'partial' : 'unpaid');
     }
 
     // Security deposit status
@@ -269,7 +282,7 @@ const feeService = {
     const depositDue = Math.max(0, requiredDeposit - collectedDeposit);
 
     // Total payable: (outstanding base + late fee - discount) + deposit due
-    const monthlyTotal = Math.max(0, outstandingBase + applicableLateFee - discount);
+    const monthlyTotal = feeStatus === 'paid' ? 0 : Math.max(0, outstandingBase + applicableLateFee - discount);
     const totalPayable = monthlyTotal + depositDue;
 
     return {
@@ -290,10 +303,12 @@ const feeService = {
       totalPayable,
       dueDate,
       daysOverdue,
+      overdueDays: daysOverdue,
       gracePeriodDays,
       lateFeePerDay,
       isOverdue,
       feeStatus,
+      status: feeStatus,
       securityDepositRequired: requiredDeposit,
       securityDepositCollected: collectedDeposit,
     };

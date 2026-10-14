@@ -46,6 +46,7 @@ coverage/
 
 # Misc
 .vercel
+backend/src/scripts/backups/
 *.tsbuildinfo
 .netlify
 

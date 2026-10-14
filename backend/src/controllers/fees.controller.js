@@ -34,7 +34,8 @@ const getFeeManagementDashboard = async (req, res) => {
 // @route   GET /api/fees/calculate
 const calculatePayableFeeEndpoint = async (req, res) => {
   try {
-    const { studentId, hostel, month, feeId, hostelId } = req.query;
+    const { studentId, hostel, feeId, hostelId } = req.query;
+    const month = req.query.month || req.query.feeMonth;
     const orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
 
@@ -451,7 +452,7 @@ const collectPayment = async (req, res) => {
       organizationId: orgId,
     });
 
-    const numAmount = Number(amount) || breakdown.baseFee;
+    const numAmount = student.fees > 0 ? Number(student.fees) : (Number(amount) || breakdown.baseFee);
     const numLateFee = lateFee !== undefined && !isNaN(Number(lateFee)) ? Number(lateFee) : breakdown.applicableLateFee;
     const numDiscount = Number(discount) || 0;
     const numSecDeposit = Number(securityDeposit) || 0;
@@ -464,7 +465,7 @@ const collectPayment = async (req, res) => {
         hostelId: student.hostelId || null,
         hostel: actualHostel,
         month,
-        amount: numAmount || (numReceived - numSecDeposit),
+        amount: numAmount,
         lateFee: numLateFee,
         discount: numDiscount,
         status: 'unpaid',
@@ -474,13 +475,13 @@ const collectPayment = async (req, res) => {
     } else {
       feeRow = await Fee.findByIdAndUpdate(
         feeRow._id,
-        { lateFee: numLateFee, discount: numDiscount, amount: numAmount || feeRow.amount },
+        { lateFee: numLateFee, discount: numDiscount, amount: numAmount },
         { new: true, session }
       );
     }
 
     const feeCore = Math.max(0, numReceived - numSecDeposit);
-    const totalDue = (numAmount || feeRow.amount || 0) + numLateFee - numDiscount;
+    const totalDue = numAmount + numLateFee - numDiscount;
 
     // 2. Create the fee payment record with organization and idempotency tracking
     const payments = await FeePayment.create([{

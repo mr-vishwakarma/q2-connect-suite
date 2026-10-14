@@ -184,25 +184,38 @@ export default function FeeManagement() {
 
     return students.map((s) => {
       const currentFee = currentFeeByStudent.get(s.id);
-      const studentFees = feesByStudent.get(s.id) || [];
       const isExpired = s.valid_date ? new Date(s.valid_date) < today : false;
 
-      const pending = studentFees
-        .filter((f) => f.status !== 'paid')
-        .reduce(
-          (sum, f) => sum + Math.max(0, f.amount + (f.late_fee || 0) - (f.discount || 0) - (f.paid_amount || 0)),
-          0
-        );
+      // Base monthly fee from student's contracted rent or currentFee
+      const monthlyFee = s.fees ? Number(s.fees) : Number(currentFee?.amount || 0);
 
+      const isPaid =
+        currentFee?.status === 'paid' ||
+        (Boolean(currentFee) &&
+          (currentFee?.paid_amount || 0) >=
+            monthlyFee + (currentFee?.late_fee || 0) - (currentFee?.discount || 0));
+
+      const dueDate = currentFee?.due_date
+        ? new Date(currentFee.due_date)
+        : s.valid_date
+        ? new Date(s.valid_date)
+        : null;
+
+      let lateFee = 0;
       let status: FeeStatusType = 'pending';
-      const dueDate = currentFee?.due_date ? new Date(currentFee.due_date) : s.valid_date ? new Date(s.valid_date) : null;
 
-      if (currentFee?.status === 'paid' || (pending === 0 && !isExpired && currentFee)) {
+      if (isPaid) {
         status = 'paid';
+        lateFee = currentFee?.late_fee || 0;
       } else if (dueDate) {
         const daysDifference = differenceInDays(today, dueDate);
         if (daysDifference > gracePeriodSetting || isExpired) {
           status = 'overdue';
+          const chargeableDays = daysDifference > gracePeriodSetting ? daysDifference - gracePeriodSetting : 0;
+          lateFee = chargeableDays * lateFeeSetting;
+          if (currentFee?.late_fee && currentFee.late_fee > lateFee) {
+            lateFee = currentFee.late_fee;
+          }
         } else if (dueDate >= today && dueDate <= next7Days) {
           status = 'upcoming';
         } else {
@@ -214,26 +227,6 @@ export default function FeeManagement() {
         status = 'pending';
       }
 
-      let lateFee = currentFee?.late_fee || 0;
-      if (dueDate && currentFee?.status !== 'paid') {
-        const daysDifference = differenceInDays(today, dueDate);
-        if (daysDifference > gracePeriodSetting || isExpired) {
-          status = 'overdue';
-          if (!currentFee?.late_fee) {
-            lateFee = (daysDifference - gracePeriodSetting) * lateFeeSetting;
-          }
-        } else if (dueDate >= today && dueDate <= next7Days) {
-          status = 'upcoming';
-        } else {
-          status = 'pending';
-        }
-      } else if (isExpired && currentFee?.status !== 'paid') {
-        status = 'overdue';
-      } else if (currentFee?.status === 'paid' || (pending === 0 && !isExpired && currentFee)) {
-        status = 'paid';
-        lateFee = currentFee?.late_fee || 0;
-      }
-
       // Compute deposit due: required deposit minus collected deposits
       const studentCollectedDeposit = deposits
         .filter((d) => d.student_id === s.id && (d.status === 'collected' || d.status === 'active' || d.status === 'held'))
@@ -241,13 +234,21 @@ export default function FeeManagement() {
       const requiredDeposit = (s as any).security_deposit || 0;
       const depositDue = Math.max(0, requiredDeposit - studentCollectedDeposit);
 
-      const totalDue = pending + (status !== 'paid' ? lateFee : 0) + depositDue;
+      const paidAmount = isPaid ? 0 : currentFee?.paid_amount || 0;
+      const discount = isPaid ? 0 : currentFee?.discount || 0;
+      const monthOutstanding = isPaid ? 0 : Math.max(0, monthlyFee + lateFee - discount - paidAmount);
+
+      const totalDue = monthOutstanding + depositDue;
+
+      if (monthOutstanding === 0 && depositDue === 0 && (currentFee || isPaid)) {
+        status = 'paid';
+      }
 
       return {
         student: s,
         currentFee,
         isExpired,
-        pending,
+        pending: monthOutstanding,
         lateFee,
         depositDue,
         totalDue,
@@ -338,18 +339,18 @@ export default function FeeManagement() {
       .reduce((s, p) => s + Number(p.amount || 0) + Number(p.security_deposit || 0), 0);
   }, [payments]);
 
-  const totalPending = useMemo(() => records.reduce((s, r) => s + r.pending, 0), [records]);
+  const totalPending = useMemo(() => records.reduce((s, r) => s + r.totalDue, 0), [records]);
 
   const overdueAmount = useMemo(() => {
     return records
       .filter((r) => r.status === 'overdue')
-      .reduce((s, r) => s + (r.pending > 0 ? r.pending : r.student.fees || 0), 0);
+      .reduce((s, r) => s + (r.totalDue || 0), 0);
   }, [records]);
 
   const upcomingAmount = useMemo(() => {
     return records
       .filter((r) => r.status === 'upcoming')
-      .reduce((s, r) => s + (r.student.fees || 0), 0);
+      .reduce((s, r) => s + (r.totalDue || 0), 0);
   }, [records]);
 
   const collectionRate = useMemo(() => {
@@ -379,9 +380,11 @@ export default function FeeManagement() {
         feeMonth: targetMonth,
       });
       if (calcRes.success && calcRes.data) {
-        outstandingAmount = calcRes.data.outstandingAmount > 0 ? calcRes.data.outstandingAmount : calcRes.data.baseFee;
-        lateFee = calcRes.data.applicableLateFee || 0;
-        depositDue = calcRes.data.depositDue || 0;
+        const c = calcRes.data;
+        const isSettled = c.status === 'paid';
+        outstandingAmount = isSettled ? 0 : (c.outstandingAmount > 0 ? c.outstandingAmount : c.baseFee);
+        lateFee = isSettled ? 0 : (c.applicableLateFee || 0);
+        depositDue = c.depositDue || 0;
       }
     } catch {
       const cf = fees.find((f) => f.student_id === s.id && f.month === targetMonth);
@@ -391,13 +394,15 @@ export default function FeeManagement() {
       }
     }
 
+    const initialReceived = Math.max(0, outstandingAmount + lateFee + depositDue);
+
     setPaymentInitialValues({
       pMonth: targetMonth,
       pAmount: outstandingAmount,
       pLateFee: lateFee,
       pDiscount: 0,
       pDeposit: depositDue,
-      pReceived: Math.max(0, outstandingAmount + lateFee + depositDue),
+      pReceived: initialReceived,
       pMode: 'upi',
       pNotes: '',
     });
@@ -1043,14 +1048,16 @@ export default function FeeManagement() {
                               <User className="w-3.5 h-3.5 mr-1" />
                               Profile
                             </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => openCollect(s)}
-                              className="h-8 text-xs rounded-xl shadow-sm"
-                            >
-                              <Plus className="w-3.5 h-3.5 mr-1" />
-                              Collect
-                            </Button>
+                            {r.totalDue > 0 && r.status !== 'paid' && (
+                              <Button
+                                size="sm"
+                                onClick={() => openCollect(s)}
+                                className="h-8 text-xs rounded-xl shadow-sm"
+                              >
+                                <Plus className="w-3.5 h-3.5 mr-1" />
+                                Collect
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -1152,14 +1159,16 @@ export default function FeeManagement() {
                         <User className="w-3.5 h-3.5 mr-1" />
                         Profile
                       </Button>
-                      <Button
-                        size="sm"
-                        className="flex-1 h-8 text-xs rounded-xl shadow-sm"
-                        onClick={() => openCollect(s)}
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1" />
-                        Collect
-                      </Button>
+                      {r.totalDue > 0 && r.status !== 'paid' && (
+                        <Button
+                          size="sm"
+                          className="flex-1 h-8 text-xs rounded-xl shadow-sm"
+                          onClick={() => openCollect(s)}
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          Collect
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

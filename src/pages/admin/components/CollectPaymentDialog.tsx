@@ -67,13 +67,13 @@ export function CollectPaymentDialog({
   const [calculating, setCalculating] = useState(false);
   const [calcDetails, setCalcDetails] = useState<CalculationDetails | null>(null);
 
-  // Synchronize initial values when dialog opens
+  // Synchronize initial values when dialog opens or selectedStudent changes
   useEffect(() => {
     if (open) {
       setForm(initialValues);
       setCalcDetails(null);
     }
-  }, [open, initialValues]);
+  }, [open, selectedStudent?.id, initialValues]);
 
   // Dynamic late-fee & payable fee calculation when month changes
   const fetchCalculation = useCallback(
@@ -90,10 +90,13 @@ export function CollectPaymentDialog({
           const c = res.data;
           setCalcDetails(c);
           setForm((prev) => {
-            const newAmount = c.outstandingAmount > 0 ? c.outstandingAmount : c.baseFee;
-            const newLateFee = c.applicableLateFee || 0;
+            const isSettled = c.status === 'paid';
+            const newAmount = isSettled ? 0 : (c.outstandingAmount > 0 ? c.outstandingAmount : c.baseFee);
+            const newLateFee = isSettled ? 0 : (c.applicableLateFee || 0);
             const newDeposit = c.depositDue || 0;
-            const newTotal = Math.max(0, newAmount + newLateFee + newDeposit - (prev.pDiscount || 0));
+            const newTotal = isSettled
+              ? newDeposit
+              : Math.max(0, newAmount + newLateFee + newDeposit - (prev.pDiscount || 0));
             return {
               ...prev,
               pMonth: month,
@@ -361,10 +364,12 @@ export function CollectPaymentDialog({
             <Button
               className="w-full h-10 font-bold"
               onClick={handleSubmit}
-              disabled={submitting || calculating}
+              disabled={submitting || calculating || (calcDetails?.status === 'paid' && form.pAmount === 0 && form.pDeposit === 0)}
             >
               {submitting ? (
                 'Processing & Generating Receipt...'
+              ) : calcDetails?.status === 'paid' && form.pAmount === 0 && form.pDeposit === 0 ? (
+                'Fee Already Settled for this Month'
               ) : (
                 <>
                   <Check className="w-4 h-4 mr-2" />

@@ -7,7 +7,7 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   envPrefix: ['VITE_', 'GOOGLE_'],
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8080,
   },
   plugins: [
