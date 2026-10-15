@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { uploadMedia } from '@/utils/uploadService';
 import { getAvatarUrl } from '@/utils/imageUtils';
+import { formatDateDMY } from '@/utils/dateUtils';
 
 export default function Profile() {
   const { profile: authProfile, refreshProfile, signOut } = useAuth();
@@ -178,8 +179,18 @@ export default function Profile() {
             <div>
               <CardTitle className="text-2xl">{formData.name}</CardTitle>
               <CardDescription className="text-base flex items-center gap-2">
-                @{formData.username}
+                <span>@{formData.username}</span>
+                {formData.hostel && <span className="text-xs bg-secondary px-2 py-0.5 rounded-md">• {formData.hostel}</span>}
+                {formData.roomNo && <span className="text-xs bg-secondary px-2 py-0.5 rounded-md">• Room {formData.roomNo}</span>}
               </CardDescription>
+              {formData.startDate && (
+                <p className="text-xs text-muted-foreground mt-1.5 font-mono">
+                  Joining Date: <strong className="text-foreground">{formatDateDMY(formData.startDate)}</strong>
+                  {formData.validDate && (
+                    <> • Valid Till: <strong className="text-foreground">{formatDateDMY(formData.validDate)}</strong></>
+                  )}
+                </p>
+              )}
             </div>
             <Button
               type="button"

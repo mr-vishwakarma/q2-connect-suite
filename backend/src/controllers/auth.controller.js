@@ -820,7 +820,7 @@ const deleteAdmin = async (req, res) => {
 };
 
 // @desc    Request password reset email
-// @route   POST /api/auth/request-reset
+// @route   POST /api/auth/password/forgot (or /api/auth/request-reset)
 // @access  Public
 const requestPasswordReset = async (req, res) => {
   try {
@@ -828,6 +828,9 @@ const requestPasswordReset = async (req, res) => {
     if (!email) return res.status(400).json({ success: false, message: 'Email or User ID is required' });
 
     const searchKey = email.toLowerCase().trim();
+    // Generic public response to prevent account enumeration
+    const genericResponse = 'If an account matches that email address, password-reset instructions will be sent.';
+
     // Look for user by email or username (student User ID or email)
     const user = await User.findOne({
       $or: [
@@ -836,50 +839,64 @@ const requestPasswordReset = async (req, res) => {
       ]
     });
     
-    // We always return success to avoid leaking which accounts exist
+    // We always return generic success to avoid leaking which accounts exist
     if (!user || !user.email) {
-      return res.status(200).json({ success: true, message: 'If an account exists with that detail, a reset link has been sent to the registered email.' });
+      return res.status(200).json({ success: true, message: genericResponse });
     }
 
-    // Generate token
+    // Generate cryptographically secure random token
     const resetToken = crypto.randomBytes(32).toString('hex');
     
-    // Hash it and save to DB
+    // Hash it and save to DB with 30 minutes expiry
     user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetPasswordExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    user.resetPasswordExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
     
     await user.save({ validateBeforeSave: false });
 
-    // Create reset URL
+    // Create reset URL using explicit trusted frontend URL
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
 
-    // Send email
+    // Queue or send email
     try {
-      await sendPasswordResetEmail({ to: user.email, resetLink });
+      const { addEmailJob } = require('../queues/queueManager');
+      await addEmailJob('PASSWORD_RESET', { to: user.email, resetLink });
     } catch (err) {
-      console.error('Failed to send reset email:', err);
-      // Clean up token if email fails
-      user.resetPasswordToken = undefined;
-      user.resetPasswordExpires = undefined;
-      await user.save({ validateBeforeSave: false });
-      return res.status(500).json({ success: false, message: 'Error sending email' });
+      console.warn('Queue reset email failed, sending directly:', err.message);
+      try {
+        await sendPasswordResetEmail({ to: user.email, resetLink });
+      } catch (directErr) {
+        console.error('Failed to send reset email:', directErr);
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save({ validateBeforeSave: false });
+        return res.status(500).json({ success: false, message: 'Error sending email' });
+      }
     }
 
-    return res.status(200).json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+    return res.status(200).json({ success: true, message: genericResponse });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    console.error('requestPasswordReset error:', error);
+    return res.status(500).json({ success: false, message: 'An internal error occurred. Please try again.' });
   }
 };
 
 // @desc    Reset password using token (or activate account using single-use activation token)
-// @route   POST /api/auth/reset-password
+// @route   POST /api/auth/password/reset (or /api/auth/reset-password)
 // @access  Public
 const resetPassword = async (req, res) => {
   try {
-    const { token, newPassword } = req.body;
+    const { token, newPassword, confirmPassword } = req.body;
     if (!token || !newPassword) {
       return res.status(400).json({ success: false, message: 'Token and new password are required' });
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      return res.status(400).json({ success: false, message: 'Passwords do not match' });
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
     }
 
     // Hash the token to compare with DB
@@ -910,38 +927,37 @@ const resetPassword = async (req, res) => {
     user.activationExpires = undefined;
     user.mustChangePassword = false;
     user.isEmailVerified = true;
-    user.status = 'ACTIVE';
-    user.isActive = true;
+
+    // Do NOT automatically reactivate suspended or deactivated accounts
+    if (user.status !== 'SUSPENDED' && user.status !== 'DEACTIVATED') {
+      user.status = 'ACTIVE';
+      user.isActive = true;
+    }
     
-    // Invalidate refresh tokens to log out other sessions
+    // Invalidate refresh tokens to log out all other active sessions
     user.refreshTokens = [];
 
     await user.save();
 
-    // Auto-login after reset / activation
-    const { accessToken, refreshToken } = generateTokens(user._id);
-    user.refreshTokens.push(refreshToken);
-    await user.save({ validateBeforeSave: false });
-
-    // Fetch student profile if student
-    let studentProfile = null;
-    if (user.role === 'student' && user.studentId) {
-      studentProfile = await Student.findById(user.studentId);
+    // Log security audit event
+    try {
+      await logAuditAction({
+        req,
+        action: 'PASSWORD_RESET_SUCCESS',
+        entityType: 'User',
+        entityId: user._id,
+        details: { email: user.email, role: user.role },
+      });
+    } catch (auditErr) {
+      // Non-fatal
     }
-
-    const resolvedOrgFeatures = await resolveUserFeaturesAndOrg(user._id);
 
     return res.status(200).json({ 
       success: true, 
-      message: 'Password has been successfully set and account activated',
-      accessToken,
-      refreshToken,
-      user: user.toJSON(),
-      student: studentProfile,
-      organization: resolvedOrgFeatures.organization,
-      features: resolvedOrgFeatures.features,
+      message: 'Password updated successfully',
     });
   } catch (error) {
+    console.error('resetPassword error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

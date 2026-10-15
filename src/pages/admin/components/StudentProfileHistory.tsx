@@ -25,6 +25,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { extractFloor } from './StudentFeeMatrix';
 import { cn } from '@/lib/utils';
+import { formatDateDMY } from '@/utils/dateUtils';
 
 interface StudentProfileHistoryProps {
   open: boolean;
@@ -156,8 +157,14 @@ export function StudentProfileHistory({
                   </DialogTitle>
                   {feeStatusBadge}
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-3 mt-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-3 mt-1 flex-wrap">
                   <span>@{selectedStudent.username}</span>
+                  {selectedStudent.start_date && (
+                    <span className="flex items-center gap-1 font-mono text-foreground font-medium">
+                      <Calendar className="w-3 h-3 text-muted-foreground" />
+                      Joined: {formatDateDMY(selectedStudent.start_date)}
+                    </span>
+                  )}
                   {selectedStudent.phone && (
                     <span className="flex items-center gap-1">
                       <Phone className="w-3 h-3 text-muted-foreground" />
@@ -288,11 +295,8 @@ export function StudentProfileHistory({
                 >
                   ₹{totalPendingBalance.toLocaleString('en-IN')}
                 </p>
-                <p className="text-[10px] text-muted-foreground">
-                  Valid till:{' '}
-                  {selectedStudent.valid_date
-                    ? format(parseISO(selectedStudent.valid_date), 'dd MMM yyyy')
-                    : 'N/A'}
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  Valid till: {formatDateDMY(selectedStudent.valid_date)}
                 </p>
               </div>
             </div>

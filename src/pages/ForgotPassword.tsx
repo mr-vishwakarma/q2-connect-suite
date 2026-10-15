@@ -24,7 +24,7 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     try {
-      const response = await api.post('/auth/request-reset', { email: email.trim() });
+      const response = await api.post('/auth/password/forgot', { email: email.trim() });
       if (response.data?.success) {
         setIsSubmitted(true);
       }

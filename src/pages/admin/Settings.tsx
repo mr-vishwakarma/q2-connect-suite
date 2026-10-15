@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'react-toastify';
-import { Settings as SettingsIcon, Save, Clock, IndianRupee, Calendar } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Clock, IndianRupee } from 'lucide-react';
 import { useHostel } from '@/contexts/HostelContext';
 import { api } from '@/lib/api';
 
@@ -12,7 +12,6 @@ export default function AdminSettings() {
   const { selectedHostel } = useHostel();
   const [lateFeePerDay, setLateFeePerDay] = useState<number>(20);
   const [gracePeriodDays, setGracePeriodDays] = useState<number>(5);
-  const [monthlyRentDueDay, setMonthlyRentDueDay] = useState<number>(5);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -21,11 +20,8 @@ export default function AdminSettings() {
       setLoading(true);
       const res = await api.get(`/settings/${selectedHostel}`);
       if (res.data?.success) {
-        setLateFeePerDay(res.data.data.lateFeePerDay);
-        setGracePeriodDays(res.data.data.gracePeriodDays);
-        if (res.data.data.monthlyRentDueDay) {
-          setMonthlyRentDueDay(res.data.data.monthlyRentDueDay);
-        }
+        setLateFeePerDay(res.data.data.lateFeePerDay ?? 20);
+        setGracePeriodDays(res.data.data.gracePeriodDays ?? 5);
       }
     } catch (error) {
       console.error(error);
@@ -40,17 +36,25 @@ export default function AdminSettings() {
   }, [fetchSettings]);
 
   const handleSave = async () => {
+    if (gracePeriodDays < 0 || !Number.isInteger(Number(gracePeriodDays))) {
+      toast.error('Grace period must be a non-negative integer');
+      return;
+    }
+    if (lateFeePerDay < 0 || isNaN(Number(lateFeePerDay))) {
+      toast.error('Late fee penalty must be a non-negative number');
+      return;
+    }
+
     try {
       setSaving(true);
       await api.put(`/settings/${selectedHostel}`, {
-        lateFeePerDay,
-        gracePeriodDays,
-        monthlyRentDueDay,
+        lateFeePerDay: Number(lateFeePerDay),
+        gracePeriodDays: Number(gracePeriodDays),
       });
-      toast.success('Settings updated successfully');
-    } catch (error) {
+      toast.success('Fee configuration updated successfully');
+    } catch (error: any) {
       console.error(error);
-      toast.error('Failed to update settings');
+      toast.error(error.response?.data?.message || 'Failed to update settings');
     } finally {
       setSaving(false);
     }
@@ -70,7 +74,9 @@ export default function AdminSettings() {
       <Card className="border-border">
         <CardHeader>
           <CardTitle>Fee Configuration</CardTitle>
-          <CardDescription>Adjust the rules for late fee calculation for {selectedHostel}. Note: Changes to these rules will be applied to future late fee calculations automatically by the daily midnight cron job.</CardDescription>
+          <CardDescription>
+            Adjust the policy rules for late fee calculation for {selectedHostel}. Monthly recurring due dates are automatically anchored to each student's joining date.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -81,11 +87,12 @@ export default function AdminSettings() {
             <Input 
               type="number" 
               min="0"
+              max="60"
               value={gracePeriodDays}
-              onChange={(e) => setGracePeriodDays(Number(e.target.value))}
+              onChange={(e) => setGracePeriodDays(Math.max(0, parseInt(e.target.value) || 0))}
             />
             <p className="text-xs text-muted-foreground">
-              Number of extra days a student gets to pay their fee after their due date without penalty.
+              Number of extra days a student gets to pay their monthly fee after their anchor due date without incurring a late fee penalty.
             </p>
           </div>
 
@@ -98,27 +105,10 @@ export default function AdminSettings() {
               type="number" 
               min="0"
               value={lateFeePerDay}
-              onChange={(e) => setLateFeePerDay(Number(e.target.value))}
+              onChange={(e) => setLateFeePerDay(Math.max(0, parseFloat(e.target.value) || 0))}
             />
             <p className="text-xs text-muted-foreground">
-              Amount charged for each day past the grace period.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-primary" />
-              Monthly Rent Due Day (Day of Month)
-            </Label>
-            <Input 
-              type="number" 
-              min="1"
-              max="31"
-              value={monthlyRentDueDay}
-              onChange={(e) => setMonthlyRentDueDay(Number(e.target.value))}
-            />
-            <p className="text-xs text-muted-foreground">
-              Day of every month on which student rent becomes due (e.g. 1st, 5th, or 10th).
+              Daily penalty amount charged for each calendar day past the grace period.
             </p>
           </div>
 

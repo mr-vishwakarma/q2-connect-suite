@@ -11,6 +11,7 @@
 
 const Fee = require('../models/Fee');
 const Settings = require('../models/Settings');
+const { calculateLateFeeBreakdown, normalizeToDateOnly } = require('../utils/billingCycle');
 
 /**
  * Runs the late fee calculation job.
@@ -35,7 +36,6 @@ async function runLateFeeCalculation(options = {}) {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const msPerDay = 1000 * 60 * 60 * 24;
 
     // Stream overdue fees via cursor to prevent unbounded memory consumption
     const feeCursor = Fee.find({
@@ -57,28 +57,26 @@ async function runLateFeeCalculation(options = {}) {
       const lateFeePerDay = hostelSettings ? hostelSettings.lateFeePerDay : defaultLateFee;
       const gracePeriodDays = hostelSettings ? hostelSettings.gracePeriodDays : defaultGracePeriod;
 
-      const dueDate = new Date(fee.dueDate);
-      dueDate.setHours(0, 0, 0, 0);
+      const breakdown = calculateLateFeeBreakdown({
+        dueDate: fee.dueDate,
+        asOfDate: today,
+        gracePeriodDays,
+        lateFeePerDay,
+        isPaid: false,
+      });
 
-      const daysLate = Math.floor((today - dueDate) / msPerDay);
+      if (breakdown.isOverdue && fee.lateFee !== breakdown.lateFee) {
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: fee._id },
+            update: { $set: { lateFee: breakdown.lateFee } },
+          },
+        });
+        updatedCount++;
 
-      if (daysLate > gracePeriodDays) {
-        const penaltyDays = daysLate - gracePeriodDays;
-        const newLateFee = penaltyDays * lateFeePerDay;
-
-        if (fee.lateFee !== newLateFee) {
-          bulkOps.push({
-            updateOne: {
-              filter: { _id: fee._id },
-              update: { $set: { lateFee: newLateFee } },
-            },
-          });
-          updatedCount++;
-
-          if (bulkOps.length >= BATCH_SIZE) {
-            await Fee.bulkWrite(bulkOps, { ordered: false });
-            bulkOps = [];
-          }
+        if (bulkOps.length >= BATCH_SIZE) {
+          await Fee.bulkWrite(bulkOps, { ordered: false });
+          bulkOps = [];
         }
       }
     }

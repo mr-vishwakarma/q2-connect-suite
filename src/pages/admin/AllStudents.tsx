@@ -70,6 +70,7 @@ interface Student {
   start_date: string;
   valid_date: string;
   username: string;
+  email?: string;
   created_at: string;
 }
 
@@ -178,6 +179,7 @@ export default function AllStudents() {
             start_date: s.startDate || '',
             valid_date: s.validDate || '',
             username: s.username || '',
+            email: s.email || (typeof s.userId === 'object' ? s.userId?.email : '') || '',
             created_at: s.createdAt || '',
           }));
         setStudents(mapped);
@@ -264,6 +266,22 @@ export default function AllStudents() {
       toast.error(err.response?.data?.message || 'Failed to decline registration');
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const handleResendInvite = async (studentId: string, studentEmail: string) => {
+    setResendingId(studentId);
+    try {
+      const res = await api.post(`/students/${studentId}/resend-invite`);
+      if (res.data?.success) {
+        toast.success(`Activation invite queued successfully for ${studentEmail}`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to resend invite');
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -687,12 +705,23 @@ export default function AllStudents() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1.5 flex-wrap">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={resendingId === student.id}
+                              onClick={() => handleResendInvite(student.id, student.email || student.username)}
+                              className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 h-8 px-2"
+                              title="Resend Welcome / Activation Email"
+                            >
+                              <Mail className="w-3.5 h-3.5 mr-1" />
+                              {resendingId === student.id ? 'Sending...' : 'Invite'}
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => openEditDialog(student)}
-                              className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10 h-8 px-2.5"
+                              className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10 h-8 px-2"
                             >
                               <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
                             </Button>
@@ -700,7 +729,7 @@ export default function AllStudents() {
                               size="sm"
                               variant="outline"
                               onClick={() => deleteStudent(student.id)}
-                              className="border-red-500/30 text-red-400 hover:bg-red-500/10 h-8 px-2.5"
+                              className="border-red-500/30 text-red-400 hover:bg-red-500/10 h-8 px-2"
                             >
                               <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
                             </Button>

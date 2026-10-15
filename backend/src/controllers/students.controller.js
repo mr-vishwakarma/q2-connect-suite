@@ -283,6 +283,9 @@ const createStudent = async (req, res) => {
     }
 
     const parsedSecurityDeposit = Number(req.body.securityDeposit) >= 0 ? Number(req.body.securityDeposit) : 0;
+    const { deriveBillingCycle } = require('../utils/billingCycle');
+    const studentStartDate = startDate ? new Date(startDate) : new Date();
+    const initialCycle = deriveBillingCycle(studentStartDate, 0);
 
     // Create Student profile
     const students = await Student.create([{
@@ -298,9 +301,10 @@ const createStudent = async (req, res) => {
       hostel: resolvedBranchCode,
       fees: fees || 0,
       securityDeposit: parsedSecurityDeposit,
-      startDate,
+      startDate: studentStartDate,
       validDate,
       studentCode: finalStudentCode,
+      welcomeEmailStatus: 'pending',
     }], { session, ordered: true });
     const student = students[0];
 
@@ -385,13 +389,12 @@ const createStudent = async (req, res) => {
       }
     }
 
-    // Handle initial Fee creation for current month
+    // Handle initial Fee creation anchored to student startDate billing cycle
     if (fees && fees > 0) {
       const Fee = require('../models/Fee');
       const FeePayment = require('../models/FeePayment');
       const now = new Date();
-      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-      const month = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+      const month = initialCycle.feeMonth;
 
       if (initialFeePaid) {
         const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
@@ -408,6 +411,10 @@ const createStudent = async (req, res) => {
           paidDate: now,
           paymentMode: 'cash',
           receiptNo,
+          dueDate: initialCycle.dueDate,
+          periodStart: initialCycle.periodStart,
+          periodEnd: initialCycle.periodEnd,
+          cycleNumber: initialCycle.cycleNumber,
         }], { session, ordered: true });
         const feeRecord = feeRecords[0];
 
@@ -430,14 +437,7 @@ const createStudent = async (req, res) => {
           notes: 'Initial fee paid at registration',
         }], { session, ordered: true });
       } else {
-        // Create UNPAID Fee record so status shows Unpaid and pending balance reflects monthly fee
-        let rentDueDay = hostelDoc?.settings?.monthlyRentDueDay;
-        if (!rentDueDay) {
-          const Settings = require('../models/Settings');
-          const settingDoc = await Settings.findOne({ ...(orgId ? { organizationId: orgId } : {}), hostel });
-          rentDueDay = settingDoc?.monthlyRentDueDay || 5;
-        }
-        const dueDate = new Date(now.getFullYear(), now.getMonth(), Math.min(rentDueDay, 28));
+        // Create UNPAID Fee record anchored to student startDate
         await Fee.create([{
           studentId: student._id,
           organizationId: orgId || null,
@@ -447,7 +447,10 @@ const createStudent = async (req, res) => {
           amount: fees,
           paidAmount: 0,
           status: 'unpaid',
-          dueDate,
+          dueDate: initialCycle.dueDate,
+          periodStart: initialCycle.periodStart,
+          periodEnd: initialCycle.periodEnd,
+          cycleNumber: initialCycle.cycleNumber,
         }], { session, ordered: true });
       }
     }
@@ -469,6 +472,7 @@ const createStudent = async (req, res) => {
     // Send single-use time-limited activation welcome email (idempotent BullMQ job)
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
+    const loginLink = `${frontendUrl}/login?role=student`;
 
     addEmailJob('STUDENT_WELCOME_ACTIVATION', {
       to: email.toLowerCase(),
@@ -477,6 +481,8 @@ const createStudent = async (req, res) => {
       username: finalUsername,
       hostelName: hostelDoc ? hostelDoc.name : resolvedBranchCode,
       activationLink,
+      loginLink,
+      studentDocId: student._id.toString(),
       supportContact: hostelDoc?.contactPhone || 'support@q2connect.com',
     }, { jobId: `welcome-activation-${student._id}` }).catch(err => console.warn('[students.controller] Welcome activation email queue warning:', err.message));
 
@@ -1025,6 +1031,15 @@ const approveAndRegisterStudent = async (req, res) => {
     user.registrationDetails.approvedAt = new Date();
     user.registrationDetails.approvedBy = req.user._id;
 
+    // Generate secure single-use activation token for account setup if not set or expired
+    let rawActivationToken = null;
+    if (!user.activationToken || (user.activationExpires && user.activationExpires < new Date())) {
+      rawActivationToken = crypto.randomBytes(32).toString('hex');
+      user.activationToken = crypto.createHash('sha256').update(rawActivationToken).digest('hex');
+      user.activationExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+      user.mustChangePassword = true;
+    }
+
     // Check if a Student profile already exists for this user
     let student = await Student.findOne({ userId: user._id }).session(session);
     // Generate studentCode if not provided
@@ -1035,6 +1050,10 @@ const approveAndRegisterStudent = async (req, res) => {
       const cleanHostel = (finalHostel || 'Q2').toUpperCase().replace(/[^A-Z0-9]/g, '');
       finalStudentCode = `${cleanHostel}S${year}${String(count + 1).padStart(3, '0')}`;
     }
+
+    const { deriveBillingCycle } = require('../utils/billingCycle');
+    const studentStartDate = startDate ? new Date(startDate) : (student?.startDate || new Date());
+    const initialCycle = deriveBillingCycle(studentStartDate, 0);
 
     if (student) {
       student.name = finalName;
@@ -1047,9 +1066,10 @@ const approveAndRegisterStudent = async (req, res) => {
       if (orgId) student.organizationId = orgId;
       if (hostelDoc) student.hostelId = hostelDoc._id;
       student.fees = fees ? parseFloat(fees) : 0;
-      student.startDate = startDate || new Date();
+      student.startDate = studentStartDate;
       student.validDate = validDate || null;
       if (!student.studentCode) student.studentCode = finalStudentCode;
+      student.welcomeEmailStatus = 'pending';
       await student.save({ session });
     } else {
       const createdStudents = await Student.create([{
@@ -1064,9 +1084,10 @@ const approveAndRegisterStudent = async (req, res) => {
         roomNo,
         hostel: finalHostel,
         fees: fees ? parseFloat(fees) : 0,
-        startDate: startDate || new Date(),
+        startDate: studentStartDate,
         validDate: validDate || null,
         studentCode: finalStudentCode,
+        welcomeEmailStatus: 'pending',
       }], { session, ordered: true });
       student = createdStudents[0];
     }
@@ -1137,13 +1158,12 @@ const approveAndRegisterStudent = async (req, res) => {
       }
     }
 
-    // Handle Fee creation if fees > 0
+    // Handle Fee creation anchored to student startDate billing cycle
     if (fees && parseFloat(fees) > 0) {
       const Fee = require('../models/Fee');
       const FeePayment = require('../models/FeePayment');
       const now = new Date();
-      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-      const month = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+      const month = initialCycle.feeMonth;
       const feeAmount = parseFloat(fees);
 
       if (initialFeePaid) {
@@ -1160,6 +1180,10 @@ const approveAndRegisterStudent = async (req, res) => {
           paidDate: now,
           paymentMode: 'cash',
           receiptNo,
+          dueDate: initialCycle.dueDate,
+          periodStart: initialCycle.periodStart,
+          periodEnd: initialCycle.periodEnd,
+          cycleNumber: initialCycle.cycleNumber,
         }], { session, ordered: true });
 
         await FeePayment.create([{
@@ -1181,13 +1205,6 @@ const approveAndRegisterStudent = async (req, res) => {
           notes: 'Initial registration fee collection',
         }], { session, ordered: true });
       } else {
-        let rentDueDay = hostelDoc?.settings?.monthlyRentDueDay;
-        if (!rentDueDay) {
-          const Settings = require('../models/Settings');
-          const settingDoc = await Settings.findOne({ ...(orgId ? { organizationId: orgId } : {}), hostel: finalHostel });
-          rentDueDay = settingDoc?.monthlyRentDueDay || 5;
-        }
-        const dueDate = new Date(now.getFullYear(), now.getMonth(), Math.min(rentDueDay, 28));
         await Fee.create([{
           studentId: student._id,
           organizationId: orgId || null,
@@ -1197,7 +1214,10 @@ const approveAndRegisterStudent = async (req, res) => {
           amount: feeAmount,
           paidAmount: 0,
           status: 'unpaid',
-          dueDate,
+          dueDate: initialCycle.dueDate,
+          periodStart: initialCycle.periodStart,
+          periodEnd: initialCycle.periodEnd,
+          cycleNumber: initialCycle.cycleNumber,
         }], { session, ordered: true });
       }
     }
@@ -1232,6 +1252,24 @@ const approveAndRegisterStudent = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
+    // Send single-use time-limited activation welcome email (idempotent BullMQ job)
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const activationLink = rawActivationToken
+      ? `${frontendUrl}/reset-password?token=${rawActivationToken}`
+      : `${frontendUrl}/login?role=student`;
+
+    addEmailJob('STUDENT_WELCOME_ACTIVATION', {
+      to: finalEmail,
+      studentName: finalName,
+      studentId: finalStudentCode,
+      username: finalUsername,
+      hostelName: hostelDoc ? hostelDoc.name : finalHostel,
+      activationLink,
+      loginLink: `${frontendUrl}/login?role=student`,
+      studentDocId: student._id.toString(),
+      supportContact: hostelDoc?.contactPhone || 'support@q2connect.com',
+    }, { jobId: `welcome-activation-${student._id}` }).catch(err => console.warn('[students.controller] Welcome activation email queue warning:', err.message));
+
     // Send asynchronous confirmation email to Admin via queue
     const adminEmail = req.user?.email || 'abhi1006@q2connect.com';
     addEmailJob('ADMIN_NEW_STUDENT_REGISTERED', {
@@ -1260,6 +1298,79 @@ const approveAndRegisterStudent = async (req, res) => {
   }
 };
 
+// @desc    Resend welcome invitation email to a student
+// @route   POST /api/students/:id/resend-invite
+// @access  Admin
+const resendStudentInvitation = async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const orgId = req.tenant?.organizationId || req.user.activeOrganizationId;
+    const isSuperAdmin = req.user.role === 'super_admin' || req.user.isSuperAdmin || req.tenant?.isSuperAdmin;
+
+    const studentQuery = { _id: studentId };
+    if (!isSuperAdmin && orgId) {
+      studentQuery.organizationId = orgId;
+    }
+    const student = await Student.findOne(studentQuery);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student record not found' });
+    }
+
+    // Branch authorization check
+    if (!isSuperAdmin) {
+      const allowedHostels = req.tenant?.hostelAccess || req.user.hostels || [];
+      const hasAllAccess = allowedHostels.includes('all');
+      const hasBranchAccess = hasAllAccess || allowedHostels.includes(student.hostel);
+      if (!hasBranchAccess) {
+        return res.status(403).json({ success: false, message: 'Not authorized for this hostel branch' });
+      }
+    }
+
+    const user = await User.findById(student.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Associated user account not found' });
+    }
+
+    // Generate fresh single-use activation token (48h expiry)
+    const rawActivationToken = crypto.randomBytes(32).toString('hex');
+    const hashedActivationToken = crypto.createHash('sha256').update(rawActivationToken).digest('hex');
+    const activationExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+    user.activationToken = hashedActivationToken;
+    user.activationExpires = activationExpires;
+    user.mustChangePassword = true;
+    await user.save({ validateBeforeSave: false });
+
+    student.welcomeEmailStatus = 'pending';
+    student.welcomeEmailError = null;
+    await student.save({ validateBeforeSave: false });
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
+    const loginLink = `${frontendUrl}/login?role=student`;
+
+    await addEmailJob('STUDENT_WELCOME_ACTIVATION', {
+      to: student.email.toLowerCase(),
+      studentName: student.name,
+      studentId: student.studentCode || student.username,
+      username: student.username,
+      hostelName: student.hostel,
+      activationLink,
+      loginLink,
+      studentDocId: student._id.toString(),
+      supportContact: 'support@q2connect.com',
+    }, { jobId: `resend-activation-${student._id}-${Date.now()}` });
+
+    return res.status(200).json({
+      success: true,
+      message: `Welcome invitation successfully queued for ${student.email}`,
+    });
+  } catch (error) {
+    console.error('resendStudentInvitation error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getAllStudents,
   getStudent,
@@ -1273,5 +1384,6 @@ module.exports = {
   approveRegistration,
   approveAndRegisterStudent,
   rejectRegistration,
+  resendStudentInvitation,
 };
 

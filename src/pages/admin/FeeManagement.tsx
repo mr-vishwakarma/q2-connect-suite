@@ -35,6 +35,7 @@ import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptDat
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getAvatarUrl } from '@/utils/imageUtils';
+import { formatDateDMY } from '@/utils/dateUtils';
 
 const generateMonthOptions = () => {
   const options = [];
@@ -237,10 +238,8 @@ export default function FeeManagement() {
       const paidAmount = isPaid ? 0 : currentFee?.paid_amount || 0;
       const discount = isPaid ? 0 : currentFee?.discount || 0;
       const monthOutstanding = isPaid ? 0 : Math.max(0, monthlyFee + lateFee - discount - paidAmount);
-
-      const totalDue = monthOutstanding + depositDue;
-
-      if (monthOutstanding === 0 && depositDue === 0 && (currentFee || isPaid)) {
+      const totalDue = monthOutstanding;
+      if (monthOutstanding === 0 && (currentFee || isPaid)) {
         status = 'paid';
       }
 
@@ -905,7 +904,7 @@ export default function FeeManagement() {
                       className="cursor-pointer select-none text-foreground font-bold hover:text-primary transition-colors py-3"
                     >
                       <div className="flex items-center gap-1.5">
-                        <span>Deposit Due</span>
+                        <span>Security Deposit Due (One-Time)</span>
                         {sortField === 'depositDue' ? (
                           sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />
                         ) : (
@@ -1004,9 +1003,12 @@ export default function FeeManagement() {
                               </div>
                               <div>
                                 <p className="leading-snug">{s.name}</p>
-                                <p className="text-[11px] text-muted-foreground font-mono font-normal">
-                                  @{s.username}
-                                </p>
+                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono font-normal">
+                                  <span>@{s.username}</span>
+                                  {s.start_date && (
+                                    <span>• Joined: {formatDateDMY(s.start_date)}</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </TableCell>
@@ -1026,7 +1028,7 @@ export default function FeeManagement() {
                             ₹{(r.totalDue || 0).toLocaleString('en-IN')}
                           </TableCell>
                           <TableCell className="text-muted-foreground font-mono text-xs hidden lg:table-cell">
-                            {r.dueDate ? format(parseISO(r.dueDate), 'dd MMM yyyy') : 'N/A'}
+                            {r.dueDate ? formatDateDMY(r.dueDate) : 'N/A'}
                           </TableCell>
                           <TableCell>{badge}</TableCell>
                           <TableCell className="text-right space-x-1">

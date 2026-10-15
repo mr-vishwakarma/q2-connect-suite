@@ -113,9 +113,28 @@ async function addEmailJob(jobType, payload, options = {}) {
         case 'STUDENT_CREDENTIALS':
           await emailUtils.sendStudentCredentials(payload);
           break;
-        case 'STUDENT_WELCOME_ACTIVATION':
-          await emailUtils.sendStudentWelcomeEmail(payload);
+        case 'STUDENT_WELCOME_ACTIVATION': {
+          const Student = require('../models/Student');
+          const targetStudentId = payload.studentDocId || payload.studentId;
+          try {
+            await emailUtils.sendStudentWelcomeEmail(payload);
+            if (targetStudentId) {
+              await Student.updateOne(
+                { _id: targetStudentId },
+                { $set: { welcomeEmailStatus: 'sent', welcomeEmailSentAt: new Date(), welcomeEmailError: null } }
+              );
+            }
+          } catch (degErr) {
+            if (targetStudentId) {
+              await Student.updateOne(
+                { _id: targetStudentId },
+                { $set: { welcomeEmailStatus: 'failed', welcomeEmailError: degErr.message } }
+              );
+            }
+            throw degErr;
+          }
           break;
+        }
         case 'PASSWORD_RESET':
           await emailUtils.sendPasswordResetEmail(payload);
           break;

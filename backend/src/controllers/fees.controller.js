@@ -6,6 +6,7 @@ const Student = require('../models/Student');
 const Notification = require('../models/Notification');
 
 const feeService = require('../services/fee.service');
+const { calculateCycleDueDate, getNextMonthlyDueDate, calculateBillingPeriod } = require('../utils/billingCycle');
 
 // @desc    Get complete fee management data for admin
 // @route   GET /api/fees/dashboard
@@ -240,7 +241,7 @@ const generateMonthlyFees = async (req, res) => {
       query.hostel = { $in: req.tenant.hostelAccess };
     }
 
-    const students = await Student.find(query).select('_id hostel hostelId organizationId fees validDate').lean();
+    const students = await Student.find(query).select('_id hostel hostelId organizationId fees validDate startDate').lean();
     if (students.length === 0) {
       return res.status(200).json({
         success: true,
@@ -251,28 +252,34 @@ const generateMonthlyFees = async (req, res) => {
     }
 
     // High-performance batched bulkWrite with $setOnInsert: 1 round-trip instead of N sequential writes
-    const bulkOps = students.map((student) => ({
-      updateOne: {
-        filter: {
-          studentId: student._id,
-          month,
-        },
-        update: {
-          $setOnInsert: {
+    const bulkOps = students.map((student) => {
+      const derivedDueDate = student.startDate
+        ? getNextMonthlyDueDate(student.startDate, 1)
+        : (student.validDate || new Date());
+
+      return {
+        updateOne: {
+          filter: {
             studentId: student._id,
-            organizationId: student.organizationId || req.tenant?.organizationId || null,
-            hostelId: student.hostelId || null,
-            hostel: student.hostel || 'Q2',
             month,
-            amount: student.fees || 0,
-            paidAmount: 0,
-            status: 'unpaid',
-            dueDate: student.validDate || new Date(),
           },
+          update: {
+            $setOnInsert: {
+              studentId: student._id,
+              organizationId: student.organizationId || req.tenant?.organizationId || null,
+              hostelId: student.hostelId || null,
+              hostel: student.hostel || 'Q2',
+              month,
+              amount: student.fees || 0,
+              paidAmount: 0,
+              status: 'unpaid',
+              dueDate: derivedDueDate,
+            },
+          },
+          upsert: true,
         },
-        upsert: true,
-      },
-    }));
+      };
+    });
 
     const writeResult = await Fee.bulkWrite(bulkOps, { ordered: false });
     const created = writeResult.upsertedCount || 0;
@@ -469,13 +476,22 @@ const collectPayment = async (req, res) => {
         lateFee: numLateFee,
         discount: numDiscount,
         status: 'unpaid',
-        paymentMode
+        paymentMode,
+        dueDate: breakdown.dueDate,
+        periodStart: breakdown.periodStart,
+        periodEnd: breakdown.periodEnd,
+        cycleNumber: breakdown.billingCycle?.cycleIndex ?? null,
       }], { session, ordered: true });
       feeRow = newFees[0];
     } else {
       feeRow = await Fee.findByIdAndUpdate(
         feeRow._id,
-        { lateFee: numLateFee, discount: numDiscount, amount: numAmount },
+        {
+          lateFee: numLateFee,
+          discount: numDiscount,
+          amount: numAmount,
+          ...(breakdown.dueDate && !feeRow.dueDate ? { dueDate: breakdown.dueDate } : {}),
+        },
         { new: true, session }
       );
     }
@@ -534,12 +550,12 @@ const collectPayment = async (req, res) => {
       }
     }
 
-    // 4. Extend student validDate if fully paid (best-effort)
+    // 4. Extend student validDate if fully paid using deterministic calendar arithmetic
     if (feeCore >= totalDue) {
-      if (student && student.validDate) {
-        const cur = new Date(student.validDate);
-        cur.setMonth(cur.getMonth() + 1);
-        await Student.findByIdAndUpdate(studentId, { validDate: cur }, { session });
+      if (student && (student.startDate || student.validDate)) {
+        const anchor = student.startDate || student.validDate;
+        const nextDue = getNextMonthlyDueDate(anchor, 1);
+        await Student.findByIdAndUpdate(studentId, { validDate: nextDue }, { session });
       }
     }
 

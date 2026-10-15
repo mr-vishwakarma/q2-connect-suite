@@ -123,11 +123,28 @@ async function processEmailJob(job) {
     }
 
     case 'STUDENT_WELCOME_ACTIVATION': {
-      const { to, activationLink } = payload;
+      const { to, activationLink, studentDocId, studentId } = payload;
+      const targetStudentId = studentDocId || studentId;
       if (!to || !activationLink) {
         throw new UnrecoverableError('Missing required welcome activation payload fields (to, activationLink)');
       }
-      await emailUtils.sendStudentWelcomeEmail(payload);
+      try {
+        await emailUtils.sendStudentWelcomeEmail(payload);
+        if (targetStudentId) {
+          await Student.updateOne(
+            { _id: targetStudentId },
+            { $set: { welcomeEmailStatus: 'sent', welcomeEmailSentAt: new Date(), welcomeEmailError: null } }
+          );
+        }
+      } catch (err) {
+        if (targetStudentId) {
+          await Student.updateOne(
+            { _id: targetStudentId },
+            { $set: { welcomeEmailStatus: 'failed', welcomeEmailError: err.message } }
+          );
+        }
+        throw err;
+      }
       return { success: true, recipient: to };
     }
 

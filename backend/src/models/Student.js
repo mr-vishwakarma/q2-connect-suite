@@ -30,6 +30,13 @@ const studentSchema = new mongoose.Schema(
     },
     isLegalHold: { type: Boolean, default: false },
     checkoutDate: { type: Date },
+    welcomeEmailStatus: {
+      type: String,
+      enum: ['pending', 'sent', 'failed'],
+      default: 'pending',
+    },
+    welcomeEmailSentAt: { type: Date },
+    welcomeEmailError: { type: String },
   },
   { timestamps: true }
 );

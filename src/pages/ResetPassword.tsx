@@ -49,28 +49,15 @@ export default function ResetPassword() {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/auth/reset-password', {
+      const response = await api.post('/auth/password/reset', {
         token,
         newPassword: password,
+        confirmPassword,
       });
 
       if (response.data?.success) {
-        toast.success('Password successfully reset! Logging you in...');
-        
-        // Auto-login
-        if (response.data.accessToken && response.data.refreshToken) {
-          localStorage.setItem('accessToken', response.data.accessToken);
-          localStorage.setItem('refreshToken', response.data.refreshToken);
-          await refreshProfile();
-          
-          if (response.data.user?.role === 'admin') {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/student/dashboard');
-          }
-        } else {
-          navigate('/login');
-        }
+        toast.success('Password updated successfully! Please sign in with your new password.');
+        navigate('/login');
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to reset password');

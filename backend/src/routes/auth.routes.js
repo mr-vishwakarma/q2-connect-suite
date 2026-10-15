@@ -45,8 +45,11 @@ router.get('/me', protect, getMe);
 router.get('/admin-exists', checkAdminExists);
 
 // Password Reset
-router.post('/request-reset', requestPasswordReset);
-router.post('/reset-password', resetPassword);
+router.post('/password/forgot', authLimiter, requestPasswordReset);
+router.post('/password/reset', authLimiter, resetPassword);
+router.post('/request-reset', authLimiter, requestPasswordReset);
+router.post('/reset-password', authLimiter, resetPassword);
+router.post('/forgot-password', authLimiter, requestPasswordReset);
 
 // Admin management
 router.get('/admins', protect, adminOnly, getAdmins);
