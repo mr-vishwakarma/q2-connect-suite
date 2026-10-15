@@ -232,12 +232,18 @@ const handleUnifiedLogin = async (req, res, defaultPortal) => {
       newValue: { portal: requestedPortal, role: user.role },
     });
 
+    const { isUserPrimaryAdmin } = require('./adminManagement.controller');
+    const isPrimary = await isUserPrimaryAdmin(user, user.activeOrganizationId);
+    const userPayload = user.toJSON();
+    userPayload.isPrimaryAdmin = isPrimary;
+    userPayload.is_primary = isPrimary;
+
     return res.status(200).json({
       success: true,
       portal: requestedPortal,
       accessToken,
       refreshToken,
-      user: user.toJSON(),
+      user: userPayload,
       student: studentProfile,
       organization: resolvedOrgFeatures.organization,
       features: resolvedOrgFeatures.features,
@@ -764,9 +770,15 @@ const getMe = async (req, res) => {
       resolveUserFeaturesAndOrg(req.user._id),
     ]);
 
+    const { isUserPrimaryAdmin } = require('./adminManagement.controller');
+    const isPrimary = await isUserPrimaryAdmin(req.user, req.user.activeOrganizationId);
+    const userPayload = req.user.toJSON ? req.user.toJSON() : req.user.toObject ? req.user.toObject() : { ...req.user };
+    userPayload.isPrimaryAdmin = isPrimary;
+    userPayload.is_primary = isPrimary;
+
     return res.status(200).json({
       success: true,
-      user: req.user,
+      user: userPayload,
       student: studentProfile,
       organization: resolvedOrgFeatures.organization,
       features: resolvedOrgFeatures.features,
@@ -788,35 +800,30 @@ const checkAdminExists = async (req, res) => {
   }
 };
 
-// @desc    Get all admins
+// @desc    Get all admins (Tenant scoped & Primary status resolved)
 // @route   GET /api/auth/admins
 // @access  Private (Admin only)
 const getAdmins = async (req, res) => {
-  try {
-    const admins = await User.find({ role: 'admin' }).select('-password -refreshTokens');
-    return res.status(200).json({ success: true, data: admins });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
+  const { getAdmins: getTenantAdmins } = require('./adminManagement.controller');
+  return getTenantAdmins(req, res);
 };
 
-// @desc    Delete an admin
+// @desc    Delete/Deactivate an admin (Requires Primary Admin OTP)
 // @route   DELETE /api/auth/admins/:id
-// @access  Private (Admin only)
+// @access  Private (Primary Admin only)
 const deleteAdmin = async (req, res) => {
-  try {
-    const adminToDelete = await User.findById(req.params.id);
-    if (!adminToDelete || adminToDelete.role !== 'admin') {
-      return res.status(404).json({ success: false, message: 'Admin not found' });
-    }
-    if (adminToDelete.email === 'abhi1006@q2hostel.local' || adminToDelete.username === 'abhi1006') {
-      return res.status(403).json({ success: false, message: 'Primary Admin cannot be deleted' });
-    }
-    await User.findByIdAndDelete(req.params.id);
-    return res.status(200).json({ success: true, message: 'Admin deleted successfully' });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+  const otp = req.headers['x-admin-otp'] || req.body?.otp;
+  if (!otp) {
+    return res.status(403).json({
+      success: false,
+      code: 'OTP_VERIFICATION_REQUIRED',
+      message: 'Email OTP verification of the Primary Admin is required to delete or deactivate an administrator account.',
+    });
   }
+
+  const { verifyDeleteAdmin } = require('./adminManagement.controller');
+  req.body = { ...req.body, otp, targetAdminId: req.params.id };
+  return verifyDeleteAdmin(req, res);
 };
 
 // @desc    Request password reset email

@@ -320,6 +320,137 @@ const sendStudentWelcomeEmail = async (options) => {
   return sendEmail({ to, subject, html, text });
 };
 
+/**
+ * Send email OTP to Primary Admin for privileged actions (Create/Delete Secondary Admin)
+ * @param {object} options - { to, adminName, action, otp, expiresInMinutes }
+ */
+const sendAdminActionOtpEmail = async ({ to, adminName = 'Administrator', action, otp, expiresInMinutes = 5 }) => {
+  const actionLabel =
+    action === 'CREATE_SECONDARY_ADMIN'
+      ? 'Create New Secondary Admin'
+      : action === 'DELETE_SECONDARY_ADMIN' || action === 'DEACTIVATE_SECONDARY_ADMIN'
+      ? 'Deactivate Secondary Admin Account'
+      : 'Privileged Admin Management Action';
+
+  const subject = `[Security] Your Verification Code: ${otp} (${actionLabel})`;
+  const text = `Q2 Connect Suite Security Verification\n\nHello ${adminName},\n\nYou have requested to perform the following sensitive administrative action:\n${actionLabel}\n\nYour One-Time Verification Code is:\n${otp}\n\nThis verification code expires in ${expiresInMinutes} minutes and is strictly single-use.\n\nSECURITY NOTICE:\nNever share this code with anyone. If you did not initiate this request, someone may be attempting to alter administrator privileges for your hostel. Please contact security immediately.\n\nBest regards,\nQ2 Connect Suite Security Operations`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 24px; background-color: #0f172a; color: #f8fafc; border-radius: 16px; border: 1px solid #1e293b;">
+      <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #334155;">
+        <h1 style="color: #f59e0b; font-size: 24px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Q2 CONNECT SUITE</h1>
+        <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px;">Security & Privilege Authorization</p>
+      </div>
+
+      <div style="padding: 24px 0;">
+        <h2 style="color: #ffffff; font-size: 18px; margin: 0 0 12px 0;">Privileged Action Verification Required 🛡️</h2>
+        <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
+          Hello <strong>${adminName}</strong>,<br/>
+          A request has been initiated by your Primary Admin account for:
+        </p>
+
+        <div style="background-color: #1e293b; border-left: 4px solid #f59e0b; border-radius: 4px; padding: 12px 16px; margin-bottom: 20px;">
+          <p style="color: #ffffff; font-size: 14px; margin: 0; font-weight: 600;">Action: ${actionLabel}</p>
+        </div>
+
+        <div style="text-align: center; background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(99,102,241,0.1)); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <p style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px 0; font-weight: 700;">One-Time Verification Code</p>
+          <div style="font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #f59e0b; font-family: monospace; margin: 8px 0;">
+            ${otp}
+          </div>
+          <p style="color: #94a3b8; font-size: 12px; margin: 8px 0 0 0;">Valid for <strong>${expiresInMinutes} minutes</strong> (Single-use)</p>
+        </div>
+
+        <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 14px; margin-bottom: 20px;">
+          <p style="color: #fca5a5; font-size: 12px; line-height: 1.5; margin: 0;">
+            <strong>Security Warning:</strong> Never share this code with anyone. Q2 support personnel will never ask for your verification code. If you did not initiate this request, change your password immediately.
+          </p>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #1e293b; padding-top: 16px; text-align: center; color: #64748b; font-size: 12px;">
+        <p style="margin: 0;">© ${new Date().getFullYear()} Q2 Connect Suite. Automated Security Notification.</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({ to, subject, html, text });
+};
+
+/**
+ * Send welcome & account setup invitation email to newly created Secondary Admin
+ * @param {object} options - { to, name, username, hostelName, orgName, activationLink, loginLink }
+ */
+const sendSecondaryAdminWelcomeEmail = async ({
+  to,
+  name,
+  username,
+  hostelName = 'Assigned Hostel',
+  orgName = 'Q2 Connect Suite',
+  activationLink,
+  loginLink,
+}) => {
+  const subject = `Welcome to Q2 Connect Suite — Activate Your Administrator Account (${hostelName})`;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+  const finalLoginLink = loginLink || `${frontendUrl}/login?role=admin`;
+
+  const text = `Welcome to Q2 Connect Suite!\n\nHello ${name},\n\nYou have been designated as a Secondary Administrator for "${hostelName}" under ${orgName}.\n\nYour Account Details:\n- Admin Name: ${name}\n- User ID: ${username}\n- Email: ${to}\n- Assigned Hostel: ${hostelName}\n\nFor security reasons, permanent passwords are never sent by email. Please activate your account and choose your password by opening the link below (valid for 48 hours):\n${activationLink}\n\nAfter setting your password, you can sign in to the Admin Dashboard at:\n${finalLoginLink}\n\nBest regards,\nPrimary Administration & Security Operations — Q2 Connect Suite`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #0f172a; color: #f8fafc; border-radius: 16px; border: 1px solid #1e293b;">
+      <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #334155;">
+        <h1 style="color: #f59e0b; font-size: 24px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Q2 CONNECT SUITE</h1>
+        <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px;">Hostel Operations & Management Platform</p>
+      </div>
+
+      <div style="padding: 24px 0;">
+        <h2 style="color: #ffffff; font-size: 19px; margin: 0 0 12px 0;">Welcome, ${name}! 👋</h2>
+        <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
+          You have been added as an <strong>Administrator</strong> for <strong>${hostelName}</strong> under <strong>${orgName}</strong>. Your staff account has been provisioned.
+        </p>
+
+        <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
+          <p style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px 0; font-weight: 600;">Account Credentials</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="color: #94a3b8; padding: 6px 0;">Assigned Role:</td>
+              <td style="color: #ffffff; font-weight: 600; text-align: right;">Secondary Admin</td>
+            </tr>
+            <tr>
+              <td style="color: #94a3b8; padding: 6px 0;">Login User ID:</td>
+              <td style="color: #ffffff; font-weight: 600; font-family: monospace; text-align: right;">${username}</td>
+            </tr>
+            <tr>
+              <td style="color: #94a3b8; padding: 6px 0;">Hostel Branch:</td>
+              <td style="color: #ffffff; font-weight: 600; text-align: right;">${hostelName}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(99,102,241,0.1)); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 22px; text-align: center; margin-bottom: 24px;">
+          <p style="color: #ffffff; font-weight: 600; font-size: 15px; margin: 0 0 8px 0;">Set Your Private Password</p>
+          <p style="color: #94a3b8; font-size: 13px; margin: 0 0 16px 0;">In accordance with Q2 Security Policies, we never send permanent passwords via email. Click below to choose your secure credentials.</p>
+          <a href="${activationLink}" style="display: inline-block; background-color: #f59e0b; color: #000000; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; box-shadow: 0 4px 12px rgba(245,158,11,0.3);">
+            Activate Account & Set Password
+          </a>
+          <p style="color: #64748b; font-size: 11px; margin: 12px 0 0 0;">This single-use activation link expires in 48 hours.</p>
+        </div>
+
+        <p style="color: #94a3b8; font-size: 13px; line-height: 1.5; margin: 0 0 12px 0;">
+          If the button above does not work, copy and paste this link into your browser:<br/>
+          <a href="${activationLink}" style="color: #38bdf8; word-break: break-all;">${activationLink}</a>
+        </p>
+      </div>
+
+      <div style="border-top: 1px solid #1e293b; padding-top: 16px; text-align: center; color: #64748b; font-size: 12px;">
+        <p style="margin: 0;">© ${new Date().getFullYear()} Q2 Connect Suite. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({ to, subject, html, text });
+};
+
 module.exports = { 
   getTransporter,
   verifySmtpConnection,
@@ -330,5 +461,8 @@ module.exports = {
   sendPasswordResetEmail,
   sendAdminNewStudentRegisteredNotification,
   sendHostelOnboardingWelcomeEmail,
+  sendAdminActionOtpEmail,
+  sendSecondaryAdminWelcomeEmail,
 };
+
 

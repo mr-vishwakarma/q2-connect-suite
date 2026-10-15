@@ -158,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           user: mappedUser,
           isSuperAdmin: userData.role === 'super_admin' || !!userData.isSuperAdmin,
           isAdmin: userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin,
-          isPrimaryAdmin: userData.role === 'admin' || userData.role === 'super_admin',
+          isPrimaryAdmin: Boolean(userData.isPrimaryAdmin ?? userData.is_primary ?? (userData.role === 'super_admin' || userData.isSuperAdmin)),
           profile: newProfile,
           features: (userFeatures && typeof userFeatures === 'object') ? userFeatures : {},
         });
@@ -253,7 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: mappedUser,
       isSuperAdmin: userData.role === 'super_admin' || !!userData.isSuperAdmin,
       isAdmin: userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin,
-      isPrimaryAdmin: userData.role === 'admin' || userData.role === 'super_admin',
+      isPrimaryAdmin: Boolean(userData.isPrimaryAdmin ?? userData.is_primary ?? (userData.role === 'super_admin' || userData.isSuperAdmin)),
       profile: newProfile,
       features: (data.features && typeof data.features === 'object') ? data.features : {},
     });

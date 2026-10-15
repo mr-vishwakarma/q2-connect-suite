@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
     },
     role: { type: String, enum: ['super_admin', 'admin', 'student', 'warden', 'accountant', 'staff'], default: 'student' },
     isSuperAdmin: { type: Boolean, default: false },
+    isPrimaryAdmin: { type: Boolean, default: false },
     activeOrganizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
     activeHostelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hostel' },
     // Admin can manage multiple hostels
@@ -66,6 +67,7 @@ const userSchema = new mongoose.Schema(
 
 userSchema.index({ role: 1, isActive: 1, createdAt: -1 });
 userSchema.index({ activeOrganizationId: 1, role: 1 });
+userSchema.index({ activeOrganizationId: 1, role: 1, isPrimaryAdmin: 1 });
 userSchema.index({ lockUntil: 1 });
 
 // Method: Check if account is locked

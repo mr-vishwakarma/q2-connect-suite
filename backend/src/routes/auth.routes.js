@@ -3,6 +3,7 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const { protect } = require('../middleware/auth.middleware');
 const { adminOnly } = require('../middleware/admin.middleware');
+const { resolveTenantContext } = require('../middleware/tenant.middleware');
 const {
   login,
   adminLogin,
@@ -51,9 +52,9 @@ router.post('/request-reset', authLimiter, requestPasswordReset);
 router.post('/reset-password', authLimiter, resetPassword);
 router.post('/forgot-password', authLimiter, requestPasswordReset);
 
-// Admin management
-router.get('/admins', protect, adminOnly, getAdmins);
-router.delete('/admins/:id', protect, adminOnly, deleteAdmin);
+// Admin management (Tenant scoped & Protected)
+router.get('/admins', protect, adminOnly, resolveTenantContext, getAdmins);
+router.delete('/admins/:id', protect, adminOnly, resolveTenantContext, deleteAdmin);
 
 module.exports = router;
 

@@ -35,6 +35,7 @@ const webhookRoutes = require('./routes/webhook.routes');
 const healthRoutes = require('./routes/health.routes');
 const billingRoutes = require('./routes/billing.routes');
 const hostelsRoutes = require('./routes/hostels.routes');
+const adminManagementRoutes = require('./routes/adminManagement.routes');
 const { requestLogger } = require('./middleware/requestLogger.middleware');
 const { requestIdMiddleware } = require('./middleware/requestId.middleware');
 
@@ -150,6 +151,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/subscriptions', billingRoutes);
 app.use('/api/hostels', hostelsRoutes);
+app.use('/api/admins', adminManagementRoutes);
+app.use('/api/admin-management', adminManagementRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // 404 handler
