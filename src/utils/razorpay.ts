@@ -88,3 +88,65 @@ export async function openRazorpaySubscriptionCheckout(
   rzp.open();
 }
 
+export interface RazorpayOrderCheckoutOptions {
+  orderId: string;
+  keyId: string;
+  amountPaise: number;
+  currency?: string;
+  organizationName?: string;
+  adminEmail?: string;
+  adminPhone?: string;
+  description?: string;
+}
+
+export interface RazorpayOrderResponse {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
+export async function openRazorpayOrderCheckout(
+  options: RazorpayOrderCheckoutOptions,
+  onSuccess: (response: RazorpayOrderResponse) => void,
+  onFailure?: (error: any) => void
+): Promise<void> {
+  const isLoaded = await loadRazorpayScript();
+  if (!isLoaded) {
+    throw new Error('Payment gateway SDK could not be loaded. Please check your network connection.');
+  }
+
+  const razorpayOptions: any = {
+    key: options.keyId,
+    order_id: options.orderId,
+    amount: options.amountPaise,
+    currency: options.currency || 'INR',
+    name: 'Q2 Connect Suite',
+    description: options.description || 'Q2 SaaS Discounted Subscription',
+    prefill: {
+      name: options.organizationName || '',
+      email: options.adminEmail || '',
+      contact: options.adminPhone || '',
+    },
+    theme: {
+      color: '#f59e0b',
+    },
+    handler: function (response: RazorpayOrderResponse) {
+      onSuccess(response);
+    },
+    modal: {
+      ondismiss: function () {
+        if (onFailure) {
+          onFailure({ message: 'Checkout was dismissed by user' });
+        }
+      },
+    },
+  };
+
+  const rzp = new (window as any).Razorpay(razorpayOptions);
+  rzp.on('payment.failed', function (response: any) {
+    if (onFailure) {
+      onFailure(response.error);
+    }
+  });
+  rzp.open();
+}

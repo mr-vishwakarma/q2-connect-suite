@@ -77,6 +77,7 @@ const HostelList = lazy(() => import("./pages/super-admin/HostelList"));
 const UserManagement = lazy(() => import("./pages/super-admin/UserManagement"));
 const PlanManagement = lazy(() => import("./pages/super-admin/PlanManagement"));
 const SubscriptionManagement = lazy(() => import("./pages/super-admin/SubscriptionManagement"));
+const CouponsVouchers = lazy(() => import("./pages/super-admin/CouponsVouchers"));
 const FeatureCatalog = lazy(() => import("./pages/super-admin/FeatureCatalog"));
 const PlatformAnalytics = lazy(() => import("./pages/super-admin/PlatformAnalytics"));
 const AuditLogsView = lazy(() => import("./pages/super-admin/AuditLogsView"));
@@ -258,6 +259,7 @@ const App = () => (
                 <Route path="users" element={<UserManagement />} />
                 <Route path="plans" element={<PlanManagement />} />
                 <Route path="subscriptions" element={<SubscriptionManagement />} />
+                <Route path="vouchers" element={<CouponsVouchers />} />
                 <Route path="features" element={<FeatureCatalog />} />
                 <Route path="audit-logs" element={<AuditLogsView />} />
                 <Route path="security" element={<SecurityCenter />} />

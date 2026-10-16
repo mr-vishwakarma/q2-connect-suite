@@ -56,6 +56,17 @@ const invoiceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    discountRupees: {
+      type: Number,
+      default: 0,
+    },
+    originalAmountRupees: {
+      type: Number,
+    },
+    voucherRedemptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'VoucherRedemption',
+    },
     totalRupees: {
       type: Number,
       required: true,

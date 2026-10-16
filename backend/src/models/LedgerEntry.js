@@ -66,7 +66,7 @@ const ledgerEntrySchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ['ONLINE_PAYMENT', 'MANUAL_PAYMENT', 'REFUND', 'ADJUSTMENT', 'WAIVER', 'REVERSAL', 'SAAS_SUBSCRIPTION'],
+      enum: ['ONLINE_PAYMENT', 'MANUAL_PAYMENT', 'REFUND', 'ADJUSTMENT', 'WAIVER', 'REVERSAL', 'SAAS_SUBSCRIPTION', 'SAAS_VOUCHER'],
       required: true,
       index: true,
     },

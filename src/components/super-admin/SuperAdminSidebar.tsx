@@ -18,6 +18,7 @@ import {
   UserCheck,
   Activity,
   FileDown,
+  Ticket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -53,6 +54,7 @@ const SUPER_ADMIN_NAV_SECTIONS: NavSection[] = [
     links: [
       { to: '/super-admin/plans', icon: CreditCard, label: 'Plans & Pricing' },
       { to: '/super-admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+      { to: '/super-admin/vouchers', icon: Ticket, label: 'Coupons & Vouchers' },
       { to: '/super-admin/features', icon: ToggleLeft, label: 'Feature Catalog' },
     ],
   },

@@ -43,10 +43,21 @@ import {
   Download,
   AlertTriangle,
   RotateCcw,
+  Ticket,
+  Tag,
+  Eye,
+  EyeOff,
+  X,
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'react-toastify';
-import { openRazorpaySubscriptionCheckout } from '@/utils/razorpay';
+import {
+  openRazorpaySubscriptionCheckout,
+  openRazorpayOrderCheckout,
+} from '@/utils/razorpay';
+import { voucherService, ApplyVoucherResponse } from '@/services/api/voucher.service';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Billing() {
@@ -62,6 +73,22 @@ export default function Billing() {
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<SaaSPlan | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+
+  // Voucher State for Checkout
+  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherPin, setVoucherPin] = useState('');
+  const [isPinVisible, setIsPinVisible] = useState(false);
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
+  const [appliedVoucherPreview, setAppliedVoucherPreview] = useState<ApplyVoucherResponse | null>(null);
+  const [voucherError, setVoucherError] = useState<string | null>(null);
+
+  const resetVoucherState = () => {
+    setVoucherCode('');
+    setVoucherPin('');
+    setAppliedVoucherPreview(null);
+    setVoucherError(null);
+    setIsPinVisible(false);
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -91,10 +118,123 @@ export default function Billing() {
   // Open Plan Summary / Billing Confirmation Modal
   const handleSelectPlan = (plan: SaaSPlan) => {
     setSelectedPlanForCheckout(plan);
+    resetVoucherState();
     setIsCheckoutOpen(true);
   };
 
-  // Launch Razorpay Subscription Checkout
+  // 1. Preview Voucher
+  const handleApplyVoucher = async () => {
+    if (!selectedPlanForCheckout) return;
+    if (!voucherCode.trim()) {
+      setVoucherError('Please enter your 16-character voucher code');
+      return;
+    }
+    if (!voucherPin.trim()) {
+      setVoucherError('Please enter your 6-digit secret PIN');
+      return;
+    }
+
+    try {
+      setIsApplyingVoucher(true);
+      setVoucherError(null);
+      const preview = await voucherService.applyVoucher({
+        code: voucherCode.trim(),
+        pin: voucherPin.trim(),
+        planId: selectedPlanForCheckout._id,
+        billingCycle,
+      });
+      setAppliedVoucherPreview(preview);
+      toast.success(`Voucher applied! ₹${preview.discountAmount.toLocaleString('en-IN')} discount calculated.`);
+    } catch (err: any) {
+      console.error('Apply voucher error:', err);
+      const msg = err.response?.data?.message || err.message || 'Voucher could not be applied';
+      setVoucherError(msg);
+      setAppliedVoucherPreview(null);
+      toast.error(msg);
+    } finally {
+      setIsApplyingVoucher(false);
+    }
+  };
+
+  // 2. Zero-Payable Direct Activation (Atomic ₹0)
+  const handleRedeemZeroPayable = async () => {
+    if (!selectedPlanForCheckout || !appliedVoucherPreview) return;
+    try {
+      setIsProcessingCheckout(true);
+      const result = await voucherService.redeemZeroPayable({
+        code: voucherCode.trim(),
+        pin: voucherPin.trim(),
+        planId: selectedPlanForCheckout._id,
+        billingCycle,
+        idempotencyKey: `zero_${selectedPlanForCheckout._id}_${Date.now()}`,
+      });
+      toast.success(`Subscription activated with voucher! Invoice: ${result.invoiceNumber}`);
+      setIsCheckoutOpen(false);
+      resetVoucherState();
+      fetchData();
+    } catch (err: any) {
+      console.error('Zero-payable redemption error:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to activate subscription with voucher');
+    } finally {
+      setIsProcessingCheckout(false);
+    }
+  };
+
+  // 3. Partial-Discount Payment Checkout
+  const handleProceedWithPartialDiscount = async () => {
+    if (!selectedPlanForCheckout || !appliedVoucherPreview) return;
+    try {
+      setIsProcessingCheckout(true);
+      const reservation = await voucherService.reservePartial({
+        code: voucherCode.trim(),
+        pin: voucherPin.trim(),
+        planId: selectedPlanForCheckout._id,
+        billingCycle,
+      });
+
+      setIsCheckoutOpen(false);
+
+      await openRazorpayOrderCheckout(
+        {
+          orderId: reservation.orderId,
+          keyId: reservation.keyId,
+          amountPaise: reservation.amountPaise,
+          currency: reservation.currency,
+          organizationName: user?.username || 'Q2 Organization',
+          adminEmail: user?.email,
+          description: `Discounted Subscription for ${reservation.planName} (${reservation.billingCycle})`,
+        },
+        async (response) => {
+          try {
+            const verifyResult = await voucherService.verifyPartial({
+              checkoutSessionId: reservation.checkoutSessionId,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            toast.success(`Discounted subscription activated! Invoice: ${verifyResult.invoiceNumber}`);
+            resetVoucherState();
+            fetchData();
+          } catch (verifyErr: any) {
+            console.error('Partial discount verification error:', verifyErr);
+            toast.error(verifyErr.response?.data?.message || 'Payment received; verifying with provider...');
+            fetchData();
+          }
+        },
+        (error) => {
+          console.warn('Checkout cancelled:', error);
+          toast.info('Checkout was cancelled');
+        }
+      );
+    } catch (err: any) {
+      console.error('Partial reservation error:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to initiate discounted payment');
+    } finally {
+      setIsProcessingCheckout(false);
+    }
+  };
+
+  // 4. Standard Non-Voucher Razorpay Subscription Checkout
   const handleProceedToPayment = async () => {
     if (!selectedPlanForCheckout) return;
 
@@ -118,7 +258,6 @@ export default function Billing() {
           description: `Subscription for ${checkoutInit.planName} (${checkoutInit.billingCycle})`,
         },
         async (response) => {
-          // Signature received from modal -> verify with backend
           try {
             const verifyResult = await billingService.verifySubscription(response);
             toast.success(`Subscription activated! Invoice: ${verifyResult.invoiceNumber}`);
@@ -475,7 +614,7 @@ export default function Billing() {
       {/* 4. Plan Summary & Checkout Confirmation Modal */}
       {selectedPlanForCheckout && (
         <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-          <DialogContent className="sm:max-w-[460px] bg-card border-border rounded-2xl p-6 shadow-2xl animate-fade-in">
+          <DialogContent className="sm:max-w-[500px] bg-card border-border rounded-2xl p-6 shadow-2xl animate-fade-in max-h-[90vh] overflow-y-auto">
             <DialogHeader className="space-y-2">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-1">
                 <CreditCard className="w-6 h-6" />
@@ -483,72 +622,273 @@ export default function Billing() {
               <DialogTitle className="text-xl font-bold text-foreground">
                 Confirm Subscription
               </DialogTitle>
-              <DialogDescription className="text-muted-foreground text-sm">
-                Review your plan summary before continuing to secure Razorpay subscription checkout.
+              <DialogDescription className="text-muted-foreground text-xs">
+                Review your plan selection, apply subscription vouchers, and activate your tier.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="bg-secondary/40 border border-border/80 rounded-xl p-4 my-4 space-y-3">
-              <div className="flex justify-between items-center text-sm">
+            {/* Plan Specs */}
+            <div className="bg-secondary/40 border border-border/80 rounded-xl p-4 my-3 space-y-2.5">
+              <div className="flex justify-between items-center text-xs">
                 <span className="text-muted-foreground">Selected Plan</span>
                 <span className="font-semibold text-foreground">{selectedPlanForCheckout.name}</span>
               </div>
-              <div className="flex justify-between items-center text-sm">
+              <div className="flex justify-between items-center text-xs">
                 <span className="text-muted-foreground">Billing Cycle</span>
-                <Badge variant="outline" className="font-mono text-xs">
+                <Badge variant="outline" className="font-mono text-[10px]">
                   {billingCycle}
                 </Badge>
               </div>
-              <div className="flex justify-between items-center text-sm">
+              <div className="flex justify-between items-center text-xs">
                 <span className="text-muted-foreground">Student Capacity</span>
                 <span className="text-foreground">{selectedPlanForCheckout.limits?.maxStudents} students</span>
               </div>
-              <div className="border-t border-border pt-3 flex justify-between items-center">
-                <span className="font-bold text-foreground">Recurring Charge</span>
-                <span className="text-2xl font-extrabold text-primary font-mono flex items-center">
-                  <IndianRupee className="w-5 h-5 mr-0.5 inline" />
-                  {(billingCycle === 'YEARLY'
+            </div>
+
+            {/* Voucher Redemption Section */}
+            <div className="border border-border/80 rounded-xl p-4 bg-muted/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                  <Ticket className="w-4 h-4 text-primary" />
+                  <span>Subscription Voucher / Coupon</span>
+                </div>
+                {appliedVoucherPreview && (
+                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">
+                    Discount Applied
+                  </Badge>
+                )}
+              </div>
+
+              {!appliedVoucherPreview ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-muted-foreground font-medium">
+                        16-Char Voucher Code
+                      </Label>
+                      <Input
+                        id="voucher-code-input"
+                        placeholder="e.g. Q2M7K9X4P8W3R6TZ"
+                        value={voucherCode}
+                        onChange={(e) => {
+                          setVoucherCode(e.target.value.toUpperCase());
+                          setVoucherError(null);
+                        }}
+                        className="h-8 text-xs font-mono uppercase"
+                        maxLength={19}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-muted-foreground font-medium">
+                        6-Digit Secret PIN
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="voucher-pin-input"
+                          type={isPinVisible ? 'text' : 'password'}
+                          placeholder="6-digit PIN"
+                          value={voucherPin}
+                          onChange={(e) => {
+                            setVoucherPin(e.target.value);
+                            setVoucherError(null);
+                          }}
+                          className="h-8 text-xs font-mono tracking-wider pr-8"
+                          maxLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setIsPinVisible(!isPinVisible)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          tabIndex={-1}
+                        >
+                          {isPinVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {voucherError && (
+                    <p className="text-[11px] text-destructive flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      {voucherError}
+                    </p>
+                  )}
+
+                  <Button
+                    id="apply-voucher-btn"
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleApplyVoucher}
+                    disabled={isApplyingVoucher || !voucherCode.trim() || !voucherPin.trim()}
+                    className="w-full h-8 text-xs font-semibold"
+                  >
+                    {isApplyingVoucher ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Validating Voucher...
+                      </>
+                    ) : (
+                      <>
+                        <Tag className="w-3.5 h-3.5 mr-1.5" /> Apply Voucher
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                    <div>
+                      <p className="font-bold text-emerald-400">{appliedVoucherPreview.voucherName}</p>
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {appliedVoucherPreview.voucherReference}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-emerald-400 text-sm">
+                        -₹{appliedVoucherPreview.discountAmount.toLocaleString('en-IN')}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={resetVoucherState}
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                        title="Remove voucher"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Financial Summary Calculation */}
+            <div className="bg-secondary/30 border border-border rounded-xl p-4 my-2 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-muted-foreground">Original Plan Price</span>
+                <span className="font-semibold text-foreground">
+                  ₹{(billingCycle === 'YEARLY'
                     ? selectedPlanForCheckout.priceYearly
                     : selectedPlanForCheckout.priceMonthly
                   ).toLocaleString('en-IN')}
-                  <span className="text-xs text-muted-foreground font-normal ml-1">
-                    / {billingCycle === 'YEARLY' ? 'yr' : 'mo'}
-                  </span>
                 </span>
+              </div>
+
+              {appliedVoucherPreview && (
+                <div className="flex justify-between items-center text-xs text-emerald-400">
+                  <span className="font-medium flex items-center gap-1">
+                    <Tag className="w-3 h-3" /> Voucher Discount
+                  </span>
+                  <span className="font-bold">
+                    -₹{appliedVoucherPreview.discountAmount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+
+              <div className="border-t border-border pt-2 flex justify-between items-center">
+                <span className="font-bold text-sm text-foreground">Final Payable</span>
+                <div className="text-right">
+                  <span className="text-2xl font-extrabold text-primary font-mono flex items-center justify-end">
+                    <IndianRupee className="w-5 h-5 mr-0.5 inline" />
+                    {(appliedVoucherPreview
+                      ? appliedVoucherPreview.finalPayable
+                      : billingCycle === 'YEARLY'
+                      ? selectedPlanForCheckout.priceYearly
+                      : selectedPlanForCheckout.priceMonthly
+                    ).toLocaleString('en-IN')}
+                    <span className="text-xs text-muted-foreground font-normal ml-1">
+                      / {billingCycle === 'YEARLY' ? 'yr' : 'mo'}
+                    </span>
+                  </span>
+
+                  {appliedVoucherPreview?.isZeroPayable && (
+                    <span className="text-[11px] font-bold text-emerald-400 block mt-0.5">
+                      100% Free • Zero-Balance Activation
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground mb-4">
               <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Recurring agreement secured by 256-bit encryption via Razorpay.</span>
+              <span>
+                {appliedVoucherPreview?.isZeroPayable
+                  ? 'Zero-balance voucher entitlement processed securely without gateway redirect.'
+                  : 'Recurring agreement secured by 256-bit encryption via Razorpay.'}
+              </span>
             </div>
 
             <DialogFooter className="flex gap-2 sm:gap-0">
               <Button
                 variant="outline"
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto text-xs"
                 disabled={isProcessingCheckout}
                 onClick={() => setIsCheckoutOpen(false)}
               >
                 Cancel
               </Button>
-              <Button
-                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-                disabled={isProcessingCheckout}
-                onClick={handleProceedToPayment}
-              >
-                {isProcessingCheckout ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Initializing Gateway...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Continue to Secure Payment
-                  </>
-                )}
-              </Button>
+
+              {appliedVoucherPreview?.isZeroPayable ? (
+                <Button
+                  id="proceed-zero-payable-btn"
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md text-xs"
+                  disabled={isProcessingCheckout}
+                  onClick={handleRedeemZeroPayable}
+                >
+                  {isProcessingCheckout ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Activating Subscription...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Proceed & Activate (₹0 Free)
+                    </>
+                  )}
+                </Button>
+              ) : appliedVoucherPreview ? (
+                <Button
+                  id="proceed-partial-discount-btn"
+                  className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs"
+                  disabled={isProcessingCheckout}
+                  onClick={handleProceedWithPartialDiscount}
+                >
+                  {isProcessingCheckout ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Initializing Gateway...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Pay ₹{appliedVoucherPreview.finalPayable.toLocaleString('en-IN')} via Razorpay
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  id="proceed-standard-payment-btn"
+                  className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs"
+                  disabled={isProcessingCheckout}
+                  onClick={handleProceedToPayment}
+                >
+                  {isProcessingCheckout ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Initializing Gateway...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Continue to Secure Payment
+                    </>
+                  )}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

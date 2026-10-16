@@ -71,9 +71,17 @@ const paymentSchema = new mongoose.Schema(
     },
     provider: {
       type: String,
-      enum: ['RAZORPAY', 'MANUAL'],
+      enum: ['RAZORPAY', 'MANUAL', 'VOUCHER'],
       default: 'RAZORPAY',
       index: true,
+    },
+    voucherRedemptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'VoucherRedemption',
+    },
+    discountRupees: {
+      type: Number,
+      default: 0,
     },
     // Provider Order Identifier (e.g. order_Q2_xyz) or Subscription Charge Reference
     orderId: {
