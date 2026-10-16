@@ -144,6 +144,31 @@ async function addEmailJob(jobType, payload, options = {}) {
         case 'ADMIN_NEW_STUDENT_REGISTERED':
           await emailUtils.sendAdminNewStudentRegisteredNotification(payload);
           break;
+        case 'SECONDARY_ADMIN_WELCOME': {
+          const User = require('../models/User');
+          const adminUserId = payload.adminUserId;
+          try {
+            await emailUtils.sendSecondaryAdminWelcomeEmail(payload);
+            if (adminUserId) {
+              await User.updateOne(
+                { _id: adminUserId },
+                { $set: { invitationEmailStatus: 'sent', invitationEmailSentAt: new Date(), invitationEmailError: null } }
+              );
+            }
+          } catch (degErr) {
+            if (adminUserId) {
+              await User.updateOne(
+                { _id: adminUserId },
+                { $set: { invitationEmailStatus: 'failed', invitationEmailError: degErr.message } }
+              );
+            }
+            throw degErr;
+          }
+          break;
+        }
+        case 'ADMIN_ACTION_OTP':
+          await emailUtils.sendAdminActionOtpEmail(payload);
+          break;
         case 'FEE_REMINDER': {
           const { processEmailJob } = require('../workers/email.worker');
           await processEmailJob({ name: 'FEE_REMINDER', data: payload, id: fallbackJobId });

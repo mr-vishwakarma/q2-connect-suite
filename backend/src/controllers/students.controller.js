@@ -470,9 +470,10 @@ const createStudent = async (req, res) => {
     session.endSession();
 
     // Send single-use time-limited activation welcome email (idempotent BullMQ job)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
     const loginLink = `${frontendUrl}/login?role=student`;
+    const correlationId = req.requestId || `welcome-activation-${student._id}`;
 
     addEmailJob('STUDENT_WELCOME_ACTIVATION', {
       to: email.toLowerCase(),
@@ -484,7 +485,33 @@ const createStudent = async (req, res) => {
       loginLink,
       studentDocId: student._id.toString(),
       supportContact: hostelDoc?.contactPhone || 'support@q2connect.com',
-    }, { jobId: `welcome-activation-${student._id}` }).catch(err => console.warn('[students.controller] Welcome activation email queue warning:', err.message));
+      correlationId,
+    }, { jobId: `welcome-activation-${student._id}` }).catch(async (err) => {
+      console.warn('[students.controller] Welcome activation email queue warning:', err.message);
+      try {
+        const emailUtils = require('../utils/email');
+        await emailUtils.sendStudentWelcomeEmail({
+          to: email.toLowerCase(),
+          name,
+          username: finalUsername,
+          studentCode: finalStudentCode,
+          hostel: hostelDoc ? hostelDoc.name : resolvedBranchCode,
+          activationLink,
+          loginLink,
+          correlationId,
+        });
+        await Student.updateOne(
+          { _id: student._id },
+          { $set: { welcomeEmailStatus: 'sent', welcomeEmailSentAt: new Date(), welcomeEmailError: null } }
+        );
+      } catch (fallbackErr) {
+        console.error('[students.controller] Direct welcome email fallback failed:', fallbackErr.message);
+        await Student.updateOne(
+          { _id: student._id },
+          { $set: { welcomeEmailStatus: 'failed', welcomeEmailError: fallbackErr.message } }
+        );
+      }
+    });
 
     // Asynchronously notify admin via queue
     const adminEmail = req.user?.email || 'abhi1006@q2connect.com';
@@ -1345,21 +1372,52 @@ const resendStudentInvitation = async (req, res) => {
     student.welcomeEmailError = null;
     await student.save({ validateBeforeSave: false });
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
     const loginLink = `${frontendUrl}/login?role=student`;
+    const correlationId = req.requestId || `resend-activation-${student._id}-${Date.now()}`;
 
-    await addEmailJob('STUDENT_WELCOME_ACTIVATION', {
-      to: student.email.toLowerCase(),
-      studentName: student.name,
-      studentId: student.studentCode || student.username,
-      username: student.username,
-      hostelName: student.hostel,
-      activationLink,
-      loginLink,
-      studentDocId: student._id.toString(),
-      supportContact: 'support@q2connect.com',
-    }, { jobId: `resend-activation-${student._id}-${Date.now()}` });
+    try {
+      await addEmailJob('STUDENT_WELCOME_ACTIVATION', {
+        to: student.email.toLowerCase(),
+        studentName: student.name,
+        studentId: student.studentCode || student.username,
+        username: student.username,
+        hostelName: student.hostel,
+        activationLink,
+        loginLink,
+        studentDocId: student._id.toString(),
+        supportContact: 'support@q2connect.com',
+        correlationId,
+      }, { jobId: `resend-activation-${student._id}-${Date.now()}` });
+    } catch (qErr) {
+      console.warn(`[students.controller] Resend queue failed (${qErr.message}), sending directly...`);
+      try {
+        const emailUtils = require('../utils/email');
+        await emailUtils.sendStudentWelcomeEmail({
+          to: student.email.toLowerCase(),
+          name: student.name,
+          username: student.username,
+          studentCode: student.studentCode || student.username,
+          hostel: student.hostel,
+          activationLink,
+          loginLink,
+          correlationId,
+        });
+        student.welcomeEmailStatus = 'sent';
+        student.welcomeEmailSentAt = new Date();
+        student.welcomeEmailError = null;
+        await student.save({ validateBeforeSave: false });
+      } catch (directErr) {
+        student.welcomeEmailStatus = 'failed';
+        student.welcomeEmailError = directErr.message;
+        await student.save({ validateBeforeSave: false });
+        return res.status(500).json({
+          success: false,
+          message: `Failed to deliver welcome email: ${directErr.message}`,
+        });
+      }
+    }
 
     return res.status(200).json({
       success: true,

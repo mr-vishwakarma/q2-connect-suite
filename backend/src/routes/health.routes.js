@@ -104,6 +104,18 @@ router.get('/ready', async (req, res) => {
     environment: process.env.RAZORPAY_ENVIRONMENT || 'test',
   };
 
+  // 5. Transactional Email & SMTP Configuration
+  const { getSmtpConfigStatus } = require('../utils/email');
+  const smtpConfig = getSmtpConfigStatus();
+  dependencies.email = {
+    status: smtpConfig.configured ? 'CONFIGURED' : 'CONFIGURATION_MISSING',
+    configured: smtpConfig.configured,
+    host: smtpConfig.host,
+    port: smtpConfig.port,
+    secure: smtpConfig.secure,
+    fromConfigured: smtpConfig.fromConfigured,
+  };
+
   const totalDurationMs = Date.now() - startTime;
   const overallStatus = isReady
     ? (dependencies.redis.status === 'HEALTHY' ? 'OPERATIONAL' : 'DEGRADED')
@@ -118,6 +130,40 @@ router.get('/ready', async (req, res) => {
     timestamp: new Date().toISOString(),
     dependencies,
     requestId: req.requestId,
+  });
+});
+
+/**
+ * Explicit Email Transport Diagnostic Probe (Controlled Verification)
+ * Distinguishes:
+ * - CONFIGURATION_MISSING
+ * - TRANSPORT_CONNECTION_FAILED
+ * - SMTP_AUTHENTICATION_FAILED
+ * - EMAIL_ACCEPTED_BY_SMTP
+ * 
+ * Never returns passwords, secrets, or permanent credentials.
+ */
+router.get('/email-diagnostic', async (req, res) => {
+  const { getSmtpConfigStatus, verifySmtpConnection } = require('../utils/email');
+  const config = getSmtpConfigStatus();
+  const verifyResult = await verifySmtpConnection();
+
+  const statusCode = verifyResult.success ? 200 : (verifyResult.status === 'CONFIGURATION_MISSING' ? 503 : 502);
+
+  res.status(statusCode).json({
+    success: verifyResult.success,
+    diagnosticStatus: verifyResult.status,
+    configPresence: {
+      configured: config.configured,
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      senderConfigured: config.fromConfigured,
+    },
+    error: verifyResult.error || null,
+    code: verifyResult.code || null,
+    requestId: req.requestId,
+    timestamp: new Date().toISOString(),
   });
 });
 

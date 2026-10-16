@@ -851,6 +851,12 @@ const requestPasswordReset = async (req, res) => {
       return res.status(200).json({ success: true, message: genericResponse });
     }
 
+    // Never generate reset tokens for suspended or deactivated accounts
+    if (user.status === 'SUSPENDED' || user.status === 'DEACTIVATED' || user.isActive === false) {
+      console.warn(`[auth.controller] Password reset requested for inactive/suspended account: ${user._id}`);
+      return res.status(200).json({ success: true, message: genericResponse });
+    }
+
     // Generate cryptographically secure random token
     const resetToken = crypto.randomBytes(32).toString('hex');
     
@@ -861,23 +867,29 @@ const requestPasswordReset = async (req, res) => {
     await user.save({ validateBeforeSave: false });
 
     // Create reset URL using explicit trusted frontend URL
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+    const correlationId = req.requestId || `pwd-reset-${Date.now()}`;
 
     // Queue or send email
     try {
       const { addEmailJob } = require('../queues/queueManager');
-      await addEmailJob('PASSWORD_RESET', { to: user.email, resetLink });
+      await addEmailJob(
+        'PASSWORD_RESET',
+        { to: user.email, resetLink, correlationId },
+        { jobId: `pwd-reset-${user._id}-${Date.now()}` }
+      );
     } catch (err) {
-      console.warn('Queue reset email failed, sending directly:', err.message);
+      console.warn(`[auth.controller] Queue reset email failed (${err.message}), sending directly...`);
       try {
-        await sendPasswordResetEmail({ to: user.email, resetLink });
+        const { sendPasswordResetEmail } = require('../utils/email');
+        await sendPasswordResetEmail({ to: user.email, resetLink, correlationId });
       } catch (directErr) {
-        console.error('Failed to send reset email:', directErr);
+        console.error(`[auth.controller] Direct reset email dispatch failed: ${directErr.message}`);
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
         await user.save({ validateBeforeSave: false });
-        return res.status(500).json({ success: false, message: 'Error sending email' });
+        return res.status(200).json({ success: true, message: genericResponse });
       }
     }
 

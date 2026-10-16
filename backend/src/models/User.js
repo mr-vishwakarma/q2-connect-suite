@@ -38,6 +38,15 @@ const userSchema = new mongoose.Schema(
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
 
+    // Invitation Email Delivery Tracking (Phase: Admin Management & Email Delivery)
+    invitationEmailStatus: {
+      type: String,
+      enum: ['pending', 'sent', 'failed'],
+      default: 'pending',
+    },
+    invitationEmailSentAt: { type: Date },
+    invitationEmailError: { type: String },
+
     // Security & Anti-Brute-Force Lockout
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },

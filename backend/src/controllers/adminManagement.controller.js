@@ -157,6 +157,9 @@ const getAdmins = async (req, res) => {
           is_primary: Boolean(isPrimary),
           isPrimaryAdmin: Boolean(isPrimary),
           hostels: u.hostels || [],
+          invitationEmailStatus: u.invitationEmailStatus || (u.status === 'INVITED' ? 'pending' : 'sent'),
+          invitationEmailError: u.invitationEmailError || null,
+          invitationEmailSentAt: u.invitationEmailSentAt || null,
           created_at: u.createdAt,
         };
       })
@@ -477,35 +480,74 @@ const verifyCreateAdmin = async (req, res) => {
     });
 
     // Queue welcome email with single-use activation link (no plaintext password)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
+    const correlationId = req.requestId || `admin-inv-${newAdmin._id}`;
+
+    const { addEmailJob } = require('../queues/queueManager');
+    let emailDispatched = false;
 
     try {
-      await sendSecondaryAdminWelcomeEmail({
-        to: newAdmin.email,
-        name: newAdmin.name,
-        username: newAdmin.username,
-        hostelName: assignedHostel ? assignedHostel.name : 'Hostel Branch',
-        orgName: req.tenant?.organizationName || 'Q2 Connect Suite',
-        activationLink,
-        loginLink: `${frontendUrl}/login?role=admin`,
-      });
+      await addEmailJob(
+        'SECONDARY_ADMIN_WELCOME',
+        {
+          to: newAdmin.email,
+          name: newAdmin.name,
+          username: newAdmin.username,
+          hostelName: assignedHostel ? assignedHostel.name : 'Hostel Branch',
+          orgName: req.tenant?.organizationName || 'Q2 Connect Suite',
+          activationLink,
+          loginLink: `${frontendUrl}/login?role=admin`,
+          adminUserId: newAdmin._id.toString(),
+          correlationId,
+        },
+        { jobId: `admin-inv-${newAdmin._id}` }
+      );
+      emailDispatched = true;
     } catch (mailErr) {
-      console.warn(`[email] Welcome email delivery to ${newAdmin.email} encountered error: ${mailErr.message}`);
+      console.warn(`[adminManagement] Queue invitation email failed (${mailErr.message}), falling back to direct send...`);
+      try {
+        await sendSecondaryAdminWelcomeEmail({
+          to: newAdmin.email,
+          name: newAdmin.name,
+          username: newAdmin.username,
+          hostelName: assignedHostel ? assignedHostel.name : 'Hostel Branch',
+          orgName: req.tenant?.organizationName || 'Q2 Connect Suite',
+          activationLink,
+          loginLink: `${frontendUrl}/login?role=admin`,
+          correlationId,
+        });
+        await User.updateOne(
+          { _id: newAdmin._id },
+          { $set: { invitationEmailStatus: 'sent', invitationEmailSentAt: new Date(), invitationEmailError: null } }
+        );
+        emailDispatched = true;
+      } catch (directErr) {
+        console.error(`[adminManagement] Direct invitation email failed: ${directErr.message}`);
+        await User.updateOne(
+          { _id: newAdmin._id },
+          { $set: { invitationEmailStatus: 'failed', invitationEmailError: directErr.message } }
+        );
+      }
     }
 
     await logAdminAuditEvent({
       req,
       action: 'SECONDARY_ADMIN_CREATED',
       entityId: newAdmin._id,
-      description: `Secondary Admin ${newAdmin.username} (${newAdmin.email}) created by Primary Admin`,
+      description: `Secondary Admin ${newAdmin.username} (${newAdmin.email}) created by Primary Admin. Email status: ${emailDispatched ? 'DISPATCHED' : 'FAILED'}`,
       newValue: { id: newAdmin._id, username: newAdmin.username, email: newAdmin.email },
       result: 'SUCCESS',
     });
 
+    const successMessage = emailDispatched
+      ? `Secondary Admin ${newAdmin.name} created successfully. An activation email has been dispatched to ${newAdmin.email}.`
+      : `Secondary Admin ${newAdmin.name} created successfully, but the activation email could not be delivered. You can resend the invitation from the directory.`;
+
     return res.status(201).json({
       success: true,
-      message: `Secondary Admin ${newAdmin.name} created successfully. An activation email has been delivered to ${newAdmin.email}.`,
+      message: successMessage,
+      emailDispatched,
       data: {
         id: newAdmin._id.toString(),
         user_id: newAdmin._id.toString(),
@@ -514,6 +556,7 @@ const verifyCreateAdmin = async (req, res) => {
         email: newAdmin.email,
         role: newAdmin.role,
         status: newAdmin.status,
+        invitationEmailStatus: emailDispatched ? 'sent' : 'failed',
         is_primary: false,
         isPrimaryAdmin: false,
         created_at: newAdmin.createdAt,
@@ -840,18 +883,69 @@ const resendAdminInvitation = async (req, res) => {
     target.activationToken = hashedActivationToken;
     target.activationExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
     target.status = 'INVITED';
+    target.invitationEmailStatus = 'pending';
+    target.invitationEmailError = null;
     await target.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
+    const correlationId = req.requestId || `resend-admin-inv-${target._id}-${Date.now()}`;
 
-    await sendSecondaryAdminWelcomeEmail({
-      to: target.email,
-      name: target.name,
-      username: target.username,
-      activationLink,
-      loginLink: `${frontendUrl}/login?role=admin`,
-    });
+    // Resolve assigned hostel for branding
+    let assignedHostelName = 'Hostel Branch';
+    if (target.activeHostelId) {
+      const hDoc = await Hostel.findById(target.activeHostelId).lean();
+      if (hDoc) assignedHostelName = hDoc.name;
+    }
+
+    const { addEmailJob } = require('../queues/queueManager');
+    let emailSent = false;
+    try {
+      await addEmailJob(
+        'SECONDARY_ADMIN_WELCOME',
+        {
+          to: target.email,
+          name: target.name,
+          username: target.username,
+          hostelName: assignedHostelName,
+          orgName: req.tenant?.organizationName || 'Q2 Connect Suite',
+          activationLink,
+          loginLink: `${frontendUrl}/login?role=admin`,
+          adminUserId: target._id.toString(),
+          correlationId,
+        },
+        { jobId: `resend-admin-inv-${target._id}-${Date.now()}` }
+      );
+      emailSent = true;
+    } catch (qErr) {
+      console.warn(`[adminManagement] Resend queue failed (${qErr.message}), falling back to direct send...`);
+      try {
+        await sendSecondaryAdminWelcomeEmail({
+          to: target.email,
+          name: target.name,
+          username: target.username,
+          hostelName: assignedHostelName,
+          orgName: req.tenant?.organizationName || 'Q2 Connect Suite',
+          activationLink,
+          loginLink: `${frontendUrl}/login?role=admin`,
+          correlationId,
+        });
+        target.invitationEmailStatus = 'sent';
+        target.invitationEmailSentAt = new Date();
+        target.invitationEmailError = null;
+        await target.save();
+        emailSent = true;
+      } catch (directErr) {
+        console.error(`[adminManagement] Direct resend failed: ${directErr.message}`);
+        target.invitationEmailStatus = 'failed';
+        target.invitationEmailError = directErr.message;
+        await target.save();
+        return res.status(500).json({
+          success: false,
+          message: `Failed to deliver invitation email: ${directErr.message}`,
+        });
+      }
+    }
 
     await logAdminAuditEvent({
       req,
@@ -863,7 +957,7 @@ const resendAdminInvitation = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `Invitation email resent successfully to ${target.email}.`,
+      message: `Invitation email dispatched successfully to ${target.email}.`,
     });
   } catch (error) {
     console.error('Error in resendAdminInvitation:', error);

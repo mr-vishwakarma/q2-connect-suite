@@ -171,6 +171,43 @@ async function processEmailJob(job) {
       return { success: true, recipient: payload.to };
     }
 
+    case 'SECONDARY_ADMIN_WELCOME': {
+      const { to, activationLink, adminUserId } = payload;
+      if (!to || !activationLink) {
+        throw new UnrecoverableError('Missing required admin invitation payload fields (to, activationLink)');
+      }
+      try {
+        await emailUtils.sendSecondaryAdminWelcomeEmail(payload);
+        if (adminUserId) {
+          await User.updateOne(
+            { _id: adminUserId },
+            { $set: { invitationEmailStatus: 'sent', invitationEmailSentAt: new Date(), invitationEmailError: null } }
+          );
+        }
+      } catch (err) {
+        if (adminUserId) {
+          await User.updateOne(
+            { _id: adminUserId },
+            { $set: { invitationEmailStatus: 'failed', invitationEmailError: err.message } }
+          );
+        }
+        if (err.status === 'CONFIGURATION_MISSING' || err.status === 'MESSAGE_REJECTED') {
+          throw new UnrecoverableError(`Permanent admin invitation error: ${err.message}`);
+        }
+        throw err;
+      }
+      return { success: true, recipient: to };
+    }
+
+    case 'ADMIN_ACTION_OTP': {
+      const { to, otp } = payload;
+      if (!to || !otp) {
+        throw new UnrecoverableError('Missing required admin action OTP payload fields (to, otp)');
+      }
+      await emailUtils.sendAdminActionOtpEmail(payload);
+      return { success: true, recipient: to };
+    }
+
     default:
       throw new UnrecoverableError(`Unrecognized email job type: ${jobType}`);
   }
