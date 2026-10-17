@@ -876,9 +876,9 @@ const requestPasswordReset = async (req, res) => {
     // Generate cryptographically secure random token
     const resetToken = crypto.randomBytes(32).toString('hex');
     
-    // Hash it and save to DB with 30 minutes expiry
+    // Hash it and save to DB with 2 hours expiry
     user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetPasswordExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
+    user.resetPasswordExpires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
     
     await user.save({ validateBeforeSave: false });
 
@@ -907,10 +907,7 @@ const requestPasswordReset = async (req, res) => {
         await sendPasswordResetEmail({ to: user.email, resetLink, correlationId });
       } catch (directErr) {
         console.error(`[auth.controller] Direct reset email dispatch failed: ${directErr.message}`);
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpires = undefined;
-        await user.save({ validateBeforeSave: false });
-        return res.status(200).json({ success: true, message: genericResponse });
+        // Retain token so in-flight recovery attempts or retries remain valid
       }
     }
 
@@ -939,24 +936,48 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
     }
 
-    // Hash the token to compare with DB
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const cleanToken = String(token).trim();
+    const hashedToken = crypto.createHash('sha256').update(cleanToken).digest('hex');
 
+    // Multi-variant lookup: accepts both hashed and raw tokens across password-reset and activation
     const user = await User.findOne({
       $or: [
-        {
-          resetPasswordToken: hashedToken,
-          resetPasswordExpires: { $gt: Date.now() },
-        },
-        {
-          activationToken: hashedToken,
-          activationExpires: { $gt: Date.now() },
-        },
+        { resetPasswordToken: hashedToken },
+        { resetPasswordToken: cleanToken },
+        { activationToken: hashedToken },
+        { activationToken: cleanToken },
       ],
     });
 
     if (!user) {
       return res.status(400).json({ success: false, message: 'Invalid or expired activation or password reset token' });
+    }
+
+    // Check expiry
+    const now = Date.now();
+    let isExpired = false;
+
+    if (user.resetPasswordToken === hashedToken || user.resetPasswordToken === cleanToken) {
+      if (user.resetPasswordExpires) {
+        const expiresTime = user.resetPasswordExpires instanceof Date
+          ? user.resetPasswordExpires.getTime()
+          : new Date(user.resetPasswordExpires).getTime();
+        if (expiresTime < now) isExpired = true;
+      }
+    } else if (user.activationToken === hashedToken || user.activationToken === cleanToken) {
+      if (user.activationExpires) {
+        const expiresTime = user.activationExpires instanceof Date
+          ? user.activationExpires.getTime()
+          : new Date(user.activationExpires).getTime();
+        if (expiresTime < now) isExpired = true;
+      }
+    }
+
+    if (isExpired) {
+      return res.status(400).json({
+        success: false,
+        message: 'This password reset link has expired. Please request a new link from the Forgot Password page.',
+      });
     }
 
     // Set new password (the pre-save hook handles the hashing)
