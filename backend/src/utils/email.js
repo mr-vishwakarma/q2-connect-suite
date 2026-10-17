@@ -71,15 +71,12 @@ let lastConfigHash = '';
  */
 function getSenderAddress() {
   const configuredFrom = (process.env.EMAIL_FROM || '').trim();
-  const smtpUser = (process.env.SMTP_USER || '').trim();
+  const smtpUser = (process.env.SMTP_USER || 'mayurvish2003@gmail.com').trim();
 
-  if (configuredFrom) {
+  if (configuredFrom && configuredFrom.includes('@') && !configuredFrom.includes('@q2connect.com')) {
     return configuredFrom;
   }
-  if (smtpUser) {
-    return `Q2 Connect Suite <${smtpUser}>`;
-  }
-  return 'Q2 Connect Suite <noreply@q2connect.com>';
+  return `Q2 GIRLS HOSTEL <${smtpUser}>`;
 }
 
 /**
@@ -819,6 +816,7 @@ module.exports = {
   getTransporter,
   getSmtpConfigStatus,
   verifySmtpConnection,
+  getSenderAddress,
   isRoutableEmail,
   sendEmail,
   sendStudentCredentials,

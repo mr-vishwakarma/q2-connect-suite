@@ -244,6 +244,24 @@ const feeService = {
       fee = allStudentFees.find((f) => String(f._id) === String(feeId));
     } else if (feeMonth) {
       fee = allStudentFees.find((f) => f.month === feeMonth);
+      if (!fee) {
+        // If the requested feeMonth is not yet stored, derive cycleIndex from joining date to feeMonth
+        const MONTHS = [
+          'january', 'february', 'march', 'april', 'may', 'june',
+          'july', 'august', 'september', 'october', 'november', 'december'
+        ];
+        const parts = feeMonth.trim().split(/\s+/);
+        if (parts.length === 2) {
+          const targetM = MONTHS.indexOf(parts[0].toLowerCase());
+          const targetY = parseInt(parts[1], 10);
+          const joinD = new Date(joiningDate);
+          if (targetM >= 0 && !isNaN(targetY) && !isNaN(joinD.getTime())) {
+            const diff = (targetY - joinD.getFullYear()) * 12 + (targetM - joinD.getMonth());
+            cycleIndex = Math.max(0, diff);
+            targetBillingPeriod = calculateBillingPeriod(joiningDate, cycleIndex);
+          }
+        }
+      }
     } else {
       // Default: Find the oldest unpaid or partial fee record (Case A & Case C: preserve arrears)
       const oldestUnpaid = allStudentFees.find((f) => f.status === 'unpaid' || f.status === 'partial');

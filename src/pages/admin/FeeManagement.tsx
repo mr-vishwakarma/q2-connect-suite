@@ -196,11 +196,28 @@ export default function FeeManagement() {
           (currentFee?.paid_amount || 0) >=
             monthlyFee + (currentFee?.late_fee || 0) - (currentFee?.discount || 0));
 
-      const dueDate = currentFee?.due_date
-        ? new Date(currentFee.due_date)
-        : s.valid_date
-        ? new Date(s.valid_date)
-        : null;
+      let dueDate: Date | null = null;
+      if (currentFee?.due_date) {
+        dueDate = new Date(currentFee.due_date);
+      } else if (s.start_date) {
+        // Derive monthly recurring due date from student's canonical joining date anchor for selectedMonth
+        try {
+          const joinDate = new Date(s.start_date);
+          const selDate = new Date(`01 ${selectedMonth}`);
+          if (!isNaN(joinDate.getTime()) && !isNaN(selDate.getTime())) {
+            const targetYear = selDate.getFullYear();
+            const targetMonth = selDate.getMonth();
+            const maxDays = new Date(targetYear, targetMonth + 1, 0).getDate();
+            const targetDay = Math.min(joinDate.getDate(), maxDays);
+            dueDate = new Date(targetYear, targetMonth, targetDay, 0, 0, 0, 0);
+          }
+        } catch {
+          // fallback
+        }
+      }
+      if (!dueDate && s.valid_date) {
+        dueDate = new Date(s.valid_date);
+      }
 
       let lateFee = 0;
       let status: FeeStatusType = 'pending';
@@ -386,9 +403,26 @@ export default function FeeManagement() {
         depositDue = c.depositDue || 0;
       }
     } catch {
+      let dDate: Date | null = null;
       const cf = fees.find((f) => f.student_id === s.id && f.month === targetMonth);
       if (cf?.due_date) {
-        const overdue = differenceInDays(new Date(), new Date(cf.due_date));
+        dDate = new Date(cf.due_date);
+      } else if (s.start_date) {
+        try {
+          const joinD = new Date(s.start_date);
+          const selD = new Date(`01 ${targetMonth}`);
+          if (!isNaN(joinD.getTime()) && !isNaN(selD.getTime())) {
+            const y = selD.getFullYear();
+            const m = selD.getMonth();
+            const maxD = new Date(y, m + 1, 0).getDate();
+            dDate = new Date(y, m, Math.min(joinD.getDate(), maxD));
+          }
+        } catch {
+          // fallback
+        }
+      }
+      if (dDate) {
+        const overdue = differenceInDays(new Date(), dDate);
         lateFee = overdue > gracePeriodSetting ? (overdue - gracePeriodSetting) * lateFeeSetting : 0;
       }
     }

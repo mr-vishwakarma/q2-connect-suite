@@ -476,7 +476,7 @@ const createStudent = async (req, res) => {
       req.headers.origin.endsWith('.lovable.app') ||
       req.headers.origin.endsWith('.onrender.com')
     )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
-    const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
+    const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
     const loginLink = `${frontendUrl}/login?role=student`;
     const correlationId = req.requestId || `welcome-activation-${student._id}`;
 
@@ -1288,9 +1288,14 @@ const approveAndRegisterStudent = async (req, res) => {
     session.endSession();
 
     // Send single-use time-limited activation welcome email (idempotent BullMQ job)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const frontendUrl = (req?.headers?.origin && (
+      req.headers.origin.endsWith('.vercel.app') ||
+      req.headers.origin.startsWith('http://localhost') ||
+      req.headers.origin.endsWith('.lovable.app') ||
+      req.headers.origin.endsWith('.onrender.com')
+    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
     const activationLink = rawActivationToken
-      ? `${frontendUrl}/reset-password?token=${rawActivationToken}`
+      ? `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`
       : `${frontendUrl}/login?role=student`;
 
     addEmailJob('STUDENT_WELCOME_ACTIVATION', {

@@ -157,8 +157,34 @@ const deriveBillingCycle = calculateBillingPeriod;
  * @returns {{ overdueDays: number, chargeableDays: number, lateFee: number, isOverdue: boolean }}
  */
 function calculateLateFeeBreakdown(dueDateInput, gracePeriodDays = 5, lateFeePerDay = 20, asOfDateInput = new Date()) {
-  const normDueDate = normalizeToDateOnly(dueDateInput);
-  const normAsOf = normalizeToDateOnly(asOfDateInput);
+  let dueDate = dueDateInput;
+  let grace = gracePeriodDays;
+  let rate = lateFeePerDay;
+  let asOf = asOfDateInput;
+  let isPaid = false;
+  let historicalLateFee = 0;
+
+  // Polymorphic support: Handle options object as first argument
+  if (typeof dueDateInput === 'object' && dueDateInput !== null && !(dueDateInput instanceof Date)) {
+    dueDate = dueDateInput.dueDate;
+    grace = dueDateInput.gracePeriodDays !== undefined ? dueDateInput.gracePeriodDays : 5;
+    rate = dueDateInput.lateFeePerDay !== undefined ? dueDateInput.lateFeePerDay : 20;
+    asOf = dueDateInput.asOfDate !== undefined ? dueDateInput.asOfDate : new Date();
+    isPaid = Boolean(dueDateInput.isPaid);
+    historicalLateFee = Number(dueDateInput.historicalLateFee || 0);
+  }
+
+  if (isPaid) {
+    return {
+      overdueDays: 0,
+      chargeableDays: 0,
+      lateFee: historicalLateFee,
+      isOverdue: false,
+    };
+  }
+
+  const normDueDate = normalizeToDateOnly(dueDate);
+  const normAsOf = normalizeToDateOnly(asOf);
 
   if (!normDueDate || !normAsOf) {
     return {
@@ -173,16 +199,16 @@ function calculateLateFeeBreakdown(dueDateInput, gracePeriodDays = 5, lateFeePer
   const diffDays = Math.round((normAsOf.getTime() - normDueDate.getTime()) / msPerDay);
   const overdueDays = Math.max(0, diffDays);
 
-  const grace = Math.max(0, Number(gracePeriodDays) || 0);
-  const rate = Math.max(0, Number(lateFeePerDay) || 0);
+  const graceDays = Math.max(0, Number(grace) || 0);
+  const dailyRate = Math.max(0, Number(rate) || 0);
 
   let chargeableDays = 0;
   let lateFee = 0;
   let isOverdue = false;
 
-  if (overdueDays > grace) {
-    chargeableDays = overdueDays - grace;
-    lateFee = chargeableDays * rate;
+  if (overdueDays > graceDays) {
+    chargeableDays = overdueDays - graceDays;
+    lateFee = chargeableDays * dailyRate;
     isOverdue = true;
   }
 

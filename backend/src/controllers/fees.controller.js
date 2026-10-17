@@ -251,11 +251,32 @@ const generateMonthlyFees = async (req, res) => {
       });
     }
 
+    const MONTHS = [
+      'january', 'february', 'march', 'april', 'may', 'june',
+      'july', 'august', 'september', 'october', 'november', 'december'
+    ];
+    const monthParts = (month || '').trim().split(/\s+/);
+    let targetM = -1;
+    let targetY = NaN;
+    if (monthParts.length === 2) {
+      targetM = MONTHS.indexOf(monthParts[0].toLowerCase());
+      targetY = parseInt(monthParts[1], 10);
+    }
+
     // High-performance batched bulkWrite with $setOnInsert: 1 round-trip instead of N sequential writes
     const bulkOps = students.map((student) => {
-      const derivedDueDate = student.startDate
-        ? getNextMonthlyDueDate(student.startDate, 1)
-        : (student.validDate || new Date());
+      let derivedDueDate = student.validDate || new Date();
+      if (student.startDate) {
+        if (targetM >= 0 && !isNaN(targetY)) {
+          const joinD = new Date(student.startDate);
+          if (!isNaN(joinD.getTime())) {
+            const diffMonths = (targetY - joinD.getFullYear()) * 12 + (targetM - joinD.getMonth());
+            derivedDueDate = calculateCycleDueDate(student.startDate, Math.max(0, diffMonths));
+          }
+        } else {
+          derivedDueDate = calculateCycleDueDate(student.startDate, 0);
+        }
+      }
 
       return {
         updateOne: {

@@ -67,13 +67,14 @@ export function CollectPaymentDialog({
   const [calculating, setCalculating] = useState(false);
   const [calcDetails, setCalcDetails] = useState<CalculationDetails | null>(null);
 
-  // Synchronize initial values when dialog opens or selectedStudent changes
+  // Synchronize initial values only when dialog opens or selectedStudent changes
   useEffect(() => {
     if (open) {
       setForm(initialValues);
       setCalcDetails(null);
     }
-  }, [open, selectedStudent?.id, initialValues]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, selectedStudent?.id]);
 
   // Dynamic late-fee & payable fee calculation when month changes
   const fetchCalculation = useCallback(
