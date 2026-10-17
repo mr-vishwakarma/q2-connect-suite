@@ -839,12 +839,28 @@ const requestPasswordReset = async (req, res) => {
     const genericResponse = 'If an account matches that email address, password-reset instructions will be sent.';
 
     // Look for user by email or username (student User ID or email)
-    const user = await User.findOne({
+    const escapedKey = searchKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let user = await User.findOne({
       $or: [
         { email: searchKey },
-        { username: searchKey }
+        { username: { $regex: new RegExp(`^${escapedKey}$`, 'i') } }
       ]
     });
+
+    if (!user) {
+      // Check if this is a student looking up by studentCode or alternate identifier
+      const Student = require('../models/Student');
+      const student = await Student.findOne({
+        $or: [
+          { studentCode: { $regex: new RegExp(`^${escapedKey}$`, 'i') } },
+          { email: searchKey },
+          { username: { $regex: new RegExp(`^${escapedKey}$`, 'i') } }
+        ]
+      });
+      if (student && student.userId) {
+        user = await User.findById(student.userId);
+      }
+    }
     
     // We always return generic success to avoid leaking which accounts exist
     if (!user || !user.email) {
@@ -866,8 +882,13 @@ const requestPasswordReset = async (req, res) => {
     
     await user.save({ validateBeforeSave: false });
 
-    // Create reset URL using explicit trusted frontend URL
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
+    // Create reset URL using explicit trusted frontend URL or request origin
+    const frontendUrl = (req?.headers?.origin && (
+      req.headers.origin.endsWith('.vercel.app') ||
+      req.headers.origin.startsWith('http://localhost') ||
+      req.headers.origin.endsWith('.lovable.app') ||
+      req.headers.origin.endsWith('.onrender.com')
+    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
     const correlationId = req.requestId || `pwd-reset-${Date.now()}`;
 

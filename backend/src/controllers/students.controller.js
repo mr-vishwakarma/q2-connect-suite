@@ -470,7 +470,12 @@ const createStudent = async (req, res) => {
     session.endSession();
 
     // Send single-use time-limited activation welcome email (idempotent BullMQ job)
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
+    const frontendUrl = (req?.headers?.origin && (
+      req.headers.origin.endsWith('.vercel.app') ||
+      req.headers.origin.startsWith('http://localhost') ||
+      req.headers.origin.endsWith('.lovable.app') ||
+      req.headers.origin.endsWith('.onrender.com')
+    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
     const loginLink = `${frontendUrl}/login?role=student`;
     const correlationId = req.requestId || `welcome-activation-${student._id}`;
@@ -1372,7 +1377,12 @@ const resendStudentInvitation = async (req, res) => {
     student.welcomeEmailError = null;
     await student.save({ validateBeforeSave: false });
 
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
+    const frontendUrl = (req?.headers?.origin && (
+      req.headers.origin.endsWith('.vercel.app') ||
+      req.headers.origin.startsWith('http://localhost') ||
+      req.headers.origin.endsWith('.lovable.app') ||
+      req.headers.origin.endsWith('.onrender.com')
+    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
     const loginLink = `${frontendUrl}/login?role=student`;
     const correlationId = req.requestId || `resend-activation-${student._id}-${Date.now()}`;
@@ -1429,6 +1439,101 @@ const resendStudentInvitation = async (req, res) => {
   }
 };
 
+// @desc    Batch force-resend activation welcome emails to all unconfirmed registered students
+// @route   POST /api/students/force-resend-unconfirmed
+// @access  Private (Admin / Super Admin)
+const forceResendUnconfirmedStudents = async (req, res) => {
+  try {
+    const frontendUrl = (req?.headers?.origin && (
+      req.headers.origin.endsWith('.vercel.app') ||
+      req.headers.origin.startsWith('http://localhost') ||
+      req.headers.origin.endsWith('.lovable.app') ||
+      req.headers.origin.endsWith('.onrender.com')
+    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
+
+    const users = await User.find({
+      role: 'student',
+      $or: [
+        { mustChangePassword: true },
+        { activationToken: { $exists: true, $ne: null } }
+      ]
+    });
+    const emailUtils = require('../utils/email');
+    const results = [];
+
+    for (const user of users) {
+      if (!user.email || !user.email.includes('@')) continue;
+
+      const student = await Student.findOne({ userId: user._id });
+      if (!student) continue;
+
+      // Generate fresh activation token valid for 48 hours
+      const rawActivationToken = crypto.randomBytes(32).toString('hex');
+      const hashedActivationToken = crypto.createHash('sha256').update(rawActivationToken).digest('hex');
+      const activationExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+      user.activationToken = hashedActivationToken;
+      user.activationExpires = activationExpires;
+      user.mustChangePassword = true;
+      await user.save({ validateBeforeSave: false });
+
+      const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
+      const loginLink = `${frontendUrl}/login?role=student`;
+      const correlationId = `force-activation-${student._id}-${Date.now()}`;
+
+      try {
+        await emailUtils.sendStudentWelcomeEmail({
+          to: student.email.toLowerCase(),
+          name: student.name,
+          username: student.username || user.username,
+          studentCode: student.studentCode || student.username,
+          hostel: student.hostel || 'Q2',
+          activationLink,
+          loginLink,
+          correlationId,
+        });
+
+        student.welcomeEmailStatus = 'sent';
+        student.welcomeEmailSentAt = new Date();
+        student.welcomeEmailError = null;
+        await student.save({ validateBeforeSave: false });
+
+        results.push({
+          studentId: student._id,
+          name: student.name,
+          email: student.email,
+          studentCode: student.studentCode,
+          status: 'SENT',
+        });
+      } catch (sendErr) {
+        student.welcomeEmailStatus = 'failed';
+        student.welcomeEmailError = sendErr.message;
+        await student.save({ validateBeforeSave: false });
+
+        results.push({
+          studentId: student._id,
+          name: student.name,
+          email: student.email,
+          studentCode: student.studentCode,
+          status: 'FAILED',
+          error: sendErr.message,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Processed ${results.length} unconfirmed students`,
+      dispatchedCount: results.filter(r => r.status === 'SENT').length,
+      failedCount: results.filter(r => r.status === 'FAILED').length,
+      results,
+    });
+  } catch (error) {
+    console.error('forceResendUnconfirmedStudents error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getAllStudents,
   getStudent,
@@ -1443,5 +1548,6 @@ module.exports = {
   approveAndRegisterStudent,
   rejectRegistration,
   resendStudentInvitation,
+  forceResendUnconfirmedStudents,
 };
 

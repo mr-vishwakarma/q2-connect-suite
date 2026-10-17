@@ -36,8 +36,9 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-// Singleton pooled transporter
+// Dynamic transporter caching
 let cachedTransporter = null;
+let fallbackTransporter = null;
 let lastConfigHash = '';
 
 /**
@@ -57,11 +58,43 @@ function getSenderAddress() {
 }
 
 /**
+ * Creates an instrumented Nodemailer transport instance
+ */
+function createTransportInstance({ host, port, secure, service, user, pass }) {
+  const options = {
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    auth: { user, pass },
+    connectionTimeout: 25000, // 25s connection timeout for cloud containers
+    greetingTimeout: 15000,
+    socketTimeout: 25000,
+    tls: {
+      rejectUnauthorized: true,
+      minVersion: 'TLSv1.2',
+    },
+  };
+
+  if (service) {
+    options.service = service;
+  } else {
+    options.host = host;
+    options.port = port;
+    options.secure = secure;
+  }
+
+  return nodemailer.createTransport(options);
+}
+
+/**
  * Get configured Nodemailer transporter with connection pooling and resilient cloud timeouts
  */
 const getTransporter = () => {
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
-  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const isGmail = host.includes('gmail.com') || process.env.SMTP_SERVICE === 'gmail';
+  // Default to port 465 (SSL direct TLS) for Gmail since cloud containers (Render) often block port 587
+  const defaultPort = isGmail ? '465' : '587';
+  const port = parseInt(process.env.SMTP_PORT || defaultPort, 10);
   const user = (process.env.SMTP_USER || '').trim();
   const pass = (process.env.SMTP_PASS || '').replace(/\s+/g, '').trim();
 
@@ -73,21 +106,12 @@ const getTransporter = () => {
 
   const isSecure = port === 465;
 
-  cachedTransporter = nodemailer.createTransport({
+  cachedTransporter = createTransportInstance({
     host,
     port,
     secure: isSecure,
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
-    auth: { user, pass },
-    connectionTimeout: 30000, // 30s connection timeout for cloud container stability
-    greetingTimeout: 20000,   // 20s greeting timeout
-    socketTimeout: 30000,     // 30s socket timeout
-    tls: {
-      rejectUnauthorized: true,
-      minVersion: 'TLSv1.2',
-    },
+    user,
+    pass,
   });
 
   lastConfigHash = configHash;
@@ -95,11 +119,42 @@ const getTransporter = () => {
 };
 
 /**
+ * Get fallback transporter using alternate port or dedicated service config
+ */
+const getFallbackTransporter = () => {
+  const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+  const user = (process.env.SMTP_USER || '').trim();
+  const pass = (process.env.SMTP_PASS || '').replace(/\s+/g, '').trim();
+  const isGmail = host.includes('gmail.com') || process.env.SMTP_SERVICE === 'gmail';
+
+  if (isGmail) {
+    // If primary was host:port, try service: 'gmail' or port 465
+    return createTransportInstance({
+      service: 'gmail',
+      user,
+      pass,
+    });
+  }
+
+  const port = parseInt(process.env.SMTP_PORT || '465', 10);
+  const altPort = port === 465 ? 587 : 465;
+  return createTransportInstance({
+    host,
+    port: altPort,
+    secure: altPort === 465,
+    user,
+    pass,
+  });
+};
+
+/**
  * Safe summary of SMTP configuration presence (NO SECRETS RETURNED)
  */
 const getSmtpConfigStatus = () => {
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
-  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const isGmail = host.includes('gmail.com') || process.env.SMTP_SERVICE === 'gmail';
+  const defaultPort = isGmail ? '465' : '587';
+  const port = parseInt(process.env.SMTP_PORT || defaultPort, 10);
   const user = (process.env.SMTP_USER || '').trim();
   const pass = (process.env.SMTP_PASS || '').replace(/\s+/g, '').trim();
   const from = getSenderAddress();
@@ -118,7 +173,7 @@ const getSmtpConfigStatus = () => {
 };
 
 /**
- * Explicit SMTP connection verification with structured diagnostics
+ * Explicit SMTP connection verification with structured diagnostics and auto-failover
  */
 const verifySmtpConnection = async () => {
   const config = getSmtpConfigStatus();
@@ -147,20 +202,41 @@ const verifySmtpConnection = async () => {
         secure: config.secure,
       },
     };
-  } catch (err) {
-    const errCode = err.code || err.responseCode || 'UNKNOWN';
+  } catch (primaryErr) {
+    console.warn(`[email] Primary SMTP verify (${config.host}:${config.port}) encountered error: ${primaryErr.message}. Testing resilient fallback transport...`);
+
+    try {
+      const fallback = getFallbackTransporter();
+      await fallback.verify();
+      cachedTransporter = fallback;
+      console.log('[email] Resilient fallback SMTP connection verified successfully!');
+      return {
+        success: true,
+        status: 'EMAIL_ACCEPTED_BY_SMTP',
+        details: {
+          host: config.host,
+          port: config.port === 465 ? 587 : 465,
+          secure: config.port !== 465,
+          fallbackActive: true,
+        },
+      };
+    } catch (fallbackErr) {
+      console.error(`[email] Fallback verify also failed: ${fallbackErr.message}`);
+    }
+
+    const errCode = primaryErr.code || primaryErr.responseCode || 'UNKNOWN';
     let status = 'TRANSPORT_CONNECTION_FAILED';
 
-    if (errCode === 'EAUTH' || err.responseCode === 535 || /auth|credentials|login/i.test(err.message)) {
+    if (errCode === 'EAUTH' || primaryErr.responseCode === 535 || /auth|credentials|login/i.test(primaryErr.message)) {
       status = 'SMTP_AUTHENTICATION_FAILED';
-    } else if (errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || /timeout/i.test(err.message)) {
+    } else if (errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || /timeout/i.test(primaryErr.message)) {
       status = 'TRANSPORT_CONNECTION_FAILED';
     }
 
     return {
       success: false,
       status,
-      error: err.message,
+      error: primaryErr.message,
       code: errCode,
     };
   }
@@ -201,16 +277,38 @@ const sendEmail = async ({ to, subject, html, text, correlationId = null }) => {
   }
 
   try {
-    const transporter = getTransporter();
     const from = getSenderAddress();
+    let transporter = getTransporter();
+    let info;
 
-    const info = await transporter.sendMail({
-      from,
-      to: cleanTo,
-      subject,
-      html,
-      text: text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-    });
+    try {
+      info = await transporter.sendMail({
+        from,
+        to: cleanTo,
+        subject,
+        html,
+        text: text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      });
+    } catch (primarySendErr) {
+      const errCode = primarySendErr.code || primarySendErr.responseCode || 'UNKNOWN';
+      const isConnectionIssue = errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || errCode === 'ECONNRESET' || /timeout|connect/i.test(primarySendErr.message);
+
+      if (isConnectionIssue) {
+        console.warn(`${logPrefix} ⚠️ Primary SMTP dispatch failed (${primarySendErr.message}). Retrying with resilient fallback transport...`);
+        const fallback = getFallbackTransporter();
+        info = await fallback.sendMail({
+          from,
+          to: cleanTo,
+          subject,
+          html,
+          text: text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+        });
+        cachedTransporter = fallback; // Cache working fallback
+        console.log(`${logPrefix} ✅ Resilient fallback SMTP dispatch succeeded!`);
+      } else {
+        throw primarySendErr;
+      }
+    }
 
     console.log(`${logPrefix} 📧 Email accepted by SMTP provider for ${maskedTo} (MessageId: ${info.messageId})`);
     return {

@@ -17,6 +17,7 @@ const {
   approveAndRegisterStudent,
   rejectRegistration,
   resendStudentInvitation,
+  forceResendUnconfirmedStudents,
 } = require('../controllers/students.controller');
 
 router.use(protect, resolveTenantContext);
@@ -28,6 +29,7 @@ router.get('/pending-registrations', adminOrWarden, getPendingRegistrations);
 router.post('/approve-registration/:id', adminOnly, approveRegistration);
 router.post('/approve-and-register/:id', adminOnly, approveAndRegisterStudent);
 router.post('/reject-registration/:id', adminOnly, rejectRegistration);
+router.post('/force-resend-unconfirmed', adminOnly, forceResendUnconfirmedStudents);
 router.post('/:id/resend-invite', adminOnly, resendStudentInvitation);
 router.get('/', adminOrWarden, getAllStudents);
 router.post('/', adminOnly, createStudent);
