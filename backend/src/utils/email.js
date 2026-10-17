@@ -36,6 +36,31 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
+/**
+ * Known placeholder/mock domains that cannot receive email and will bounce back
+ */
+const UNROUTABLE_MOCK_DOMAINS = [
+  'q2connect.com',
+  'q2hostel.local',
+  'example.com',
+  'example.org',
+  'example.net',
+  'test.com',
+  'localhost',
+  'invalid',
+];
+
+/**
+ * Checks if an email belongs to a routable domain or a mock/testing placeholder domain
+ */
+function isRoutableEmail(email) {
+  if (!isValidEmail(email)) return false;
+  const parts = email.trim().toLowerCase().split('@');
+  if (parts.length !== 2) return false;
+  const domain = parts[1];
+  return !UNROUTABLE_MOCK_DOMAINS.includes(domain);
+}
+
 // Dynamic transporter caching
 let cachedTransporter = null;
 let fallbackTransporter = null;
@@ -266,6 +291,19 @@ const sendEmail = async ({ to, subject, html, text, correlationId = null }) => {
     };
   }
 
+  // Intercept and safely suppress delivery to unroutable mock/placeholder domains to prevent SMTP bounce-backs
+  if (!isRoutableEmail(cleanTo)) {
+    console.warn(`${logPrefix} ⚠️ Outgoing email suppressed: recipient '${cleanTo}' is on a non-routable/mock domain (${cleanTo.split('@')[1]}). Skipping SMTP delivery to protect sender reputation.`);
+    return {
+      success: true,
+      suppressed: true,
+      reason: 'UNROUTABLE_MOCK_DOMAIN',
+      recipient: maskedTo,
+      messageId: `suppressed-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      status: 'EMAIL_SUPPRESSED_UNROUTABLE_DOMAIN',
+    };
+  }
+
   const config = getSmtpConfigStatus();
   if (!config.configured) {
     const errorMsg = 'SMTP configuration is missing. Cannot send transactional email.';
@@ -278,17 +316,26 @@ const sendEmail = async ({ to, subject, html, text, correlationId = null }) => {
 
   try {
     const from = getSenderAddress();
+    const replyTo = (process.env.SMTP_USER || '').trim() || from;
     let transporter = getTransporter();
     let info;
 
+    const mailOptions = {
+      from,
+      to: cleanTo,
+      replyTo,
+      subject,
+      html,
+      text: text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      headers: {
+        'X-Mailer': 'Q2 Connect Suite Mailer v2',
+        'X-Auto-Response-Suppress': 'OOF, AutoReply',
+        'Auto-Submitted': 'auto-generated',
+      },
+    };
+
     try {
-      info = await transporter.sendMail({
-        from,
-        to: cleanTo,
-        subject,
-        html,
-        text: text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-      });
+      info = await transporter.sendMail(mailOptions);
     } catch (primarySendErr) {
       const errCode = primarySendErr.code || primarySendErr.responseCode || 'UNKNOWN';
       const isConnectionIssue = errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || errCode === 'ECONNRESET' || /timeout|connect/i.test(primarySendErr.message);
@@ -296,13 +343,7 @@ const sendEmail = async ({ to, subject, html, text, correlationId = null }) => {
       if (isConnectionIssue) {
         console.warn(`${logPrefix} ⚠️ Primary SMTP dispatch failed (${primarySendErr.message}). Retrying with resilient fallback transport...`);
         const fallback = getFallbackTransporter();
-        info = await fallback.sendMail({
-          from,
-          to: cleanTo,
-          subject,
-          html,
-          text: text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-        });
+        info = await fallback.sendMail(mailOptions);
         cachedTransporter = fallback; // Cache working fallback
         console.log(`${logPrefix} ✅ Resilient fallback SMTP dispatch succeeded!`);
       } else {
@@ -516,7 +557,7 @@ const sendStudentWelcomeEmail = async (options) => {
   const safeStudentCode = escapeHtml(rawStudentCode);
   const safeHostel = escapeHtml(rawHostel);
 
-  const subject = `Welcome to ${rawHostel} Hostel — Activate Your Resident Account`;
+  const subject = options.subject || `Your Hostel Admission Details & Account Activation — ${rawHostel} Hostel`;
   const cleanActivationLink = (activationLink || '').trim();
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
   const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=student`).trim();
@@ -778,6 +819,7 @@ module.exports = {
   getTransporter,
   getSmtpConfigStatus,
   verifySmtpConnection,
+  isRoutableEmail,
   sendEmail,
   sendStudentCredentials,
   sendStudentWelcomeEmail,

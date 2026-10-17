@@ -36,7 +36,7 @@ async function runTestSuite() {
   console.log('🧪 Q2 CONNECT SUITE — TRANSACTIONAL EMAIL DELIVERY TEST SUITE');
   console.log('================================================================\n');
 
-  await mongoose.connect(process.env.MONGODB_URI);
+  await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 30000 });
   console.log('✅ Connected to MongoDB Atlas\n');
 
   let passedTests = 0;
@@ -214,13 +214,15 @@ async function runTestSuite() {
         hostelName: testHostel.name,
         orgName: testOrg.name,
         activationLink: `${frontendUrl}/reset-password?token=mock_token&type=activation`,
-        adminUserId: secondaryAdminUser._id.toString(),
+        adminUserId: new mongoose.Types.ObjectId().toString(),
       },
       { jobId: `test-admin-inv-${secondaryAdminUser._id}` }
     );
 
     assert(enqueueResult.success === true, 'Admin invitation email job enqueue must succeed');
     assert(enqueueResult.jobId, 'Must produce a valid job ID');
+    // Allow background worker job to settle
+    await new Promise((r) => setTimeout(r, 800));
   });
 
   await runTest('Resend Secondary Admin invitation regenerates activation token and resets email status', async () => {
@@ -299,6 +301,8 @@ async function runTestSuite() {
 
     assert(enqueueResult.success === true, 'Student welcome email job enqueue must succeed');
     assert(enqueueResult.jobId, 'Must produce a deterministic job ID');
+    // Allow background worker job to settle
+    await new Promise((r) => setTimeout(r, 800));
   });
 
   await runTest('Resend student invitation preserves student record and does not duplicate account', async () => {

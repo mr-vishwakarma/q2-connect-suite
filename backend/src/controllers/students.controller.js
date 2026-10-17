@@ -518,8 +518,11 @@ const createStudent = async (req, res) => {
       }
     });
 
-    // Asynchronously notify admin via queue
-    const adminEmail = req.user?.email || 'abhi1006@q2connect.com';
+    // Asynchronously notify admin via queue (using routable admin email)
+    const defaultAdminEmail = (process.env.ADMIN_ALERT_EMAIL || process.env.SMTP_USER || 'mayurvish2003@gmail.com').trim();
+    const rawAdminEmail = req.user?.email;
+    const isMockAdmin = !rawAdminEmail || rawAdminEmail.endsWith('@q2connect.com') || rawAdminEmail.endsWith('@q2hostel.local') || rawAdminEmail.endsWith('@example.com');
+    const adminEmail = isMockAdmin ? defaultAdminEmail : rawAdminEmail;
     addEmailJob('ADMIN_NEW_STUDENT_REGISTERED', {
       to: adminEmail,
       studentName: name,
@@ -1302,8 +1305,11 @@ const approveAndRegisterStudent = async (req, res) => {
       supportContact: hostelDoc?.contactPhone || 'support@q2connect.com',
     }, { jobId: `welcome-activation-${student._id}` }).catch(err => console.warn('[students.controller] Welcome activation email queue warning:', err.message));
 
-    // Send asynchronous confirmation email to Admin via queue
-    const adminEmail = req.user?.email || 'abhi1006@q2connect.com';
+    // Send asynchronous confirmation email to Admin via queue (using routable admin email)
+    const defaultAdminEmail = (process.env.ADMIN_ALERT_EMAIL || process.env.SMTP_USER || 'mayurvish2003@gmail.com').trim();
+    const rawAdminEmail = req.user?.email;
+    const isMockAdmin = !rawAdminEmail || rawAdminEmail.endsWith('@q2connect.com') || rawAdminEmail.endsWith('@q2hostel.local') || rawAdminEmail.endsWith('@example.com');
+    const adminEmail = isMockAdmin ? defaultAdminEmail : rawAdminEmail;
     addEmailJob('ADMIN_NEW_STUDENT_REGISTERED', {
       to: adminEmail,
       studentName: finalName,
