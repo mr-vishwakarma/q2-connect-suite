@@ -480,7 +480,7 @@ const verifyCreateAdmin = async (req, res) => {
     });
 
     // Queue welcome email with single-use activation link (no plaintext password)
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
+    const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
     const correlationId = req.requestId || `admin-inv-${newAdmin._id}`;
 
@@ -887,7 +887,7 @@ const resendAdminInvitation = async (req, res) => {
     target.invitationEmailError = null;
     await target.save();
 
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8080').trim();
+    const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
     const correlationId = req.requestId || `resend-admin-inv-${target._id}-${Date.now()}`;
 

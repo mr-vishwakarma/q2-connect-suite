@@ -80,17 +80,37 @@ function getSenderAddress() {
 }
 
 /**
+ * Resolves the trusted frontend base URL, strictly preventing localhost links from being emailed to users
+ */
+function getTrustedFrontendUrl(req = null) {
+  if (req?.headers?.origin) {
+    const origin = req.headers.origin.trim();
+    if (
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.lovable.app') ||
+      origin.endsWith('.onrender.com') ||
+      (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost'))
+    ) {
+      return origin;
+    }
+  }
+  const configured = (process.env.FRONTEND_URL || '').trim();
+  if (configured && !configured.includes('localhost')) {
+    return configured;
+  }
+  return 'https://q2-connect-suite.vercel.app';
+}
+
+/**
  * Creates an instrumented Nodemailer transport instance
  */
 function createTransportInstance({ host, port, secure, service, user, pass }) {
   const options = {
-    pool: true,
-    maxConnections: 3,
-    maxMessages: 100,
+    pool: false, // Transactional emails must use dedicated direct TLS connections to prevent stale pooled socket timeouts
     auth: { user, pass },
-    connectionTimeout: 25000, // 25s connection timeout for cloud containers
-    greetingTimeout: 15000,
-    socketTimeout: 25000,
+    connectionTimeout: 15000, // 15s connection timeout for cloud containers
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     tls: {
       rejectUnauthorized: true,
       minVersion: 'TLSv1.2',
@@ -109,7 +129,7 @@ function createTransportInstance({ host, port, secure, service, user, pass }) {
 }
 
 /**
- * Get configured Nodemailer transporter with connection pooling and resilient cloud timeouts
+ * Get configured Nodemailer transporter with resilient cloud timeouts
  */
 const getTransporter = () => {
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
@@ -265,17 +285,28 @@ const verifySmtpConnection = async () => {
 };
 
 /**
- * Send a transactional email using the centralized reusable transport
- * @param {object} options - { to, subject, html, text, correlationId }
+ * Send a transactional email using the centralized reusable transport with in-flight retries and durable logging
+ * @param {object} options - { to, subject, html, text, correlationId, purpose, targetUserId, targetStudentId, metadata }
  */
-const sendEmail = async ({ to, subject, html, text, correlationId = null }) => {
+const sendEmail = async ({
+  to,
+  subject,
+  html,
+  text,
+  correlationId = null,
+  purpose = 'GENERAL_NOTIFICATION',
+  targetUserId = null,
+  targetStudentId = null,
+  metadata = {},
+}) => {
   if (!isValidEmail(to)) {
     throw new Error(`Invalid recipient email address: '${to}'`);
   }
 
   const cleanTo = to.trim().toLowerCase();
   const maskedTo = maskEmail(cleanTo);
-  const logPrefix = `[email][${correlationId || 'no_cid'}]`;
+  const effectiveCid = correlationId || `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+  const logPrefix = `[email][${effectiveCid}]`;
 
   // Explicit mock bypass for automated unit tests only
   if (process.env.NODE_ENV === 'test' || process.env.MOCK_EMAIL === 'true') {
@@ -291,6 +322,28 @@ const sendEmail = async ({ to, subject, html, text, correlationId = null }) => {
   // Intercept and safely suppress delivery to unroutable mock/placeholder domains to prevent SMTP bounce-backs
   if (!isRoutableEmail(cleanTo)) {
     console.warn(`${logPrefix} ⚠️ Outgoing email suppressed: recipient '${cleanTo}' is on a non-routable/mock domain (${cleanTo.split('@')[1]}). Skipping SMTP delivery to protect sender reputation.`);
+
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection && mongoose.connection.readyState === 1) {
+        const EmailLog = require('../models/EmailLog');
+        await EmailLog.create({
+          recipient: cleanTo,
+          recipientMasked: maskedTo,
+          purpose,
+          subject,
+          status: 'SUPPRESSED_UNROUTABLE',
+          correlationId: effectiveCid,
+          targetUserId,
+          targetStudentId,
+          metadata,
+          lastError: `Recipient domain ${cleanTo.split('@')[1]} is a non-routable mock placeholder`,
+        });
+      }
+    } catch (e) {
+      // Non-fatal logging error
+    }
+
     return {
       success: true,
       suppressed: true,
@@ -311,11 +364,31 @@ const sendEmail = async ({ to, subject, html, text, correlationId = null }) => {
     throw error;
   }
 
+  let emailLogEntry = null;
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      const EmailLog = require('../models/EmailLog');
+      emailLogEntry = await EmailLog.create({
+        recipient: cleanTo,
+        recipientMasked: maskedTo,
+        purpose,
+        subject,
+        status: 'PROCESSING',
+        correlationId: effectiveCid,
+        targetUserId,
+        targetStudentId,
+        metadata,
+        attempts: 1,
+      });
+    }
+  } catch (logErr) {
+    // Non-fatal logging error
+  }
+
   try {
     const from = getSenderAddress();
     const replyTo = (process.env.SMTP_USER || '').trim() || from;
-    let transporter = getTransporter();
-    let info;
 
     const mailOptions = {
       from,
@@ -331,29 +404,61 @@ const sendEmail = async ({ to, subject, html, text, correlationId = null }) => {
       },
     };
 
-    try {
-      info = await transporter.sendMail(mailOptions);
-    } catch (primarySendErr) {
-      const errCode = primarySendErr.code || primarySendErr.responseCode || 'UNKNOWN';
-      const isConnectionIssue = errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || errCode === 'ECONNRESET' || /timeout|connect/i.test(primarySendErr.message);
+    let info = null;
+    let lastSendErr = null;
+
+    // Resilient send attempt with in-flight retry loop for transient connection dropouts
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const transporter = getTransporter();
+        info = await transporter.sendMail(mailOptions);
+        lastSendErr = null;
+        break; // Successfully handed off to SMTP provider
+      } catch (sendErr) {
+        lastSendErr = sendErr;
+        cachedTransporter = null; // Invalidate cached transporter on error to ensure clean socket on retry
+        const errCode = sendErr.code || sendErr.responseCode || 'UNKNOWN';
+        const isTransient = errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || errCode === 'ECONNRESET' || /timeout|connect/i.test(sendErr.message);
+
+        if (isTransient && attempt < 2) {
+          console.warn(`${logPrefix} ⚠️ Primary SMTP attempt ${attempt} encountered transient error (${sendErr.message}). Retrying fresh TLS connection in 1200ms...`);
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        } else {
+          break;
+        }
+      }
+    }
+
+    // If primary transport attempts failed with a connection issue, test the fallback transport
+    if (!info && lastSendErr) {
+      const errCode = lastSendErr.code || lastSendErr.responseCode || 'UNKNOWN';
+      const isConnectionIssue = errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || errCode === 'ECONNRESET' || /timeout|connect/i.test(lastSendErr.message);
 
       if (isConnectionIssue) {
-        console.warn(`${logPrefix} ⚠️ Primary SMTP dispatch failed (${primarySendErr.message}). Retrying with resilient fallback transport...`);
+        console.warn(`${logPrefix} ⚠️ Primary SMTP failed (${lastSendErr.message}). Retrying with resilient fallback transport...`);
         const fallback = getFallbackTransporter();
         info = await fallback.sendMail(mailOptions);
-        cachedTransporter = fallback; // Cache working fallback
         console.log(`${logPrefix} ✅ Resilient fallback SMTP dispatch succeeded!`);
       } else {
-        throw primarySendErr;
+        throw lastSendErr;
       }
     }
 
     console.log(`${logPrefix} 📧 Email accepted by SMTP provider for ${maskedTo} (MessageId: ${info.messageId})`);
+
+    if (emailLogEntry) {
+      emailLogEntry.status = 'SMTP_ACCEPTED';
+      emailLogEntry.smtpMessageId = info.messageId;
+      emailLogEntry.deliveredAt = new Date();
+      await emailLogEntry.save().catch(() => {});
+    }
+
     return {
       success: true,
       messageId: info.messageId,
       accepted: true,
       status: 'EMAIL_ACCEPTED_BY_SMTP',
+      correlationId: effectiveCid,
     };
   } catch (error) {
     const errCode = error.code || error.responseCode || 'UNKNOWN';
@@ -366,6 +471,15 @@ const sendEmail = async ({ to, subject, html, text, correlationId = null }) => {
     }
 
     console.error(`${logPrefix} ❌ Email dispatch failed for ${maskedTo}: ${error.message} [Status: ${classifiedStatus}, Code: ${errCode}]`);
+
+    if (emailLogEntry) {
+      emailLogEntry.status = classifiedStatus === 'SMTP_AUTHENTICATION_FAILED' || classifiedStatus === 'MESSAGE_REJECTED' ? 'FAILED_PERMANENT' : 'FAILED_RETRYABLE';
+      emailLogEntry.lastError = error.message;
+      emailLogEntry.lastErrorCode = String(errCode);
+      emailLogEntry.failedAt = new Date();
+      await emailLogEntry.save().catch(() => {});
+    }
+
     error.status = classifiedStatus;
     throw error;
   }
@@ -454,12 +568,19 @@ const sendPasswordResetEmail = async ({ to, resetLink, correlationId }) => {
     footerNote: 'Tip: If this email arrived in your Spam folder, please mark it as "Not Spam" to receive future security updates.',
   });
 
-  return sendEmail({ to, subject, html, text, correlationId });
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'PASSWORD_RESET',
+  });
 };
 
 /**
  * Send welcome & account setup invitation email to newly created Secondary Admin
- * @param {object} options - { to, name, username, hostelName, orgName, activationLink, loginLink, correlationId }
+ * @param {object} options - { to, name, username, hostelName, orgName, activationLink, loginLink, correlationId, adminUserId }
  */
 const sendSecondaryAdminWelcomeEmail = async ({
   to,
@@ -470,12 +591,13 @@ const sendSecondaryAdminWelcomeEmail = async ({
   activationLink,
   loginLink,
   correlationId,
+  adminUserId = null,
 }) => {
   const safeName = escapeHtml(name || 'Administrator');
   const safeUsername = escapeHtml(username || '');
   const safeHostel = escapeHtml(hostelName || 'Assigned Hostel');
   const safeOrg = escapeHtml(orgName || 'Q2 Connect Suite');
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+  const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
   const cleanActivationLink = (activationLink || `${frontendUrl}/login`).trim();
   const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=admin`).trim();
 
@@ -535,12 +657,21 @@ const sendSecondaryAdminWelcomeEmail = async ({
     footerNote: 'This email was generated automatically by authorized Primary Admin invitation.',
   });
 
-  return sendEmail({ to, subject, html, text, correlationId });
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'SECONDARY_ADMIN_WELCOME',
+    targetUserId: adminUserId,
+    metadata: { name, username, hostelName, orgName },
+  });
 };
 
 /**
  * Send branded welcome & account activation email to student
- * @param {object} options - { to, name, studentName, username, studentCode, studentId, hostel, hostelName, activationLink, loginLink, correlationId }
+ * @param {object} options - { to, name, studentName, username, studentCode, studentId, studentDocId, hostel, hostelName, activationLink, loginLink, correlationId }
  */
 const sendStudentWelcomeEmail = async (options) => {
   const { to, activationLink, loginLink, correlationId } = options;
@@ -548,6 +679,7 @@ const sendStudentWelcomeEmail = async (options) => {
   const rawUsername = options.username || '';
   const rawStudentCode = options.studentCode || options.studentId || options.username || '';
   const rawHostel = options.hostel || options.hostelName || 'Q2';
+  const targetStudentId = options.studentDocId || options.studentId || null;
 
   const safeName = escapeHtml(rawName);
   const safeUsername = escapeHtml(rawUsername);
@@ -556,7 +688,7 @@ const sendStudentWelcomeEmail = async (options) => {
 
   const subject = options.subject || `Your Hostel Admission Details & Account Activation — ${rawHostel} Hostel`;
   const cleanActivationLink = (activationLink || '').trim();
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+  const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
   const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=student`).trim();
 
   const text = `Welcome to Q2 Connect Suite!\n\nDear ${rawName},\n\nYour resident admission into ${rawHostel} Hostel has been confirmed.\n\nYour Account Details:\n- Resident Name: ${rawName}\n- Hostel: ${rawHostel}\n- User ID: ${rawUsername}\n- Student ID: ${rawStudentCode}\n\nPlease click the link below to activate your account and securely set your password (valid for 48 hours):\n${cleanActivationLink}\n\nOnce activated, you can sign in to the Student Portal at:\n${cleanLoginLink}\n\nIf you have any questions or need assistance, contact our administration at support@q2connect.com.\n\nBest regards,\n${rawHostel} Administration — Q2 Connect Suite`;
@@ -614,7 +746,21 @@ const sendStudentWelcomeEmail = async (options) => {
     footerNote: 'Welcome to your new home! Please save this email for your records.',
   });
 
-  return sendEmail({ to, subject, html, text, correlationId });
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'STUDENT_WELCOME_ACTIVATION',
+    targetStudentId,
+    metadata: {
+      name: rawName,
+      username: rawUsername,
+      studentCode: rawStudentCode,
+      hostel: rawHostel,
+    },
+  });
 };
 
 /**
@@ -668,7 +814,14 @@ const sendAdminActionOtpEmail = async ({ to, adminName = 'Administrator', action
     footerNote: 'Automated high-security verification notification.',
   });
 
-  return sendEmail({ to, subject, html, text, correlationId });
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'ADMIN_ACTION_OTP',
+  });
 };
 
 /**
@@ -681,7 +834,7 @@ const sendAdminNewStudentRegisteredNotification = async ({ to, studentName, stud
   const safeUsername = escapeHtml(username || 'N/A');
   const safeEmail = escapeHtml(studentEmail);
   const safePhone = escapeHtml(studentPhone || 'N/A');
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+  const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
 
   const subject = `New Student Registered: ${studentName} (${studentHostel} - Room ${studentRoom || 'N/A'})`;
   const text = `New Student Registered Successfully!\n\nDetails:\n- Student Name: ${studentName}\n- Hostel: ${studentHostel}\n- Room No: ${studentRoom || 'Unassigned'}\n- User ID: ${username}\n- Email: ${studentEmail}\n- Phone: ${studentPhone || 'N/A'}\n\nLog in to Admin Panel: ${frontendUrl}/admin/students\n\nBest regards,\nQ2 Connect Suite`;
@@ -713,7 +866,15 @@ const sendAdminNewStudentRegisteredNotification = async ({ to, studentName, stud
   });
 
   try {
-    return await sendEmail({ to, subject, html, text, correlationId });
+    return await sendEmail({
+      to,
+      subject,
+      html,
+      text,
+      correlationId,
+      purpose: 'ADMIN_NEW_STUDENT_REGISTERED',
+      metadata: { studentName, studentEmail, studentHostel, studentRoom, username },
+    });
   } catch (err) {
     console.warn(`[email] Admin notification email skipped or failed: ${err.message}`);
     return null;
@@ -734,7 +895,7 @@ const sendHostelOnboardingWelcomeEmail = async ({
   correlationId,
 }) => {
   const subject = `Welcome to Q2 Connect Suite — Onboarding Complete for ${orgName}`;
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+  const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
   const activationUrl = setupUrl || `${frontendUrl}/login`;
 
   const text = `Welcome to Q2 Connect Suite!\n\nHello ${name},\n\nYour organization "${orgName}" (${branchName}) has been successfully onboarded.\n\nYour Administrator Account:\nEmail: ${to}\nTemporary Password: ${tempPassword || 'Set via activation link'}\n\nAccess your dashboard:\n${activationUrl}\n\nBest regards,\nQ2 Connect Suite Platform Operations Team`;
@@ -767,7 +928,15 @@ const sendHostelOnboardingWelcomeEmail = async ({
     contentHtml,
   });
 
-  return sendEmail({ to, subject, html, text, correlationId });
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'HOSTEL_ONBOARDING_WELCOME',
+    metadata: { orgName, branchName, role },
+  });
 };
 
 /**
@@ -795,7 +964,15 @@ const sendMessRequestUpdate = async ({ to, name, status, leavingDate, returnDate
     contentHtml,
   });
 
-  return sendEmail({ to, subject, html, text, correlationId });
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'MESS_REQUEST_UPDATE',
+    metadata: { name, status, leavingDate, returnDate },
+  });
 };
 
 /**
@@ -827,4 +1004,5 @@ module.exports = {
   sendHostelOnboardingWelcomeEmail,
   sendAdminActionOtpEmail,
   sendSecondaryAdminWelcomeEmail,
+  getTrustedFrontendUrl,
 };

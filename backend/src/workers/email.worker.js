@@ -149,11 +149,11 @@ async function processEmailJob(job) {
     }
 
     case 'PASSWORD_RESET': {
-      const { to, resetLink } = payload;
+      const { to, resetLink, correlationId } = payload;
       if (!to || !resetLink) {
         throw new UnrecoverableError('Missing required password reset fields (to, resetLink)');
       }
-      await emailUtils.sendPasswordResetEmail({ to, resetLink });
+      await emailUtils.sendPasswordResetEmail({ to, resetLink, correlationId });
       return { success: true, recipient: to };
     }
 

@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const Student = require('../models/Student');
-const { sendPasswordResetEmail } = require('../utils/email');
+const { sendPasswordResetEmail, isRoutableEmail, getTrustedFrontendUrl } = require('../utils/email');
 const { PORTALS, normalizePortal, isRoleAllowedForPortal } = require('../utils/portalAccess');
 const { logAuditAction } = require('../middleware/audit.middleware');
 
@@ -834,7 +834,7 @@ const requestPasswordReset = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: 'Email or User ID is required' });
 
-    const searchKey = email.toLowerCase().trim();
+    const searchKey = String(email).toLowerCase().trim();
     // Generic public response to prevent account enumeration
     const genericResponse = 'If an account matches that email address, password-reset instructions will be sent.';
 
@@ -847,23 +847,42 @@ const requestPasswordReset = async (req, res) => {
       ]
     });
 
+    let studentDoc = null;
     if (!user) {
-      // Check if this is a student looking up by studentCode or alternate identifier
+      // Check if this is a student looking up by studentCode, email, or username
       const Student = require('../models/Student');
-      const student = await Student.findOne({
+      studentDoc = await Student.findOne({
         $or: [
           { studentCode: { $regex: new RegExp(`^${escapedKey}$`, 'i') } },
           { email: searchKey },
           { username: { $regex: new RegExp(`^${escapedKey}$`, 'i') } }
         ]
       });
-      if (student && student.userId) {
-        user = await User.findById(student.userId);
+      if (studentDoc && studentDoc.userId) {
+        user = await User.findById(studentDoc.userId);
+      }
+    } else if (user.role === 'student') {
+      const Student = require('../models/Student');
+      studentDoc = await Student.findOne({ userId: user._id });
+    }
+
+    // Generic success response if no matching user found
+    if (!user) {
+      return res.status(200).json({ success: true, message: genericResponse });
+    }
+
+    // Resolve most reliable, routable recipient email
+    let recipientEmail = user.email ? user.email.toLowerCase().trim() : null;
+    if (studentDoc && studentDoc.email) {
+      const studentEmail = studentDoc.email.toLowerCase().trim();
+      if (!isRoutableEmail(recipientEmail) && isRoutableEmail(studentEmail)) {
+        recipientEmail = studentEmail;
+        user.email = recipientEmail;
       }
     }
-    
-    // We always return generic success to avoid leaking which accounts exist
-    if (!user || !user.email) {
+
+    if (!recipientEmail || !isRoutableEmail(recipientEmail)) {
+      console.warn(`[auth.controller] Password reset requested for unroutable or missing email for user ${user._id}`);
       return res.status(200).json({ success: true, message: genericResponse });
     }
 
@@ -882,29 +901,24 @@ const requestPasswordReset = async (req, res) => {
     
     await user.save({ validateBeforeSave: false });
 
-    // Create reset URL using explicit trusted frontend URL or request origin
-    const frontendUrl = (req?.headers?.origin && (
-      req.headers.origin.endsWith('.vercel.app') ||
-      req.headers.origin.startsWith('http://localhost') ||
-      req.headers.origin.endsWith('.lovable.app') ||
-      req.headers.origin.endsWith('.onrender.com')
-    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
+    // Create reset URL using explicit trusted frontend URL
+    const frontendUrl = getTrustedFrontendUrl(req);
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
-    const correlationId = req.requestId || `pwd-reset-${Date.now()}`;
+    const correlationId = req.requestId || `pwd-reset-${user._id}-${Date.now()}`;
 
     // Queue or send email
     try {
       const { addEmailJob } = require('../queues/queueManager');
       await addEmailJob(
         'PASSWORD_RESET',
-        { to: user.email, resetLink, correlationId },
+        { to: recipientEmail, resetLink, correlationId },
         { jobId: `pwd-reset-${user._id}-${Date.now()}` }
       );
     } catch (err) {
       console.warn(`[auth.controller] Queue reset email failed (${err.message}), sending directly...`);
       try {
         const { sendPasswordResetEmail } = require('../utils/email');
-        await sendPasswordResetEmail({ to: user.email, resetLink, correlationId });
+        await sendPasswordResetEmail({ to: recipientEmail, resetLink, correlationId });
       } catch (directErr) {
         console.error(`[auth.controller] Direct reset email dispatch failed: ${directErr.message}`);
         // Retain token so in-flight recovery attempts or retries remain valid

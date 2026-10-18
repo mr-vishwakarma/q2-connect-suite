@@ -27,7 +27,7 @@ function getRedisOptions() {
 
   const baseOptions = {
     maxRetriesPerRequest: null, // Required by BullMQ
-    enableReadyCheck: false,
+    enableReadyCheck: true,
     connectTimeout: 10000,
     retryStrategy(times) {
       if (times > 10) {
@@ -79,7 +79,11 @@ function createRedisInstance(role = 'client') {
     }
 
     instance.on('connect', () => {
-      redisStatus = 'CONNECTING';
+      // Mark ready as soon as socket connects
+      if (redisStatus !== 'READY') {
+        redisStatus = 'READY';
+      }
+      lastError = null;
     });
 
     instance.on('ready', () => {

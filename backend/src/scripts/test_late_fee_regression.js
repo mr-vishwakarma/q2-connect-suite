@@ -149,7 +149,7 @@ async function runLateFeeRegressionTests() {
   // --- SECTION 4: INTEGRATED FEE SERVICE WITH ATLAS ---
   console.log('\n🏦 SECTION 4: AUTHORITATIVE FEE SERVICE ATLAS INTEGRATION');
 
-  await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 15000 });
+  await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 30000 });
 
   await testAsync('feeService.calculatePayableFee correctly derives late fee for student Karan', async () => {
     const karan = await Student.findOne({ name: 'Karan' }).lean();

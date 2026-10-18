@@ -4,7 +4,7 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const Room = require('../models/Room');
 const Notification = require('../models/Notification');
-const { sendStudentCredentials, sendAdminNewStudentRegisteredNotification } = require('../utils/email');
+const { sendStudentCredentials, sendAdminNewStudentRegisteredNotification, getTrustedFrontendUrl } = require('../utils/email');
 const { addEmailJob } = require('../queues/queueManager');
 const { parsePagination, getPaginationMeta } = require('../utils/pagination');
 
@@ -470,12 +470,7 @@ const createStudent = async (req, res) => {
     session.endSession();
 
     // Send single-use time-limited activation welcome email (idempotent BullMQ job)
-    const frontendUrl = (req?.headers?.origin && (
-      req.headers.origin.endsWith('.vercel.app') ||
-      req.headers.origin.startsWith('http://localhost') ||
-      req.headers.origin.endsWith('.lovable.app') ||
-      req.headers.origin.endsWith('.onrender.com')
-    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
+    const frontendUrl = getTrustedFrontendUrl(req);
     const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
     const loginLink = `${frontendUrl}/login?role=student`;
     const correlationId = req.requestId || `welcome-activation-${student._id}`;
@@ -491,7 +486,7 @@ const createStudent = async (req, res) => {
       studentDocId: student._id.toString(),
       supportContact: hostelDoc?.contactPhone || 'support@q2connect.com',
       correlationId,
-    }, { jobId: `welcome-activation-${student._id}` }).catch(async (err) => {
+    }, { jobId: `welcome-activation-${student._id}-${Date.now()}` }).catch(async (err) => {
       console.warn('[students.controller] Welcome activation email queue warning:', err.message);
       try {
         const emailUtils = require('../utils/email');
@@ -1288,12 +1283,7 @@ const approveAndRegisterStudent = async (req, res) => {
     session.endSession();
 
     // Send single-use time-limited activation welcome email (idempotent BullMQ job)
-    const frontendUrl = (req?.headers?.origin && (
-      req.headers.origin.endsWith('.vercel.app') ||
-      req.headers.origin.startsWith('http://localhost') ||
-      req.headers.origin.endsWith('.lovable.app') ||
-      req.headers.origin.endsWith('.onrender.com')
-    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
+    const frontendUrl = getTrustedFrontendUrl(req);
     const activationLink = rawActivationToken
       ? `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`
       : `${frontendUrl}/login?role=student`;
@@ -1308,7 +1298,7 @@ const approveAndRegisterStudent = async (req, res) => {
       loginLink: `${frontendUrl}/login?role=student`,
       studentDocId: student._id.toString(),
       supportContact: hostelDoc?.contactPhone || 'support@q2connect.com',
-    }, { jobId: `welcome-activation-${student._id}` }).catch(err => console.warn('[students.controller] Welcome activation email queue warning:', err.message));
+    }, { jobId: `welcome-activation-${student._id}-${Date.now()}` }).catch(err => console.warn('[students.controller] Welcome activation email queue warning:', err.message));
 
     // Send asynchronous confirmation email to Admin via queue (using routable admin email)
     const defaultAdminEmail = (process.env.ADMIN_ALERT_EMAIL || process.env.SMTP_USER || 'mayurvish2003@gmail.com').trim();
@@ -1388,13 +1378,8 @@ const resendStudentInvitation = async (req, res) => {
     student.welcomeEmailError = null;
     await student.save({ validateBeforeSave: false });
 
-    const frontendUrl = (req?.headers?.origin && (
-      req.headers.origin.endsWith('.vercel.app') ||
-      req.headers.origin.startsWith('http://localhost') ||
-      req.headers.origin.endsWith('.lovable.app') ||
-      req.headers.origin.endsWith('.onrender.com')
-    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
-    const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
+    const frontendUrl = getTrustedFrontendUrl(req);
+    const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
     const loginLink = `${frontendUrl}/login?role=student`;
     const correlationId = req.requestId || `resend-activation-${student._id}-${Date.now()}`;
 
@@ -1455,12 +1440,7 @@ const resendStudentInvitation = async (req, res) => {
 // @access  Private (Admin / Super Admin)
 const forceResendUnconfirmedStudents = async (req, res) => {
   try {
-    const frontendUrl = (req?.headers?.origin && (
-      req.headers.origin.endsWith('.vercel.app') ||
-      req.headers.origin.startsWith('http://localhost') ||
-      req.headers.origin.endsWith('.lovable.app') ||
-      req.headers.origin.endsWith('.onrender.com')
-    )) ? req.headers.origin : (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
+    const frontendUrl = getTrustedFrontendUrl(req);
 
     const users = await User.find({
       role: 'student',
@@ -1488,7 +1468,7 @@ const forceResendUnconfirmedStudents = async (req, res) => {
       user.mustChangePassword = true;
       await user.save({ validateBeforeSave: false });
 
-      const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}`;
+      const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
       const loginLink = `${frontendUrl}/login?role=student`;
       const correlationId = `force-activation-${student._id}-${Date.now()}`;
 

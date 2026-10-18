@@ -88,25 +88,14 @@ function initQueues() {
  * @param {object} payload - Concise payload (IDs + minimal metadata only)
  * @param {object} options - Optional BullMQ JobOptions (e.g. deterministic jobId)
  */
-async function addEmailJob(jobType, payload, options = {}) {
-  initQueues();
+/**
+ * Executes a degraded mode transactional email with bounded exponential retries.
+ */
+async function executeDegradedEmailWithRetry(jobType, payload, fallbackJobId) {
+  const maxAttempts = 3;
+  let lastError = null;
 
-  if (emailQueue && getRedisStatus().ready) {
-    try {
-      const job = await emailQueue.add(jobType, payload, {
-        ...DEFAULT_JOB_OPTIONS,
-        ...options,
-      });
-      return { success: true, jobId: job.id, queued: true };
-    } catch (err) {
-      console.warn(`[QueueManager] Failed to enqueue to Redis (${err.message}). Falling back to degraded mode.`);
-    }
-  }
-
-  // Degraded Mode Fallback:
-  // Execute transactional emails in the background without blocking the HTTP request
-  const fallbackJobId = `deg-email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-  setImmediate(async () => {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const emailUtils = require('../utils/email');
       switch (jobType) {
@@ -115,23 +104,17 @@ async function addEmailJob(jobType, payload, options = {}) {
           break;
         case 'STUDENT_WELCOME_ACTIVATION': {
           const Student = require('../models/Student');
+          const mongoose = require('mongoose');
           const targetStudentId = payload.studentDocId || payload.studentId;
-          try {
-            await emailUtils.sendStudentWelcomeEmail(payload);
-            if (targetStudentId) {
-              await Student.updateOne(
-                { _id: targetStudentId },
-                { $set: { welcomeEmailStatus: 'sent', welcomeEmailSentAt: new Date(), welcomeEmailError: null } }
-              );
-            }
-          } catch (degErr) {
-            if (targetStudentId) {
-              await Student.updateOne(
-                { _id: targetStudentId },
-                { $set: { welcomeEmailStatus: 'failed', welcomeEmailError: degErr.message } }
-              );
-            }
-            throw degErr;
+          await emailUtils.sendStudentWelcomeEmail(payload);
+
+          if (targetStudentId) {
+            const query = mongoose.Types.ObjectId.isValid(targetStudentId)
+              ? { _id: targetStudentId }
+              : { studentCode: targetStudentId };
+            await Student.updateOne(query, {
+              $set: { welcomeEmailStatus: 'sent', welcomeEmailSentAt: new Date(), welcomeEmailError: null },
+            });
           }
           break;
         }
@@ -147,22 +130,12 @@ async function addEmailJob(jobType, payload, options = {}) {
         case 'SECONDARY_ADMIN_WELCOME': {
           const User = require('../models/User');
           const adminUserId = payload.adminUserId;
-          try {
-            await emailUtils.sendSecondaryAdminWelcomeEmail(payload);
-            if (adminUserId) {
-              await User.updateOne(
-                { _id: adminUserId },
-                { $set: { invitationEmailStatus: 'sent', invitationEmailSentAt: new Date(), invitationEmailError: null } }
-              );
-            }
-          } catch (degErr) {
-            if (adminUserId) {
-              await User.updateOne(
-                { _id: adminUserId },
-                { $set: { invitationEmailStatus: 'failed', invitationEmailError: degErr.message } }
-              );
-            }
-            throw degErr;
+          await emailUtils.sendSecondaryAdminWelcomeEmail(payload);
+          if (adminUserId) {
+            await User.updateOne(
+              { _id: adminUserId },
+              { $set: { invitationEmailStatus: 'sent', invitationEmailSentAt: new Date(), invitationEmailError: null } }
+            );
           }
           break;
         }
@@ -177,9 +150,94 @@ async function addEmailJob(jobType, payload, options = {}) {
         default:
           console.warn(`[QueueManager:Degraded] Unhandled degraded email type: ${jobType}`);
       }
+
+      // Successful dispatch
+      return { success: true, attempts: attempt };
     } catch (err) {
-      console.error(`[QueueManager:Degraded] Fallback email dispatch failed: ${err.message}`);
+      lastError = err;
+      console.warn(`[QueueManager:Degraded] Attempt ${attempt}/${maxAttempts} for ${jobType} failed: ${err.message}`);
+
+      // If permanent failure (auth error or rejected recipient), do not retry
+      if (err.status === 'SMTP_AUTHENTICATION_FAILED' || err.status === 'MESSAGE_REJECTED' || err.status === 'CONFIGURATION_MISSING') {
+        break;
+      }
+
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+      }
     }
+  }
+
+  // All retries exhausted
+  console.error(`[QueueManager:Degraded] All ${maxAttempts} attempts for ${jobType} failed: ${lastError?.message}`);
+  if (jobType === 'STUDENT_WELCOME_ACTIVATION') {
+    try {
+      const Student = require('../models/Student');
+      const mongoose = require('mongoose');
+      const targetStudentId = payload.studentDocId || payload.studentId;
+      if (targetStudentId) {
+        const query = mongoose.Types.ObjectId.isValid(targetStudentId)
+          ? { _id: targetStudentId }
+          : { studentCode: targetStudentId };
+        await Student.updateOne(query, {
+          $set: { welcomeEmailStatus: 'failed', welcomeEmailError: lastError?.message || 'Delivery failed' },
+        });
+      }
+    } catch (dbErr) {
+      // Non-fatal
+    }
+  } else if (jobType === 'SECONDARY_ADMIN_WELCOME') {
+    try {
+      const User = require('../models/User');
+      if (payload.adminUserId) {
+        await User.updateOne(
+          { _id: payload.adminUserId },
+          { $set: { invitationEmailStatus: 'failed', invitationEmailError: lastError?.message || 'Delivery failed' } }
+        );
+      }
+    } catch (dbErr) {
+      // Non-fatal
+    }
+  }
+
+  return { success: false, error: lastError?.message };
+}
+
+/**
+ * Enqueues an email job. If Redis is degraded/unavailable, handles gracefully with bounded retries.
+ * 
+ * @param {string} jobType - e.g. 'STUDENT_CREDENTIALS', 'FEE_REMINDER', 'PASSWORD_RESET'
+ * @param {object} payload - Concise payload (IDs + minimal metadata only)
+ * @param {object} options - Optional BullMQ JobOptions (e.g. deterministic jobId)
+ */
+async function addEmailJob(jobType, payload, options = {}) {
+  initQueues();
+
+  if (emailQueue && getRedisStatus().ready) {
+    try {
+      // Suffix timestamp to jobId to avoid BullMQ deduplication suppression on legitimate retries
+      const deterministicJobId = options.jobId
+        ? (options.jobId.endsWith(Date.now().toString().slice(-4)) ? options.jobId : `${options.jobId}-${Date.now()}`)
+        : `${jobType.toLowerCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+
+      const job = await emailQueue.add(jobType, payload, {
+        ...DEFAULT_JOB_OPTIONS,
+        ...options,
+        jobId: deterministicJobId,
+      });
+      return { success: true, jobId: job.id, queued: true };
+    } catch (err) {
+      console.warn(`[QueueManager] Failed to enqueue to Redis (${err.message}). Falling back to degraded mode.`);
+    }
+  }
+
+  // Degraded Mode Fallback:
+  // Execute transactional emails in the background with bounded exponential retries
+  const fallbackJobId = `deg-email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+  setImmediate(() => {
+    executeDegradedEmailWithRetry(jobType, payload, fallbackJobId).catch((err) => {
+      console.error(`[QueueManager:Degraded] Critical unhandled error in fallback runner: ${err.message}`);
+    });
   });
 
   return {
