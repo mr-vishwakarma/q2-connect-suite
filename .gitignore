@@ -58,5 +58,7 @@ backend/seed*.js
 add-export-buttons.mjs
 replace-spinners.mjs
 replace-spinners.cjs
+scratch/
+backend/scratch/
 
 .vercel
