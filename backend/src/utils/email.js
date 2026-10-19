@@ -108,9 +108,9 @@ function createTransportInstance({ host, port, secure, service, user, pass }) {
   const options = {
     pool: false, // Transactional emails must use dedicated direct TLS connections to prevent stale pooled socket timeouts
     auth: { user, pass },
-    connectionTimeout: 15000, // 15s connection timeout for cloud containers
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: 8000, // 8s connection timeout for cloud containers
+    greetingTimeout: 6000,
+    socketTimeout: 8000,
     tls: {
       rejectUnauthorized: true,
       minVersion: 'TLSv1.2',
@@ -133,28 +133,36 @@ function createTransportInstance({ host, port, secure, service, user, pass }) {
  */
 const getTransporter = () => {
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
-  const isGmail = host.includes('gmail.com') || process.env.SMTP_SERVICE === 'gmail';
-  // Default to port 465 (SSL direct TLS) for Gmail since cloud containers (Render) often block port 587
-  const defaultPort = isGmail ? '465' : '587';
-  const port = parseInt(process.env.SMTP_PORT || defaultPort, 10);
   const user = (process.env.SMTP_USER || '').trim();
   const pass = (process.env.SMTP_PASS || '').replace(/\s+/g, '').trim();
+  const isGmail = host.includes('gmail.com') || process.env.SMTP_SERVICE === 'gmail' || user.endsWith('@gmail.com');
+  const defaultPort = isGmail ? '465' : '587';
+  const port = parseInt(process.env.SMTP_PORT || defaultPort, 10);
 
-  const configHash = `${host}:${port}:${user}:${pass ? 'set' : 'none'}`;
+  const configHash = `${host}:${port}:${user}:${pass ? 'set' : 'none'}:${isGmail ? 'gmail' : 'custom'}`;
 
   if (cachedTransporter && lastConfigHash === configHash) {
     return cachedTransporter;
   }
 
-  const isSecure = port === 465;
-
-  cachedTransporter = createTransportInstance({
-    host,
-    port,
-    secure: isSecure,
-    user,
-    pass,
-  });
+  // When Gmail is detected, service: 'gmail' provides instant, optimized TLS routing
+  // avoiding cloud container port 465/587 handshake delays on Render/AWS/GCP
+  if (isGmail) {
+    cachedTransporter = createTransportInstance({
+      service: 'gmail',
+      user,
+      pass,
+    });
+  } else {
+    const isSecure = port === 465;
+    cachedTransporter = createTransportInstance({
+      host,
+      port,
+      secure: isSecure,
+      user,
+      pass,
+    });
+  }
 
   lastConfigHash = configHash;
   return cachedTransporter;
@@ -167,12 +175,14 @@ const getFallbackTransporter = () => {
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
   const user = (process.env.SMTP_USER || '').trim();
   const pass = (process.env.SMTP_PASS || '').replace(/\s+/g, '').trim();
-  const isGmail = host.includes('gmail.com') || process.env.SMTP_SERVICE === 'gmail';
+  const isGmail = host.includes('gmail.com') || process.env.SMTP_SERVICE === 'gmail' || user.endsWith('@gmail.com');
 
   if (isGmail) {
-    // If primary was host:port, try service: 'gmail' or port 465
+    // If primary was service: 'gmail', try direct SSL host:port 465 as resilient backup
     return createTransportInstance({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       user,
       pass,
     });

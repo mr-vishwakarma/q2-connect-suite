@@ -38,6 +38,9 @@ export default function ForgotPassword() {
 
       if (serverMessage) {
         toast.error(serverMessage);
+      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        // If client timeout occurred, the server already processed and saved the token
+        setIsSubmitted(true);
       } else if (error.code === 'ERR_NETWORK') {
         toast.error('Network error: Unable to reach the server. Please check your internet connection.');
       } else {

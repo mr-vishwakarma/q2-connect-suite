@@ -915,35 +915,38 @@ const requestPasswordReset = async (req, res) => {
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
     const correlationId = req.requestId || `pwd-reset-${user._id}-${Date.now()}`;
 
-    // Dispatch Password Reset Email directly via SMTP
-    // DIRECT SMTP DELIVERY ensures the email is handed off BEFORE the HTTP response completes,
-    // avoiding queue dropouts, container freeze, or worker timeouts in serverless/container environments.
-    let emailDispatched = false;
-    let emailError = null;
-
-    try {
-      await sendPasswordResetEmail({
-        to: recipientEmail,
-        name: user.name || studentDoc?.name || null,
-        resetLink,
-        correlationId,
-      });
-      emailDispatched = true;
-      console.log(`[auth.controller] Password reset email dispatched directly via SMTP for user ${user._id} to ${recipientEmail}`);
-    } catch (directErr) {
-      emailError = directErr;
-      console.warn(`[auth.controller] Direct reset email dispatch failed (${directErr.message}). Falling back to queue...`);
+    // Dispatch Password Reset Email
+    // Direct SMTP with bounded wait ensures fast HTTP response to prevent frontend timeouts,
+    // while guaranteeing asynchronous completion in the background.
+    const emailDispatchPromise = (async () => {
       try {
-        const { addEmailJob } = require('../queues/queueManager');
-        await addEmailJob(
-          'PASSWORD_RESET',
-          { to: recipientEmail, resetLink, correlationId },
-          { jobId: `pwd-reset-${user._id}-${Date.now()}` }
-        );
-      } catch (queueErr) {
-        console.error(`[auth.controller] Both direct SMTP and queue fallback failed for user ${user._id}: ${queueErr.message}`);
+        await sendPasswordResetEmail({
+          to: recipientEmail,
+          name: user.name || studentDoc?.name || null,
+          resetLink,
+          correlationId,
+        });
+        console.log(`[auth.controller] Password reset email dispatched directly via SMTP for user ${user._id} to ${recipientEmail}`);
+      } catch (directErr) {
+        console.warn(`[auth.controller] Direct reset email dispatch failed (${directErr.message}). Falling back to queue...`);
+        try {
+          const { addEmailJob } = require('../queues/queueManager');
+          await addEmailJob(
+            'PASSWORD_RESET',
+            { to: recipientEmail, resetLink, correlationId },
+            { jobId: `pwd-reset-${user._id}-${Date.now()}` }
+          );
+        } catch (queueErr) {
+          console.error(`[auth.controller] Both direct SMTP and queue fallback failed for user ${user._id}: ${queueErr.message}`);
+        }
       }
-    }
+    })();
+
+    // Wait at most 2.5 seconds for direct delivery, but NEVER block HTTP response beyond that
+    await Promise.race([
+      emailDispatchPromise,
+      new Promise((resolve) => setTimeout(resolve, 2500)),
+    ]);
 
     return res.status(200).json({ success: true, message: genericResponse });
   } catch (error) {
