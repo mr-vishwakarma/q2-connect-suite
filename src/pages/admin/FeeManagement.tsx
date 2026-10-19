@@ -28,7 +28,7 @@ import {
   Search, IndianRupee, Calendar, Check, Filter, Download, TrendingUp,
   AlertCircle, Wallet, Users, FileText, Receipt, Plus, User, Printer,
   LayoutGrid, List, Clock, AlertTriangle, ArrowUpRight, Percent, Building2,
-  ArrowUpDown, ArrowUp, ArrowDown
+  ArrowUpDown, ArrowUp, ArrowDown, Mail
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays, addMonths, addDays } from 'date-fns';
 import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptData, getHistoryReceiptBlob } from '@/lib/receiptPdf';
@@ -100,6 +100,25 @@ export default function FeeManagement() {
     pAmount: 0, pLateFee: 0, pDiscount: 0, pDeposit: 0, pReceived: 0,
     pMode: 'upi', pNotes: '',
   });
+
+  const [emailingStudentId, setEmailingStudentId] = useState<string | null>(null);
+
+  const handleSendEmail = async (s: Student) => {
+    if (!s.id) return;
+    try {
+      setEmailingStudentId(s.id);
+      const res = await feeService.sendFeeReminder(s.id, selectedMonth);
+      if (res.success) {
+        toast.success(`Fee statement email sent successfully to ${s.name}!`);
+      } else {
+        toast.error(res.message || 'Failed to send fee statement email');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to send fee statement email');
+    } finally {
+      setEmailingStudentId(null);
+    }
+  };
 
   const currentMonth = format(new Date(), 'MMMM yyyy');
 
@@ -1077,6 +1096,16 @@ export default function FeeManagement() {
                             </Button>
                             <Button
                               size="sm"
+                              variant="ghost"
+                              title="Send Fee Statement Email"
+                              disabled={emailingStudentId === s.id}
+                              onClick={() => handleSendEmail(s)}
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg"
+                            >
+                              <Mail className={cn("w-4 h-4", emailingStudentId === s.id && "animate-spin text-emerald-400")} />
+                            </Button>
+                            <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => openProfile(s)}
                               className="h-8 text-xs rounded-xl border-border"
@@ -1176,7 +1205,7 @@ export default function FeeManagement() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2 pt-1">
+                    <div className="flex gap-1.5 pt-1">
                       <Button
                         size="sm"
                         variant="outline"
@@ -1185,6 +1214,16 @@ export default function FeeManagement() {
                       >
                         <Printer className="w-3.5 h-3.5 mr-1 text-primary" />
                         Receipt
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 h-8 text-xs rounded-xl border-border text-foreground hover:bg-secondary"
+                        disabled={emailingStudentId === s.id}
+                        onClick={() => handleSendEmail(s)}
+                      >
+                        <Mail className={cn("w-3.5 h-3.5 mr-1 text-emerald-400", emailingStudentId === s.id && "animate-spin")} />
+                        {emailingStudentId === s.id ? 'Sending...' : 'Email'}
                       </Button>
                       <Button
                         size="sm"

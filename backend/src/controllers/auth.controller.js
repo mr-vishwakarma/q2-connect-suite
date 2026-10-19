@@ -838,12 +838,14 @@ const requestPasswordReset = async (req, res) => {
     // Generic public response to prevent account enumeration
     const genericResponse = 'If an account matches that email address, password-reset instructions will be sent.';
 
-    // Look for user by email or username (student User ID or email)
+    // Look for user by email or username (case-insensitive for both)
     const escapedKey = searchKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const caseInsensitiveKey = new RegExp(`^${escapedKey}$`, 'i');
+
     let user = await User.findOne({
       $or: [
-        { email: searchKey },
-        { username: { $regex: new RegExp(`^${escapedKey}$`, 'i') } }
+        { email: caseInsensitiveKey },
+        { username: caseInsensitiveKey }
       ]
     });
 
@@ -853,9 +855,9 @@ const requestPasswordReset = async (req, res) => {
       const Student = require('../models/Student');
       studentDoc = await Student.findOne({
         $or: [
-          { studentCode: { $regex: new RegExp(`^${escapedKey}$`, 'i') } },
-          { email: searchKey },
-          { username: { $regex: new RegExp(`^${escapedKey}$`, 'i') } }
+          { studentCode: caseInsensitiveKey },
+          { email: caseInsensitiveKey },
+          { username: caseInsensitiveKey }
         ]
       });
       if (studentDoc && studentDoc.userId) {
@@ -875,7 +877,7 @@ const requestPasswordReset = async (req, res) => {
     let recipientEmail = user.email ? user.email.toLowerCase().trim() : null;
     if (studentDoc && studentDoc.email) {
       const studentEmail = studentDoc.email.toLowerCase().trim();
-      if (!isRoutableEmail(recipientEmail) && isRoutableEmail(studentEmail)) {
+      if (!recipientEmail || !isRoutableEmail(recipientEmail) || recipientEmail.endsWith('.local') || recipientEmail.endsWith('@q2connect.com')) {
         recipientEmail = studentEmail;
         user.email = recipientEmail;
       }
@@ -906,22 +908,33 @@ const requestPasswordReset = async (req, res) => {
     const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
     const correlationId = req.requestId || `pwd-reset-${user._id}-${Date.now()}`;
 
-    // Queue or send email
+    // Dispatch Password Reset Email directly via SMTP
+    // DIRECT SMTP DELIVERY ensures the email is handed off BEFORE the HTTP response completes,
+    // avoiding queue dropouts, container freeze, or worker timeouts in serverless/container environments.
+    let emailDispatched = false;
+    let emailError = null;
+
     try {
-      const { addEmailJob } = require('../queues/queueManager');
-      await addEmailJob(
-        'PASSWORD_RESET',
-        { to: recipientEmail, resetLink, correlationId },
-        { jobId: `pwd-reset-${user._id}-${Date.now()}` }
-      );
-    } catch (err) {
-      console.warn(`[auth.controller] Queue reset email failed (${err.message}), sending directly...`);
+      await sendPasswordResetEmail({
+        to: recipientEmail,
+        name: user.name || studentDoc?.name || null,
+        resetLink,
+        correlationId,
+      });
+      emailDispatched = true;
+      console.log(`[auth.controller] Password reset email dispatched directly via SMTP for user ${user._id} to ${recipientEmail}`);
+    } catch (directErr) {
+      emailError = directErr;
+      console.warn(`[auth.controller] Direct reset email dispatch failed (${directErr.message}). Falling back to queue...`);
       try {
-        const { sendPasswordResetEmail } = require('../utils/email');
-        await sendPasswordResetEmail({ to: recipientEmail, resetLink, correlationId });
-      } catch (directErr) {
-        console.error(`[auth.controller] Direct reset email dispatch failed: ${directErr.message}`);
-        // Retain token so in-flight recovery attempts or retries remain valid
+        const { addEmailJob } = require('../queues/queueManager');
+        await addEmailJob(
+          'PASSWORD_RESET',
+          { to: recipientEmail, resetLink, correlationId },
+          { jobId: `pwd-reset-${user._id}-${Date.now()}` }
+        );
+      } catch (queueErr) {
+        console.error(`[auth.controller] Both direct SMTP and queue fallback failed for user ${user._id}: ${queueErr.message}`);
       }
     }
 

@@ -526,16 +526,18 @@ function renderBrandedLayout({ title, subtitle, contentHtml, footerNote }) {
 
 /**
  * Send password reset email
- * @param {object} options - { to, resetLink, correlationId }
+ * @param {object} options - { to, name, resetLink, correlationId }
  */
-const sendPasswordResetEmail = async ({ to, resetLink, correlationId }) => {
+const sendPasswordResetEmail = async ({ to, name = null, resetLink, correlationId }) => {
   const subject = 'Password Reset Request — Q2 Connect Suite';
   const cleanLink = resetLink.trim();
+  const safeName = name ? escapeHtml(name) : null;
 
-  const text = `Password Reset Request — Q2 Connect Suite\n\nYou requested a password reset for your account.\n\nOpen the link below in your browser to set a new password:\n${cleanLink}\n\nSecurity Notice:\n- This link is single-use and expires in 30 minutes.\n- If you did not request this, please ignore this email or notify security immediately.\n\nBest regards,\nQ2 Connect Suite Security Team`;
+  const text = `Password Reset Request — Q2 Connect Suite\n\n${name ? `Hello ${name},\n\n` : ''}We received a request to reset the password for your Q2 Connect Suite account.\n\nOpen the link below in your browser to set a new password:\n${cleanLink}\n\nSecurity Notice:\n- This link is single-use and valid for 2 hours.\n- If you did not request this, please ignore this email or notify security immediately. Your account remains secure.\n\nBest regards,\nQ2 Connect Suite Security Team`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #cbd5e1;">
+      ${safeName ? `Hello <strong>${safeName}</strong>,<br/><br/>` : ''}
       We received a request to reset the password for your Q2 Connect Suite account.
     </p>
 
@@ -545,7 +547,7 @@ const sendPasswordResetEmail = async ({ to, resetLink, correlationId }) => {
         Reset My Password
       </a>
       <p style="margin: 14px 0 0 0; font-size: 12px; color: #94a3b8;">
-        ⏳ Valid for <strong>30 minutes</strong> &bull; Single-use only
+        ⏳ Valid for <strong>2 hours</strong> &bull; Single-use only
       </p>
     </div>
 

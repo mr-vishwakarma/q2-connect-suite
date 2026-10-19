@@ -6,6 +6,7 @@ const Room = require('../models/Room');
 const Notification = require('../models/Notification');
 const { sendStudentCredentials, sendAdminNewStudentRegisteredNotification, getTrustedFrontendUrl } = require('../utils/email');
 const { addEmailJob } = require('../queues/queueManager');
+const studentService = require('../services/student.service');
 const { parsePagination, getPaginationMeta } = require('../utils/pagination');
 
 // @desc    Get all students (with optional hostel filter)
@@ -469,64 +470,17 @@ const createStudent = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Send single-use time-limited activation welcome email (idempotent BullMQ job)
-    const frontendUrl = getTrustedFrontendUrl(req);
-    const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
-    const loginLink = `${frontendUrl}/login?role=student`;
-    const correlationId = req.requestId || `welcome-activation-${student._id}`;
-
-    addEmailJob('STUDENT_WELCOME_ACTIVATION', {
-      to: email.toLowerCase(),
-      studentName: name,
-      studentId: finalStudentCode,
-      username: finalUsername,
-      hostelName: hostelDoc ? hostelDoc.name : resolvedBranchCode,
-      activationLink,
-      loginLink,
-      studentDocId: student._id.toString(),
-      supportContact: hostelDoc?.contactPhone || 'support@q2connect.com',
-      correlationId,
-    }, { jobId: `welcome-activation-${student._id}-${Date.now()}` }).catch(async (err) => {
-      console.warn('[students.controller] Welcome activation email queue warning:', err.message);
-      try {
-        const emailUtils = require('../utils/email');
-        await emailUtils.sendStudentWelcomeEmail({
-          to: email.toLowerCase(),
-          name,
-          username: finalUsername,
-          studentCode: finalStudentCode,
-          hostel: hostelDoc ? hostelDoc.name : resolvedBranchCode,
-          activationLink,
-          loginLink,
-          correlationId,
-        });
-        await Student.updateOne(
-          { _id: student._id },
-          { $set: { welcomeEmailStatus: 'sent', welcomeEmailSentAt: new Date(), welcomeEmailError: null } }
-        );
-      } catch (fallbackErr) {
-        console.error('[students.controller] Direct welcome email fallback failed:', fallbackErr.message);
-        await Student.updateOne(
-          { _id: student._id },
-          { $set: { welcomeEmailStatus: 'failed', welcomeEmailError: fallbackErr.message } }
-        );
-      }
-    });
-
-    // Asynchronously notify admin via queue (using routable admin email)
-    const defaultAdminEmail = (process.env.ADMIN_ALERT_EMAIL || process.env.SMTP_USER || 'mayurvish2003@gmail.com').trim();
-    const rawAdminEmail = req.user?.email;
-    const isMockAdmin = !rawAdminEmail || rawAdminEmail.endsWith('@q2connect.com') || rawAdminEmail.endsWith('@q2hostel.local') || rawAdminEmail.endsWith('@example.com');
-    const adminEmail = isMockAdmin ? defaultAdminEmail : rawAdminEmail;
-    addEmailJob('ADMIN_NEW_STUDENT_REGISTERED', {
-      to: adminEmail,
-      studentName: name,
-      studentEmail: email.toLowerCase(),
-      studentRoom: roomNo,
-      studentHostel: hostel,
-      studentPhone: phone,
-      username: finalUsername,
-    }, { jobId: `admin-notif-${student._id}` }).catch(err => console.warn('[students.controller] Admin notification email queue warning:', err.message));
+    // Dispatch single-use time-limited activation welcome email directly to student (single source of email dispatch)
+    try {
+      await studentService.dispatchStudentWelcomeEmail({
+        student,
+        user,
+        hostelDoc,
+        req,
+      });
+    } catch (emailErr) {
+      console.warn('[students.controller] Welcome activation email dispatch warning:', emailErr.message);
+    }
 
     return res.status(201).json({
       success: true,
@@ -1282,38 +1236,17 @@ const approveAndRegisterStudent = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Send single-use time-limited activation welcome email (idempotent BullMQ job)
-    const frontendUrl = getTrustedFrontendUrl(req);
-    const activationLink = rawActivationToken
-      ? `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`
-      : `${frontendUrl}/login?role=student`;
-
-    addEmailJob('STUDENT_WELCOME_ACTIVATION', {
-      to: finalEmail,
-      studentName: finalName,
-      studentId: finalStudentCode,
-      username: finalUsername,
-      hostelName: hostelDoc ? hostelDoc.name : finalHostel,
-      activationLink,
-      loginLink: `${frontendUrl}/login?role=student`,
-      studentDocId: student._id.toString(),
-      supportContact: hostelDoc?.contactPhone || 'support@q2connect.com',
-    }, { jobId: `welcome-activation-${student._id}-${Date.now()}` }).catch(err => console.warn('[students.controller] Welcome activation email queue warning:', err.message));
-
-    // Send asynchronous confirmation email to Admin via queue (using routable admin email)
-    const defaultAdminEmail = (process.env.ADMIN_ALERT_EMAIL || process.env.SMTP_USER || 'mayurvish2003@gmail.com').trim();
-    const rawAdminEmail = req.user?.email;
-    const isMockAdmin = !rawAdminEmail || rawAdminEmail.endsWith('@q2connect.com') || rawAdminEmail.endsWith('@q2hostel.local') || rawAdminEmail.endsWith('@example.com');
-    const adminEmail = isMockAdmin ? defaultAdminEmail : rawAdminEmail;
-    addEmailJob('ADMIN_NEW_STUDENT_REGISTERED', {
-      to: adminEmail,
-      studentName: finalName,
-      studentEmail: finalEmail,
-      studentRoom: roomNo,
-      studentHostel: finalHostel,
-      studentPhone: finalPhone,
-      username: finalUsername,
-    }).catch(e => console.warn('Admin registration confirmation email queue warning:', e.message));
+    // Dispatch single-use time-limited activation welcome email directly to student (single source of email dispatch)
+    try {
+      await studentService.dispatchStudentWelcomeEmail({
+        student,
+        user,
+        hostelDoc,
+        req,
+      });
+    } catch (emailErr) {
+      console.warn('[students.controller] Welcome activation email dispatch warning on approval:', emailErr.message);
+    }
 
     return res.status(200).json({
       success: true,
@@ -1364,71 +1297,24 @@ const resendStudentInvitation = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Associated user account not found' });
     }
 
-    // Generate fresh single-use activation token (48h expiry)
-    const rawActivationToken = crypto.randomBytes(32).toString('hex');
-    const hashedActivationToken = crypto.createHash('sha256').update(rawActivationToken).digest('hex');
-    const activationExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
-
-    user.activationToken = hashedActivationToken;
-    user.activationExpires = activationExpires;
-    user.mustChangePassword = true;
-    await user.save({ validateBeforeSave: false });
-
-    student.welcomeEmailStatus = 'pending';
-    student.welcomeEmailError = null;
-    await student.save({ validateBeforeSave: false });
-
-    const frontendUrl = getTrustedFrontendUrl(req);
-    const activationLink = `${frontendUrl}/reset-password?token=${rawActivationToken}&type=activation`;
-    const loginLink = `${frontendUrl}/login?role=student`;
-    const correlationId = req.requestId || `resend-activation-${student._id}-${Date.now()}`;
-
     try {
-      await addEmailJob('STUDENT_WELCOME_ACTIVATION', {
-        to: student.email.toLowerCase(),
-        studentName: student.name,
-        studentId: student.studentCode || student.username,
-        username: student.username,
-        hostelName: student.hostel,
-        activationLink,
-        loginLink,
-        studentDocId: student._id.toString(),
-        supportContact: 'support@q2connect.com',
-        correlationId,
-      }, { jobId: `resend-activation-${student._id}-${Date.now()}` });
-    } catch (qErr) {
-      console.warn(`[students.controller] Resend queue failed (${qErr.message}), sending directly...`);
-      try {
-        const emailUtils = require('../utils/email');
-        await emailUtils.sendStudentWelcomeEmail({
-          to: student.email.toLowerCase(),
-          name: student.name,
-          username: student.username,
-          studentCode: student.studentCode || student.username,
-          hostel: student.hostel,
-          activationLink,
-          loginLink,
-          correlationId,
-        });
-        student.welcomeEmailStatus = 'sent';
-        student.welcomeEmailSentAt = new Date();
-        student.welcomeEmailError = null;
-        await student.save({ validateBeforeSave: false });
-      } catch (directErr) {
-        student.welcomeEmailStatus = 'failed';
-        student.welcomeEmailError = directErr.message;
-        await student.save({ validateBeforeSave: false });
-        return res.status(500).json({
-          success: false,
-          message: `Failed to deliver welcome email: ${directErr.message}`,
-        });
-      }
-    }
+      await studentService.dispatchStudentWelcomeEmail({
+        student,
+        user,
+        hostelDoc: null,
+        req,
+      });
 
-    return res.status(200).json({
-      success: true,
-      message: `Welcome invitation successfully queued for ${student.email}`,
-    });
+      return res.status(200).json({
+        success: true,
+        message: `Welcome & activation invitation successfully sent to ${student.email}`,
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: `Failed to deliver welcome invitation email: ${err.message}`,
+      });
+    }
   } catch (error) {
     console.error('resendStudentInvitation error:', error);
     return res.status(500).json({ success: false, message: error.message });

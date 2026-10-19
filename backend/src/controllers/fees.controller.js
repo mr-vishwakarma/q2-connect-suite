@@ -621,6 +621,123 @@ const collectPayment = async (req, res) => {
   }
 };
 
+// @desc    Send fee statement / reminder email to a student
+// @route   POST /api/fees/send-reminder/:studentId
+// @access  Admin
+const sendFeeReminderEmail = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { month } = req.body;
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    const studentQuery = { _id: studentId };
+    if (orgId && !isSuperAdmin) {
+      studentQuery.organizationId = orgId;
+    }
+
+    const student = await Student.findOne(studentQuery);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    if (!student.email || !student.email.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Student has no registered email address' });
+    }
+
+    const targetMonth = month || new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date());
+    const fee = await Fee.findOne({ studentId: student._id, month: targetMonth });
+
+    const monthlyAmount = fee?.amount ?? (student.fees || 0);
+    const lateFee = fee?.lateFee || 0;
+    const paidAmount = fee?.paidAmount || 0;
+    const discount = fee?.discount || 0;
+    const totalDue = fee ? Math.max(0, monthlyAmount + lateFee - paidAmount - discount) : (student.fees || 0);
+    const feeStatus = fee ? (fee.status || (totalDue === 0 ? 'paid' : 'pending')) : (totalDue === 0 ? 'paid' : 'pending');
+
+    const emailUtils = require('../utils/email');
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
+        <div style="text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 16px; margin-bottom: 20px;">
+          <h2 style="color: #6366f1; margin: 0 0 6px 0;">Hostel Fee Statement & Notice</h2>
+          <p style="color: #64748b; font-size: 14px; margin: 0;">${student.hostel} Hostel — Resident Billing</p>
+        </div>
+
+        <p style="font-size: 15px; line-height: 1.5; margin: 0 0 16px 0;">
+          Dear <strong>${student.name}</strong>,
+        </p>
+        <p style="font-size: 14px; line-height: 1.5; color: #475569; margin: 0 0 16px 0;">
+          Here is your official hostel fee status statement for the billing period of <strong>${targetMonth}</strong>.
+        </p>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="color: #64748b; padding: 6px 0;">Student Code:</td>
+              <td style="color: #0f172a; font-weight: 600; text-align: right; font-family: monospace;">${student.studentCode || student.username}</td>
+            </tr>
+            <tr>
+              <td style="color: #64748b; padding: 6px 0;">Room No:</td>
+              <td style="color: #0f172a; font-weight: 600; text-align: right;">${student.roomNo || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style="color: #64748b; padding: 6px 0;">Fee Month:</td>
+              <td style="color: #0f172a; font-weight: 600; text-align: right;">${targetMonth}</td>
+            </tr>
+            <tr>
+              <td style="color: #64748b; padding: 6px 0;">Monthly Rent:</td>
+              <td style="color: #0f172a; font-weight: 600; text-align: right;">₹${monthlyAmount.toLocaleString('en-IN')}</td>
+            </tr>
+            ${lateFee > 0 ? `
+            <tr>
+              <td style="color: #d97706; padding: 6px 0;">Late Fee:</td>
+              <td style="color: #d97706; font-weight: 600; text-align: right;">₹${lateFee.toLocaleString('en-IN')}</td>
+            </tr>` : ''}
+            ${paidAmount > 0 ? `
+            <tr>
+              <td style="color: #10b981; padding: 6px 0;">Paid Amount:</td>
+              <td style="color: #10b981; font-weight: 600; text-align: right;">₹${paidAmount.toLocaleString('en-IN')}</td>
+            </tr>` : ''}
+            <tr style="border-top: 1px solid #e2e8f0;">
+              <td style="color: #0f172a; font-weight: 700; padding: 10px 0 0 0; font-size: 15px;">Total Balance Due:</td>
+              <td style="color: ${totalDue > 0 ? '#ef4444' : '#10b981'}; font-weight: 700; text-align: right; padding: 10px 0 0 0; font-size: 16px;">
+                ₹${totalDue.toLocaleString('en-IN')} (${totalDue > 0 ? 'Pending' : 'Settled'})
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0 0 16px 0;">
+          Hostel fees are collected offline at the hostel administration desk. Please contact your branch administrator or warden to clear any outstanding dues.
+        </p>
+
+        <div style="border-top: 1px solid #f1f5f9; padding-top: 14px; margin-top: 20px; font-size: 12px; color: #94a3b8;">
+          <p style="margin: 0;">Sent by ${student.hostel} Hostel Administration via Q2 Connect Suite.</p>
+        </div>
+      </div>
+    `;
+
+    await emailUtils.sendEmail({
+      to: student.email,
+      subject: `Hostel Fee Statement — ${targetMonth} (${student.hostel} Hostel)`,
+      html,
+      text: `Hello ${student.name}, your hostel fee for ${targetMonth} at ${student.hostel} is ₹${totalDue} (${feeStatus.toUpperCase()}). Please contact hostel administration for payment clearance.`,
+      purpose: 'FEE_REMINDER',
+      targetStudentId: student._id,
+      metadata: { month: targetMonth, totalDue, monthlyAmount },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Fee statement email sent successfully to ${student.email}`,
+    });
+  } catch (error) {
+    console.error('sendFeeReminderEmail error:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to send fee statement email' });
+  }
+};
+
 module.exports = {
   getFeeManagementDashboard,
   calculatePayableFeeEndpoint,
@@ -630,4 +747,5 @@ module.exports = {
   generateMonthlyFees,
   getFeePayments,
   collectPayment,
+  sendFeeReminderEmail,
 };

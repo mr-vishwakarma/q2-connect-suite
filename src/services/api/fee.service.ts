@@ -58,4 +58,9 @@ export const feeService = {
     const res = await api.get(`/fees/payments/${studentId}`);
     return res.data;
   },
+
+  async sendFeeReminder(studentId: string, month?: string): Promise<ApiResponse<any>> {
+    const res = await api.post(`/fees/send-reminder/${studentId}`, { month });
+    return res.data;
+  },
 };

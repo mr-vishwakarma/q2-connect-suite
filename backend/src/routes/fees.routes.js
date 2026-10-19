@@ -13,6 +13,7 @@ const {
   getFeeManagementDashboard,
   collectPayment,
   calculatePayableFeeEndpoint,
+  sendFeeReminderEmail,
 } = require('../controllers/fees.controller');
 
 router.use(protect, resolveTenantContext);
@@ -23,6 +24,9 @@ router.get('/calculate', adminOnly, calculatePayableFeeEndpoint);
 
 // Collect payment (atomic operation)
 router.post('/collect', adminOnly, collectPayment);
+
+// Send fee statement/reminder email
+router.post('/send-reminder/:studentId', adminOnly, sendFeeReminderEmail);
 
 // Fees
 router.get('/', getFees);

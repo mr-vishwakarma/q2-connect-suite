@@ -605,48 +605,75 @@ export default function AllStudents() {
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="font-semibold text-foreground">{student.name}</p>
-                          <p className="text-xs text-muted-foreground">{student.username || '-'}</p>
+                          <p className="font-semibold text-foreground text-base">{student.name}</p>
+                          <p className="text-xs text-muted-foreground font-mono">@{student.username || '-'}</p>
                         </div>
-                        <div className="flex gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => openEditDialog(student)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 h-8 w-8 p-0">
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => deleteStudent(student.id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8 p-0">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <Badge variant="outline" className="text-primary border-primary/30 font-bold">
+                          {student.room_no || 'N/A'}
+                        </Badge>
                       </div>
+
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
                           <p className="text-muted-foreground text-xs">Phone</p>
                           <p className="text-foreground">{student.phone || '-'}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground text-xs">Room</p>
-                          <Badge variant="outline" className="text-primary border-primary/30">{student.room_no || 'N/A'}</Badge>
-                        </div>
-                        <div>
                           <p className="text-muted-foreground text-xs">Fees</p>
-                          <p className="text-foreground">{student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : '-'}</p>
+                          <p className="text-foreground font-semibold">{student.fees ? `₹${student.fees.toLocaleString('en-IN')}` : '-'}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground text-xs">Status</p>
-                          <span className={cn(
-                            "font-medium",
-                            status.type === 'expired' && "text-destructive",
-                            status.type === 'warning' && "text-orange-500",
-                            status.type === 'active' && "text-foreground"
-                          )}>{status.label}</span>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs">Start</p>
+                          <p className="text-muted-foreground text-xs">Start Date</p>
                           <p className="text-foreground text-xs font-mono">{formatDateDMY(student.start_date)}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground text-xs">End</p>
+                          <p className="text-muted-foreground text-xs">End Date</p>
                           <p className="text-foreground text-xs font-mono">{formatDateDMY(student.valid_date)}</p>
                         </div>
+                        <div className="col-span-2">
+                          <p className="text-muted-foreground text-xs mb-1">Status</p>
+                          <span className={cn(
+                            "px-2.5 py-0.5 rounded-full text-xs font-semibold inline-block",
+                            status.type === 'expired' && "bg-destructive/15 text-destructive border border-destructive/30",
+                            status.type === 'warning' && "bg-orange-500/15 text-orange-500 border border-orange-500/30",
+                            status.type === 'active' && "bg-primary/15 text-primary border border-primary/30"
+                          )}>{status.label}</span>
+                        </div>
+                      </div>
+
+                      {/* Mobile Action Buttons Bar */}
+                      <div className="flex items-center gap-2 pt-2.5 border-t border-border/50">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={resendingId === student.id}
+                          onClick={() => handleResendInvite(student.id, student.email || student.username)}
+                          className="flex-1 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 h-8 px-2 text-xs flex items-center justify-center gap-1.5 rounded-lg"
+                          title="Send Welcome / Activation Email"
+                        >
+                          <Mail className={cn("w-3.5 h-3.5", resendingId === student.id && "animate-spin")} />
+                          <span>{resendingId === student.id ? 'Sending...' : 'Invite'}</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openEditDialog(student)}
+                          className="flex-1 border-blue-500/30 text-blue-400 hover:bg-blue-500/10 h-8 px-2 text-xs flex items-center justify-center gap-1.5 rounded-lg"
+                          title="Edit Student"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => deleteStudent(student.id)}
+                          className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10 h-8 px-2 text-xs flex items-center justify-center gap-1.5 rounded-lg"
+                          title="Delete Student"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
