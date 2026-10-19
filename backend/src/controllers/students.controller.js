@@ -779,8 +779,6 @@ const updateOwnProfile = async (req, res) => {
   }
 };
 
-const studentService = require('../services/student.service');
-
 // @desc    Get count of alert students (expiring within 5 days or already expired)
 // @route   GET /api/students/alerts/count
 const getAlertsCount = async (req, res) => {
