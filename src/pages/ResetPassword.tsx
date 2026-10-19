@@ -60,7 +60,7 @@ export default function ResetPassword() {
         navigate('/login');
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to reset password');
+      toast.error(error.response?.data?.message || 'Failed to reset password. If your link expired, please request a new one.');
     } finally {
       setIsLoading(false);
     }
@@ -72,11 +72,14 @@ export default function ResetPassword() {
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <Card className="bg-card border-border">
             <CardContent className="p-6 text-center">
-              <h2 className="text-2xl font-bold text-destructive mb-2">Invalid Link</h2>
+              <h2 className="text-2xl font-bold text-destructive mb-2">Invalid or Missing Link</h2>
               <p className="text-muted-foreground mb-4">
-                This password reset link is invalid or has expired.
+                This password reset link is invalid or has expired. Please request a new link from the Forgot Password page.
               </p>
-              <Button onClick={() => navigate('/login')} className="w-full">
+              <Button onClick={() => navigate('/forgot-password')} className="w-full mb-2">
+                Request New Reset Link
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/login')} className="w-full">
                 Return to Login
               </Button>
             </CardContent>

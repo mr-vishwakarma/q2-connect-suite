@@ -37,6 +37,12 @@ const userSchema = new mongoose.Schema(
     refreshTokens: [{ type: String }],
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
+    activeResetTokens: [
+      {
+        token: { type: String },
+        expires: { type: Date },
+      },
+    ],
 
     // Invitation Email Delivery Tracking (Phase: Admin Management & Email Delivery)
     invitationEmailStatus: {

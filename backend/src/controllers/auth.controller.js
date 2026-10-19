@@ -907,6 +907,12 @@ const requestPasswordReset = async (req, res) => {
           resetPasswordToken: hashedResetToken,
           resetPasswordExpires: resetExpires,
         },
+        $push: {
+          activeResetTokens: {
+            $each: [{ token: hashedResetToken, expires: resetExpires }],
+            $slice: -10, // Retain up to 10 active recent tokens so recent emails remain valid
+          },
+        },
       }
     );
 
@@ -973,47 +979,31 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
     }
 
-    const cleanToken = String(token).trim();
+    let cleanToken = String(token).trim();
+    try {
+      cleanToken = decodeURIComponent(cleanToken).trim();
+    } catch (e) {
+      // Ignore decode error
+    }
     const hashedToken = crypto.createHash('sha256').update(cleanToken).digest('hex');
+    const now = new Date();
 
-    // Multi-variant lookup: accepts both hashed and raw tokens across password-reset and activation
+    // Multi-variant lookup: accepts current token, raw token, activation tokens, and active recent tokens
     const user = await User.findOne({
       $or: [
-        { resetPasswordToken: hashedToken },
-        { resetPasswordToken: cleanToken },
-        { activationToken: hashedToken },
-        { activationToken: cleanToken },
+        { resetPasswordToken: hashedToken, resetPasswordExpires: { $gt: now } },
+        { resetPasswordToken: cleanToken, resetPasswordExpires: { $gt: now } },
+        { activationToken: hashedToken, activationExpires: { $gt: now } },
+        { activationToken: cleanToken, activationExpires: { $gt: now } },
+        { 'activeResetTokens.token': hashedToken, 'activeResetTokens.expires': { $gt: now } },
+        { 'activeResetTokens.token': cleanToken, 'activeResetTokens.expires': { $gt: now } },
       ],
     });
 
     if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired activation or password reset token' });
-    }
-
-    // Check expiry
-    const now = Date.now();
-    let isExpired = false;
-
-    if (user.resetPasswordToken === hashedToken || user.resetPasswordToken === cleanToken) {
-      if (user.resetPasswordExpires) {
-        const expiresTime = user.resetPasswordExpires instanceof Date
-          ? user.resetPasswordExpires.getTime()
-          : new Date(user.resetPasswordExpires).getTime();
-        if (expiresTime < now) isExpired = true;
-      }
-    } else if (user.activationToken === hashedToken || user.activationToken === cleanToken) {
-      if (user.activationExpires) {
-        const expiresTime = user.activationExpires instanceof Date
-          ? user.activationExpires.getTime()
-          : new Date(user.activationExpires).getTime();
-        if (expiresTime < now) isExpired = true;
-      }
-    }
-
-    if (isExpired) {
       return res.status(400).json({
         success: false,
-        message: 'This password reset link has expired. Please request a new link from the Forgot Password page.',
+        message: 'Invalid or expired activation or password reset token. If you received multiple reset emails, please use the link in the most recent email or request a fresh one.',
       });
     }
 
@@ -1023,6 +1013,7 @@ const resetPassword = async (req, res) => {
     user.resetPasswordExpires = undefined;
     user.activationToken = undefined;
     user.activationExpires = undefined;
+    user.activeResetTokens = [];
     user.mustChangePassword = false;
     user.isEmailVerified = true;
 
@@ -1036,6 +1027,14 @@ const resetPassword = async (req, res) => {
     user.refreshTokens = [];
 
     await user.save();
+
+    if (user.role === 'student') {
+      const Student = require('../models/Student');
+      await Student.updateOne(
+        { userId: user._id },
+        { $set: { status: 'ACTIVE', isActive: true } }
+      ).catch(() => {});
+    }
 
     // Log security audit event
     try {
