@@ -27,10 +27,22 @@ export default function ForgotPassword() {
       const response = await api.post('/auth/password/forgot', { email: email.trim() });
       if (response.data?.success) {
         setIsSubmitted(true);
+      } else {
+        toast.error(response.data?.message || 'Unable to process password reset. Please try again.');
       }
     } catch (error: any) {
-      // Show error but maybe fallback to success state to prevent email enumeration
-      toast.error(error.response?.data?.message || 'Something went wrong');
+      const serverMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error?.message ||
+        (typeof error.response?.data === 'string' && error.response.data.length < 200 ? error.response.data : null);
+
+      if (serverMessage) {
+        toast.error(serverMessage);
+      } else if (error.code === 'ERR_NETWORK') {
+        toast.error('Network error: Unable to reach the server. Please check your internet connection.');
+      } else {
+        toast.error('Something went wrong. Please try again later.');
+      }
     } finally {
       setIsLoading(false);
     }

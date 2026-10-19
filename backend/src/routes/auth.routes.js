@@ -26,10 +26,18 @@ const User = require('../models/User');
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15, // Limit each IP to 15 requests per 15 minutes
+  max: 60, // Limit each IP to 60 requests per 15 minutes
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again after 15 minutes.' }
+});
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // Dedicated quota for password recovery
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many password reset requests. Please wait a few minutes before trying again.' }
 });
 
 router.post('/login', authLimiter, login);
@@ -45,12 +53,12 @@ router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
 router.get('/admin-exists', checkAdminExists);
 
-// Password Reset
-router.post('/password/forgot', authLimiter, requestPasswordReset);
-router.post('/password/reset', authLimiter, resetPassword);
-router.post('/request-reset', authLimiter, requestPasswordReset);
-router.post('/reset-password', authLimiter, resetPassword);
-router.post('/forgot-password', authLimiter, requestPasswordReset);
+// Password Reset (dedicated rate limiter)
+router.post('/password/forgot', passwordResetLimiter, requestPasswordReset);
+router.post('/password/reset', passwordResetLimiter, resetPassword);
+router.post('/request-reset', passwordResetLimiter, requestPasswordReset);
+router.post('/reset-password', passwordResetLimiter, resetPassword);
+router.post('/forgot-password', passwordResetLimiter, requestPasswordReset);
 
 // Admin management (Tenant scoped & Protected)
 router.get('/admins', protect, adminOnly, resolveTenantContext, getAdmins);

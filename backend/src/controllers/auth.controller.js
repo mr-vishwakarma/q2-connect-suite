@@ -879,7 +879,6 @@ const requestPasswordReset = async (req, res) => {
       const studentEmail = studentDoc.email.toLowerCase().trim();
       if (!recipientEmail || !isRoutableEmail(recipientEmail) || recipientEmail.endsWith('.local') || recipientEmail.endsWith('@q2connect.com')) {
         recipientEmail = studentEmail;
-        user.email = recipientEmail;
       }
     }
 
@@ -897,11 +896,19 @@ const requestPasswordReset = async (req, res) => {
     // Generate cryptographically secure random token
     const resetToken = crypto.randomBytes(32).toString('hex');
     
-    // Hash it and save to DB with 2 hours expiry
-    user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetPasswordExpires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
-    
-    await user.save({ validateBeforeSave: false });
+    // Hash it and save to DB atomically with 2 hours expiry (no risk of email unique index collision)
+    const hashedResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const resetExpires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
+
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          resetPasswordToken: hashedResetToken,
+          resetPasswordExpires: resetExpires,
+        },
+      }
+    );
 
     // Create reset URL using explicit trusted frontend URL
     const frontendUrl = getTrustedFrontendUrl(req);
