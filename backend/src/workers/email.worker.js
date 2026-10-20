@@ -249,7 +249,17 @@ function initEmailWorker() {
       console.error(`[Worker:Email] Job ${job?.id} failed after ${job?.attemptsMade} attempts: ${err.message}`);
     });
 
+    let lastWarnTime = 0;
     emailWorker.on('error', (err) => {
+      const now = Date.now();
+      // Throttle repetitive ECONNRESET socket warnings from serverless Redis proxies
+      if (err.message && err.message.includes('ECONNRESET')) {
+        if (now - lastWarnTime > 30000) {
+          lastWarnTime = now;
+          console.warn(`[Worker:Email] Redis socket reset (${err.message}) — auto-reconnecting in background.`);
+        }
+        return;
+      }
       console.warn(`[Worker:Email] Worker connection warning: ${err.message}`);
     });
 

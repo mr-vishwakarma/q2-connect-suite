@@ -9,7 +9,7 @@
  * - Unified graceful shutdown
  */
 
-const { getRedisClient, getRedisStatus, closeRedisConnections } = require('../config/redis');
+const { getRedisClient, getRedisStatus, closeRedisConnections, verifyRedisConnection } = require('../config/redis');
 const { initQueues, closeQueues } = require('../queues/queueManager');
 const { initEmailWorker, closeEmailWorker } = require('../workers/email.worker');
 const { initScheduledWorker, closeScheduledWorker } = require('../workers/scheduled.worker');
@@ -30,10 +30,22 @@ async function initBackgroundSystem() {
 
   if (!redisStatus.configured) {
     console.log('ℹ️  REDIS_URL not configured. Background queue system running in DEGRADED mode.');
-    console.log('   (Transactional emails will be delivered inline/asynchronously; distributed scheduled crons inactive).\n');
+    console.log('   (Transactional emails will be delivered directly via SMTP; distributed scheduled crons inactive).\n');
     isInitialized = true;
     return;
   }
+
+  // Pre-flight connectivity verification (prevents BullMQ infinite reconnection loops & heap OOM crashes)
+  const isHealthy = await verifyRedisConnection();
+  if (!isHealthy) {
+    console.warn('⚠️  Redis connectivity check failed or timed out. Operating in safe DEGRADED mode.');
+    console.warn('   (Transactional emails will be delivered directly via SMTP with zero memory leak; workers paused).\n');
+    await closeRedisConnections();
+    isInitialized = true;
+    return;
+  }
+
+  console.log('✅ Redis connectivity verified. Starting BullMQ queues, workers, and scheduler...');
 
   // 1. Initialize Queues
   initQueues();

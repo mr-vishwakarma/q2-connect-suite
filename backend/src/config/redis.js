@@ -22,24 +22,31 @@ let lastError = null;
  * Parses and sanitizes Redis configuration options.
  */
 function getRedisOptions() {
-  const redisUrl = process.env.REDIS_URL;
-  const isTls = process.env.REDIS_TLS === 'true' || (redisUrl && redisUrl.startsWith('rediss://'));
+  let redisUrl = (process.env.REDIS_URL || '').trim();
+
+  // If using Upstash, force TLS protocol rediss://
+  if (redisUrl && redisUrl.includes('upstash.io') && redisUrl.startsWith('redis://')) {
+    redisUrl = redisUrl.replace(/^redis:\/\//, 'rediss://');
+  }
+
+  const isTls = process.env.REDIS_TLS === 'true' || (redisUrl && (redisUrl.startsWith('rediss://') || redisUrl.includes('upstash.io')));
 
   const baseOptions = {
     maxRetriesPerRequest: null, // Required by BullMQ
     enableReadyCheck: true,
-    connectTimeout: 10000,
+    connectTimeout: 8000,
+    keepAlive: 10000, // Send TCP keepalive probes every 10s to keep Upstash connection alive
+    family: 4, // Force IPv4 to prevent hanging on cloud container IPv6 blackholes
     retryStrategy(times) {
-      if (times > 10) {
-        console.warn('[Redis] Maximum connection retries reached. Background jobs operating in DEGRADED mode.');
+      if (times > 3) {
+        // Stop retrying after 3 attempts to prevent unbounded event listener memory leaks & OOM
         redisStatus = 'DEGRADED';
-        return null; // Stop retrying after 10 attempts
+        return null;
       }
-      const delay = Math.min(times * 200, 3000);
-      return delay;
+      return Math.min(times * 1000, 3000);
     },
     reconnectOnError(err) {
-      const targetErrors = ['READONLY', 'ETIMEDOUT', 'ECONNRESET'];
+      const targetErrors = ['READONLY', 'ETIMEDOUT'];
       return targetErrors.some(target => err.message.includes(target));
     },
   };
@@ -184,6 +191,43 @@ async function closeRedisConnections() {
   redisStatus = 'CLOSED';
 }
 
+/**
+ * Proactively verifies if Redis can actually respond to PING within 3 seconds.
+ * Returns true if operational, false if unreachable (preventing worker spawn and OOM loops).
+ */
+async function verifyRedisConnection() {
+  const { redisUrl, baseOptions } = getRedisOptions();
+  if (!redisUrl && !process.env.REDIS_HOST) {
+    return false;
+  }
+
+  const probe = redisUrl
+    ? new Redis(redisUrl, { ...baseOptions, connectTimeout: 3000, lazyConnect: true })
+    : new Redis({
+        host: process.env.REDIS_HOST || '127.0.0.1',
+        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+        password: process.env.REDIS_PASSWORD || undefined,
+        ...baseOptions,
+        connectTimeout: 3000,
+        lazyConnect: true,
+      });
+
+  probe.on('error', () => {}); // Silence unhandled error on temporary probe
+
+  try {
+    await probe.connect();
+    const res = await Promise.race([
+      probe.ping(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500)),
+    ]);
+    await probe.quit().catch(() => probe.disconnect());
+    return res === 'PONG';
+  } catch (err) {
+    probe.disconnect();
+    return false;
+  }
+}
+
 module.exports = {
   getRedisClient,
   getRedisSubscriber,
@@ -191,4 +235,5 @@ module.exports = {
   getRedisStatus,
   closeRedisConnections,
   getRedisOptions,
+  verifyRedisConnection,
 };
