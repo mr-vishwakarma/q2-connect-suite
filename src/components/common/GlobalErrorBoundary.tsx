@@ -18,10 +18,52 @@ export class GlobalErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
+    const errorMsg = error?.message || String(error || '');
+    const isChunkError =
+      errorMsg.includes('Failed to fetch dynamically imported module') ||
+      errorMsg.includes('Importing a module script failed') ||
+      errorMsg.includes('Loading chunk') ||
+      error?.name === 'ChunkLoadError';
+
+    if (isChunkError) {
+      try {
+        const lastReload = sessionStorage.getItem('app_chunk_reload_time');
+        const now = Date.now();
+        // If we haven't auto-reloaded in the last 15 seconds, automatically reload to pull fresh assets
+        if (!lastReload || now - parseInt(lastReload, 10) > 15000) {
+          sessionStorage.setItem('app_chunk_reload_time', now.toString());
+          window.location.reload();
+          return { hasError: false, error: null };
+        }
+      } catch {
+        // Ignore sessionStorage access errors
+      }
+    }
+
     return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    const errorMsg = error?.message || String(error || '');
+    const isChunkError =
+      errorMsg.includes('Failed to fetch dynamically imported module') ||
+      errorMsg.includes('Importing a module script failed') ||
+      errorMsg.includes('Loading chunk') ||
+      error?.name === 'ChunkLoadError';
+
+    if (isChunkError) {
+      try {
+        const lastReload = sessionStorage.getItem('app_chunk_reload_time');
+        const now = Date.now();
+        if (!lastReload || now - parseInt(lastReload, 10) > 15000) {
+          sessionStorage.setItem('app_chunk_reload_time', now.toString());
+          window.location.reload();
+          return;
+        }
+      } catch {
+        // Ignore
+      }
+    }
     console.error('[GlobalErrorBoundary] Uncaught component crash:', error, errorInfo);
   }
 
@@ -40,6 +82,13 @@ export class GlobalErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      const errorMsg = this.state.error?.message || String(this.state.error || '');
+      const isChunkError =
+        errorMsg.includes('Failed to fetch dynamically imported module') ||
+        errorMsg.includes('Importing a module script failed') ||
+        errorMsg.includes('Loading chunk') ||
+        this.state.error?.name === 'ChunkLoadError';
+
       return (
         <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-card border border-border rounded-2xl p-6 sm:p-8 text-center shadow-xl space-y-6">
@@ -48,11 +97,15 @@ export class GlobalErrorBoundary extends Component<Props, State> {
             </div>
 
             <div className="space-y-2">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Something went wrong</h1>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+                {isChunkError ? 'New Update Available' : 'Something went wrong'}
+              </h1>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                An unexpected runtime error occurred. We have isolated the issue to prevent data corruption.
+                {isChunkError
+                  ? 'A new version of Q2 Connect Suite was deployed. Please reload the page to load the latest application updates.'
+                  : 'An unexpected runtime error occurred. We have isolated the issue to prevent data corruption.'}
               </p>
-              {this.state.error && (
+              {this.state.error && !isChunkError && (
                 <div className="mt-3 p-3 bg-secondary/50 rounded-xl text-left border border-border/60 overflow-hidden">
                   <p className="text-[11px] font-mono text-destructive break-all line-clamp-3">
                     {this.state.error.message || String(this.state.error)}
@@ -65,29 +118,31 @@ export class GlobalErrorBoundary extends Component<Props, State> {
               <Button
                 variant="default"
                 size="sm"
-                onClick={this.handleReset}
-                className="w-full sm:w-auto gap-1.5 text-xs h-9"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Try Again
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
                 onClick={this.handleHardReload}
-                className="w-full sm:w-auto gap-1.5 text-xs h-9 border-border hover:bg-secondary"
+                className="w-full sm:w-auto gap-1.5 text-xs h-9"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 Reload Page
               </Button>
+              {!isChunkError && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={this.handleReset}
+                  className="w-full sm:w-auto gap-1.5 text-xs h-9 border-border hover:bg-secondary"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Try Again
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { window.location.href = '/'; }}
+                onClick={() => { window.location.href = '/login'; }}
                 className="w-full sm:w-auto gap-1.5 text-xs h-9 text-muted-foreground hover:text-foreground"
               >
                 <Home className="w-3.5 h-3.5" />
-                Home
+                Login
               </Button>
             </div>
           </div>

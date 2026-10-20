@@ -22,4 +22,15 @@ if (import.meta.env.PROD) {
   console.log = noop;
 }
 
+// Handle dynamic import / chunk load failures when a new version is deployed
+window.addEventListener('vite:preloadError', () => {
+  const lastReload = sessionStorage.getItem('vite_preload_reload_time');
+  const now = Date.now();
+  // Auto-reload at most once every 10 seconds to avoid reload loops
+  if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+    sessionStorage.setItem('vite_preload_reload_time', now.toString());
+    window.location.reload();
+  }
+});
+
 createRoot(document.getElementById("root")!).render(<App />);

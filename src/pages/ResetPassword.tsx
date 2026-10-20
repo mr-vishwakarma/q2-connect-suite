@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Key, Eye, EyeOff } from 'lucide-react';
+import { Shield, Key, Eye, EyeOff, CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
@@ -20,8 +20,9 @@ export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [expiredNotice, setExpiredNotice] = useState<string | null>(null);
-  const { signOut, refreshProfile } = useAuth();
+  const { signOut } = useAuth();
 
   // Ensure any existing sessions (like an admin session) are cleared 
   // so the user starts fresh and auto-login works cleanly.
@@ -58,8 +59,8 @@ export default function ResetPassword() {
       });
 
       if (response.data?.success) {
-        toast.success('Password updated successfully! Please sign in with your new password.');
-        navigate('/login');
+        setIsSuccess(true);
+        toast.success('Your password has been reset. You can continue to log in.');
       }
     } catch (error: any) {
       if (error.response?.data?.expired) {
@@ -73,6 +74,77 @@ export default function ResetPassword() {
       setIsLoading(false);
     }
   };
+
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-500/10 via-background to-background" />
+        
+        <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center"
+          >
+            <div className="mx-auto w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/10">
+              <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+              Password Reset Complete! 🎉
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground font-medium">
+              Your password has been reset. You can continue to log in.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mt-8"
+          >
+            <Card className="bg-card border-border shadow-2xl">
+              <CardContent className="p-6 text-center space-y-5">
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm text-left space-y-2">
+                  <div className="flex items-center gap-2 font-medium text-emerald-300">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Account Security Verified</span>
+                  </div>
+                  <ul className="text-xs text-emerald-300/80 space-y-1 list-disc list-inside">
+                    <li>Your new password is now active</li>
+                    <li>Previous sessions have been invalidated for security</li>
+                    <li>Sign in with your User ID / Email and new password</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <Button
+                    onClick={() => {
+                      // Fresh window navigation prevents stale cached chunks after new deployment
+                      window.location.href = '/login';
+                    }}
+                    className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-600/20 gap-2"
+                  >
+                    <span>Continue to Login</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      window.location.href = '/';
+                    }}
+                    className="w-full h-10 border-border hover:bg-secondary text-xs"
+                  >
+                    Return to Home
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   if (!token) {
     return (
