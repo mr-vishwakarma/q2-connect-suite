@@ -44,6 +44,7 @@ const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const OurTeam = lazy(() => import("./pages/OurTeam"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword.tsx"));
+const OAuthCallback = lazy(() => import("./pages/OAuthCallback"));
 const StudentDashboard = lazy(() => import("./pages/student/StudentDashboard"));
 const Profile = lazy(() => import("./pages/student/Profile"));
 const MessOff = lazy(() => import("./pages/student/MessOff"));
@@ -209,6 +210,7 @@ const App = () => (
               <Route path="/register-admin" element={<PublicOnlyRoute><RegisterAdmin /></PublicOnlyRoute>} />
               <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
               <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
+              <Route path="/auth/google/callback" element={<OAuthCallback />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
 
               {/* Student Protected Routes */}

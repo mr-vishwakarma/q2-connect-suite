@@ -24,6 +24,7 @@
     "test:separate-receipts": "node src/scripts/test_separate_receipts_workflow.js",
     "test:vouchers": "node src/scripts/test_vouchers.js",
     "test:manual-billing": "node src/scripts/test_manual_renewal_saas_billing.js",
+    "test:production": "node src/scripts/test_production_integration_suite.js",
     "test": "node src/scripts/test_p0_security.js"
   },
   "dependencies": {
@@ -46,6 +47,7 @@
     "node-cron": "^4.6.0",
     "nodemailer": "^6.9.14",
     "razorpay": "^2.9.8",
+    "resend": "^6.34.1",
     "socket.io": "^4.7.5",
     "uuid": "^10.0.0",
     "xss-clean": "^0.1.4"

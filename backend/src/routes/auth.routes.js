@@ -18,6 +18,8 @@ const {
   requestPasswordReset,
   resetPassword,
   googleLogin,
+  initiateGoogleOAuth,
+  handleGoogleOAuthCallback,
   registerStudent,
   completeGoogleSetup,
   requestGoogleRegistration,
@@ -43,6 +45,13 @@ const passwordResetLimiter = rateLimit({
 router.post('/login', authLimiter, login);
 router.post('/admin/login', authLimiter, adminLogin);
 router.post('/super-admin/login', authLimiter, superAdminLogin);
+
+// Google OAuth2 (Redirect code grant flow)
+router.get('/google', authLimiter, initiateGoogleOAuth);
+router.get('/google/callback', authLimiter, handleGoogleOAuthCallback);
+router.get('/auth/google/callback', authLimiter, handleGoogleOAuthCallback);
+
+// Google OAuth2 (GIS ID Token verification)
 router.post('/google', authLimiter, googleLogin);
 router.post('/request-google-registration', authLimiter, requestGoogleRegistration);
 router.post('/complete-google-setup', authLimiter, completeGoogleSetup);

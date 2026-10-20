@@ -2,8 +2,72 @@ import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 import { notifyApiError } from '@/utils/errorHandling';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+// Resolve API Base URL (supports VITE_API_URL and standard Vercel API_URL, ensuring /api suffix)
+const resolveApiUrl = (): string => {
+  const envUrl = (
+    import.meta.env.VITE_API_URL || 
+    import.meta.env.API_URL || 
+    ''
+  ).trim();
+
+  if (envUrl) {
+    const cleanUrl = envUrl.replace(/\/+$/, '');
+    return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  }
+
+  // In production builds, default to Render backend rather than localhost
+  if (import.meta.env.PROD) {
+    return 'https://q2-connect-api.onrender.com/api';
+  }
+
+  return 'http://localhost:5000/api';
+};
+
+// Resolve WebSocket Server URL (defaults to Render root in production without /api)
+const resolveSocketUrl = (resolvedApiUrl: string): string => {
+  const envSocketUrl = (
+    import.meta.env.VITE_SOCKET_URL || 
+    import.meta.env.SOCKET_URL || 
+    ''
+  ).trim();
+
+  if (envSocketUrl) {
+    return envSocketUrl.replace(/\/+$/, '');
+  }
+
+  if (resolvedApiUrl) {
+    return resolvedApiUrl.replace(/\/api\/?$/, '');
+  }
+
+  if (import.meta.env.PROD) {
+    return 'https://q2-connect-api.onrender.com';
+  }
+
+  return 'http://localhost:5000';
+};
+
+// Resolve Public Frontend Site URL
+const resolveSiteUrl = (): string => {
+  const envSite = (
+    import.meta.env.VITE_SITE_URL || 
+    import.meta.env.SITE_URL || 
+    ''
+  ).trim();
+
+  if (envSite) {
+    return envSite.replace(/\/+$/, '');
+  }
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  return 'https://mrvishwakarma.in';
+};
+
+export const API_URL = resolveApiUrl();
+export const SOCKET_URL = resolveSocketUrl(API_URL);
+export const SITE_URL = resolveSiteUrl();
 
 export const api = axios.create({
   baseURL: API_URL,

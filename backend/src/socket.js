@@ -7,20 +7,14 @@ const User = require('./models/User');
  * @param {import('http').Server} httpServer
  * @returns {import('socket.io').Server} io
  */
+const { isAllowedOrigin } = require('./config/cors');
+
 const initSocket = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        const isAllowed = 
-          origin.startsWith('http://localhost') ||
-          origin.endsWith('.vercel.app') ||
-          origin.endsWith('.lovable.app') ||
-          origin.endsWith('.lovableproject.com') ||
-          (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL);
-
-        if (isAllowed) {
-          callback(null, origin);
+        if (isAllowedOrigin(origin)) {
+          callback(null, origin || true);
         } else {
           callback(new Error('Not allowed by CORS'));
         }

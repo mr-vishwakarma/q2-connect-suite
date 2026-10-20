@@ -69,28 +69,10 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// CORS configuration - allow all Vercel domains and local environments
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    
-    const isAllowed = 
-      origin.startsWith('http://localhost') ||
-      origin.startsWith('http://127.0.0.1') ||
-      origin.endsWith('.vercel.app') ||
-      origin.endsWith('.lovable.app') ||
-      origin.endsWith('.lovableproject.com') ||
-      origin.endsWith('.onrender.com') ||
-      (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL);
-
-    if (isAllowed) {
-      callback(null, origin);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-}));
+// CORS configuration - production domain mrvishwakarma.in, Vercel, and local environments
+const { corsOptions } = require('./config/cors');
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Analytics Logger Middleware
 app.use(requestLogger);
@@ -134,7 +116,8 @@ app.use((req, res, next) => {
 app.use('/api/health', healthRoutes);
 app.use('/health', healthRoutes);
 
-// Mount routes
+// Mount auth routes (supports both direct domain /auth/google/callback and /api/auth/google/callback)
+app.use('/auth', authRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentsRoutes);
 app.use('/api/rooms', roomsRoutes);

@@ -141,6 +141,60 @@ export default function Login() {
     }
   }, [searchParams]);
 
+  // Handle incoming OAuth callback query parameters from redirect flow
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      toast.error(decodeURIComponent(errorParam), { toastId: 'oauth-error' });
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('error');
+      setSearchParams(newParams, { replace: true });
+      return;
+    }
+
+    const statusParam = searchParams.get('status');
+    if (statusParam === 'pending_approval') {
+      toast.info('Your registration request is pending admin approval. You will receive an update once verified.', { toastId: 'oauth-pending' });
+      return;
+    }
+
+    if (statusParam === 'rejected') {
+      const reason = searchParams.get('reason') || 'Please contact administration.';
+      toast.error(`Registration not approved: ${decodeURIComponent(reason)}`, { toastId: 'oauth-rejected' });
+      return;
+    }
+
+    const setupTokenParam = searchParams.get('setupToken');
+    if (setupTokenParam) {
+      const emailParam = searchParams.get('email') || '';
+      setGoogleSetupToken(setupTokenParam);
+      setGoogleProfileData({ email: emailParam });
+      setShowGoogleStep2(true);
+      return;
+    }
+
+    const tokenParam = searchParams.get('accessToken') || searchParams.get('token');
+    const refreshParam = searchParams.get('refreshToken');
+    const returnToParam = searchParams.get('returnTo');
+
+    if (tokenParam && refreshParam) {
+      localStorage.setItem('accessToken', tokenParam);
+      localStorage.setItem('refreshToken', refreshParam);
+
+      // Clean tokens from URL bar immediately to prevent exposure in history
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      toast.success('Signed in with Google!', { toastId: 'oauth-success' });
+      
+      // Navigate to destination or refresh to let auth context load
+      if (returnToParam && returnToParam.startsWith('/')) {
+        navigate(returnToParam, { replace: true });
+      } else {
+        window.location.href = '/';
+      }
+    }
+  }, [searchParams, setSearchParams, navigate]);
+
   // Authenticated redirect guard: if already logged in and visiting without query, route to verified portal
   useEffect(() => {
     const roleParam = searchParams.get('role');

@@ -104,16 +104,25 @@ router.get('/ready', async (req, res) => {
     environment: process.env.RAZORPAY_ENVIRONMENT || 'test',
   };
 
-  // 5. Transactional Email & SMTP Configuration
-  const { getSmtpConfigStatus } = require('../utils/email');
-  const smtpConfig = getSmtpConfigStatus();
+  // 5. Transactional Email Configuration (Resend primary + SMTP fallback)
+  const { getMailConfigStatus, verifyMailConnection } = require('../utils/email');
+  const mailConfig = getMailConfigStatus();
   dependencies.email = {
-    status: smtpConfig.configured ? 'CONFIGURED' : 'CONFIGURATION_MISSING',
-    configured: smtpConfig.configured,
-    host: smtpConfig.host,
-    port: smtpConfig.port,
-    secure: smtpConfig.secure,
-    fromConfigured: smtpConfig.fromConfigured,
+    status: mailConfig.configured ? 'CONFIGURED' : 'CONFIGURATION_MISSING',
+    configured: mailConfig.configured,
+    primaryProvider: mailConfig.primaryProvider,
+    from: mailConfig.from,
+    resend: {
+      configured: mailConfig.resend.configured,
+      senderAddress: mailConfig.resend.senderAddress,
+      domain: mailConfig.resend.domain,
+    },
+    smtp: {
+      configured: mailConfig.smtp.configured,
+      host: mailConfig.smtp.host,
+      port: mailConfig.smtp.port,
+      secure: mailConfig.smtp.secure,
+    },
   };
 
   const totalDurationMs = Date.now() - startTime;
@@ -137,29 +146,31 @@ router.get('/ready', async (req, res) => {
  * Explicit Email Transport Diagnostic Probe (Controlled Verification)
  * Distinguishes:
  * - CONFIGURATION_MISSING
+ * - RESEND_READY
+ * - EMAIL_ACCEPTED_BY_SMTP
  * - TRANSPORT_CONNECTION_FAILED
  * - SMTP_AUTHENTICATION_FAILED
- * - EMAIL_ACCEPTED_BY_SMTP
  * 
  * Never returns passwords, secrets, or permanent credentials.
  */
 router.get('/email-diagnostic', async (req, res) => {
-  const { getSmtpConfigStatus, verifySmtpConnection } = require('../utils/email');
-  const config = getSmtpConfigStatus();
-  const verifyResult = await verifySmtpConnection();
+  const { getMailConfigStatus, verifyMailConnection } = require('../utils/email');
+  const config = getMailConfigStatus();
+  const verifyResult = await verifyMailConnection();
 
   const statusCode = verifyResult.success ? 200 : (verifyResult.status === 'CONFIGURATION_MISSING' ? 503 : 502);
 
   res.status(statusCode).json({
     success: verifyResult.success,
     diagnosticStatus: verifyResult.status,
+    primaryProvider: config.primaryProvider,
     configPresence: {
       configured: config.configured,
-      host: config.host,
-      port: config.port,
-      secure: config.secure,
-      senderConfigured: config.fromConfigured,
+      senderAddress: config.from,
+      resendConfigured: config.resend.configured,
+      smtpConfigured: config.smtp.configured,
     },
+    details: verifyResult.details || null,
     error: verifyResult.error || null,
     code: verifyResult.code || null,
     requestId: req.requestId,

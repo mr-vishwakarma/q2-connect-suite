@@ -269,6 +269,207 @@ const adminLogin = async (req, res) => handleUnifiedLogin(req, res, PORTALS.ADMI
 // @access  Public
 const superAdminLogin = async (req, res) => handleUnifiedLogin(req, res, PORTALS.SUPER_ADMIN);
 
+/**
+ * Safely sanitizes return destination to prevent open redirects.
+ * Only allows relative paths starting with a single '/' (e.g. /student/dashboard).
+ */
+const sanitizeReturnTo = (returnTo) => {
+  if (!returnTo || typeof returnTo !== 'string') return null;
+  const trimmed = returnTo.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/\\')) {
+    return trimmed;
+  }
+  return null;
+};
+
+/**
+ * Resolves the Google OAuth callback URI configured on the backend or derived from frontend URL.
+ * Intended canonical URI: https://mrvishwakarma.in/auth/google/callback
+ */
+const getGoogleCallbackUrl = (req) => {
+  if (process.env.GOOGLE_CALLBACK_URL && process.env.GOOGLE_CALLBACK_URL.trim()) {
+    return process.env.GOOGLE_CALLBACK_URL.trim();
+  }
+  const frontendUrl = getTrustedFrontendUrl(req);
+  return `${frontendUrl}/auth/google/callback`;
+};
+
+// @desc    Initiate Google OAuth2 authorization redirect flow
+// @route   GET /api/auth/google (or /auth/google)
+// @access  Public
+const initiateGoogleOAuth = async (req, res) => {
+  try {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      return res.status(503).json({
+        success: false,
+        message: 'Google OAuth is not configured on this server (missing GOOGLE_CLIENT_ID).',
+      });
+    }
+
+    const callbackUrl = getGoogleCallbackUrl(req);
+    const client = new OAuth2Client(
+      clientId,
+      process.env.GOOGLE_CLIENT_SECRET,
+      callbackUrl
+    );
+
+    const requestedPortal = (req.query.portal || 'STUDENT').toUpperCase();
+    const returnTo = sanitizeReturnTo(req.query.returnTo);
+    const nonce = crypto.randomBytes(16).toString('hex');
+
+    const statePayload = JSON.stringify({
+      portal: requestedPortal,
+      returnTo,
+      nonce,
+      ts: Date.now(),
+    });
+    const state = Buffer.from(statePayload).toString('base64url');
+
+    const authUrl = client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'select_account',
+      scope: ['openid', 'profile', 'email'],
+      state,
+      redirect_uri: callbackUrl,
+    });
+
+    return res.redirect(authUrl);
+  } catch (error) {
+    console.error('[Google OAuth] Error generating authorization URL:', error);
+    const frontendUrl = getTrustedFrontendUrl(req);
+    return res.redirect(`${frontendUrl}/login?error=oauth_initiation_failed`);
+  }
+};
+
+// @desc    Handle Google OAuth2 callback
+// @route   GET /api/auth/google/callback (or /auth/google/callback)
+// @access  Public
+const handleGoogleOAuthCallback = async (req, res) => {
+  const frontendUrl = getTrustedFrontendUrl(req);
+  try {
+    // 1. Handle error returned by Google
+    if (req.query.error) {
+      const errorMsg = req.query.error_description || req.query.error;
+      console.warn('[Google OAuth] Google returned error on callback:', errorMsg);
+      return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent(errorMsg)}`);
+    }
+
+    const { code, state } = req.query;
+    if (!code) {
+      return res.redirect(`${frontendUrl}/login?error=missing_authorization_code`);
+    }
+
+    // 2. Decode state safely
+    let parsedState = {};
+    if (state) {
+      try {
+        const decodedStr = Buffer.from(state, 'base64url').toString('utf8');
+        parsedState = JSON.parse(decodedStr);
+      } catch (e) {
+        // Fallback or ignore malformed state
+      }
+    }
+    const requestedPortal = normalizePortal(parsedState.portal) || PORTALS.STUDENT;
+    const returnTo = sanitizeReturnTo(parsedState.returnTo);
+
+    // 3. Exchange authorization code for tokens
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const callbackUrl = getGoogleCallbackUrl(req);
+
+    const client = new OAuth2Client(clientId, clientSecret, callbackUrl);
+    const { tokens } = await client.getToken(code);
+
+    const ticket = await client.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: clientId,
+    });
+    const payload = ticket.getPayload();
+
+    if (!payload || !payload.email) {
+      return res.redirect(`${frontendUrl}/login?error=invalid_google_account`);
+    }
+
+    const { sub: googleId, email, name, picture } = payload;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 4. Lookup user in database
+    let user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      // User not in DB -> self registration disabled
+      return res.redirect(
+        `${frontendUrl}/login?error=${encodeURIComponent('Public registration disabled. Please contact hostel front desk.')}&unregistered=true`
+      );
+    }
+
+    if (!user.isActive) {
+      return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('Account is deactivated. Please contact administration.')}`);
+    }
+
+    if (user.registrationStatus === 'pending_approval') {
+      return res.redirect(`${frontendUrl}/login?status=pending_approval`);
+    }
+
+    if (user.registrationStatus === 'rejected') {
+      const reason = user.registrationDetails?.rejectionReason || 'Please contact hostel administration.';
+      return res.redirect(`${frontendUrl}/login?status=rejected&reason=${encodeURIComponent(reason)}`);
+    }
+
+    if (user.registrationStatus === 'approved') {
+      const setupToken = jwt.sign(
+        {
+          userId: user._id,
+          email: user.email,
+          googleId: user.googleId || googleId,
+          name: user.name,
+          picture: picture || user.registrationDetails?.picture || '',
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      return res.redirect(`${frontendUrl}/login?status=approved&setupToken=${setupToken}&email=${encodeURIComponent(user.email)}`);
+    }
+
+    // Portal role authorization check
+    if (!isRoleAllowedForPortal(user, requestedPortal)) {
+      console.warn(`[SECURITY AUDIT] Google OAuth callback portal access denied: user "${user.username || user.email}" with role "${user.role}" attempted unauthorized access to portal "${requestedPortal}"`);
+      return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('You are not authorized to access this portal.')}`);
+    }
+
+    // Link Google ID & issue JWT tokens
+    user.googleId = googleId;
+    if (user.password) {
+      user.authProvider = 'both';
+    } else {
+      user.authProvider = 'google';
+    }
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+
+    const { accessToken, refreshToken } = generateTokens(user._id);
+    user.refreshTokens.push(refreshToken);
+    if (user.refreshTokens.length > 5) user.refreshTokens.shift();
+    await user.save({ validateBeforeSave: false });
+
+    // Build safe redirect URL
+    const params = new URLSearchParams({
+      accessToken,
+      refreshToken,
+      authMethod: 'google',
+    });
+    if (returnTo) {
+      params.append('returnTo', returnTo);
+    }
+
+    return res.redirect(`${frontendUrl}/login?${params.toString()}`);
+  } catch (error) {
+    console.error('[Google OAuth] Callback exchange error:', error);
+    return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('Google authentication failed. Please try again.')}`);
+  }
+};
+
 // @desc    Google OAuth login & unified account linking
 // @route   POST /api/auth/google
 // @access  Public
@@ -1137,6 +1338,7 @@ const resetPassword = async (req, res) => {
 module.exports = { 
   login, adminLogin, superAdminLogin, registerAdmin, refreshToken, logout, getMe, 
   checkAdminExists, getAdmins, deleteAdmin, requestPasswordReset, resetPassword,
-  googleLogin, registerStudent, completeGoogleSetup, requestGoogleRegistration
+  googleLogin, initiateGoogleOAuth, handleGoogleOAuthCallback, registerStudent, completeGoogleSetup, requestGoogleRegistration,
+  sanitizeReturnTo, getGoogleCallbackUrl
 };
 

@@ -41,6 +41,7 @@ const emailLogSchema = new mongoose.Schema(
         'QUEUED',
         'PROCESSING',
         'SMTP_ACCEPTED',
+        'RESEND_ACCEPTED',
         'FAILED_RETRYABLE',
         'FAILED_PERMANENT',
         'BOUNCED',
@@ -48,6 +49,11 @@ const emailLogSchema = new mongoose.Schema(
       ],
       default: 'REQUESTED',
       index: true,
+    },
+    provider: {
+      type: String,
+      enum: ['smtp', 'resend', 'simulated'],
+      default: 'smtp',
     },
     correlationId: {
       type: String,
@@ -67,6 +73,10 @@ const emailLogSchema = new mongoose.Schema(
       default: 3,
     },
     smtpMessageId: {
+      type: String,
+      trim: true,
+    },
+    resendMessageId: {
       type: String,
       trim: true,
     },

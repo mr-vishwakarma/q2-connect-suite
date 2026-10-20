@@ -1,5 +1,16 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/auth/(.*)",
+      "destination": "https://q2-connect-api.onrender.com/auth/$1"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "https://q2-connect-api.onrender.com/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }

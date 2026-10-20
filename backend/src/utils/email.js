@@ -3,6 +3,12 @@ if (typeof dns.setDefaultResultOrder === 'function') {
   dns.setDefaultResultOrder('ipv4first');
 }
 const nodemailer = require('nodemailer');
+const {
+  sendViaResend,
+  getResendStatus,
+  getResendSenderAddress,
+  verifyResendConnection,
+} = require('../services/resend.service');
 
 /**
  * Escapes HTML characters to prevent XSS / HTML injection in email clients
@@ -71,9 +77,12 @@ let fallbackTransporter = null;
 let lastConfigHash = '';
 
 /**
- * Resolves sender address cleanly matching the SMTP authentication identity
+ * Resolves sender address cleanly matching the active mail transport (Resend or SMTP)
  */
 function getSenderAddress() {
+  if (process.env.RESEND_API_KEY) {
+    return getResendSenderAddress();
+  }
   const configuredFrom = (process.env.EMAIL_FROM || '').trim();
   const smtpUser = (process.env.SMTP_USER || 'mayurvish2003@gmail.com').trim();
 
@@ -90,19 +99,28 @@ function getTrustedFrontendUrl(req = null) {
   if (req?.headers?.origin) {
     const origin = req.headers.origin.trim();
     if (
+      origin === 'https://mrvishwakarma.in' ||
+      origin === 'https://www.mrvishwakarma.in' ||
       origin.endsWith('.vercel.app') ||
       origin.endsWith('.lovable.app') ||
       origin.endsWith('.onrender.com') ||
-      (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost'))
+      (process.env.NODE_ENV === 'development' && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')))
     ) {
       return origin;
     }
   }
-  const configured = (process.env.FRONTEND_URL || '').trim();
+
+  const siteUrl = (process.env.SITE_URL || '').trim();
+  if (siteUrl && !siteUrl.includes('localhost')) {
+    return siteUrl;
+  }
+
+  const configured = (process.env.FRONTEND_URL || process.env.CLIENT_URL || '').trim();
   if (configured && !configured.includes('localhost')) {
     return configured;
   }
-  return 'https://q2-connect-suite.vercel.app';
+
+  return 'https://mrvishwakarma.in';
 }
 
 /**
@@ -237,6 +255,33 @@ const getSmtpConfigStatus = () => {
     fromConfigured: Boolean(from),
     fromMasked: from.includes('@') ? maskEmail(from) : from,
   };
+};
+
+/**
+ * Comprehensive mail configuration status (Resend + SMTP) without secret leakage
+ */
+const getMailConfigStatus = () => {
+  const resendStatus = getResendStatus();
+  const smtpStatus = getSmtpConfigStatus();
+  const primaryProvider = resendStatus.configured ? 'resend' : (smtpStatus.configured ? 'smtp' : 'none');
+
+  return {
+    primaryProvider,
+    configured: Boolean(resendStatus.configured || smtpStatus.configured),
+    from: getSenderAddress(),
+    resend: resendStatus,
+    smtp: smtpStatus,
+  };
+};
+
+/**
+ * Diagnostic mail connection verification (Resend or SMTP)
+ */
+const verifyMailConnection = async () => {
+  if (process.env.RESEND_API_KEY) {
+    return verifyResendConnection();
+  }
+  return verifySmtpConnection();
 };
 
 /**
@@ -379,9 +424,75 @@ const sendEmail = async ({
     };
   }
 
+  // 1. Primary: If Resend API Key is set, deliver transactional email via Resend SDK
+  if (process.env.RESEND_API_KEY) {
+    let emailLogEntry = null;
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection && mongoose.connection.readyState === 1) {
+        const EmailLog = require('../models/EmailLog');
+        emailLogEntry = await EmailLog.create({
+          recipient: cleanTo,
+          recipientMasked: maskedTo,
+          purpose,
+          subject,
+          status: 'PROCESSING',
+          provider: 'resend',
+          correlationId: effectiveCid,
+          targetUserId,
+          targetStudentId,
+          metadata,
+          attempts: 1,
+        });
+      }
+    } catch (logErr) {
+      // Non-fatal logging error
+    }
+
+    try {
+      const result = await sendViaResend({
+        to: cleanTo,
+        subject,
+        html,
+        text,
+        correlationId: effectiveCid,
+        metadata: { purpose, targetUserId, targetStudentId, ...metadata },
+      });
+
+      if (emailLogEntry) {
+        emailLogEntry.status = 'RESEND_ACCEPTED';
+        emailLogEntry.resendMessageId = result.messageId;
+        emailLogEntry.deliveredAt = new Date();
+        await emailLogEntry.save().catch(() => {});
+      }
+
+      return {
+        success: true,
+        provider: 'resend',
+        messageId: result.messageId,
+        accepted: true,
+        status: 'EMAIL_ACCEPTED_BY_RESEND',
+        correlationId: effectiveCid,
+      };
+    } catch (resendErr) {
+      console.warn(`${logPrefix} ⚠️ Resend dispatch error (${resendErr.message}). Checking SMTP fallback availability...`);
+      const smtpConfig = getSmtpConfigStatus();
+      if (!smtpConfig.configured) {
+        if (emailLogEntry) {
+          emailLogEntry.status = 'FAILED_PERMANENT';
+          emailLogEntry.lastError = resendErr.message;
+          emailLogEntry.failedAt = new Date();
+          await emailLogEntry.save().catch(() => {});
+        }
+        throw resendErr;
+      }
+      console.log(`${logPrefix} 🔄 Falling back to SMTP transport...`);
+    }
+  }
+
   const config = getSmtpConfigStatus();
   if (!config.configured) {
-    const errorMsg = 'SMTP configuration is missing. Cannot send transactional email.';
+    const errorMsg = 'Email transport configuration is missing (neither Resend nor SMTP configured).';
     console.error(`${logPrefix} ❌ ${errorMsg} Missing required variables.`);
     const error = new Error(errorMsg);
     error.status = 'CONFIGURATION_MISSING';
@@ -644,7 +755,7 @@ const sendSecondaryAdminWelcomeEmail = async ({
   const safeUsername = escapeHtml(username || '');
   const safeHostel = escapeHtml(hostelName || 'Assigned Hostel');
   const safeOrg = escapeHtml(orgName || 'Q2 Connect Suite');
-  const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
+  const frontendUrl = getTrustedFrontendUrl();
   const cleanActivationLink = (activationLink || `${frontendUrl}/login`).trim();
   const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=admin`).trim();
 
@@ -735,7 +846,7 @@ const sendStudentWelcomeEmail = async (options) => {
 
   const subject = options.subject || `Your Hostel Admission Details & Account Activation — ${rawHostel} Hostel`;
   const cleanActivationLink = (activationLink || '').trim();
-  const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
+  const frontendUrl = getTrustedFrontendUrl();
   const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=student`).trim();
 
   const text = `Welcome to Q2 Connect Suite!\n\nDear ${rawName},\n\nYour resident admission into ${rawHostel} Hostel has been confirmed.\n\nYour Account Details:\n- Resident Name: ${rawName}\n- Hostel: ${rawHostel}\n- User ID: ${rawUsername}\n- Student ID: ${rawStudentCode}\n\nPlease click the link below to activate your account and securely set your password (valid for 48 hours):\n${cleanActivationLink}\n\nOnce activated, you can sign in to the Student Portal at:\n${cleanLoginLink}\n\nIf you have any questions or need assistance, contact our administration at support@q2connect.com.\n\nBest regards,\n${rawHostel} Administration — Q2 Connect Suite`;
@@ -881,7 +992,7 @@ const sendAdminNewStudentRegisteredNotification = async ({ to, studentName, stud
   const safeUsername = escapeHtml(username || 'N/A');
   const safeEmail = escapeHtml(studentEmail);
   const safePhone = escapeHtml(studentPhone || 'N/A');
-  const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
+  const frontendUrl = getTrustedFrontendUrl();
 
   const subject = `New Student Registered: ${studentName} (${studentHostel} - Room ${studentRoom || 'N/A'})`;
   const text = `New Student Registered Successfully!\n\nDetails:\n- Student Name: ${studentName}\n- Hostel: ${studentHostel}\n- Room No: ${studentRoom || 'Unassigned'}\n- User ID: ${username}\n- Email: ${studentEmail}\n- Phone: ${studentPhone || 'N/A'}\n\nLog in to Admin Panel: ${frontendUrl}/admin/students\n\nBest regards,\nQ2 Connect Suite`;
@@ -942,7 +1053,7 @@ const sendHostelOnboardingWelcomeEmail = async ({
   correlationId,
 }) => {
   const subject = `Welcome to Q2 Connect Suite — Onboarding Complete for ${orgName}`;
-  const frontendUrl = (process.env.FRONTEND_URL || 'https://q2-connect-suite.vercel.app').trim();
+  const frontendUrl = getTrustedFrontendUrl();
   const activationUrl = setupUrl || `${frontendUrl}/login`;
 
   const text = `Welcome to Q2 Connect Suite!\n\nHello ${name},\n\nYour organization "${orgName}" (${branchName}) has been successfully onboarded.\n\nYour Administrator Account:\nEmail: ${to}\nTemporary Password: ${tempPassword || 'Set via activation link'}\n\nAccess your dashboard:\n${activationUrl}\n\nBest regards,\nQ2 Connect Suite Platform Operations Team`;
@@ -1040,6 +1151,10 @@ module.exports = {
   getTransporter,
   getSmtpConfigStatus,
   verifySmtpConnection,
+  getMailConfigStatus,
+  verifyMailConnection,
+  getResendStatus,
+  sendViaResend,
   getSenderAddress,
   isRoutableEmail,
   sendEmail,
