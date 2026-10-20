@@ -252,15 +252,16 @@ function initEmailWorker() {
     let lastWarnTime = 0;
     emailWorker.on('error', (err) => {
       const now = Date.now();
-      // Throttle repetitive ECONNRESET socket warnings from serverless Redis proxies
-      if (err.message && err.message.includes('ECONNRESET')) {
-        if (now - lastWarnTime > 30000) {
+      const msg = String(err?.message || err?.code || err || '');
+      // Throttle repetitive ECONNRESET / socket close warnings from serverless Redis proxies (e.g. Upstash)
+      if (msg.includes('ECONNRESET') || msg.includes('closed') || msg.includes('ETIMEDOUT')) {
+        if (now - lastWarnTime > 60000) {
           lastWarnTime = now;
-          console.warn(`[Worker:Email] Redis socket reset (${err.message}) — auto-reconnecting in background.`);
+          console.log(`[Worker:Email] Redis proxy socket idle reset (${msg}) — automatically maintaining connection.`);
         }
         return;
       }
-      console.warn(`[Worker:Email] Worker connection warning: ${err.message}`);
+      console.warn(`[Worker:Email] Worker connection warning: ${msg}`);
     });
 
     console.log('[Worker:Email] BullMQ Email Worker initialized with bounded concurrency (5) and rate limiter (10/s).');

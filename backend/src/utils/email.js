@@ -108,11 +108,9 @@ function getTrustedFrontendUrl(req = null) {
 /**
  * Creates an instrumented Nodemailer transport instance
  */
-function createTransportInstance({ host, port, secure, service, user, pass, pool = true }) {
+function createTransportInstance({ host, port, secure, service, user, pass, pool = false }) {
   const options = {
-    pool: Boolean(pool),
-    maxConnections: 3,
-    maxMessages: 50,
+    pool: false, // Transactional delivery must NEVER pool idle sockets on cloud containers (prevents Connection Timeout)
     auth: { user, pass },
     connectionTimeout: 10000, // 10s connection timeout for cloud containers
     greetingTimeout: 8000,
@@ -162,7 +160,7 @@ const getTransporter = () => {
       family: 4,
       user,
       pass,
-      pool: true,
+      pool: false,
     });
   } else {
     const isSecure = port === 465;
@@ -173,7 +171,7 @@ const getTransporter = () => {
       family: 4,
       user,
       pass,
-      pool: true,
+      pool: false,
     });
   }
 

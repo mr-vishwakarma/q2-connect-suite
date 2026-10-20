@@ -38,16 +38,13 @@ function getRedisOptions() {
     keepAlive: 10000, // Send TCP keepalive probes every 10s to keep Upstash connection alive
     family: 4, // Force IPv4 to prevent hanging on cloud container IPv6 blackholes
     retryStrategy(times) {
-      if (times > 3) {
-        // Stop retrying after 3 attempts to prevent unbounded event listener memory leaks & OOM
-        redisStatus = 'DEGRADED';
-        return null;
-      }
-      return Math.min(times * 1000, 3000);
+      // Reconnect with bounded backoff (min 200ms, max 3000ms).
+      // Never return null so serverless Redis proxy disconnects (Upstash idle resets) auto-heal seamlessly.
+      return Math.min(times * 300, 3000);
     },
     reconnectOnError(err) {
-      const targetErrors = ['READONLY', 'ETIMEDOUT'];
-      return targetErrors.some(target => err.message.includes(target));
+      const targetErrors = ['READONLY', 'ETIMEDOUT', 'ECONNRESET', 'closed'];
+      return targetErrors.some(target => (err.message || '').toLowerCase().includes(target.toLowerCase()));
     },
   };
 
@@ -99,10 +96,30 @@ function createRedisInstance(role = 'client') {
       console.log(`[Redis] ${role.toUpperCase()} connection established and ready.`);
     });
 
+    let lastErrorLogTime = 0;
     instance.on('error', (err) => {
       lastError = err.message;
+      const msg = String(err?.message || err?.code || '');
+      const isQuotaError = msg.includes('limit exceeded') || msg.includes('max requests');
+      if (isQuotaError) {
+        redisStatus = 'DEGRADED';
+        const now = Date.now();
+        if (now - lastErrorLogTime > 60000) {
+          lastErrorLogTime = now;
+          console.warn(`[Redis] ${role.toUpperCase()} provider monthly request quota exhausted (${err.message}). Running in safe DEGRADED mode.`);
+        }
+        return;
+      }
+      const isIdleReset = msg.includes('ECONNRESET') || msg.includes('closed');
+      if (isIdleReset) {
+        const now = Date.now();
+        if (now - lastErrorLogTime > 60000) {
+          lastErrorLogTime = now;
+          console.log(`[Redis] ${role.toUpperCase()} proxy socket idle reset — auto-reconnecting in background.`);
+        }
+        return;
+      }
       redisStatus = 'DEGRADED';
-      // Log sanitized error message without credentials
       console.warn(`[Redis] ${role.toUpperCase()} connection warning (${err.code || 'ERR'}): ${err.message}`);
     });
 
@@ -192,8 +209,9 @@ async function closeRedisConnections() {
 }
 
 /**
- * Proactively verifies if Redis can actually respond to PING within 3 seconds.
- * Returns true if operational, false if unreachable (preventing worker spawn and OOM loops).
+ * Proactively verifies if Redis is functional and can read/write data within 3 seconds.
+ * Tests both PING and SET to ensure cloud quotas (e.g. Upstash request limits) are not exhausted.
+ * Returns true if operational, false if unreachable or quota-exhausted (triggering safe degraded mode).
  */
 async function verifyRedisConnection() {
   const { redisUrl, baseOptions } = getRedisOptions();
@@ -217,13 +235,22 @@ async function verifyRedisConnection() {
   try {
     await probe.connect();
     const res = await Promise.race([
-      probe.ping(),
+      (async () => {
+        const pingRes = await probe.ping();
+        if (pingRes !== 'PONG') return false;
+        // Verify write permission (catches Upstash request limit exceeded / read-only states)
+        const healthKey = `__probe_health_${Date.now()}__`;
+        await probe.set(healthKey, '1', 'EX', 3);
+        await probe.del(healthKey).catch(() => {});
+        return true;
+      })(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500)),
     ]);
     await probe.quit().catch(() => probe.disconnect());
-    return res === 'PONG';
+    return Boolean(res);
   } catch (err) {
     probe.disconnect();
+    console.warn(`[Redis] Health probe failed (${err.message}). Safe degraded mode will be activated.`);
     return false;
   }
 }

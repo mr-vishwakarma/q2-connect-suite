@@ -331,6 +331,7 @@ module.exports = {
   DEFAULT_JOB_OPTIONS,
   initQueues,
   addEmailJob,
+  executeDegradedEmailWithRetry,
   addScheduledJob,
   getQueueMetrics,
   closeQueues,

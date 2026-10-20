@@ -948,10 +948,10 @@ const requestPasswordReset = async (req, res) => {
       }
     })();
 
-    // Wait at most 2.5 seconds for direct delivery, but NEVER block HTTP response beyond that
+    // Wait up to 5 seconds for direct delivery, while guaranteeing fast response
     await Promise.race([
       emailDispatchPromise,
-      new Promise((resolve) => setTimeout(resolve, 2500)),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
     ]);
 
     return res.status(200).json({ success: true, message: genericResponse });
