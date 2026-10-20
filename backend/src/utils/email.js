@@ -1,3 +1,7 @@
+const dns = require('dns');
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
 const nodemailer = require('nodemailer');
 
 /**
@@ -104,13 +108,16 @@ function getTrustedFrontendUrl(req = null) {
 /**
  * Creates an instrumented Nodemailer transport instance
  */
-function createTransportInstance({ host, port, secure, service, user, pass }) {
+function createTransportInstance({ host, port, secure, service, user, pass, pool = true }) {
   const options = {
-    pool: false, // Transactional emails must use dedicated direct TLS connections to prevent stale pooled socket timeouts
+    pool: Boolean(pool),
+    maxConnections: 3,
+    maxMessages: 50,
     auth: { user, pass },
-    connectionTimeout: 8000, // 8s connection timeout for cloud containers
-    greetingTimeout: 6000,
-    socketTimeout: 8000,
+    connectionTimeout: 10000, // 10s connection timeout for cloud containers
+    greetingTimeout: 8000,
+    socketTimeout: 15000,
+    family: 4, // CRITICAL: Force IPv4 to prevent hanging on cloud container IPv6 blackholes
     tls: {
       rejectUnauthorized: true,
       minVersion: 'TLSv1.2',
@@ -145,13 +152,17 @@ const getTransporter = () => {
     return cachedTransporter;
   }
 
-  // When Gmail is detected, service: 'gmail' provides instant, optimized TLS routing
-  // avoiding cloud container port 465/587 handshake delays on Render/AWS/GCP
+  // When Gmail is detected, direct SSL connection to smtp.gmail.com:465 with family: 4
+  // provides instantaneous, reliable TLS routing on cloud containers (Render/Docker)
   if (isGmail) {
     cachedTransporter = createTransportInstance({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      family: 4,
       user,
       pass,
+      pool: true,
     });
   } else {
     const isSecure = port === 465;
@@ -159,8 +170,10 @@ const getTransporter = () => {
       host,
       port,
       secure: isSecure,
+      family: 4,
       user,
       pass,
+      pool: true,
     });
   }
 
@@ -169,7 +182,7 @@ const getTransporter = () => {
 };
 
 /**
- * Get fallback transporter using alternate port or dedicated service config
+ * Get fallback transporter using dedicated clean non-pooled direct socket
  */
 const getFallbackTransporter = () => {
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
@@ -178,13 +191,15 @@ const getFallbackTransporter = () => {
   const isGmail = host.includes('gmail.com') || process.env.SMTP_SERVICE === 'gmail' || user.endsWith('@gmail.com');
 
   if (isGmail) {
-    // If primary was service: 'gmail', try direct SSL host:port 465 as resilient backup
+    // Non-pooled dedicated fresh socket on port 465 with IPv4
     return createTransportInstance({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
+      family: 4,
       user,
       pass,
+      pool: false,
     });
   }
 
@@ -194,8 +209,10 @@ const getFallbackTransporter = () => {
     host,
     port: altPort,
     secure: altPort === 465,
+    family: 4,
     user,
     pass,
+    pool: false,
   });
 };
 
@@ -539,17 +556,37 @@ function renderBrandedLayout({ title, subtitle, contentHtml, footerNote }) {
  * @param {object} options - { to, name, resetLink, correlationId }
  */
 const sendPasswordResetEmail = async ({ to, name = null, resetLink, correlationId }) => {
-  const subject = 'Password Reset Request — Q2 Connect Suite';
+  const now = new Date();
+  const timeFormatted = now.toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const dateFormatted = now.toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const subject = `Password Reset Request — Q2 Connect Suite [${timeFormatted}]`;
   const cleanLink = resetLink.trim();
   const safeName = name ? escapeHtml(name) : null;
 
-  const text = `Password Reset Request — Q2 Connect Suite\n\n${name ? `Hello ${name},\n\n` : ''}We received a request to reset the password for your Q2 Connect Suite account.\n\nOpen the link below in your browser to set a new password:\n${cleanLink}\n\nSecurity Notice:\n- This link is single-use and valid for 2 hours.\n- If you did not request this, please ignore this email or notify security immediately. Your account remains secure.\n\nBest regards,\nQ2 Connect Suite Security Team`;
+  const text = `Password Reset Request — Q2 Connect Suite\n\n${name ? `Hello ${name},\n\n` : ''}We received a request to reset the password for your Q2 Connect Suite account on ${dateFormatted} at ${timeFormatted} (IST).\n\nOpen the link below in your browser to set a new password:\n${cleanLink}\n\nSecurity Notice:\n- This link was requested on ${dateFormatted} at ${timeFormatted} (IST) and is valid for 2 hours.\n- If you requested multiple links, please use this newest email (${timeFormatted}).\n- If you did not request this, please ignore this email or notify security immediately. Your account remains secure.\n\nBest regards,\nQ2 Connect Suite Security Team`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #cbd5e1;">
       ${safeName ? `Hello <strong>${safeName}</strong>,<br/><br/>` : ''}
       We received a request to reset the password for your Q2 Connect Suite account.
     </p>
+
+    <div style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px 16px; margin: 16px 0; text-align: center;">
+      <p style="margin: 0; font-size: 13px; color: #93c5fd;">
+        🕒 Requested at: <strong>${dateFormatted}, ${timeFormatted} (IST)</strong> &bull; Valid for 2 hours
+      </p>
+    </div>
 
     <div style="background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(99,102,241,0.1)); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
       <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #ffffff;">Click the button below to choose your new password:</p>

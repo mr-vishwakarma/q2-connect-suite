@@ -20,6 +20,7 @@ export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [expiredNotice, setExpiredNotice] = useState<string | null>(null);
   const { signOut, refreshProfile } = useAuth();
 
   // Ensure any existing sessions (like an admin session) are cleared 
@@ -47,6 +48,7 @@ export default function ResetPassword() {
     }
 
     setIsLoading(true);
+    setExpiredNotice(null);
 
     try {
       const response = await api.post('/auth/password/reset', {
@@ -60,7 +62,13 @@ export default function ResetPassword() {
         navigate('/login');
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to reset password. If your link expired, please request a new one.');
+      if (error.response?.data?.expired) {
+        const msg = error.response.data.message || 'This reset link has expired. A fresh reset link has been sent to your email.';
+        setExpiredNotice(msg);
+        toast.info(msg, { autoClose: 10000 });
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to reset password. If your link expired, please request a new one.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -123,6 +131,25 @@ export default function ResetPassword() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {expiredNotice && (
+                <div className="mb-5 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm">
+                  <p className="font-semibold mb-1 flex items-center gap-1.5">
+                    <span>📬</span> Fresh Reset Link Sent
+                  </p>
+                  <p className="text-xs text-blue-300 leading-relaxed mb-3">
+                    {expiredNotice}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/login')}
+                    className="w-full text-xs border-blue-500/40 hover:bg-blue-500/20"
+                  >
+                    Return to Login
+                  </Button>
+                </div>
+              )}
               <form className="space-y-5" onSubmit={handleSubmit}>
                 <div className="space-y-2">
                   <Label htmlFor="password">New Password</Label>

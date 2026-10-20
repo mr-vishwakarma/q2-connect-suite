@@ -966,16 +966,18 @@ const requestPasswordReset = async (req, res) => {
 // @access  Public
 const resetPassword = async (req, res) => {
   try {
-    const { token, newPassword, confirmPassword } = req.body;
-    if (!token || !newPassword) {
+    const { token, confirmPassword } = req.body;
+    const effectivePassword = req.body.newPassword || req.body.password;
+
+    if (!token || !effectivePassword) {
       return res.status(400).json({ success: false, message: 'Token and new password are required' });
     }
 
-    if (confirmPassword && newPassword !== confirmPassword) {
+    if (confirmPassword && effectivePassword !== confirmPassword) {
       return res.status(400).json({ success: false, message: 'Passwords do not match' });
     }
 
-    if (typeof newPassword !== 'string' || newPassword.length < 6) {
+    if (typeof effectivePassword !== 'string' || effectivePassword.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
     }
 
@@ -985,30 +987,103 @@ const resetPassword = async (req, res) => {
     } catch (e) {
       // Ignore decode error
     }
+    // Strip trailing punctuation often appended by email clients (., ;, /, >, whitespace)
+    cleanToken = cleanToken.replace(/[.,;/>\s]+$/, '');
     const hashedToken = crypto.createHash('sha256').update(cleanToken).digest('hex');
-    const now = new Date();
 
-    // Multi-variant lookup: accepts current token, raw token, activation tokens, and active recent tokens
+    // 1. Identify user by token across active, current, or activation tokens (without strict expiry check first)
     const user = await User.findOne({
       $or: [
-        { resetPasswordToken: hashedToken, resetPasswordExpires: { $gt: now } },
-        { resetPasswordToken: cleanToken, resetPasswordExpires: { $gt: now } },
-        { activationToken: hashedToken, activationExpires: { $gt: now } },
-        { activationToken: cleanToken, activationExpires: { $gt: now } },
-        { 'activeResetTokens.token': hashedToken, 'activeResetTokens.expires': { $gt: now } },
-        { 'activeResetTokens.token': cleanToken, 'activeResetTokens.expires': { $gt: now } },
+        { resetPasswordToken: hashedToken },
+        { resetPasswordToken: cleanToken },
+        { activationToken: hashedToken },
+        { activationToken: cleanToken },
+        { 'activeResetTokens.token': hashedToken },
+        { 'activeResetTokens.token': cleanToken },
       ],
     });
 
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired activation or password reset token. If you received multiple reset emails, please use the link in the most recent email or request a fresh one.',
+        message: 'Invalid or already used password reset link. If you have already reset your password, please sign in. Otherwise, please request a fresh reset link.',
+      });
+    }
+
+    const now = new Date();
+    // 15-minute grace tolerance for clock skew and form completion
+    const GRACE_BUFFER_MS = 15 * 60 * 1000;
+    const nowWithGrace = new Date(now.getTime() - GRACE_BUFFER_MS);
+
+    // Determine specific expiry for the matched token
+    let tokenExpiry = null;
+    let isActivation = false;
+
+    if (user.resetPasswordToken === hashedToken || user.resetPasswordToken === cleanToken) {
+      tokenExpiry = user.resetPasswordExpires;
+    } else if (user.activationToken === hashedToken || user.activationToken === cleanToken) {
+      tokenExpiry = user.activationExpires;
+      isActivation = true;
+    } else if (Array.isArray(user.activeResetTokens)) {
+      const match = user.activeResetTokens.find(
+        (t) => t.token === hashedToken || t.token === cleanToken
+      );
+      if (match) {
+        tokenExpiry = match.expires;
+      }
+    }
+
+    if (!tokenExpiry) {
+      tokenExpiry = user.resetPasswordExpires || user.activationExpires;
+    }
+
+    const isExpired = tokenExpiry && new Date(tokenExpiry) < nowWithGrace;
+
+    if (isExpired) {
+      // Auto-dispatch a brand-new reset email so the user is never stuck
+      try {
+        const freshResetToken = crypto.randomBytes(32).toString('hex');
+        const freshHashedToken = crypto.createHash('sha256').update(freshResetToken).digest('hex');
+        const freshExpires = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
+
+        await User.updateOne(
+          { _id: user._id },
+          {
+            $set: {
+              resetPasswordToken: freshHashedToken,
+              resetPasswordExpires: freshExpires,
+            },
+            $push: {
+              activeResetTokens: {
+                $each: [{ token: freshHashedToken, expires: freshExpires }],
+                $slice: -10,
+              },
+            },
+          }
+        );
+
+        const frontendUrl = getTrustedFrontendUrl(req);
+        const resetLink = `${frontendUrl}/reset-password?token=${freshResetToken}`;
+
+        sendPasswordResetEmail({
+          to: user.email,
+          name: user.name,
+          resetLink,
+          correlationId: `auto-refresh-${user._id}-${Date.now()}`,
+        }).catch((err) => console.error('[auth.controller] Auto-refresh reset email failed:', err.message));
+      } catch (autoErr) {
+        console.error('[auth.controller] Failed to auto-dispatch fresh token on expiry:', autoErr.message);
+      }
+
+      return res.status(400).json({
+        success: false,
+        expired: true,
+        message: 'This reset link has expired. We have automatically sent a brand-new reset link to your email. Please check your inbox for the latest email.',
       });
     }
 
     // Set new password (the pre-save hook handles the hashing)
-    user.password = newPassword;
+    user.password = effectivePassword;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     user.activationToken = undefined;
