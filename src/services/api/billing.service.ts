@@ -28,6 +28,9 @@ export interface OrganizationSubscription {
   planId: SaaSPlan;
   razorpayPlanId?: string;
   razorpaySubscriptionId?: string;
+  orderId?: string;
+  renewalMode?: 'MANUAL' | 'AUTOMATIC';
+  autoRenew?: boolean;
   status: 'CREATED' | 'AUTHENTICATED' | 'ACTIVE' | 'PENDING' | 'HALTED' | 'PAUSED' | 'CANCELLED' | 'COMPLETED' | 'EXPIRED' | 'TRIAL' | 'PAST_DUE';
   billingCycle: 'MONTHLY' | 'YEARLY';
   amount: number;
@@ -37,7 +40,7 @@ export interface OrganizationSubscription {
   currentPeriodEnd: string;
   nextChargeAt?: string;
   cancelledAt?: string;
-  usage: {
+  usage?: {
     studentCount: number;
     roomCount: number;
     hostelCount: number;
@@ -46,7 +49,8 @@ export interface OrganizationSubscription {
 }
 
 export interface CreateSubscriptionResponse {
-  subscriptionId: string;
+  subscriptionId?: string;
+  orderId?: string;
   localSubscriptionId: string;
   keyId: string;
   amountPaise: number;
@@ -55,20 +59,27 @@ export interface CreateSubscriptionResponse {
   planName: string;
   planCode: string;
   billingCycle: 'MONTHLY' | 'YEARLY';
+  renewalMode?: 'MANUAL' | 'AUTOMATIC';
+  autoRenew?: boolean;
 }
 
 export interface VerifySubscriptionPayload {
   razorpay_payment_id: string;
-  razorpay_subscription_id: string;
+  razorpay_subscription_id?: string;
+  razorpay_order_id?: string;
   razorpay_signature: string;
 }
 
 export interface VerifySubscriptionResponse {
-  subscriptionId: string;
+  subscriptionId?: string;
+  orderId?: string;
   paymentId: string;
   status: string;
   invoiceNumber: string;
   invoiceId?: string;
+  renewalMode?: string;
+  autoRenew?: boolean;
+  currentPeriodEnd?: string;
 }
 
 export interface BillingHistoryInvoice {

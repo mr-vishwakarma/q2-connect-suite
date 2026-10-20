@@ -239,25 +239,7 @@ const hostelController = {
         return res.status(400).json({ success: false, message: 'Hostel branch name is required' });
       }
 
-      // Enforce subscription plan limits
-      const subscription = await Subscription.findOne({
-        organizationId: orgId,
-        status: { $in: ['ACTIVE', 'TRIAL'] },
-      }).populate('planId');
-
-      if (subscription && subscription.planId && subscription.planId.limits) {
-        const maxHostels = subscription.planId.limits.maxHostels;
-        if (maxHostels && maxHostels > 0) {
-          const currentCount = await Hostel.countDocuments({ organizationId: orgId, isDeleted: false });
-          if (currentCount >= maxHostels) {
-            return res.status(403).json({
-              success: false,
-              code: 'PLAN_LIMIT_EXCEEDED',
-              message: `Your current plan (${subscription.planId.name}) allows a maximum of ${maxHostels} hostel branch(es). Please upgrade your subscription to add more branches.`,
-            });
-          }
-        }
-      }
+      // SaaS subscription limits on hostel branches removed per policy (unlimited branches)
 
       // Generate stable code if not provided
       let branchCode = (code || name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10)).toUpperCase();

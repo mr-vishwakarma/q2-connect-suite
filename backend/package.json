@@ -22,6 +22,8 @@
     "test:load": "node src/scripts/run_phase_g_load_test.js",
     "test:resilience": "node src/scripts/test_phase_i_resilience.js",
     "test:separate-receipts": "node src/scripts/test_separate_receipts_workflow.js",
+    "test:vouchers": "node src/scripts/test_vouchers.js",
+    "test:manual-billing": "node src/scripts/test_manual_renewal_saas_billing.js",
     "test": "node src/scripts/test_p0_security.js"
   },
   "dependencies": {

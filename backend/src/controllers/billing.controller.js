@@ -24,8 +24,12 @@ const {
   fetchSubscription: rzpFetchSubscription,
   cancelSubscription: rzpCancelSubscription,
   verifySubscriptionSignature,
+  createOrder,
+  verifyPaymentSignature,
   getPublicKey,
+  isConfigured,
 } = require('../config/razorpay');
+const { calculateSubscriptionPeriod } = require('../utils/subscriptionPeriod');
 
 // Helper: Resolve tenant ID
 function resolveOrgId(req) {
@@ -88,32 +92,49 @@ const getSubscriptionStatus = async (req, res) => {
 
     let subscription = await Subscription.findOne({ organizationId }).populate('planId');
 
+    // If subscription exists, check if active plan has reached period end without renewal -> transition to EXPIRED
+    if (subscription && subscription.status === 'ACTIVE' && subscription.currentPeriodEnd) {
+      if (new Date(subscription.currentPeriodEnd) < new Date()) {
+        subscription.status = 'EXPIRED';
+        await subscription.save();
+      }
+    }
+
     // If no subscription exists, safely find or create default subscription
     if (!subscription) {
       const org = await Organization.findById(organizationId).lean();
       let defaultPlan = null;
       if (org && org.subscriptionId) {
-        const existingSub = await Subscription.findById(org.subscriptionId).populate('planId').lean();
+        const existingSub = await Subscription.findById(org.subscriptionId).populate('planId');
         if (existingSub && existingSub.planId) {
           subscription = existingSub;
         }
       }
 
       if (!subscription) {
-        defaultPlan = (await Plan.findOne({ code: 'ENTERPRISE' }).lean()) ||
+        defaultPlan = (await Plan.findOne({ code: 'STARTER' }).lean()) ||
+          (await Plan.findOne({ code: 'GROWTH' }).lean()) ||
           (await Plan.findOne({ code: 'PROFESSIONAL' }).lean()) ||
-          (await Plan.findOne({ code: 'STARTER' }).lean()) ||
           (await Plan.findOne().lean());
+
+        const now = new Date();
+        const period = calculateSubscriptionPeriod({
+          activationDate: now,
+          billingCycle: 'MONTHLY',
+          durationCycles: 1,
+        });
 
         subscription = {
           organizationId,
           planId: defaultPlan,
           status: 'ACTIVE',
+          renewalMode: 'MANUAL',
+          autoRenew: false,
           billingCycle: 'MONTHLY',
-          amount: defaultPlan?.priceMonthly || 0,
+          amount: defaultPlan?.priceMonthly || 1999,
           currency: 'INR',
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+          currentPeriodStart: period.periodStart,
+          currentPeriodEnd: period.periodEnd,
           usage: { studentCount: 0, roomCount: 0, hostelCount: 0, staffCount: 0 },
         };
       }
@@ -123,9 +144,13 @@ const getSubscriptionStatus = async (req, res) => {
       subscription.planId = fallbackPlan;
     }
 
+    const subData = subscription.toObject ? subscription.toObject() : { ...subscription };
+    subData.renewalMode = subData.renewalMode || 'MANUAL';
+    subData.autoRenew = Boolean(subData.autoRenew);
+
     return res.status(200).json({
       success: true,
-      data: subscription,
+      data: subData,
       requestId: req.requestId,
     });
   } catch (err) {
@@ -139,7 +164,7 @@ const getSubscriptionStatus = async (req, res) => {
 };
 
 /**
- * @desc    Create a Razorpay Subscription for Organization Plan checkout
+ * @desc    Create a One-Time Razorpay Order for Manual SaaS Subscription Renewal / Activation
  * @route   POST /api/billing/subscriptions/create
  * @access  Private (Organization Admin / Super Admin ONLY — Students strictly blocked)
  */
@@ -182,40 +207,62 @@ const createSubscription = async (req, res) => {
     const amountRupees = isYearly ? plan.priceYearly : plan.priceMonthly;
     const amountPaise = Math.round(amountRupees * 100);
 
-    // 3. Resolve or link Razorpay Plan
-    const rzpPlanId = isYearly ? plan.razorpayPlanIdYearly : plan.razorpayPlanIdMonthly;
+    // 3. Gateway Configuration Guard:
+    // If Razorpay credentials are missing and not running in test mode, return 503
+    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.ALLOW_TEST_PAYMENTS === 'true';
+    if (!isConfigured() && !isTestEnv) {
+      return res.status(503).json({
+        success: false,
+        code: 'PAYMENT_GATEWAY_NOT_CONFIGURED',
+        message: 'Online payment gateway is not configured yet. Please activate using an eligible subscription voucher or contact administrator.',
+        data: {
+          planId: plan._id,
+          planName: plan.name,
+          amountRupees,
+          billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
+        },
+        requestId: req.requestId,
+      });
+    }
 
-    // 4. Create Subscription with Razorpay provider
-    const rzpSubscription = await rzpCreateSubscription({
-      planId: rzpPlanId || `plan_${plan.code.toLowerCase()}_${isYearly ? 'yearly' : 'monthly'}`,
-      totalCount: isYearly ? 5 : 12,
+    // 4. Create One-Time Razorpay Order (No automated recurring deduction)
+    const receipt = `rcpt_saas_${organizationId.toString().slice(-6)}_${Date.now()}`;
+    const rzpOrder = await createOrder({
+      amountPaise,
+      currency: 'INR',
+      receipt,
       notes: {
         organizationId: organizationId.toString(),
         q2PlanId: plan._id.toString(),
         planCode: plan.code,
-        billingCycle,
+        billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
+        type: 'SAAS_MANUAL_RENEWAL',
       },
     });
 
-    // 5. Durably Upsert local Subscription in CREATED state
-    const now = new Date();
-    const periodEnd = new Date(now.getTime() + (isYearly ? 365 : 30) * 24 * 3600 * 1000);
+    // 5. Durably Upsert local Subscription in PENDING state for this order
+    const existingSubscription = await Subscription.findOne({ organizationId });
+    const period = calculateSubscriptionPeriod({
+      activationDate: new Date(),
+      billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
+      existingSubscription,
+      durationCycles: 1,
+    });
 
     const subscriptionDoc = await Subscription.findOneAndUpdate(
       { organizationId },
       {
         planId: plan._id,
-        razorpayPlanId: rzpPlanId || `plan_${plan.code.toLowerCase()}`,
-        razorpaySubscriptionId: rzpSubscription.id,
-        status: 'CREATED',
+        orderId: rzpOrder.id,
+        status: existingSubscription?.status === 'ACTIVE' ? 'ACTIVE' : 'PENDING',
+        renewalMode: 'MANUAL',
+        autoRenew: false,
         billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
         amountPaise,
         amount: amountRupees,
         currency: 'INR',
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-        totalCount: isYearly ? 5 : 12,
-        paidCount: 0,
+        currentPeriodStart: period.periodStart,
+        currentPeriodEnd: period.periodEnd,
       },
       { upsert: true, new: true }
     );
@@ -223,7 +270,8 @@ const createSubscription = async (req, res) => {
     return res.status(201).json({
       success: true,
       data: {
-        subscriptionId: rzpSubscription.id,
+        orderId: rzpOrder.id,
+        subscriptionId: rzpOrder.id, // Provided for client compatibility
         localSubscriptionId: subscriptionDoc._id,
         keyId: getPublicKey(),
         amountPaise,
@@ -232,6 +280,8 @@ const createSubscription = async (req, res) => {
         planName: plan.name,
         planCode: plan.code,
         billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
+        renewalMode: 'MANUAL',
+        autoRenew: false,
       },
       requestId: req.requestId,
     });
@@ -265,39 +315,62 @@ const verifySubscription = async (req, res) => {
       });
     }
 
-    const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature } = req.body;
+    const {
+      razorpay_payment_id,
+      razorpay_order_id,
+      razorpay_subscription_id,
+      razorpay_signature,
+    } = req.body;
 
-    if (!razorpay_payment_id || !razorpay_subscription_id || !razorpay_signature) {
+    if (!razorpay_payment_id || !razorpay_signature || (!razorpay_order_id && !razorpay_subscription_id)) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required parameters: razorpay_payment_id, razorpay_subscription_id, and razorpay_signature are required',
+        message: 'Missing required parameters: razorpay_payment_id, razorpay_signature, and either razorpay_order_id or razorpay_subscription_id are required',
       });
     }
 
-    // 2. Cryptographic signature verification per Razorpay Subscriptions formula:
-    // HMAC-SHA256(razorpay_payment_id + "|" + razorpay_subscription_id, key_secret) === razorpay_signature
-    const isValidSignature = verifySubscriptionSignature({
-      subscriptionId: razorpay_subscription_id,
-      paymentId: razorpay_payment_id,
-      signature: razorpay_signature,
-    });
+    // 2. Cryptographic signature verification
+    let isValidSignature = false;
+    if (razorpay_order_id) {
+      // One-time payment formula: HMAC-SHA256(order_id + "|" + payment_id, secret)
+      isValidSignature = verifyPaymentSignature({
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        signature: razorpay_signature,
+      });
+    } else if (razorpay_subscription_id) {
+      // Legacy recurring subscription formula: HMAC-SHA256(payment_id + "|" + subscription_id, secret)
+      isValidSignature = verifySubscriptionSignature({
+        subscriptionId: razorpay_subscription_id,
+        paymentId: razorpay_payment_id,
+        signature: razorpay_signature,
+      });
+    }
 
     if (!isValidSignature) {
       return res.status(400).json({
         success: false,
         error: {
-          code: 'SUBSCRIPTION_VERIFICATION_FAILED',
-          message: 'Subscription signature verification failed: signature mismatch',
+          code: 'PAYMENT_VERIFICATION_FAILED',
+          message: 'Payment signature verification failed: signature mismatch',
         },
-        message: 'Subscription signature verification failed: signature mismatch',
+        message: 'Payment signature verification failed: signature mismatch',
         requestId: req.requestId,
       });
     }
 
     const organizationId = resolveOrgId(req);
-    const subscription = await Subscription.findOne({
-      razorpaySubscriptionId: razorpay_subscription_id,
-    }).populate('planId');
+    let subscription = null;
+
+    if (razorpay_order_id) {
+      subscription = await Subscription.findOne({ orderId: razorpay_order_id }).populate('planId');
+    }
+    if (!subscription && razorpay_subscription_id) {
+      subscription = await Subscription.findOne({ razorpaySubscriptionId: razorpay_subscription_id }).populate('planId');
+    }
+    if (!subscription && organizationId) {
+      subscription = await Subscription.findOne({ organizationId }).populate('planId');
+    }
 
     if (!subscription) {
       return res.status(404).json({
@@ -319,33 +392,50 @@ const verifySubscription = async (req, res) => {
       });
     }
 
-    // 4. Idempotency guard: If already active and payment already processed
+    // 4. Idempotency guard: If already captured, prevent duplicate period extension
     const existingPayment = await Payment.findOne({
       paymentId: razorpay_payment_id,
       status: 'CAPTURED',
     });
 
-    if (subscription.status === 'ACTIVE' && existingPayment) {
+    if (existingPayment) {
       const existingInvoice = await Invoice.findOne({ paymentId: existingPayment._id });
       return res.status(200).json({
         success: true,
         idempotent: true,
         data: {
-          subscriptionId: subscription.razorpaySubscriptionId,
+          orderId: razorpay_order_id || subscription.orderId,
+          subscriptionId: subscription.razorpaySubscriptionId || subscription.orderId,
           paymentId: existingPayment.paymentId,
           status: subscription.status,
           invoiceNumber: existingInvoice?.invoiceNumber,
           invoiceId: existingInvoice?._id,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          renewalMode: subscription.renewalMode || 'MANUAL',
+          autoRenew: false,
         },
-        message: 'Subscription is already active and verified',
+        message: 'Payment already verified and subscription is active',
         requestId: req.requestId,
       });
     }
 
-    // 5. Monotonic state transition to ACTIVE
+    // 5. Authoritative Period Calculation (supports calendar month-end and early extension)
+    const now = new Date();
+    const period = calculateSubscriptionPeriod({
+      activationDate: now,
+      billingCycle: subscription.billingCycle,
+      existingSubscription: subscription,
+      durationCycles: 1,
+    });
+
     subscription.status = 'ACTIVE';
-    subscription.startedAt = subscription.startedAt || new Date();
+    subscription.renewalMode = 'MANUAL';
+    subscription.autoRenew = false;
+    subscription.startedAt = subscription.startedAt || now;
+    subscription.currentPeriodStart = period.periodStart;
+    subscription.currentPeriodEnd = period.periodEnd;
     subscription.paidCount = (subscription.paidCount || 0) + 1;
+    if (razorpay_order_id) subscription.orderId = razorpay_order_id;
     await subscription.save();
 
     // 6. Update Organization's active subscription reference
@@ -360,8 +450,8 @@ const verifySubscription = async (req, res) => {
       billingDomain: 'SAAS',
       subscriptionId: subscription._id,
       planId: subscription.planId._id,
-      razorpaySubscriptionId: subscription.razorpaySubscriptionId,
-      orderId: `order_sub_${razorpay_payment_id || Date.now()}`,
+      razorpaySubscriptionId: subscription.razorpaySubscriptionId || undefined,
+      orderId: razorpay_order_id || subscription.orderId || `order_${Date.now()}`,
       amountPaise: subscription.amountPaise || Math.round((subscription.amount || 0) * 100),
       amountRupees: subscription.amount || 0,
       currency: subscription.currency || 'INR',
@@ -369,8 +459,8 @@ const verifySubscription = async (req, res) => {
       paymentId: razorpay_payment_id,
       signature: razorpay_signature,
       status: 'CAPTURED',
-      paymentMethod: 'subscription_online',
-      capturedAt: new Date(),
+      paymentMethod: razorpay_order_id ? 'one_time_online' : 'subscription_online',
+      capturedAt: now,
     });
 
     // 8. Generate sequential invoice number Q2-INV-YYYY-NNNNNN
@@ -386,9 +476,9 @@ const verifySubscription = async (req, res) => {
       taxRupees: 0,
       totalRupees: subscription.amount || 0,
       currency: subscription.currency || 'INR',
-      status: 'ISSUED',
-      issuedAt: new Date(),
-      paidAt: new Date(),
+      status: 'PAID',
+      issuedAt: now,
+      paidAt: now,
     });
 
     // Link invoiceId back to payment
@@ -407,7 +497,7 @@ const verifySubscription = async (req, res) => {
       type: 'CREDIT',
       source: 'SAAS_SUBSCRIPTION',
       externalReference: razorpay_payment_id,
-      description: `Q2 SaaS Plan Subscription - ${subscription.planId.name} (${subscription.billingCycle})`,
+      description: `Q2 SaaS Manual Plan Renewal - ${subscription.planId.name} (${subscription.billingCycle})`,
     });
 
     // 10. Audit Log
@@ -421,10 +511,12 @@ const verifySubscription = async (req, res) => {
         entityType: 'Subscription',
         entityId: subscription._id.toString(),
         newValue: {
-          subscriptionId: subscription.razorpaySubscriptionId,
+          orderId: razorpay_order_id || subscription.orderId,
           planId: subscription.planId._id,
           invoiceNumber,
           amountRupees: subscription.amount,
+          currentPeriodEnd: period.periodEnd,
+          renewalMode: 'MANUAL',
         },
       });
     } catch (auditErr) {
@@ -434,13 +526,17 @@ const verifySubscription = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: {
-        subscriptionId: subscription.razorpaySubscriptionId,
+        orderId: razorpay_order_id || subscription.orderId,
+        subscriptionId: subscription.razorpaySubscriptionId || subscription.orderId,
         paymentId: payment.paymentId,
         status: subscription.status,
         invoiceNumber: invoice.invoiceNumber,
         invoiceId: invoice._id,
+        currentPeriodEnd: period.periodEnd,
+        renewalMode: 'MANUAL',
+        autoRenew: false,
       },
-      message: 'SaaS subscription successfully activated and verified',
+      message: 'SaaS subscription successfully renewed and verified',
       requestId: req.requestId,
     });
   } catch (err) {

@@ -234,7 +234,7 @@ export default function Billing() {
     }
   };
 
-  // 4. Standard Non-Voucher Razorpay Subscription Checkout
+  // 4. Standard Non-Voucher Razorpay One-Time Payment Checkout (Manual Renewal)
   const handleProceedToPayment = async () => {
     if (!selectedPlanForCheckout) return;
 
@@ -247,24 +247,28 @@ export default function Billing() {
 
       setIsCheckoutOpen(false);
 
-      await openRazorpaySubscriptionCheckout(
+      await openRazorpayOrderCheckout(
         {
-          subscriptionId: checkoutInit.subscriptionId,
+          orderId: checkoutInit.orderId || checkoutInit.subscriptionId || '',
           keyId: checkoutInit.keyId,
           amountPaise: checkoutInit.amountPaise,
           currency: checkoutInit.currency,
           organizationName: user?.username || 'Q2 Organization',
           adminEmail: user?.email,
-          description: `Subscription for ${checkoutInit.planName} (${checkoutInit.billingCycle})`,
+          description: `SaaS Manual Plan Renewal - ${checkoutInit.planName} (${checkoutInit.billingCycle})`,
         },
         async (response) => {
           try {
-            const verifyResult = await billingService.verifySubscription(response);
-            toast.success(`Subscription activated! Invoice: ${verifyResult.invoiceNumber}`);
+            const verifyResult = await billingService.verifySubscription({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            toast.success(`Subscription renewed successfully! Invoice: ${verifyResult.invoiceNumber}`);
             fetchData();
           } catch (verifyErr: any) {
             console.error('Verification error:', verifyErr);
-            toast.error(verifyErr.response?.data?.message || 'Payment received; verifying subscription with provider...');
+            toast.error(verifyErr.response?.data?.message || 'Payment received; verifying with provider...');
             fetchData();
           }
         },
@@ -274,8 +278,9 @@ export default function Billing() {
         }
       );
     } catch (err: any) {
-      console.error('Subscription creation error:', err);
-      toast.error(err.message || 'Failed to initialize subscription checkout');
+      console.error('Checkout creation error:', err);
+      const msg = err.response?.data?.message || err.message || 'Failed to initialize payment checkout';
+      toast.error(msg);
     } finally {
       setIsProcessingCheckout(false);
     }
@@ -287,6 +292,8 @@ export default function Billing() {
         return <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30">Active</Badge>;
       case 'TRIAL':
         return <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30">Free Trial</Badge>;
+      case 'EXPIRED':
+        return <Badge className="bg-destructive/20 text-destructive border-destructive/30">Expired</Badge>;
       case 'AUTHENTICATED':
         return <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30">Authenticated</Badge>;
       case 'PENDING':
@@ -317,6 +324,29 @@ export default function Billing() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
+      {/* Expired Plan Banner */}
+      {subscription?.status === 'EXPIRED' && (
+        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-destructive font-medium">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>
+              Your subscription period has ended. Please renew manually or apply an eligible voucher. All your hostel, room, and student records are safely preserved.
+            </span>
+          </div>
+          {currentPlan && (
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-8 text-xs font-semibold shrink-0"
+              onClick={() => handleSelectPlan(currentPlan)}
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1" />
+              Renew Plan Now
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* 1. Top Section: Current Subscription Status Card */}
       <Card className="bg-card border-border shadow-sm">
         <CardHeader className="pb-4">
@@ -331,12 +361,22 @@ export default function Billing() {
                     Current SaaS Subscription
                   </CardTitle>
                   <CardDescription>
-                    Manage your organization's subscription tier, billing period, and capacity limits.
+                    Manage your organization's subscription tier, manual renewal period, and payment history.
                   </CardDescription>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {currentPlan && (
+                <Button
+                  size="sm"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm text-xs h-8"
+                  onClick={() => handleSelectPlan(currentPlan)}
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                  Renew Plan
+                </Button>
+              )}
               {subscription && getStatusBadge(subscription.status)}
               <Badge variant="outline" className="font-mono text-xs uppercase">
                 {subscription?.billingCycle || 'MONTHLY'}
@@ -352,7 +392,7 @@ export default function Billing() {
               <p className="text-xs text-muted-foreground font-mono mt-0.5">Code: {currentPlan?.code || 'STARTER'}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Recurring Amount</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Plan Price</p>
               <p className="text-lg font-bold text-foreground mt-0.5 flex items-center">
                 <IndianRupee className="w-4 h-4 mr-0.5 inline text-primary" />
                 {(subscription?.amount || currentPlan?.priceMonthly || 0).toLocaleString('en-IN')}
@@ -360,47 +400,23 @@ export default function Billing() {
                   / {subscription?.billingCycle?.toLowerCase() === 'yearly' ? 'year' : 'month'}
                 </span>
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Automated Razorpay recurring</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Manual renewal flow</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Current Period End</p>
               <p className="text-lg font-bold text-foreground mt-0.5">
                 {subscription?.currentPeriodEnd ? format(parseISO(subscription.currentPeriodEnd), 'dd MMM yyyy') : 'N/A'}
               </p>
-              <p className="text-xs text-emerald-500 mt-0.5 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 inline" /> Renews automatically
+              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 inline text-primary" /> Manual renewal; automatic renewal is off
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Provider Reference</p>
-              <p className="text-xs font-mono font-medium text-foreground mt-1 truncate">
-                {subscription?.razorpaySubscriptionId || 'N/A (Trial Mode)'}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Tokenized gateway agreement</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Renewal Mode</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">Manual Renewal</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Automatic deduction is off</p>
             </div>
           </div>
-
-          {/* Entitlement limits meter */}
-          {currentPlan?.limits && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-border/80">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Users className="w-4 h-4 text-primary shrink-0" />
-                <span>Max Students: <strong className="text-foreground">{currentPlan.limits.maxStudents}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <DoorOpen className="w-4 h-4 text-primary shrink-0" />
-                <span>Max Rooms: <strong className="text-foreground">{currentPlan.limits.maxRooms}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Building2 className="w-4 h-4 text-primary shrink-0" />
-                <span>Max Hostels: <strong className="text-foreground">{currentPlan.limits.maxHostels}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Zap className="w-4 h-4 text-primary shrink-0" />
-                <span>Storage: <strong className="text-foreground">{currentPlan.limits.storageGb} GB</strong></span>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -486,27 +502,12 @@ export default function Billing() {
                 </CardHeader>
 
                 <CardContent className="space-y-4 flex-1">
-                  <div className="border-t border-border/80 pt-3 space-y-2 text-xs">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Users className="w-4 h-4 text-primary shrink-0" />
-                      <span>Up to <strong className="text-foreground">{plan.limits?.maxStudents}</strong> students</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <DoorOpen className="w-4 h-4 text-primary shrink-0" />
-                      <span>Up to <strong className="text-foreground">{plan.limits?.maxRooms}</strong> rooms</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Building2 className="w-4 h-4 text-primary shrink-0" />
-                      <span>Up to <strong className="text-foreground">{plan.limits?.maxHostels}</strong> hostel property</span>
-                    </div>
-                  </div>
-
                   {plan.includedFeatures && plan.includedFeatures.length > 0 && (
                     <div className="border-t border-border/80 pt-3 space-y-1.5">
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                         Features Included
                       </p>
-                      {plan.includedFeatures.slice(0, 5).map((feat, idx) => (
+                      {plan.includedFeatures.slice(0, 6).map((feat, idx) => (
                         <div key={idx} className="flex items-center gap-2 text-xs text-foreground/90">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                           <span className="truncate capitalize">{feat.replace(/_/g, ' ')}</span>
@@ -518,17 +519,28 @@ export default function Billing() {
 
                 <div className="p-6 pt-0">
                   {isSelectedPlan && isCurrentPlanActive ? (
-                    <Button
-                      variant="outline"
-                      className="w-full border-emerald-500/30 text-emerald-500 bg-emerald-500/10 cursor-default"
-                      disabled
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                      Current Active Plan
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-emerald-500/30 text-emerald-500 bg-emerald-500/10 cursor-default text-xs"
+                        disabled
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                        Current Plan
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-primary/40 text-primary hover:bg-primary/10 text-xs font-semibold px-3"
+                        onClick={() => handleSelectPlan(plan)}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                        Renew
+                      </Button>
+                    </div>
                   ) : (
                     <Button
-                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md"
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md text-xs"
                       onClick={() => handleSelectPlan(plan)}
                     >
                       <CreditCard className="w-4 h-4 mr-1.5" />
@@ -640,8 +652,8 @@ export default function Billing() {
                 </Badge>
               </div>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-muted-foreground">Student Capacity</span>
-                <span className="text-foreground">{selectedPlanForCheckout.limits?.maxStudents} students</span>
+                <span className="text-muted-foreground">Renewal Mode</span>
+                <span className="text-foreground font-medium">Manual Renewal (One-Time)</span>
               </div>
             </div>
 
@@ -817,7 +829,7 @@ export default function Billing() {
               <span>
                 {appliedVoucherPreview?.isZeroPayable
                   ? 'Zero-balance voucher entitlement processed securely without gateway redirect.'
-                  : 'Recurring agreement secured by 256-bit encryption via Razorpay.'}
+                  : 'One-time payment secured by 256-bit encryption via Razorpay.'}
               </span>
             </div>
 

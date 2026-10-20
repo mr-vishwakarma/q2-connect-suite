@@ -176,53 +176,33 @@ export default function OrganizationDetail() {
               </CardContent>
             </Card>
 
-            {/* Student Quota Meter */}
+            {/* Registered Students Counter */}
             <Card className="border-border/60">
               <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Student Quota</CardTitle>
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Active Students</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-1.5">
+              <CardContent className="space-y-1">
                 <div className="flex justify-between items-baseline">
                   <span className="text-xl font-bold text-foreground">{org.studentCount || 0}</span>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {isUnlimitedStudents ? 'Unlimited' : `Max ${maxStudents}`}
-                  </span>
+                  <span className="text-xs text-emerald-400 font-mono">Unlimited Capacity</span>
                 </div>
-                <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      !isUnlimitedStudents && ((org.studentCount || 0) / maxStudents) > 0.85
-                        ? 'bg-rose-500'
-                        : 'bg-emerald-500'
-                    }`}
-                    style={{
-                      width: `${isUnlimitedStudents ? 100 : Math.min(100, ((org.studentCount || 0) / maxStudents) * 100)}%`,
-                    }}
-                  />
-                </div>
+                <p className="text-xs text-muted-foreground">No subscription limits enforced</p>
               </CardContent>
             </Card>
 
-        {/* Branch Quota Meter */}
-        <Card className="border-border/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Hostel Branches</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1.5">
-            <div className="flex justify-between items-baseline">
-              <span className="text-xl font-bold text-foreground">{org.hostels?.length || 0}</span>
-              <span className="text-xs text-muted-foreground font-mono">Max {org.subscription?.planId?.limits?.maxHostels || 5}</span>
-            </div>
-            <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-blue-500 h-full rounded-full transition-all"
-                style={{
-                  width: `${Math.min(100, ((org.hostels?.length || 0) / (org.subscription?.planId?.limits?.maxHostels || 5)) * 100)}%`,
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
+            {/* Hostel Branches Counter */}
+            <Card className="border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Hostel Branches</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xl font-bold text-foreground">{org.hostels?.length || 0}</span>
+                  <span className="text-xs text-blue-400 font-mono">Active Properties</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Multi-branch management enabled</p>
+              </CardContent>
+            </Card>
 
             <Card className="border-border/60">
               <CardHeader className="pb-2">

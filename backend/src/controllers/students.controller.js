@@ -206,26 +206,7 @@ const createStudent = async (req, res) => {
       }
     }
 
-    // Check Organization SaaS Subscription Plan Limits
-    if (orgId) {
-      const Subscription = require('../models/Subscription');
-      const sub = await withSession(Subscription.findOne({
-        organizationId: orgId,
-        status: { $in: ['ACTIVE', 'TRIAL'] },
-      }).populate('planId'));
-
-      if (sub?.planId?.limits?.maxStudents && sub.planId.limits.maxStudents > 0) {
-        const studentCount = await withSession(Student.countDocuments({ organizationId: orgId, isActive: true }));
-        if (studentCount >= sub.planId.limits.maxStudents) {
-          await tx.abort();
-          return res.status(403).json({
-            success: false,
-            code: 'PLAN_LIMIT_EXCEEDED',
-            message: `Current subscription plan (${sub.planId.name}) maximum student limit of ${sub.planId.limits.maxStudents} reached. Please upgrade to enroll more students.`,
-          });
-        }
-      }
-    }
+    // SaaS subscription limits on student capacity removed per policy (unlimited residents)
 
     const resolvedBranchCode = hostelDoc ? hostelDoc.code : (hostel || 'Q2');
 

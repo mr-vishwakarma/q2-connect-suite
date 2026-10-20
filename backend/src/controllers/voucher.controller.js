@@ -29,6 +29,7 @@ const {
   verifyPaymentSignature,
   getPublicKey,
 } = require('../config/razorpay');
+const { calculateSubscriptionPeriod } = require('../utils/subscriptionPeriod');
 const {
   generateVoucherCode,
   normalizeVoucherCode,
@@ -991,23 +992,31 @@ const redeemVoucherZeroPayable = async (req, res) => {
     // 5. Activate SaaS Subscription
     const isYearly = calculation.isYearly;
     const durationCycles = updatedVoucher.discountDurationCycles || 1;
-    const daysToAdd = (isYearly ? 365 : 30) * durationCycles;
-    const periodEnd = new Date(now.getTime() + daysToAdd * 24 * 3600 * 1000);
+    const existingSubscription = await Subscription.findOne({ organizationId });
+    const period = calculateSubscriptionPeriod({
+      activationDate: now,
+      billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
+      existingSubscription,
+      durationCycles,
+    });
+    const periodEnd = period.periodEnd;
 
     const subscription = await Subscription.findOneAndUpdate(
       { organizationId },
       {
         planId: calculation.plan._id,
         status: 'ACTIVE',
+        renewalMode: 'MANUAL',
+        autoRenew: false,
         billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
         amount: 0,
         amountPaise: 0,
         currency: 'INR',
-        startedAt: now,
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
+        startedAt: existingSubscription?.startedAt || now,
+        currentPeriodStart: period.periodStart,
+        currentPeriodEnd: period.periodEnd,
         totalCount: isYearly ? 5 : 12,
-        paidCount: 1,
+        paidCount: (existingSubscription?.paidCount || 0) + 1,
       },
       { upsert: true, new: true }
     );
@@ -1319,6 +1328,25 @@ const verifyVoucherPartial = async (req, res) => {
       });
     }
 
+    // 1b. Idempotency guard: If payment already captured, return early
+    const existingPayment = await Payment.findOne({
+      paymentId: razorpay_payment_id,
+      status: 'CAPTURED',
+    });
+    if (existingPayment) {
+      const existingInvoice = await Invoice.findOne({ paymentId: existingPayment._id });
+      return res.status(200).json({
+        success: true,
+        idempotent: true,
+        message: 'Payment already processed and subscription is active',
+        data: {
+          subscriptionId: existingPayment.subscriptionId,
+          invoiceNumber: existingInvoice?.invoiceNumber,
+          paymentId: existingPayment.paymentId,
+        },
+      });
+    }
+
     // 2. Fetch reservation
     const reservation = await VoucherReservation.findOne({
       checkoutSessionId,
@@ -1358,22 +1386,32 @@ const verifyVoucherPartial = async (req, res) => {
 
     // 4. Activate SaaS Subscription
     const isYearly = reservation.billingCycle === 'YEARLY';
-    const periodEnd = new Date(now.getTime() + (isYearly ? 365 : 30) * 24 * 3600 * 1000);
+    const existingSubscription = await Subscription.findOne({ organizationId });
+    const period = calculateSubscriptionPeriod({
+      activationDate: now,
+      billingCycle: reservation.billingCycle,
+      existingSubscription,
+      durationCycles: 1,
+    });
+    const periodEnd = period.periodEnd;
 
     const subscription = await Subscription.findOneAndUpdate(
       { organizationId },
       {
         planId: reservation.planId._id,
+        orderId: razorpay_order_id,
         status: 'ACTIVE',
+        renewalMode: 'MANUAL',
+        autoRenew: false,
         billingCycle: reservation.billingCycle,
         amount: reservation.finalPayableRupees,
         amountPaise: Math.round(reservation.finalPayableRupees * 100),
         currency: 'INR',
-        startedAt: now,
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
+        startedAt: existingSubscription?.startedAt || now,
+        currentPeriodStart: period.periodStart,
+        currentPeriodEnd: period.periodEnd,
         totalCount: isYearly ? 5 : 12,
-        paidCount: 1,
+        paidCount: (existingSubscription?.paidCount || 0) + 1,
       },
       { upsert: true, new: true }
     );

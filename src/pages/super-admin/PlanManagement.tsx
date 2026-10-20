@@ -29,9 +29,6 @@ export default function PlanManagement() {
     priceMonthly: 0,
     priceYearly: 0,
     description: '',
-    maxStudents: 0,
-    maxRooms: 50,
-    maxHostels: 1,
     isPopular: false,
   });
 
@@ -61,9 +58,6 @@ export default function PlanManagement() {
       priceMonthly: plan.priceMonthly || 0,
       priceYearly: plan.priceYearly || 0,
       description: plan.description || '',
-      maxStudents: plan.limits?.maxStudents ?? 0,
-      maxRooms: plan.limits?.maxRooms ?? 50,
-      maxHostels: plan.limits?.maxHostels ?? 1,
       isPopular: plan.isPopular || false,
     });
   };
@@ -80,12 +74,6 @@ export default function PlanManagement() {
         priceMonthly: Number(formData.priceMonthly),
         priceYearly: Number(formData.priceYearly),
         description: formData.description,
-        limits: {
-          ...editingPlan.limits,
-          maxStudents: Number(formData.maxStudents),
-          maxRooms: Number(formData.maxRooms),
-          maxHostels: Number(formData.maxHostels),
-        },
         isPopular: formData.isPopular,
       };
 
@@ -96,7 +84,7 @@ export default function PlanManagement() {
         fetchPlans();
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to update plan limits');
+      toast.error(error?.response?.data?.message || 'Failed to update plan pricing');
     } finally {
       setIsSaving(false);
     }
@@ -106,16 +94,13 @@ export default function PlanManagement() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Subscription Plans & Limits</h1>
-          <p className="text-sm text-muted-foreground">Manage SaaS pricing tiers, student capacity limits, and feature packages.</p>
+          <h1 className="text-2xl font-bold text-foreground">Subscription Plans & Pricing</h1>
+          <p className="text-sm text-muted-foreground">Manage SaaS pricing tiers, feature packages, and billing definitions.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((plan) => {
-          const maxStudents = plan.limits?.maxStudents;
-          const isUnlimited = !maxStudents || maxStudents <= 0;
-
           return (
             <Card
               key={plan._id || plan.id}
@@ -145,22 +130,6 @@ export default function PlanManagement() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <div className="p-3 rounded-lg bg-secondary/40 border border-border/50 text-xs space-y-1.5">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Student Quota:</span>
-                    <span className="font-bold text-foreground font-mono">
-                      {isUnlimited ? 'Unlimited' : maxStudents}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Max Rooms:</span>
-                    <span className="font-bold text-foreground font-mono">{plan.limits?.maxRooms || 50}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Max Hostels:</span>
-                    <span className="font-bold text-foreground font-mono">{plan.limits?.maxHostels || 1}</span>
-                  </div>
-                </div>
 
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-muted-foreground uppercase">Included Modules:</span>
@@ -240,49 +209,6 @@ export default function PlanManagement() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="maxStudents" className="text-xs">
-                  Max Students <span className="text-[10px] text-muted-foreground block">(0 = Unlimited)</span>
-                </Label>
-                <Input
-                  id="maxStudents"
-                  type="number"
-                  min="0"
-                  value={formData.maxStudents}
-                  onChange={(e) => setFormData({ ...formData, maxStudents: Number(e.target.value) })}
-                  className="h-9 text-xs"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="maxRooms" className="text-xs">
-                  Max Rooms <span className="text-[10px] text-muted-foreground block">(Per Branch)</span>
-                </Label>
-                <Input
-                  id="maxRooms"
-                  type="number"
-                  min="1"
-                  value={formData.maxRooms}
-                  onChange={(e) => setFormData({ ...formData, maxRooms: Number(e.target.value) })}
-                  className="h-9 text-xs"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="maxHostels" className="text-xs">
-                  Hostel Branches <span className="text-[10px] text-muted-foreground block">(Total Allowed)</span>
-                </Label>
-                <Input
-                  id="maxHostels"
-                  type="number"
-                  min="1"
-                  value={formData.maxHostels}
-                  onChange={(e) => setFormData({ ...formData, maxHostels: Number(e.target.value) })}
-                  className="h-9 text-xs"
-                />
-              </div>
-            </div>
 
             <div className="flex items-center gap-2 pt-2">
               <input

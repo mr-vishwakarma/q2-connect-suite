@@ -60,7 +60,26 @@ const subscriptionSchema = new mongoose.Schema(
       enum: ['MONTHLY', 'YEARLY'],
       default: 'MONTHLY',
     },
-    // Subscription recurring amount in minor units (paise) and major units (rupees)
+    // Manual renewal lifecycle (automatic recurring billing disabled by default)
+    renewalMode: {
+      type: String,
+      enum: ['MANUAL', 'AUTOMATIC'],
+      default: 'MANUAL',
+    },
+    autoRenew: {
+      type: Boolean,
+      default: false,
+    },
+    orderId: {
+      type: String,
+      trim: true,
+      sparse: true,
+    },
+    voucherRedemptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'VoucherRedemption',
+    },
+    // Subscription plan amount in minor units (paise) and major units (rupees)
     amountPaise: {
       type: Number,
       default: 0,
