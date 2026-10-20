@@ -17,6 +17,7 @@ const feePaymentSchema = new mongoose.Schema(
     paymentMode: { type: String, enum: ['cash', 'upi', 'bank', 'online'], required: true },
     paymentDate: { type: Date, default: Date.now },
     receiptNo: { type: String, required: true },
+    depositReceiptNo: { type: String, trim: true },
     receiptUrl: { type: String },
     notes: { type: String },
     idempotencyKey: { type: String, sparse: true, index: true },

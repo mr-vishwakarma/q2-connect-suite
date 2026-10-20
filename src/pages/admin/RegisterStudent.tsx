@@ -43,6 +43,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { StudentIDCard } from '@/components/admin/StudentIDCard';
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
+import { ReceiptsSuccessModal } from './components/ReceiptsSuccessModal';
+import { FeeReceiptData, SecurityDepositReceiptData } from '@/lib/receiptPdf';
 
 interface Room {
   id: string;
@@ -86,6 +88,12 @@ function RegisterStudentContent() {
     pass: string;
     studentCode?: string;
   } | null>(null);
+
+  const [createdReceipts, setCreatedReceipts] = useState<{
+    feeReceipt?: FeeReceiptData | null;
+    depositReceipt?: SecurityDepositReceiptData | null;
+  } | null>(null);
+  const [showReceiptsModal, setShowReceiptsModal] = useState(false);
 
   const [searchParams] = useSearchParams();
   const applicantIdParam = searchParams.get('applicantId');
@@ -319,6 +327,12 @@ function RegisterStudentContent() {
 
       if (response.data?.success) {
         toast.success(`Student ${formData.name} registered successfully!`);
+        
+        if (response.data?.data?.receipts) {
+          setCreatedReceipts(response.data.data.receipts);
+          setShowReceiptsModal(true);
+        }
+
         setLastCreated({
           name: formData.name,
           username: normalizedUsername,
@@ -1277,6 +1291,15 @@ function RegisterStudentContent() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ReceiptsSuccessModal
+        open={showReceiptsModal}
+        onOpenChange={setShowReceiptsModal}
+        title="Student Registration Payment Recorded"
+        subtitle="Initial payment collected successfully. Receipts are available below."
+        feeReceipt={createdReceipts?.feeReceipt}
+        depositReceipt={createdReceipts?.depositReceipt}
+      />
     </div>
   );
 }

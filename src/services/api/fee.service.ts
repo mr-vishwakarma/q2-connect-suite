@@ -63,4 +63,9 @@ export const feeService = {
     const res = await api.post(`/fees/send-reminder/${studentId}`, { month });
     return res.data;
   },
+
+  async getSecurityDeposits(params?: { studentId?: string; hostel?: string; status?: string }): Promise<ApiResponse<SecurityDeposit[]>> {
+    const res = await api.get('/fees/deposits', { params });
+    return res.data;
+  },
 };

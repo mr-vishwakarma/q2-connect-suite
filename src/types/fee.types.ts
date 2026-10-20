@@ -22,6 +22,7 @@ export interface Payment {
   fee_id: string;
   student_id: string;
   receipt_no: string;
+  deposit_receipt_no?: string | null;
   amount: number;
   late_fee: number;
   discount: number;
@@ -38,9 +39,13 @@ export interface SecurityDeposit {
   id: string;
   student_id: string;
   amount: number;
+  paid_amount?: number;
+  receipt_no?: string | null;
+  payment_mode?: PaymentMode | null;
   status: 'pending' | 'collected' | 'held' | 'active' | 'refunded' | 'adjusted' | 'forfeited';
   collected_date: string | null;
   refund_date: string | null;
+  notes?: string | null;
 }
 
 export type Deposit = SecurityDeposit;
@@ -56,6 +61,8 @@ export interface CollectPaymentPayload {
   receivedAmount: number;
   paymentMode: PaymentMode;
   notes?: string;
-  receiptNo: string;
+  receiptNo?: string;
+  depositReceiptNo?: string;
   receiptUrl?: string | null;
+  idempotencyKey?: string;
 }

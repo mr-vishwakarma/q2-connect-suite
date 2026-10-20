@@ -10,6 +10,7 @@ const {
   updateFee,
   generateMonthlyFees,
   getFeePayments,
+  getSecurityDeposits,
   getFeeManagementDashboard,
   collectPayment,
   calculatePayableFeeEndpoint,
@@ -34,7 +35,8 @@ router.post('/', adminOnly, createFee);
 router.put('/:id', adminOnly, updateFee);
 router.post('/generate-monthly', adminOnly, generateMonthlyFees);
 
-// Fee Payments
+// Fee Payments & Security Deposits
 router.get('/payments', getFeePayments);
+router.get('/deposits', getSecurityDeposits);
 
 module.exports = router;

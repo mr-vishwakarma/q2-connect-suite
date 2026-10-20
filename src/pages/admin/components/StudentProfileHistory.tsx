@@ -26,6 +26,12 @@ import { format, parseISO } from 'date-fns';
 import { extractFloor } from './StudentFeeMatrix';
 import { cn } from '@/lib/utils';
 import { formatDateDMY } from '@/utils/dateUtils';
+import {
+  FeeReceiptData,
+  SecurityDepositReceiptData,
+  downloadFeeReceipt,
+  downloadSecurityDepositReceipt,
+} from '@/lib/receiptPdf';
 
 interface StudentProfileHistoryProps {
   open: boolean;
@@ -53,6 +59,76 @@ export function StudentProfileHistory({
   onSelectAnotherStudent,
 }: StudentProfileHistoryProps) {
   if (!selectedStudent) return null;
+
+  const handleDownloadFeeReceipt = async (p: any) => {
+    try {
+      const data: FeeReceiptData = {
+        receipt_no: p.receipt_no,
+        payment_date: p.payment_date,
+        student_name: selectedStudent.name,
+        username: selectedStudent.username,
+        student_code: selectedStudent.student_code || selectedStudent.studentCode,
+        room_no: selectedStudent.room_no,
+        hostel: selectedStudent.hostel || 'Q2',
+        month: p.month,
+        monthly_fee: p.amount,
+        late_fee: p.late_fee || 0,
+        discount: p.discount || 0,
+        amount_paid: p.amount,
+        payment_mode: p.payment_mode,
+        admin_name: p.admin_name,
+        notes: p.notes,
+        deposit_collected_separately: p.security_deposit > 0 ? p.security_deposit : null,
+        deposit_receipt_no: p.deposit_receipt_no || null,
+      };
+      await downloadFeeReceipt(data);
+    } catch {
+      downloadHistoryForStudent(selectedStudent);
+    }
+  };
+
+  const handleDownloadDepositReceipt = async (p: any) => {
+    try {
+      const data: SecurityDepositReceiptData = {
+        receipt_no: p.deposit_receipt_no || `DEP-${p.receipt_no}`,
+        payment_date: p.payment_date,
+        student_name: selectedStudent.name,
+        username: selectedStudent.username,
+        student_code: selectedStudent.student_code || selectedStudent.studentCode,
+        room_no: selectedStudent.room_no,
+        hostel: selectedStudent.hostel || 'Q2',
+        deposit_amount: p.security_deposit,
+        payment_mode: p.payment_mode,
+        admin_name: p.admin_name,
+        notes: p.notes,
+      };
+      await downloadSecurityDepositReceipt(data);
+    } catch {
+      downloadHistoryForStudent(selectedStudent);
+    }
+  };
+
+  const handleDownloadStandaloneDepositReceipt = async () => {
+    if (!selectedStudentDeposit) return;
+    try {
+      const data: SecurityDepositReceiptData = {
+        receipt_no: selectedStudentDeposit.receipt_no || `DEP-${selectedStudent.username}`,
+        payment_date: selectedStudentDeposit.collected_date || new Date().toISOString(),
+        student_name: selectedStudent.name,
+        username: selectedStudent.username,
+        student_code: selectedStudent.student_code || selectedStudent.studentCode,
+        room_no: selectedStudent.room_no,
+        hostel: selectedStudent.hostel || 'Q2',
+        deposit_amount: selectedStudentDeposit.amount,
+        payment_mode: selectedStudentDeposit.payment_mode || 'offline',
+        admin_name: selectedStudentDeposit.notes,
+        notes: selectedStudentDeposit.notes,
+      };
+      await downloadSecurityDepositReceipt(data);
+    } catch {
+      downloadHistoryForStudent(selectedStudent);
+    }
+  };
 
   // Floor calculation
   const floorName = extractFloor(selectedStudent.room_no, selectedStudent.floor);
@@ -264,13 +340,33 @@ export function StudentProfileHistory({
               </div>
 
               <div className="bg-card border border-border/80 p-3.5 rounded-2xl space-y-1 shadow-sm">
-                <p className="text-xs text-muted-foreground">Security Deposit</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">Security Deposit</p>
+                  {selectedStudentDeposit?.status === 'collected' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 hover:bg-blue-500/20 text-blue-400 rounded-lg"
+                      onClick={handleDownloadStandaloneDepositReceipt}
+                      title="Download Security Deposit Receipt PDF"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
                 <p className="text-base sm:text-lg font-bold text-foreground font-mono">
                   ₹{(selectedStudentDeposit?.amount || 0).toLocaleString('en-IN')}
                 </p>
-                <p className="text-[10px] text-muted-foreground capitalize">
-                  Status: {selectedStudentDeposit?.status || 'Active'}
-                </p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-[10px] text-muted-foreground capitalize">
+                    Status: {selectedStudentDeposit?.status || 'Active'}
+                  </p>
+                  {selectedStudentDeposit?.receipt_no && (
+                    <span className="text-[9px] font-mono text-blue-400">
+                      #{selectedStudentDeposit.receipt_no}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="bg-card border border-border/80 p-3.5 rounded-2xl space-y-1 shadow-sm">
@@ -394,25 +490,48 @@ export function StudentProfileHistory({
                           {format(parseISO(p.payment_date), 'dd MMM yyyy')}
                         </TableCell>
                         <TableCell className="text-foreground font-mono text-xs font-semibold">
-                          {p.receipt_no}
+                          <div>{p.receipt_no}</div>
+                          {p.deposit_receipt_no && (
+                            <div className="text-[10px] text-blue-400 font-normal">
+                              Dep: #{p.deposit_receipt_no}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-foreground text-xs">{p.month}</TableCell>
                         <TableCell className="text-emerald-400 font-mono font-medium text-xs">
-                          ₹{Number(p.amount) + Number(p.security_deposit || 0)}
+                          <div>₹{Number(p.amount).toLocaleString('en-IN')}</div>
+                          {p.security_deposit > 0 && (
+                            <div className="text-[10px] text-blue-400 font-normal">
+                              +₹{Number(p.security_deposit).toLocaleString('en-IN')} dep
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-foreground uppercase text-[11px] font-mono">
                           {p.payment_mode}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 hover:bg-primary/20 hover:text-primary rounded-lg"
-                            onClick={() => downloadHistoryForStudent(selectedStudent)}
-                            title="Download PDF Receipt"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 hover:bg-primary/20 hover:text-primary rounded-lg"
+                              onClick={() => handleDownloadFeeReceipt(p)}
+                              title={`Download Hostel Fee Receipt #${p.receipt_no}`}
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </Button>
+                            {(p.deposit_receipt_no || p.security_deposit > 0) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 hover:bg-blue-500/20 text-blue-400 rounded-lg"
+                                onClick={() => handleDownloadDepositReceipt(p)}
+                                title={`Download Security Deposit Receipt #${p.deposit_receipt_no || p.receipt_no}`}
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

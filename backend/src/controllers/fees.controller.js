@@ -375,11 +375,74 @@ const getFeePayments = async (req, res) => {
   }
 };
 
+// @desc    Get security deposits
+// @route   GET /api/fees/deposits
+const getSecurityDeposits = async (req, res) => {
+  try {
+    const { studentId, hostel, status, page = 1, limit = 50 } = req.query;
+    const query = {};
+
+    const orgId = req.organizationId || req.tenant?.organizationId;
+    const isSuperAdmin = req.tenant?.isSuperAdmin;
+
+    // Enforce Tenant Scoping
+    if (!isSuperAdmin) {
+      query.organizationId = orgId || new mongoose.Types.ObjectId();
+    } else if (orgId) {
+      query.organizationId = orgId;
+    }
+
+    if (req.user.role === 'student') {
+      const student = await Student.findOne({ userId: req.user._id }).lean();
+      if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+      query.studentId = student._id;
+    } else {
+      if (studentId) query.studentId = studentId;
+      if (status) query.status = status;
+      if (hostel && hostel !== 'All') {
+        query.hostel = hostel;
+      } else if (req.tenant && req.tenant.hostelAccess && !req.tenant.hostelAccess.includes('all') && !isSuperAdmin) {
+        query.hostel = { $in: req.tenant.hostelAccess };
+      }
+    }
+
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitAmount = Math.min(Math.max(parseInt(limit) || 50, 1), 100);
+    const skip = (pageNum - 1) * limitAmount;
+
+    const [total, deposits] = await Promise.all([
+      SecurityDeposit.countDocuments(query),
+      SecurityDeposit.find(query)
+        .populate('studentId', 'name username room')
+        .sort({ collectedDate: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limitAmount)
+        .lean()
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      count: deposits.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitAmount) || (total === 0 ? 0 : 1),
+      limit: limitAmount,
+      data: deposits
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const { startSafeTransaction } = require('../utils/transaction');
+
 // @desc    Record a fee payment (handles fees, fee_payments, security_deposits, and students table)
 // @route   POST /api/fees/collect
 const collectPayment = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const withSession = (q) => (session ? q.session(session) : q);
+  const sessionOpts = session ? { session, ordered: true } : { ordered: true };
 
   let idempotencyKey = null;
   let orgId = null;
@@ -387,58 +450,45 @@ const collectPayment = async (req, res) => {
   try {
     const {
       studentId, hostel, month, amount, lateFee, discount, securityDeposit,
-      receivedAmount, paymentMode, notes, receiptNo, receiptUrl, idempotencyKey: bodyIdempotencyKey
+      receivedAmount, paymentMode, notes, receiptNo, depositReceiptNo: reqDepositReceiptNo,
+      receiptUrl, idempotencyKey: bodyIdempotencyKey
     } = req.body;
 
     idempotencyKey = req.headers['idempotency-key'] || bodyIdempotencyKey;
 
-    if (!studentId || !month || !receivedAmount || !paymentMode || !receiptNo) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    if (!studentId || !month || receivedAmount === undefined || receivedAmount === null || !paymentMode) {
+      await tx.abort();
+      return res.status(400).json({ success: false, message: 'Missing required fields: studentId, month, receivedAmount, paymentMode' });
+    }
+
+    const numReceived = Number(receivedAmount);
+    if (isNaN(numReceived) || numReceived <= 0) {
+      await tx.abort();
+      return res.status(400).json({ success: false, message: 'Received amount must be greater than zero' });
     }
 
     orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
 
     if (!isSuperAdmin && !orgId) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(403).json({ success: false, message: 'Organization tenant context required' });
     }
 
     // Idempotency check: prevent duplicate financial charges on network retry
     if (idempotencyKey) {
-      const existingPayment = await FeePayment.findOne({
+      const existingPayment = await withSession(FeePayment.findOne({
         idempotencyKey,
         ...(orgId ? { organizationId: orgId } : {})
-      }).session(session);
+      }));
 
       if (existingPayment) {
-        await session.abortTransaction();
-        session.endSession();
+        await tx.abort();
         return res.status(200).json({
           success: true,
           data: existingPayment,
           idempotent: true,
           message: 'Payment already recorded successfully (idempotent response)'
-        });
-      }
-    }
-
-    // Check duplicate receipt number within organization
-    if (orgId) {
-      const existingReceipt = await FeePayment.findOne({
-        receiptNo,
-        organizationId: orgId
-      }).session(session);
-
-      if (existingReceipt) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(409).json({
-          success: false,
-          message: `Receipt number "${receiptNo}" has already been issued.`
         });
       }
     }
@@ -451,26 +501,12 @@ const collectPayment = async (req, res) => {
       studentQuery.organizationId = orgId;
     }
 
-    const student = await Student.findOne(studentQuery).session(session);
+    const student = await withSession(Student.findOne(studentQuery));
     if (!student) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(404).json({ success: false, message: 'Student not found in this organization' });
     }
     const actualHostel = student.hostel || hostel;
-
-
-    // 1. Ensure a monthly fees row exists
-    const feeFilter = { studentId, month, hostel: actualHostel };
-    if (orgId) feeFilter.organizationId = orgId;
-
-    let feeRow = await Fee.findOne(feeFilter).session(session);
-    
-    if (feeRow && feeRow.status === 'paid') {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ success: false, message: 'Fee for this month is already fully paid' });
-    }
 
     // Calculate authoritative payable breakdown
     const breakdown = await feeService.calculatePayableFee({
@@ -480,12 +516,126 @@ const collectPayment = async (req, res) => {
       organizationId: orgId,
     });
 
+    const explicitFeeAmount = amount !== undefined && amount !== null ? Number(amount) : null;
     const numAmount = student.fees > 0 ? Number(student.fees) : (Number(amount) || breakdown.baseFee);
-    const numLateFee = lateFee !== undefined && !isNaN(Number(lateFee)) ? Number(lateFee) : breakdown.applicableLateFee;
+    let numLateFee = lateFee !== undefined && !isNaN(Number(lateFee)) ? Number(lateFee) : breakdown.applicableLateFee;
     const numDiscount = Number(discount) || 0;
     const numSecDeposit = Number(securityDeposit) || 0;
-    const numReceived = Number(receivedAmount) || 0;
 
+    // If explicit fee amount was sent without explicit late fee, and receivedAmount matches base + deposit:
+    if (explicitFeeAmount !== null && lateFee === undefined && Math.abs((explicitFeeAmount + numSecDeposit) - numReceived) < 0.01) {
+      numLateFee = 0;
+    }
+
+    // Validate security deposit liability
+    if (numSecDeposit > 0) {
+      if (breakdown.isDepositFullyPaid || breakdown.depositDue === 0) {
+        await tx.abort();
+        return res.status(400).json({
+          success: false,
+          message: 'Security deposit has already been fully paid for this student and cannot be charged again.'
+        });
+      }
+      if (numSecDeposit > breakdown.depositDue) {
+        await tx.abort();
+        return res.status(400).json({
+          success: false,
+          message: `Security deposit amount (₹${numSecDeposit}) exceeds the outstanding deposit balance of ₹${breakdown.depositDue}.`
+        });
+      }
+    }
+
+    // Explicit allocation validation:
+    // If client specified an intended fee amount and security deposit amount,
+    // their sum (including late fee and discount on fee) must match the receivedAmount.
+    const computedFeeTarget = explicitFeeAmount !== null
+      ? Math.max(0, explicitFeeAmount + numLateFee - numDiscount)
+      : Math.max(0, numAmount + numLateFee - numDiscount);
+
+    if (explicitFeeAmount !== null && Math.abs((computedFeeTarget + numSecDeposit) - numReceived) > 0.01) {
+      await tx.abort();
+      return res.status(400).json({
+        success: false,
+        message: `Allocation mismatch: received amount (₹${numReceived}) does not match the sum of fee allocation (₹${computedFeeTarget}) and security deposit (₹${numSecDeposit}).`
+      });
+    }
+
+    // Determine fee portion vs deposit portion
+    const feeCore = Math.max(0, numReceived - numSecDeposit);
+    const totalDue = Math.max(0, numAmount + numLateFee - numDiscount);
+
+    if (Math.abs((feeCore + numSecDeposit) - numReceived) > 0.01) {
+      await tx.abort();
+      return res.status(400).json({
+        success: false,
+        message: `Sum of fee allocation (₹${feeCore}) and deposit allocation (₹${numSecDeposit}) must equal total received amount (₹${numReceived}).`
+      });
+    }
+
+    // Check fee payment status
+    const feeFilter = { studentId, month };
+    if (orgId) feeFilter.organizationId = orgId;
+    let feeRow = await withSession(Fee.findOne(feeFilter));
+    if (feeRow && !feeRow.hostel && actualHostel) {
+      feeRow.hostel = actualHostel;
+    }
+
+    if (feeRow && feeRow.status === 'paid' && feeCore > 0) {
+      await tx.abort();
+      return res.status(400).json({
+        success: false,
+        message: `Monthly fee for ${month} is already fully paid. Only outstanding security deposit can be collected.`
+      });
+    }
+
+    if (feeRow && feeRow.status === 'paid' && breakdown.depositDue === 0) {
+      await tx.abort();
+      return res.status(400).json({
+        success: false,
+        message: 'Both monthly fee and security deposit are already fully settled. No payment due.'
+      });
+    }
+
+    // Generate or validate distinct receipt numbers
+    const feeReceiptNo = feeCore > 0
+      ? (receiptNo || `RCPT-FEE-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`)
+      : null;
+    const depositReceiptNo = numSecDeposit > 0
+      ? (reqDepositReceiptNo || (feeCore === 0 ? receiptNo : null) || `RCPT-DEP-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`)
+      : null;
+
+    // Check duplicate receipt numbers within organization
+    if (orgId && feeReceiptNo) {
+      const existingReceipt = await withSession(FeePayment.findOne({
+        receiptNo: feeReceiptNo,
+        organizationId: orgId
+      }));
+
+      if (existingReceipt) {
+        await tx.abort();
+        return res.status(409).json({
+          success: false,
+          message: `Receipt number "${feeReceiptNo}" has already been issued.`
+        });
+      }
+    }
+
+    if (orgId && depositReceiptNo) {
+      const existingDepositReceipt = await withSession(SecurityDeposit.findOne({
+        receiptNo: depositReceiptNo,
+        organizationId: orgId
+      }));
+
+      if (existingDepositReceipt) {
+        await tx.abort();
+        return res.status(409).json({
+          success: false,
+          message: `Security Deposit Receipt number "${depositReceiptNo}" has already been issued.`
+        });
+      }
+    }
+
+    // 1. Ensure or update monthly fee row
     if (!feeRow) {
       const newFees = await Fee.create([{
         studentId,
@@ -502,9 +652,9 @@ const collectPayment = async (req, res) => {
         periodStart: breakdown.periodStart,
         periodEnd: breakdown.periodEnd,
         cycleNumber: breakdown.billingCycle?.cycleIndex ?? null,
-      }], { session, ordered: true });
+      }], sessionOpts);
       feeRow = newFees[0];
-    } else {
+    } else if (feeCore > 0) {
       feeRow = await Fee.findByIdAndUpdate(
         feeRow._id,
         {
@@ -513,90 +663,173 @@ const collectPayment = async (req, res) => {
           amount: numAmount,
           ...(breakdown.dueDate && !feeRow.dueDate ? { dueDate: breakdown.dueDate } : {}),
         },
-        { new: true, session }
+        session ? { new: true, session } : { new: true }
       );
     }
 
-    const feeCore = Math.max(0, numReceived - numSecDeposit);
-    const totalDue = numAmount + numLateFee - numDiscount;
+    const now = new Date();
 
-    // 2. Create the fee payment record with organization and idempotency tracking
+    // 2. Create the FeePayment record (tracks fee allocation + cross-reference to deposit receipt)
+    const primaryReceiptNo = feeReceiptNo || depositReceiptNo;
     const payments = await FeePayment.create([{
       feeId: feeRow._id,
       studentId,
       organizationId: orgId || null,
       hostelId: student.hostelId || null,
       hostel: actualHostel,
-      receiptNo,
+      receiptNo: primaryReceiptNo,
+      depositReceiptNo: depositReceiptNo || undefined,
       receiptUrl,
       amount: feeCore,
       lateFee: numLateFee,
       discount: numDiscount,
       securityDeposit: numSecDeposit,
       paymentMode,
-      paymentDate: new Date(),
+      paymentDate: now,
       adminId: req.user._id,
       adminName: req.user.name,
       month,
       notes: notes || null,
       idempotencyKey: idempotencyKey || null,
-    }], { session, ordered: true });
+    }], sessionOpts);
     const payment = payments[0];
 
     // 3. Security deposit tracking: update pending deposit or record new collected deposit
     if (numSecDeposit > 0) {
-      const pendingDeposit = await SecurityDeposit.findOne({
+      const pendingDeposit = await withSession(SecurityDeposit.findOne({
         studentId,
         status: 'pending',
         ...(orgId ? { organizationId: orgId } : {}),
-      }).session(session);
+      }));
+
+      const previouslyCollected = breakdown.securityDepositCollected || 0;
+      const totalPaidNow = previouslyCollected + numSecDeposit;
+      const isSettled = totalPaidNow >= breakdown.securityDepositRequired;
 
       if (pendingDeposit) {
-        pendingDeposit.status = 'collected';
-        pendingDeposit.amount = numSecDeposit;
-        pendingDeposit.collectedDate = new Date();
+        pendingDeposit.status = isSettled ? 'collected' : 'pending';
+        if (!pendingDeposit.amount || pendingDeposit.amount < totalPaidNow) {
+          pendingDeposit.amount = breakdown.securityDepositRequired || student.securityDeposit || totalPaidNow;
+        }
+        pendingDeposit.paidAmount = totalPaidNow;
+        pendingDeposit.collectedDate = now;
         pendingDeposit.paymentMode = paymentMode;
-        await pendingDeposit.save({ session });
+        pendingDeposit.receiptNo = depositReceiptNo;
+        pendingDeposit.adminId = req.user._id;
+        pendingDeposit.adminName = req.user.name;
+        pendingDeposit.feePaymentId = payment._id;
+        pendingDeposit.notes = notes || 'Security deposit collected';
+        await pendingDeposit.save(session ? { session } : undefined);
       } else {
         await SecurityDeposit.create([{
           studentId,
           organizationId: orgId || null,
           hostelId: student.hostelId || null,
           hostel: actualHostel,
-          amount: numSecDeposit,
-          collectedDate: new Date(),
-          status: 'collected',
+          amount: breakdown.securityDepositRequired || student.securityDeposit || numSecDeposit,
+          paidAmount: totalPaidNow,
+          collectedDate: now,
+          status: isSettled ? 'collected' : 'pending',
           paymentMode,
-        }], { session, ordered: true });
+          receiptNo: depositReceiptNo,
+          adminId: req.user._id,
+          adminName: req.user.name,
+          feePaymentId: payment._id,
+          notes: notes || 'Security deposit collected',
+        }], sessionOpts);
       }
     }
 
-    // 4. Extend student validDate if fully paid using deterministic calendar arithmetic
-    if (feeCore >= totalDue) {
-      if (student && (student.startDate || student.validDate)) {
-        const anchor = student.startDate || student.validDate;
-        const nextDue = getNextMonthlyDueDate(anchor, 1);
-        await Student.findByIdAndUpdate(studentId, { validDate: nextDue }, { session });
+    // 4. Update Fee status and extend validDate if fee was collected
+    let newPaidAmount = feeRow.paidAmount || 0;
+    if (feeCore > 0) {
+      newPaidAmount += feeCore;
+      if (newPaidAmount >= totalDue) {
+        await Fee.findByIdAndUpdate(
+          feeRow._id,
+          { status: 'paid', paidAmount: newPaidAmount, paidDate: now, receiptNo: feeReceiptNo },
+          session ? { session } : undefined
+        );
+        if (student && (student.startDate || student.validDate)) {
+          const anchor = student.startDate || student.validDate;
+          const nextDue = getNextMonthlyDueDate(anchor, 1);
+          await Student.findByIdAndUpdate(
+            studentId,
+            { validDate: nextDue },
+            session ? { session } : undefined
+          );
+        }
+      } else {
+        await Fee.findByIdAndUpdate(
+          feeRow._id,
+          { status: 'partial', paidAmount: newPaidAmount, paidDate: now },
+          session ? { session } : undefined
+        );
       }
     }
 
-    // 5. Update Fee status to paid if fully paid
-    const newPaidAmount = (feeRow.paidAmount || 0) + feeCore;
-    if (newPaidAmount >= totalDue) {
-      await Fee.findByIdAndUpdate(feeRow._id, { status: 'paid', paidAmount: newPaidAmount, paidDate: new Date() }, { session });
-    } else if (newPaidAmount > 0) {
-      await Fee.findByIdAndUpdate(feeRow._id, { status: 'partial', paidAmount: newPaidAmount, paidDate: new Date() }, { session });
-    }
+    await tx.commit();
 
-    await session.commitTransaction();
-    session.endSession();
+    // Construct structured receipts payload for immediate download / presentation
+    const feeReceipt = feeCore > 0 ? {
+      receiptNo: feeReceiptNo,
+      receipt_no: feeReceiptNo,
+      amount: feeCore,
+      amount_paid: feeCore,
+      monthly_fee: numAmount,
+      late_fee: numLateFee,
+      discount: numDiscount,
+      month,
+      billing_period: breakdown.periodStart && breakdown.periodEnd
+        ? `${new Date(breakdown.periodStart).toLocaleDateString('en-IN')} - ${new Date(breakdown.periodEnd).toLocaleDateString('en-IN')}`
+        : undefined,
+      payment_mode: paymentMode,
+      paymentMode,
+      payment_date: now.toISOString(),
+      paymentDate: now.toISOString(),
+      deposit_collected_separately: numSecDeposit > 0 ? numSecDeposit : null,
+      deposit_receipt_no: depositReceiptNo,
+      remaining_fee_balance: Math.max(0, totalDue - newPaidAmount),
+      student_name: student.name,
+      username: student.username,
+      student_code: student.studentCode,
+      room_no: student.roomNo,
+      hostel: actualHostel,
+      admin_name: req.user.name,
+      notes,
+    } : null;
 
-    return res.status(201).json({ success: true, data: payment });
+    const depositReceipt = numSecDeposit > 0 ? {
+      receiptNo: depositReceiptNo,
+      receipt_no: depositReceiptNo,
+      deposit_amount: numSecDeposit,
+      amount: numSecDeposit,
+      total_required: breakdown.securityDepositRequired,
+      previously_paid: breakdown.securityDepositCollected || 0,
+      remaining_balance: Math.max(0, breakdown.depositDue - numSecDeposit),
+      payment_mode: paymentMode,
+      paymentMode,
+      payment_date: now.toISOString(),
+      paymentDate: now.toISOString(),
+      student_name: student.name,
+      username: student.username,
+      student_code: student.studentCode,
+      room_no: student.roomNo,
+      hostel: actualHostel,
+      admin_name: req.user.name,
+      notes,
+    } : null;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        payment,
+        feeReceipt,
+        depositReceipt,
+      }
+    });
   } catch (error) {
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
-    session.endSession();
+    await tx.abort();
     if (error.code === 11000 || error.code === 112 || (error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError')) || (error.message && error.message.includes('Write conflict'))) {
       if (idempotencyKey) {
         // Wait briefly for concurrent winning transaction to commit
@@ -746,6 +979,7 @@ module.exports = {
   updateFee,
   generateMonthlyFees,
   getFeePayments,
+  getSecurityDeposits,
   collectPayment,
   sendFeeReminderEmail,
 };

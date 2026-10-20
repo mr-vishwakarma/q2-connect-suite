@@ -39,6 +39,9 @@ interface CalculationDetails {
   isOverdue: boolean;
   dueDate: string | null;
   depositDue: number;
+  isDepositFullyPaid?: boolean;
+  securityDepositRequired?: number;
+  securityDepositCollected?: number;
   totalPayable: number;
   status: string;
 }
@@ -278,8 +281,10 @@ export function CollectPaymentDialog({
               <div>
                 <Label className="text-xs flex items-center justify-between">
                   <span>Security Deposit (₹)</span>
-                  {calcDetails?.depositDue ? (
-                    <span className="text-[10px] text-blue-400 font-normal">Pending Deposit</span>
+                  {calcDetails?.isDepositFullyPaid || calcDetails?.depositDue === 0 ? (
+                    <span className="text-[10px] text-emerald-400 font-normal">Fully Paid / Settled</span>
+                  ) : calcDetails?.depositDue ? (
+                    <span className="text-[10px] text-blue-400 font-normal">Pending Deposit (₹{calcDetails.depositDue})</span>
                   ) : null}
                 </Label>
                 <Input
@@ -368,13 +373,17 @@ export function CollectPaymentDialog({
               disabled={submitting || calculating || (calcDetails?.status === 'paid' && form.pAmount === 0 && form.pDeposit === 0)}
             >
               {submitting ? (
-                'Processing & Generating Receipt...'
+                'Processing & Generating Receipts...'
               ) : calcDetails?.status === 'paid' && form.pAmount === 0 && form.pDeposit === 0 ? (
-                'Fee Already Settled for this Month'
+                'Fee & Deposit Already Settled'
               ) : (
                 <>
                   <Check className="w-4 h-4 mr-2" />
-                  Confirm Collection & Download PDF Receipt
+                  {form.pAmount > 0 && form.pDeposit > 0
+                    ? 'Confirm Collection & Generate Both Receipts'
+                    : form.pDeposit > 0
+                    ? 'Confirm Collection & Generate Security Deposit Receipt'
+                    : 'Confirm Collection & Generate Fee Receipt'}
                 </>
               )}
             </Button>

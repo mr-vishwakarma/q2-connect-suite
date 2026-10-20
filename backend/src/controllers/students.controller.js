@@ -130,16 +130,22 @@ const getStudent = async (req, res) => {
 
 // @desc    Register a new student (creates User + Student records)
 // @route   POST /api/students
+const { startSafeTransaction } = require('../utils/transaction');
+
+// @desc    Register a new student (creates User + Student records)
+// @route   POST /api/students
 // @access  Admin
 const createStudent = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const withSession = (q) => (session ? q.session(session) : q);
+  const sessionOpts = session ? { session, ordered: true } : { ordered: true };
   
   try {
     const { name, username, email, phone, parentPhone, roomNo, hostel, fees, startDate, validDate, password, initialFeePaid } = req.body;
 
     if (!name || !email) {
-      await session.abortTransaction();
+      await tx.abort();
       return res.status(400).json({ success: false, message: 'name and email are required' });
     }
 
@@ -152,26 +158,26 @@ const createStudent = async (req, res) => {
     const Hostel = require('../models/Hostel');
     let hostelDoc = null;
     if (req.body.hostelId && mongoose.Types.ObjectId.isValid(req.body.hostelId)) {
-      hostelDoc = await Hostel.findById(req.body.hostelId).session(session);
+      hostelDoc = await withSession(Hostel.findById(req.body.hostelId));
     }
     if (!hostelDoc && hostel) {
-      hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel }).session(session);
+      hostelDoc = await withSession(Hostel.findOne({ organizationId: orgId, code: hostel }));
       if (!hostelDoc) {
-        hostelDoc = await Hostel.findOne({ organizationId: orgId, name: hostel }).session(session);
+        hostelDoc = await withSession(Hostel.findOne({ organizationId: orgId, name: hostel }));
       }
     }
 
     if (!hostelDoc) {
       const defaultHostelId = req.tenant?.hostelId || req.user.activeHostelId;
       if (defaultHostelId && mongoose.Types.ObjectId.isValid(defaultHostelId)) {
-        hostelDoc = await Hostel.findById(defaultHostelId).session(session);
+        hostelDoc = await withSession(Hostel.findById(defaultHostelId));
       } else if (Array.isArray(req.user.hostels) && req.user.hostels.length > 0) {
-        hostelDoc = await Hostel.findOne({ organizationId: orgId, code: req.user.hostels[0] }).session(session);
+        hostelDoc = await withSession(Hostel.findOne({ organizationId: orgId, code: req.user.hostels[0] }));
       }
     }
 
     if (hostelDoc && (hostelDoc.status === 'SUSPENDED' || hostelDoc.status === 'INACTIVE')) {
-      await session.abortTransaction();
+      await tx.abort();
       return res.status(400).json({
         success: false,
         code: 'HOSTEL_SUSPENDED',
@@ -191,7 +197,7 @@ const createStudent = async (req, res) => {
         (req.user.activeHostelId && req.user.activeHostelId.toString() === hostelDoc._id.toString());
 
       if (!hasBranchAccess) {
-        await session.abortTransaction();
+        await tx.abort();
         return res.status(403).json({
           success: false,
           code: 'UNAUTHORIZED_BRANCH_ACCESS',
@@ -203,15 +209,15 @@ const createStudent = async (req, res) => {
     // Check Organization SaaS Subscription Plan Limits
     if (orgId) {
       const Subscription = require('../models/Subscription');
-      const sub = await Subscription.findOne({
+      const sub = await withSession(Subscription.findOne({
         organizationId: orgId,
         status: { $in: ['ACTIVE', 'TRIAL'] },
-      }).populate('planId').session(session);
+      }).populate('planId'));
 
       if (sub?.planId?.limits?.maxStudents && sub.planId.limits.maxStudents > 0) {
-        const studentCount = await Student.countDocuments({ organizationId: orgId, isActive: true }).session(session);
+        const studentCount = await withSession(Student.countDocuments({ organizationId: orgId, isActive: true }));
         if (studentCount >= sub.planId.limits.maxStudents) {
-          await session.abortTransaction();
+          await tx.abort();
           return res.status(403).json({
             success: false,
             code: 'PLAN_LIMIT_EXCEEDED',
@@ -230,7 +236,7 @@ const createStudent = async (req, res) => {
 
     // Check for existing user/username
     let user;
-    const existingUser = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username: finalUsername }] }).session(session);
+    const existingUser = await withSession(User.findOne({ $or: [{ email: email.toLowerCase() }, { username: finalUsername }] }));
     if (existingUser) {
       if (existingUser.registrationStatus === 'pending_approval' && existingUser.email === email.toLowerCase()) {
         existingUser.name = name;
@@ -247,10 +253,10 @@ const createStudent = async (req, res) => {
         existingUser.activeHostelId = hostelDoc ? hostelDoc._id : null;
         if (orgId) existingUser.activeOrganizationId = orgId;
         if (existingUser.authProvider === 'google') existingUser.authProvider = 'both';
-        await existingUser.save({ session });
+        await existingUser.save(session ? { session } : undefined);
         user = existingUser;
       } else {
-        await session.abortTransaction();
+        await tx.abort();
         return res.status(409).json({ success: false, message: 'Email or username already exists' });
       }
     } else {
@@ -270,7 +276,7 @@ const createStudent = async (req, res) => {
         hostels: [resolvedBranchCode],
         activeHostelId: hostelDoc ? hostelDoc._id : null,
         activeOrganizationId: orgId || null,
-      }], { session, ordered: true });
+      }], sessionOpts);
       user = users[0];
     }
 
@@ -278,7 +284,7 @@ const createStudent = async (req, res) => {
     let finalStudentCode = req.body.studentCode;
     if (!finalStudentCode) {
       const year = new Date(startDate || Date.now()).getFullYear();
-      const count = await Student.countDocuments({ organizationId: orgId }).session(session);
+      const count = await withSession(Student.countDocuments({ organizationId: orgId }));
       const cleanHostel = resolvedBranchCode.toUpperCase().replace(/[^A-Z0-9]/g, '');
       finalStudentCode = `${cleanHostel}S${year}${String(count + 1).padStart(3, '0')}`;
     }
@@ -306,10 +312,17 @@ const createStudent = async (req, res) => {
       validDate,
       studentCode: finalStudentCode,
       welcomeEmailStatus: 'pending',
-    }], { session, ordered: true });
+    }], sessionOpts);
     const student = students[0];
 
-    // Record pending security deposit if required
+    const feeReceiptNo = initialFeePaid && fees > 0
+      ? `RCPT-FEE-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+      : null;
+    const depositReceiptNo = initialFeePaid && parsedSecurityDeposit > 0
+      ? `RCPT-DEP-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+      : null;
+
+    // Record security deposit liability (status: collected if initialFeePaid, else pending)
     if (parsedSecurityDeposit > 0) {
       const SecurityDeposit = require('../models/SecurityDeposit');
       await SecurityDeposit.create([{
@@ -318,14 +331,22 @@ const createStudent = async (req, res) => {
         studentId: student._id,
         hostel: resolvedBranchCode,
         amount: parsedSecurityDeposit,
-        status: 'pending',
-        notes: 'Required security deposit registered at student enrollment',
-      }], { session, ordered: true });
+        paidAmount: initialFeePaid ? parsedSecurityDeposit : 0,
+        status: initialFeePaid ? 'collected' : 'pending',
+        receiptNo: depositReceiptNo || undefined,
+        collectedDate: initialFeePaid ? new Date() : undefined,
+        paymentMode: initialFeePaid ? 'cash' : undefined,
+        adminId: initialFeePaid ? req.user._id : undefined,
+        adminName: initialFeePaid ? req.user.name : undefined,
+        notes: initialFeePaid
+          ? 'Initial security deposit collected at student enrollment'
+          : 'Required security deposit registered at student enrollment',
+      }], sessionOpts);
     }
 
     // Link student to user
     user.studentId = student._id;
-    await user.save({ validateBeforeSave: false, session });
+    await user.save(session ? { validateBeforeSave: false, session } : { validateBeforeSave: false });
 
     // Ensure Membership exists for student user
     if (orgId) {
@@ -339,7 +360,7 @@ const createStudent = async (req, res) => {
           status: 'ACTIVE',
           hostelAccess: [hostel],
         },
-        { upsert: true, session }
+        session ? { upsert: true, session } : { upsert: true }
       );
     }
 
@@ -370,13 +391,12 @@ const createStudent = async (req, res) => {
             },
           },
         ],
-        { session, new: true }
+        session ? { session, new: true } : { new: true }
       );
 
       if (!updatedRoom) {
-        const existingRoom = await Room.findOne(roomQuery).session(session);
-        await session.abortTransaction();
-        session.endSession();
+        const existingRoom = await withSession(Room.findOne(roomQuery));
+        await tx.abort();
         if (!existingRoom) {
           return res.status(400).json({
             success: false,
@@ -391,6 +411,7 @@ const createStudent = async (req, res) => {
     }
 
     // Handle initial Fee creation anchored to student startDate billing cycle
+    let feeRecord = null;
     if (fees && fees > 0) {
       const Fee = require('../models/Fee');
       const FeePayment = require('../models/FeePayment');
@@ -398,8 +419,6 @@ const createStudent = async (req, res) => {
       const month = initialCycle.feeMonth;
 
       if (initialFeePaid) {
-        const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
-
         const feeRecords = await Fee.create([{
           studentId: student._id,
           organizationId: orgId || null,
@@ -411,13 +430,13 @@ const createStudent = async (req, res) => {
           status: 'paid',
           paidDate: now,
           paymentMode: 'cash',
-          receiptNo,
+          receiptNo: feeReceiptNo,
           dueDate: initialCycle.dueDate,
           periodStart: initialCycle.periodStart,
           periodEnd: initialCycle.periodEnd,
           cycleNumber: initialCycle.cycleNumber,
-        }], { session, ordered: true });
-        const feeRecord = feeRecords[0];
+        }], sessionOpts);
+        feeRecord = feeRecords[0];
 
         await FeePayment.create([{
           feeId: feeRecord._id,
@@ -425,18 +444,19 @@ const createStudent = async (req, res) => {
           organizationId: orgId || null,
           hostelId: hostelDoc?._id || null,
           hostel,
-          receiptNo,
+          receiptNo: feeReceiptNo,
+          depositReceiptNo: depositReceiptNo || undefined,
           amount: fees,
           lateFee: 0,
           discount: 0,
-          securityDeposit: 0,
+          securityDeposit: parsedSecurityDeposit,
           paymentMode: 'cash',
           paymentDate: now,
           adminId: req.user._id,
           adminName: req.user.name,
           month,
           notes: 'Initial fee paid at registration',
-        }], { session, ordered: true });
+        }], sessionOpts);
       } else {
         // Create UNPAID Fee record anchored to student startDate
         await Fee.create([{
@@ -452,7 +472,7 @@ const createStudent = async (req, res) => {
           periodStart: initialCycle.periodStart,
           periodEnd: initialCycle.periodEnd,
           cycleNumber: initialCycle.cycleNumber,
-        }], { session, ordered: true });
+        }], sessionOpts);
       }
     }
 
@@ -465,10 +485,57 @@ const createStudent = async (req, res) => {
       title: 'Welcome to Q2 Connect Suite!',
       message: `Hello ${name}, your account has been set up. Welcome to ${hostel} hostel.`,
       type: 'success',
-    }], { session, ordered: true });
+    }], sessionOpts);
 
-    await session.commitTransaction();
-    session.endSession();
+    await tx.commit();
+
+    // Construct structured receipts payload for immediate download / presentation
+    const receipts = initialFeePaid ? {
+      feeReceipt: (fees > 0 && feeReceiptNo) ? {
+        receiptNo: feeReceiptNo,
+        receipt_no: feeReceiptNo,
+        amount: fees,
+        amount_paid: fees,
+        monthly_fee: fees,
+        late_fee: 0,
+        discount: 0,
+        month: initialCycle.feeMonth,
+        billing_period: initialCycle.periodStart && initialCycle.periodEnd
+          ? `${new Date(initialCycle.periodStart).toLocaleDateString('en-IN')} - ${new Date(initialCycle.periodEnd).toLocaleDateString('en-IN')}`
+          : undefined,
+        payment_mode: 'cash',
+        paymentMode: 'cash',
+        payment_date: new Date().toISOString(),
+        paymentDate: new Date().toISOString(),
+        deposit_collected_separately: parsedSecurityDeposit > 0 ? parsedSecurityDeposit : null,
+        deposit_receipt_no: depositReceiptNo,
+        student_name: student.name,
+        username: student.username,
+        student_code: student.studentCode,
+        room_no: student.roomNo,
+        hostel: resolvedBranchCode,
+        admin_name: req.user.name,
+      } : null,
+      depositReceipt: (parsedSecurityDeposit > 0 && depositReceiptNo) ? {
+        receiptNo: depositReceiptNo,
+        receipt_no: depositReceiptNo,
+        deposit_amount: parsedSecurityDeposit,
+        amount: parsedSecurityDeposit,
+        total_required: parsedSecurityDeposit,
+        previously_paid: 0,
+        remaining_balance: 0,
+        payment_mode: 'cash',
+        paymentMode: 'cash',
+        payment_date: new Date().toISOString(),
+        paymentDate: new Date().toISOString(),
+        student_name: student.name,
+        username: student.username,
+        student_code: student.studentCode,
+        room_no: student.roomNo,
+        hostel: resolvedBranchCode,
+        admin_name: req.user.name,
+      } : null,
+    } : null;
 
     // Dispatch single-use time-limited activation welcome email directly to student (single source of email dispatch)
     try {
@@ -485,13 +552,10 @@ const createStudent = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Student registered successfully',
-      data: { user: user.toJSON(), student }
+      data: { user: user.toJSON(), student, receipts }
     });
   } catch (error) {
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
-    session.endSession();
+    await tx.abort();
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'A student or user with this email or username already exists' });
     }
@@ -1036,6 +1100,7 @@ const approveAndRegisterStudent = async (req, res) => {
     const { deriveBillingCycle } = require('../utils/billingCycle');
     const studentStartDate = startDate ? new Date(startDate) : (student?.startDate || new Date());
     const initialCycle = deriveBillingCycle(studentStartDate, 0);
+    const parsedSecurityDeposit = Number(req.body.securityDeposit) >= 0 ? Number(req.body.securityDeposit) : 0;
 
     if (student) {
       student.name = finalName;
@@ -1048,6 +1113,7 @@ const approveAndRegisterStudent = async (req, res) => {
       if (orgId) student.organizationId = orgId;
       if (hostelDoc) student.hostelId = hostelDoc._id;
       student.fees = fees ? parseFloat(fees) : 0;
+      student.securityDeposit = parsedSecurityDeposit;
       student.startDate = studentStartDate;
       student.validDate = validDate || null;
       if (!student.studentCode) student.studentCode = finalStudentCode;
@@ -1066,6 +1132,7 @@ const approveAndRegisterStudent = async (req, res) => {
         roomNo,
         hostel: finalHostel,
         fees: fees ? parseFloat(fees) : 0,
+        securityDeposit: parsedSecurityDeposit,
         startDate: studentStartDate,
         validDate: validDate || null,
         studentCode: finalStudentCode,
@@ -1076,6 +1143,34 @@ const approveAndRegisterStudent = async (req, res) => {
 
     user.studentId = student._id;
     await user.save({ session });
+
+    const feeReceiptNo = initialFeePaid && parseFloat(fees) > 0
+      ? `RCPT-FEE-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+      : null;
+    const depositReceiptNo = initialFeePaid && parsedSecurityDeposit > 0
+      ? `RCPT-DEP-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
+      : null;
+
+    if (parsedSecurityDeposit > 0) {
+      const SecurityDeposit = require('../models/SecurityDeposit');
+      await SecurityDeposit.create([{
+        organizationId: orgId || null,
+        hostelId: hostelDoc?._id || null,
+        studentId: student._id,
+        hostel: finalHostel,
+        amount: parsedSecurityDeposit,
+        paidAmount: initialFeePaid ? parsedSecurityDeposit : 0,
+        status: initialFeePaid ? 'collected' : 'pending',
+        receiptNo: depositReceiptNo || undefined,
+        collectedDate: initialFeePaid ? new Date() : undefined,
+        paymentMode: initialFeePaid ? 'cash' : undefined,
+        adminId: initialFeePaid ? req.user._id : undefined,
+        adminName: initialFeePaid ? req.user.name : undefined,
+        notes: initialFeePaid
+          ? 'Initial security deposit collected at student enrollment'
+          : 'Required security deposit registered at student enrollment',
+      }], { session, ordered: true });
+    }
 
     // Ensure Membership exists for student user
     if (orgId) {
@@ -1149,7 +1244,6 @@ const approveAndRegisterStudent = async (req, res) => {
       const feeAmount = parseFloat(fees);
 
       if (initialFeePaid) {
-        const receiptNo = `REC-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
         const feeRecords = await Fee.create([{
           studentId: student._id,
           organizationId: orgId || null,
@@ -1161,7 +1255,7 @@ const approveAndRegisterStudent = async (req, res) => {
           status: 'paid',
           paidDate: now,
           paymentMode: 'cash',
-          receiptNo,
+          receiptNo: feeReceiptNo,
           dueDate: initialCycle.dueDate,
           periodStart: initialCycle.periodStart,
           periodEnd: initialCycle.periodEnd,
@@ -1174,11 +1268,12 @@ const approveAndRegisterStudent = async (req, res) => {
           organizationId: orgId || null,
           hostelId: hostelDoc?._id || null,
           hostel: finalHostel,
-          receiptNo,
+          receiptNo: feeReceiptNo,
+          depositReceiptNo: depositReceiptNo || undefined,
           amount: feeAmount,
           lateFee: 0,
           discount: 0,
-          securityDeposit: 0,
+          securityDeposit: parsedSecurityDeposit,
           paymentMode: 'cash',
           paymentDate: now,
           adminId: req.user._id,
@@ -1234,6 +1329,54 @@ const approveAndRegisterStudent = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
+    // Construct structured receipts payload for immediate download / presentation
+    const receipts = initialFeePaid ? {
+      feeReceipt: (fees && parseFloat(fees) > 0 && feeReceiptNo) ? {
+        receiptNo: feeReceiptNo,
+        receipt_no: feeReceiptNo,
+        amount: parseFloat(fees),
+        amount_paid: parseFloat(fees),
+        monthly_fee: parseFloat(fees),
+        late_fee: 0,
+        discount: 0,
+        month: initialCycle.feeMonth,
+        billing_period: initialCycle.periodStart && initialCycle.periodEnd
+          ? `${new Date(initialCycle.periodStart).toLocaleDateString('en-IN')} - ${new Date(initialCycle.periodEnd).toLocaleDateString('en-IN')}`
+          : undefined,
+        payment_mode: 'cash',
+        paymentMode: 'cash',
+        payment_date: new Date().toISOString(),
+        paymentDate: new Date().toISOString(),
+        deposit_collected_separately: parsedSecurityDeposit > 0 ? parsedSecurityDeposit : null,
+        deposit_receipt_no: depositReceiptNo,
+        student_name: student.name,
+        username: student.username,
+        student_code: student.studentCode,
+        room_no: student.roomNo,
+        hostel: finalHostel,
+        admin_name: req.user.name,
+      } : null,
+      depositReceipt: (parsedSecurityDeposit > 0 && depositReceiptNo) ? {
+        receiptNo: depositReceiptNo,
+        receipt_no: depositReceiptNo,
+        deposit_amount: parsedSecurityDeposit,
+        amount: parsedSecurityDeposit,
+        total_required: parsedSecurityDeposit,
+        previously_paid: 0,
+        remaining_balance: 0,
+        payment_mode: 'cash',
+        paymentMode: 'cash',
+        payment_date: new Date().toISOString(),
+        paymentDate: new Date().toISOString(),
+        student_name: student.name,
+        username: student.username,
+        student_code: student.studentCode,
+        room_no: student.roomNo,
+        hostel: finalHostel,
+        admin_name: req.user.name,
+      } : null,
+    } : null;
+
     // Dispatch single-use time-limited activation welcome email directly to student (single source of email dispatch)
     try {
       await studentService.dispatchStudentWelcomeEmail({
@@ -1249,7 +1392,7 @@ const approveAndRegisterStudent = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: `Student ${finalName} successfully registered and approved!`,
-      data: { user: user.toJSON(), student },
+      data: { user: user.toJSON(), student, receipts },
     });
   } catch (error) {
     await session.abortTransaction();

@@ -131,6 +131,7 @@ const feeService = {
       fee_id: p.feeId,
       student_id: p.studentId,
       receipt_no: p.receiptNo,
+      deposit_receipt_no: p.depositReceiptNo || null,
       amount: p.amount,
       late_fee: p.lateFee,
       discount: p.discount,
@@ -146,9 +147,13 @@ const feeService = {
       id: d._id,
       student_id: d.studentId,
       amount: d.amount,
+      paid_amount: d.paidAmount !== undefined ? d.paidAmount : (d.status === 'collected' ? d.amount : 0),
+      receipt_no: d.receiptNo || null,
+      payment_mode: d.paymentMode || null,
       status: d.status,
       collected_date: d.collectedDate,
       refund_date: d.refundDate,
+      notes: d.notes || null,
     }));
 
     return {
@@ -338,12 +343,25 @@ const feeService = {
     }
 
     // Security Deposit: STRICT ONE-TIME CHARGE (Phase 4)
-    const requiredDeposit = Number(student.securityDeposit || 0);
     const depositRecords = await SecurityDeposit.find({
       studentId: student._id,
-      status: { $in: ['collected', 'held'] },
+      ...(organizationId ? { organizationId } : {}),
     }).lean();
-    const collectedDeposit = depositRecords.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+
+    let requiredDeposit = Number(student.securityDeposit || 0);
+    if (!requiredDeposit && depositRecords.length > 0) {
+      requiredDeposit = depositRecords.reduce((max, d) => Math.max(max, Number(d.amount || 0)), 0);
+    }
+
+    const collectedDeposit = depositRecords.reduce((sum, d) => {
+      if (d.paidAmount !== undefined && d.paidAmount !== null) {
+        return sum + Number(d.paidAmount || 0);
+      }
+      if (d.status === 'collected' || d.status === 'held') {
+        return sum + Number(d.amount || 0);
+      }
+      return sum;
+    }, 0);
     const depositDue = Math.max(0, requiredDeposit - collectedDeposit);
 
     // Monthly Rent Total: ONLY base + late fee - discount (DO NOT add deposit here!)

@@ -21,6 +21,7 @@
     "test:integrity": "node src/scripts/validate_data_integrity.js",
     "test:load": "node src/scripts/run_phase_g_load_test.js",
     "test:resilience": "node src/scripts/test_phase_i_resilience.js",
+    "test:separate-receipts": "node src/scripts/test_separate_receipts_workflow.js",
     "test": "node src/scripts/test_p0_security.js"
   },
   "dependencies": {

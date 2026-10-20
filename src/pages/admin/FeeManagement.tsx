@@ -31,7 +31,18 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Mail
 } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, differenceInDays, addMonths, addDays } from 'date-fns';
-import { downloadReceipt, ReceiptData, downloadHistoryReceipt, HistoryReceiptData, getHistoryReceiptBlob } from '@/lib/receiptPdf';
+import {
+  downloadReceipt,
+  ReceiptData,
+  downloadHistoryReceipt,
+  HistoryReceiptData,
+  getHistoryReceiptBlob,
+  FeeReceiptData,
+  SecurityDepositReceiptData,
+  downloadFeeReceipt,
+  downloadSecurityDepositReceipt,
+} from '@/lib/receiptPdf';
+import { ReceiptsSuccessModal } from './components/ReceiptsSuccessModal';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getAvatarUrl } from '@/utils/imageUtils';
@@ -100,6 +111,12 @@ export default function FeeManagement() {
     pAmount: 0, pLateFee: 0, pDiscount: 0, pDeposit: 0, pReceived: 0,
     pMode: 'upi', pNotes: '',
   });
+
+  const [paymentReceipts, setPaymentReceipts] = useState<{
+    feeReceipt?: FeeReceiptData | null;
+    depositReceipt?: SecurityDepositReceiptData | null;
+  } | null>(null);
+  const [showReceiptsModal, setShowReceiptsModal] = useState(false);
 
   const [emailingStudentId, setEmailingStudentId] = useState<string | null>(null);
 
@@ -267,7 +284,7 @@ export default function FeeManagement() {
       // Compute deposit due: required deposit minus collected deposits
       const studentCollectedDeposit = deposits
         .filter((d) => d.student_id === s.id && (d.status === 'collected' || d.status === 'active' || d.status === 'held'))
-        .reduce((sum, d) => sum + (d.amount || 0), 0);
+        .reduce((sum, d) => sum + (d.paid_amount !== undefined ? d.paid_amount : (d.amount || 0)), 0);
       const requiredDeposit = (s as any).security_deposit || 0;
       const depositDue = Math.max(0, requiredDeposit - studentCollectedDeposit);
 
@@ -499,45 +516,7 @@ export default function FeeManagement() {
     }
 
     try {
-      const receipt_no = genReceiptNo();
-
-      const studentPayments = [...payments.filter((p) => p.student_id === selectedStudent.id)];
-      studentPayments.unshift({
-        id: 'new',
-        fee_id: '',
-        student_id: selectedStudent.id,
-        receipt_no,
-        payment_date: new Date().toISOString(),
-        month: form.pMonth,
-        amount: form.pReceived,
-        payment_mode: form.pMode,
-        admin_name: profile?.name || '',
-        notes: form.pNotes,
-        late_fee: form.pLateFee,
-        discount: form.pDiscount,
-        security_deposit: form.pDeposit,
-      });
-
-      const receiptData: HistoryReceiptData = {
-        student_name: selectedStudent.name,
-        username: selectedStudent.username,
-        room_no: selectedStudent.room_no,
-        hostel: selectedHostel,
-        payments: studentPayments,
-      };
-
-      const pdfBlob = await getHistoryReceiptBlob(receiptData);
-      const formData = new FormData();
-      formData.append('file', pdfBlob, `receipt-${receipt_no}.pdf`);
-      formData.append('folder', `/q2-connect/receipts/students/${selectedStudent.username}`);
-
-      const uploadRes = await api.post('/upload/file', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const receiptUrl = uploadRes.data?.url || null;
-
-      await api.post('/fees/collect', {
+      const res = await api.post('/fees/collect', {
         studentId: selectedStudent.id,
         hostel: selectedHostel,
         month: form.pMonth,
@@ -548,15 +527,22 @@ export default function FeeManagement() {
         receivedAmount: form.pReceived,
         paymentMode: form.pMode,
         notes: form.pNotes,
-        receiptNo: receipt_no,
-        receiptUrl,
       });
 
-      await downloadHistoryReceipt(receiptData);
+      if (res.data?.success) {
+        toast.success('Payment recorded successfully');
+        setShowPaymentDialog(false);
+        fetchData();
 
-      toast.success('Payment recorded and receipt generated');
-      setShowPaymentDialog(false);
-      fetchData();
+        const data = res.data.data;
+        if (data?.feeReceipt || data?.depositReceipt) {
+          setPaymentReceipts({
+            feeReceipt: data.feeReceipt || null,
+            depositReceipt: data.depositReceipt || null,
+          });
+          setShowReceiptsModal(true);
+        }
+      }
     } catch (e: unknown) {
       console.error(e);
       toast.error(e instanceof Error ? e.message : 'Failed to record payment');
@@ -1301,6 +1287,16 @@ export default function FeeManagement() {
         downloadHistoryForStudent={downloadHistoryForStudent}
         openCollect={openCollect}
         onSelectAnotherStudent={openProfile}
+      />
+
+      {/* Receipts Success Modal: Separate Fee & Deposit Receipts */}
+      <ReceiptsSuccessModal
+        open={showReceiptsModal}
+        onOpenChange={setShowReceiptsModal}
+        title="Fee Collection Recorded"
+        subtitle="Receipts generated successfully. You can download or print each document."
+        feeReceipt={paymentReceipts?.feeReceipt}
+        depositReceipt={paymentReceipts?.depositReceipt}
       />
     </div>
   );
