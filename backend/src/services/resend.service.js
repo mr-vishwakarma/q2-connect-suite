@@ -158,6 +158,21 @@ async function verifyResendConnection() {
 }
 
 /**
+ * Resolves authoritative Reply-To address on the custom domain (mrvishwakarma.in).
+ * Never leaks or misaligns with free-tier Gmail addresses, which triggers DMARC and spam penalties.
+ */
+function getEffectiveReplyTo(customReplyTo = null) {
+  if (customReplyTo && typeof customReplyTo === 'string' && customReplyTo.includes('@')) {
+    return customReplyTo.trim();
+  }
+  const configuredReplyTo = (process.env.REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL || '').trim();
+  if (configuredReplyTo && configuredReplyTo.includes('@') && !configuredReplyTo.includes('@gmail.com') && !configuredReplyTo.includes('@q2connect.com')) {
+    return configuredReplyTo;
+  }
+  return 'Q2 Connect Suite Support <support@mrvishwakarma.in>';
+}
+
+/**
  * Dispatches a transactional email via Resend with bounded in-flight retries.
  * 
  * @param {object} options
@@ -167,6 +182,7 @@ async function verifyResendConnection() {
  * @param {string} [options.text] - Plain text alternative
  * @param {string} [options.correlationId] - Tracing / request identifier
  * @param {string} [options.replyTo] - Reply-to address
+ * @param {string} [options.listUnsubscribe] - Optional List-Unsubscribe header for announcements
  * @param {object} [options.metadata] - Key-value metadata
  */
 async function sendViaResend({
@@ -176,12 +192,36 @@ async function sendViaResend({
   text,
   correlationId = null,
   replyTo = null,
+  listUnsubscribe = null,
   metadata = {},
 }) {
   const cleanTo = (to || '').trim().toLowerCase();
   const maskedTo = maskEmail(cleanTo);
   const effectiveCid = correlationId || `resend-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
   const logPrefix = `[resend][${effectiveCid}]`;
+
+  // Check EmailSuppression list (hard bounces / spam complaints) to protect sender reputation
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      const EmailSuppression = require('../models/EmailSuppression');
+      const suppression = await EmailSuppression.findOne({ email: cleanTo }).lean();
+      if (suppression) {
+        console.warn(`${logPrefix} 🛡️ Email delivery suppressed: ${maskedTo} is on the suppression list (Reason: ${suppression.reason}). Suppressing to protect domain reputation.`);
+        return {
+          success: true,
+          suppressed: true,
+          reason: suppression.reason,
+          provider: 'resend',
+          messageId: `suppressed-${Date.now()}`,
+          status: 'EMAIL_SUPPRESSED_BOUNCED',
+          correlationId: effectiveCid,
+        };
+      }
+    }
+  } catch (suppressErr) {
+    // Non-fatal suppression check
+  }
 
   // Simulation mode check for automated unit test runs
   if (process.env.NODE_ENV === 'test' || process.env.MOCK_EMAIL === 'true') {
@@ -206,7 +246,23 @@ async function sendViaResend({
 
   const from = getResendSenderAddress();
   const plainText = text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  const effectiveReplyTo = replyTo || (process.env.SMTP_USER ? process.env.SMTP_USER.trim() : from);
+  const effectiveReplyTo = getEffectiveReplyTo(replyTo);
+
+  const isTransactional = ['PASSWORD_RESET', 'STUDENT_WELCOME_ACTIVATION', 'ADMIN_ACTION_OTP', 'SECONDARY_ADMIN_WELCOME'].includes(metadata?.purpose);
+
+  const headers = {
+    'X-Entity-Ref-ID': effectiveCid,
+  };
+
+  if (isTransactional) {
+    headers['Auto-Submitted'] = 'auto-generated';
+    headers['X-Auto-Response-Suppress'] = 'OOF, AutoReply';
+  }
+
+  if (listUnsubscribe) {
+    headers['List-Unsubscribe'] = listUnsubscribe;
+    headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+  }
 
   const payload = {
     from,
@@ -215,9 +271,7 @@ async function sendViaResend({
     html,
     text: plainText,
     reply_to: effectiveReplyTo,
-    headers: {
-      'X-Entity-Ref-ID': effectiveCid,
-    },
+    headers,
     tags: [
       { name: 'correlation_id', value: effectiveCid.slice(0, 60) },
       ...(metadata?.purpose ? [{ name: 'purpose', value: String(metadata.purpose).slice(0, 60) }] : []),
@@ -279,6 +333,7 @@ async function sendViaResend({
 module.exports = {
   getResendClient,
   getResendSenderAddress,
+  getEffectiveReplyTo,
   getResendStatus,
   verifyResendConnection,
   sendViaResend,

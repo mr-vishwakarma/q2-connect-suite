@@ -142,6 +142,9 @@ async function executeDegradedEmailWithRetry(jobType, payload, fallbackJobId) {
         case 'ADMIN_ACTION_OTP':
           await emailUtils.sendAdminActionOtpEmail(payload);
           break;
+        case 'STUDENT_ANNOUNCEMENT':
+          await emailUtils.sendStudentAnnouncementEmail(payload);
+          break;
         case 'FEE_REMINDER': {
           const { processEmailJob } = require('../workers/email.worker');
           await processEmailJob({ name: 'FEE_REMINDER', data: payload, id: fallbackJobId });

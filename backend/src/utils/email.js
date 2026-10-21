@@ -7,6 +7,7 @@ const {
   sendViaResend,
   getResendStatus,
   getResendSenderAddress,
+  getEffectiveReplyTo,
   verifyResendConnection,
 } = require('../services/resend.service');
 
@@ -73,23 +74,32 @@ function isRoutableEmail(email) {
 
 // Dynamic transporter caching
 let cachedTransporter = null;
-let fallbackTransporter = null;
 let lastConfigHash = '';
 
 /**
  * Resolves sender address cleanly matching the active mail transport (Resend or SMTP)
+ * Defaults to authenticated domain: Q2 Connect Suite <noreply@mrvishwakarma.in>
  */
 function getSenderAddress() {
   if (process.env.RESEND_API_KEY) {
     return getResendSenderAddress();
   }
   const configuredFrom = (process.env.EMAIL_FROM || '').trim();
-  const smtpUser = (process.env.SMTP_USER || 'mayurvish2003@gmail.com').trim();
-
   if (configuredFrom && configuredFrom.includes('@') && !configuredFrom.includes('@q2connect.com')) {
     return configuredFrom;
   }
-  return `Q2 GIRLS HOSTEL <${smtpUser}>`;
+  return 'Q2 Connect Suite <noreply@mrvishwakarma.in>';
+}
+
+/**
+ * Resolves monitored support contact address on the custom domain
+ */
+function getEffectiveSupportEmail() {
+  const configured = (process.env.SUPPORT_EMAIL || process.env.REPLY_TO_EMAIL || '').trim();
+  if (configured && configured.includes('@') && !configured.includes('@q2connect.com') && !configured.includes('@gmail.com')) {
+    return configured;
+  }
+  return 'support@mrvishwakarma.in';
 }
 
 /**
@@ -126,14 +136,14 @@ function getTrustedFrontendUrl(req = null) {
 /**
  * Creates an instrumented Nodemailer transport instance
  */
-function createTransportInstance({ host, port, secure, service, user, pass, pool = false }) {
+function createTransportInstance({ host, port, secure, service, user, pass }) {
   const options = {
-    pool: false, // Transactional delivery must NEVER pool idle sockets on cloud containers (prevents Connection Timeout)
+    pool: false, // Transactional delivery must NEVER pool idle sockets on cloud containers
     auth: { user, pass },
-    connectionTimeout: 10000, // 10s connection timeout for cloud containers
+    connectionTimeout: 10000,
     greetingTimeout: 8000,
     socketTimeout: 15000,
-    family: 4, // CRITICAL: Force IPv4 to prevent hanging on cloud container IPv6 blackholes
+    family: 4, // Force IPv4 to prevent hanging on cloud container IPv6 issues
     tls: {
       rejectUnauthorized: true,
       minVersion: 'TLSv1.2',
@@ -152,7 +162,7 @@ function createTransportInstance({ host, port, secure, service, user, pass, pool
 }
 
 /**
- * Get configured Nodemailer transporter with resilient cloud timeouts
+ * Get configured Nodemailer transporter
  */
 const getTransporter = () => {
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
@@ -168,37 +178,21 @@ const getTransporter = () => {
     return cachedTransporter;
   }
 
-  // When Gmail is detected, direct SSL connection to smtp.gmail.com:465 with family: 4
-  // provides instantaneous, reliable TLS routing on cloud containers (Render/Docker)
-  if (isGmail) {
-    cachedTransporter = createTransportInstance({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      family: 4,
-      user,
-      pass,
-      pool: false,
-    });
-  } else {
-    const isSecure = port === 465;
-    cachedTransporter = createTransportInstance({
-      host,
-      port,
-      secure: isSecure,
-      family: 4,
-      user,
-      pass,
-      pool: false,
-    });
-  }
+  cachedTransporter = createTransportInstance({
+    host: isGmail ? 'smtp.gmail.com' : host,
+    port: isGmail ? 465 : port,
+    secure: isGmail ? true : port === 465,
+    family: 4,
+    user,
+    pass,
+  });
 
   lastConfigHash = configHash;
   return cachedTransporter;
 };
 
 /**
- * Get fallback transporter using dedicated clean non-pooled direct socket
+ * Get fallback transporter
  */
 const getFallbackTransporter = () => {
   const host = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
@@ -207,7 +201,6 @@ const getFallbackTransporter = () => {
   const isGmail = host.includes('gmail.com') || process.env.SMTP_SERVICE === 'gmail' || user.endsWith('@gmail.com');
 
   if (isGmail) {
-    // Non-pooled dedicated fresh socket on port 465 with IPv4
     return createTransportInstance({
       host: 'smtp.gmail.com',
       port: 465,
@@ -215,7 +208,6 @@ const getFallbackTransporter = () => {
       family: 4,
       user,
       pass,
-      pool: false,
     });
   }
 
@@ -228,7 +220,6 @@ const getFallbackTransporter = () => {
     family: 4,
     user,
     pass,
-    pool: false,
   });
 };
 
@@ -269,6 +260,7 @@ const getMailConfigStatus = () => {
     primaryProvider,
     configured: Boolean(resendStatus.configured || smtpStatus.configured),
     from: getSenderAddress(),
+    supportEmail: getEffectiveSupportEmail(),
     resend: resendStatus,
     smtp: smtpStatus,
   };
@@ -285,7 +277,7 @@ const verifyMailConnection = async () => {
 };
 
 /**
- * Explicit SMTP connection verification with structured diagnostics and auto-failover
+ * Explicit SMTP connection verification
  */
 const verifySmtpConnection = async () => {
   const config = getSmtpConfigStatus();
@@ -315,13 +307,10 @@ const verifySmtpConnection = async () => {
       },
     };
   } catch (primaryErr) {
-    console.warn(`[email] Primary SMTP verify (${config.host}:${config.port}) encountered error: ${primaryErr.message}. Testing resilient fallback transport...`);
-
     try {
       const fallback = getFallbackTransporter();
       await fallback.verify();
       cachedTransporter = fallback;
-      console.log('[email] Resilient fallback SMTP connection verified successfully!');
       return {
         success: true,
         status: 'EMAIL_ACCEPTED_BY_SMTP',
@@ -341,8 +330,6 @@ const verifySmtpConnection = async () => {
 
     if (errCode === 'EAUTH' || primaryErr.responseCode === 535 || /auth|credentials|login/i.test(primaryErr.message)) {
       status = 'SMTP_AUTHENTICATION_FAILED';
-    } else if (errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || /timeout/i.test(primaryErr.message)) {
-      status = 'TRANSPORT_CONNECTION_FAILED';
     }
 
     return {
@@ -356,7 +343,7 @@ const verifySmtpConnection = async () => {
 
 /**
  * Send a transactional email using the centralized reusable transport with in-flight retries and durable logging
- * @param {object} options - { to, subject, html, text, correlationId, purpose, targetUserId, targetStudentId, metadata }
+ * @param {object} options
  */
 const sendEmail = async ({
   to,
@@ -367,6 +354,8 @@ const sendEmail = async ({
   purpose = 'GENERAL_NOTIFICATION',
   targetUserId = null,
   targetStudentId = null,
+  replyTo = null,
+  listUnsubscribe = null,
   metadata = {},
 }) => {
   if (!isValidEmail(to)) {
@@ -378,7 +367,7 @@ const sendEmail = async ({
   const effectiveCid = correlationId || `email-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
   const logPrefix = `[email][${effectiveCid}]`;
 
-  // Explicit mock bypass for automated unit tests only
+  // Simulation mode bypass for automated tests
   if (process.env.NODE_ENV === 'test' || process.env.MOCK_EMAIL === 'true') {
     console.log(`${logPrefix} 📧 [Simulated Email] Delivered to: ${maskedTo} (Subject: ${subject})`);
     return {
@@ -389,9 +378,30 @@ const sendEmail = async ({
     };
   }
 
-  // Intercept and safely suppress delivery to unroutable mock/placeholder domains to prevent SMTP bounce-backs
+  // Suppression check for hard-bounced or complained recipients to protect domain reputation
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      const EmailSuppression = require('../models/EmailSuppression');
+      const suppression = await EmailSuppression.findOne({ email: cleanTo }).lean();
+      if (suppression) {
+        console.warn(`${logPrefix} 🛡️ Email delivery suppressed: ${maskedTo} is on suppression list (${suppression.reason}). Skipping to protect domain reputation.`);
+        return {
+          success: true,
+          suppressed: true,
+          reason: suppression.reason,
+          messageId: `suppressed-${Date.now()}`,
+          status: 'EMAIL_SUPPRESSED_BOUNCED',
+        };
+      }
+    }
+  } catch (suppressErr) {
+    // Non-fatal suppression check
+  }
+
+  // Intercept unroutable mock/placeholder domains
   if (!isRoutableEmail(cleanTo)) {
-    console.warn(`${logPrefix} ⚠️ Outgoing email suppressed: recipient '${cleanTo}' is on a non-routable/mock domain (${cleanTo.split('@')[1]}). Skipping SMTP delivery to protect sender reputation.`);
+    console.warn(`${logPrefix} ⚠️ Outgoing email suppressed: recipient '${cleanTo}' is on a non-routable/mock domain. Skipping to protect sender reputation.`);
 
     try {
       const mongoose = require('mongoose');
@@ -456,13 +466,19 @@ const sendEmail = async ({
         html,
         text,
         correlationId: effectiveCid,
+        replyTo: replyTo || getEffectiveSupportEmail(),
+        listUnsubscribe,
         metadata: { purpose, targetUserId, targetStudentId, ...metadata },
       });
 
       if (emailLogEntry) {
-        emailLogEntry.status = 'RESEND_ACCEPTED';
-        emailLogEntry.resendMessageId = result.messageId;
-        emailLogEntry.deliveredAt = new Date();
+        if (result.suppressed) {
+          emailLogEntry.status = 'SUPPRESSED_BOUNCED';
+        } else {
+          emailLogEntry.status = 'RESEND_ACCEPTED';
+          emailLogEntry.resendMessageId = result.messageId;
+          emailLogEntry.deliveredAt = new Date();
+        }
         await emailLogEntry.save().catch(() => {});
       }
 
@@ -470,8 +486,9 @@ const sendEmail = async ({
         success: true,
         provider: 'resend',
         messageId: result.messageId,
-        accepted: true,
-        status: 'EMAIL_ACCEPTED_BY_RESEND',
+        accepted: !result.suppressed,
+        suppressed: Boolean(result.suppressed),
+        status: result.suppressed ? 'EMAIL_SUPPRESSED_BOUNCED' : 'EMAIL_ACCEPTED_BY_RESEND',
         correlationId: effectiveCid,
       };
     } catch (resendErr) {
@@ -490,10 +507,11 @@ const sendEmail = async ({
     }
   }
 
+  // 2. Fallback: SMTP Transport
   const config = getSmtpConfigStatus();
   if (!config.configured) {
     const errorMsg = 'Email transport configuration is missing (neither Resend nor SMTP configured).';
-    console.error(`${logPrefix} ❌ ${errorMsg} Missing required variables.`);
+    console.error(`${logPrefix} ❌ ${errorMsg}`);
     const error = new Error(errorMsg);
     error.status = 'CONFIGURATION_MISSING';
     error.code = 'CONFIG_MISSING';
@@ -524,40 +542,51 @@ const sendEmail = async ({
 
   try {
     const from = getSenderAddress();
-    const replyTo = (process.env.SMTP_USER || '').trim() || from;
+    const effectiveReplyTo = replyTo || getEffectiveSupportEmail();
+
+    const headers = {
+      'X-Mailer': 'Q2 Connect Suite Mailer v2',
+      'X-Entity-Ref-ID': effectiveCid,
+    };
+
+    const isTransactional = ['PASSWORD_RESET', 'STUDENT_WELCOME_ACTIVATION', 'ADMIN_ACTION_OTP', 'SECONDARY_ADMIN_WELCOME'].includes(purpose);
+    if (isTransactional) {
+      headers['Auto-Submitted'] = 'auto-generated';
+      headers['X-Auto-Response-Suppress'] = 'OOF, AutoReply';
+    }
+
+    if (listUnsubscribe) {
+      headers['List-Unsubscribe'] = listUnsubscribe;
+      headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+    }
 
     const mailOptions = {
       from,
       to: cleanTo,
-      replyTo,
+      replyTo: effectiveReplyTo,
       subject,
       html,
       text: text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-      headers: {
-        'X-Mailer': 'Q2 Connect Suite Mailer v2',
-        'X-Auto-Response-Suppress': 'OOF, AutoReply',
-        'Auto-Submitted': 'auto-generated',
-      },
+      headers,
     };
 
     let info = null;
     let lastSendErr = null;
 
-    // Resilient send attempt with in-flight retry loop for transient connection dropouts
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const transporter = getTransporter();
         info = await transporter.sendMail(mailOptions);
         lastSendErr = null;
-        break; // Successfully handed off to SMTP provider
+        break;
       } catch (sendErr) {
         lastSendErr = sendErr;
-        cachedTransporter = null; // Invalidate cached transporter on error to ensure clean socket on retry
+        cachedTransporter = null;
         const errCode = sendErr.code || sendErr.responseCode || 'UNKNOWN';
         const isTransient = errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || errCode === 'ECONNRESET' || /timeout|connect/i.test(sendErr.message);
 
         if (isTransient && attempt < 2) {
-          console.warn(`${logPrefix} ⚠️ Primary SMTP attempt ${attempt} encountered transient error (${sendErr.message}). Retrying fresh TLS connection in 1200ms...`);
+          console.warn(`${logPrefix} ⚠️ Primary SMTP attempt ${attempt} transient error (${sendErr.message}). Retrying in 1200ms...`);
           await new Promise((resolve) => setTimeout(resolve, 1200));
         } else {
           break;
@@ -565,22 +594,21 @@ const sendEmail = async ({
       }
     }
 
-    // If primary transport attempts failed with a connection issue, test the fallback transport
     if (!info && lastSendErr) {
       const errCode = lastSendErr.code || lastSendErr.responseCode || 'UNKNOWN';
       const isConnectionIssue = errCode === 'ETIMEDOUT' || errCode === 'ECONNREFUSED' || errCode === 'ECONNRESET' || /timeout|connect/i.test(lastSendErr.message);
 
       if (isConnectionIssue) {
-        console.warn(`${logPrefix} ⚠️ Primary SMTP failed (${lastSendErr.message}). Retrying with resilient fallback transport...`);
+        console.warn(`${logPrefix} ⚠️ Primary SMTP failed. Retrying with fallback transport...`);
         const fallback = getFallbackTransporter();
         info = await fallback.sendMail(mailOptions);
-        console.log(`${logPrefix} ✅ Resilient fallback SMTP dispatch succeeded!`);
+        console.log(`${logPrefix} ✅ Fallback SMTP dispatch succeeded!`);
       } else {
         throw lastSendErr;
       }
     }
 
-    console.log(`${logPrefix} 📧 Email accepted by SMTP provider for ${maskedTo} (MessageId: ${info.messageId})`);
+    console.log(`${logPrefix} 📧 Email accepted by SMTP for ${maskedTo} (MessageId: ${info.messageId})`);
 
     if (emailLogEntry) {
       emailLogEntry.status = 'SMTP_ACCEPTED';
@@ -606,7 +634,7 @@ const sendEmail = async ({
       classifiedStatus = 'MESSAGE_REJECTED';
     }
 
-    console.error(`${logPrefix} ❌ Email dispatch failed for ${maskedTo}: ${error.message} [Status: ${classifiedStatus}, Code: ${errCode}]`);
+    console.error(`${logPrefix} ❌ Email dispatch failed for ${maskedTo}: ${error.message}`);
 
     if (emailLogEntry) {
       emailLogEntry.status = classifiedStatus === 'SMTP_AUTHENTICATION_FAILED' || classifiedStatus === 'MESSAGE_REJECTED' ? 'FAILED_PERMANENT' : 'FAILED_RETRYABLE';
@@ -622,198 +650,203 @@ const sendEmail = async ({
 };
 
 /**
- * Standard layout wrapper for Q2 Connect Suite branded emails
+ * Clean, lightweight, professional email layout designed for high deliverability and spam avoidance.
+ * Features:
+ * - High-contrast readable typography on pure white (#ffffff) card
+ * - Light neutral canvas (#f8fafc) compatible with mobile and desktop email clients
+ * - Hidden preheader to prevent preview snippet bleed in inbox lists
+ * - Zero dark background inversion traps
+ * - Authentic, verified organization identity in header & footer
+ * - Zero spam trigger phrases ("mark as not spam" completely removed)
  */
-function renderBrandedLayout({ title, subtitle, contentHtml, footerNote }) {
+function renderBrandedLayout({ title, subtitle, preheader, contentHtml, footerNote, unsubscribeUrl }) {
   const currentYear = new Date().getFullYear();
-  return `
-    <div style="background-color: #0b132b; padding: 32px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc; min-height: 100%;">
-      <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #1c2541; border: 1px solid #3a506b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.4);">
-        <!-- Header -->
-        <tr>
-          <td style="padding: 28px 24px 20px 24px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg, #1e293b 0%, #1c2541 100%);">
-            <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: #f59e0b;">Q2 CONNECT SUITE</h1>
-            <p style="margin: 6px 0 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8;">${escapeHtml(subtitle || 'Hostel Operations & Resident Management')}</p>
-          </td>
-        </tr>
+  const safePreheader = preheader ? escapeHtml(preheader) : '';
+  const supportEmail = getEffectiveSupportEmail();
 
-        <!-- Main Body -->
-        <tr>
-          <td style="padding: 32px 28px;">
-            ${title ? `<h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #ffffff;">${escapeHtml(title)}</h2>` : ''}
-            ${contentHtml}
-          </td>
-        </tr>
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>${escapeHtml(title || 'Q2 Connect Suite')}</title>
+  <!--[if mso]>
+  <style type="text/css">
+    body, table, td {font-family: Arial, Helvetica, sans-serif !important;}
+  </style>
+  <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; color: #334155;">
+  ${safePreheader ? `
+  <!-- Hidden preheader text to control inbox preview snippet -->
+  <div style="display: none; font-size: 1px; color: #f8fafc; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden; mso-hide: all;">
+    ${safePreheader}
+    &zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
+  </div>` : ''}
 
-        <!-- Footer -->
-        <tr>
-          <td style="padding: 20px 24px; background-color: #0b132b; border-top: 1px solid rgba(255,255,255,0.08); text-align: center;">
-            ${footerNote ? `<p style="margin: 0 0 8px 0; font-size: 12px; color: #94a3b8; line-height: 1.4;">${footerNote}</p>` : ''}
-            <p style="margin: 0; font-size: 12px; color: #64748b;">
-              &copy; ${currentYear} Q2 Connect Suite. All rights reserved.<br/>
-              Need assistance? Contact our team at <a href="mailto:support@q2connect.com" style="color: #38bdf8; text-decoration: none;">support@q2connect.com</a>
-            </p>
-          </td>
-        </tr>
-      </table>
-    </div>
-  `;
+  <div style="background-color: #f8fafc; padding: 32px 16px; min-height: 100%;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+      <!-- Brand Header -->
+      <tr>
+        <td style="padding: 24px 28px 20px 28px; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td>
+                <span style="font-size: 18px; font-weight: 800; letter-spacing: -0.3px; color: #0f172a; text-transform: uppercase;">Q2 CONNECT SUITE</span>
+                <p style="margin: 3px 0 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; color: #64748b;">${escapeHtml(subtitle || 'Resident & Hostel Management Platform')}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- Main Body -->
+      <tr>
+        <td style="padding: 28px 28px 24px 28px; background-color: #ffffff;">
+          ${title ? `<h1 style="margin: 0 0 16px 0; font-size: 19px; font-weight: 700; color: #0f172a; line-height: 1.3;">${escapeHtml(title)}</h1>` : ''}
+          ${contentHtml}
+        </td>
+      </tr>
+
+      <!-- Trust & Support Footer -->
+      <tr>
+        <td style="padding: 20px 28px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: left; font-size: 12px; line-height: 1.5; color: #64748b;">
+          ${footerNote ? `<p style="margin: 0 0 8px 0; color: #475569;">${footerNote}</p>` : ''}
+          <p style="margin: 0 0 4px 0; color: #64748b;">
+            You received this message because your account is registered with <strong>Q2 Connect Suite</strong>.
+          </p>
+          <p style="margin: 0; color: #64748b;">
+            Questions or assistance? Contact our team at <a href="mailto:${supportEmail}" style="color: #2563eb; text-decoration: none;">${supportEmail}</a>
+          </p>
+          ${unsubscribeUrl ? `
+          <p style="margin: 8px 0 0 0; font-size: 11px;">
+            <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Manage email preferences or unsubscribe</a>
+          </p>` : ''}
+          <p style="margin: 10px 0 0 0; font-size: 11px; color: #94a3b8;">
+            &copy; ${currentYear} Q2 Connect Suite &bull; Student & Resident Operations
+          </p>
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>`;
 }
 
 /**
- * Send password reset email
- * @param {object} options - { to, name, resetLink, correlationId }
+ * Send Student Announcement or General Update Email
+ * Adheres strictly to the copy and structure in Section 6.
+ * 
+ * @param {object} options
+ * @param {string} options.to - Student email address
+ * @param {string} options.studentName - Full student name
+ * @param {string} options.announcementTitle - Specific announcement title
+ * @param {string} options.announcementSummary - 1-2 sentence concise summary
+ * @param {string} options.date - Date of the update/event
+ * @param {string} options.time - Time of the update/event
+ * @param {string} options.details - Location or relevant operational details
+ * @param {string} [options.actionUrl] - Direct HTTPS link to view announcement
+ * @param {string} [options.supportEmail] - Monitored support contact
+ * @param {string} [options.correlationId] - Tracing ID
  */
-const sendPasswordResetEmail = async ({ to, name = null, resetLink, correlationId }) => {
-  const now = new Date();
-  const timeFormatted = now.toLocaleTimeString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
-  const dateFormatted = now.toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-
-  const subject = `Password Reset Request — Q2 Connect Suite [${timeFormatted}]`;
-  const cleanLink = resetLink.trim();
-  const safeName = name ? escapeHtml(name) : null;
-
-  const text = `Password Reset Request — Q2 Connect Suite\n\n${name ? `Hello ${name},\n\n` : ''}We received a request to reset the password for your Q2 Connect Suite account on ${dateFormatted} at ${timeFormatted} (IST).\n\nOpen the link below in your browser to set a new password:\n${cleanLink}\n\nSecurity Notice:\n- This link was requested on ${dateFormatted} at ${timeFormatted} (IST) and is valid for 2 hours.\n- If you requested multiple links, please use this newest email (${timeFormatted}).\n- If you did not request this, please ignore this email or notify security immediately. Your account remains secure.\n\nBest regards,\nQ2 Connect Suite Security Team`;
-
-  const contentHtml = `
-    <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #cbd5e1;">
-      ${safeName ? `Hello <strong>${safeName}</strong>,<br/><br/>` : ''}
-      We received a request to reset the password for your Q2 Connect Suite account.
-    </p>
-
-    <div style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px 16px; margin: 16px 0; text-align: center;">
-      <p style="margin: 0; font-size: 13px; color: #93c5fd;">
-        🕒 Requested at: <strong>${dateFormatted}, ${timeFormatted} (IST)</strong> &bull; Valid for 2 hours
-      </p>
-    </div>
-
-    <div style="background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(99,102,241,0.1)); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
-      <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #ffffff;">Click the button below to choose your new password:</p>
-      <a href="${cleanLink}" style="display: inline-block; background-color: #f59e0b; color: #000000; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 12px rgba(245,158,11,0.3);">
-        Reset My Password
-      </a>
-      <p style="margin: 14px 0 0 0; font-size: 12px; color: #94a3b8;">
-        ⏳ Valid for <strong>2 hours</strong> &bull; Single-use only
-      </p>
-    </div>
-
-    <p style="margin: 20px 0 8px 0; font-size: 13px; color: #94a3b8; line-height: 1.5;">
-      If the button above doesn't work, copy and paste this URL into your browser:<br/>
-      <a href="${cleanLink}" style="color: #38bdf8; word-break: break-all; font-size: 12px;">${cleanLink}</a>
-    </p>
-
-    <div style="margin-top: 24px; padding: 14px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px;">
-      <p style="margin: 0; font-size: 12px; color: #fca5a5; line-height: 1.5;">
-        <strong>Security Notice:</strong> If you did not request this password reset, please ignore this email or contact support immediately. Your password has not been changed.
-      </p>
-    </div>
-  `;
-
-  const html = renderBrandedLayout({
-    title: 'Password Reset Request',
-    subtitle: 'Security & Access Control',
-    contentHtml,
-    footerNote: 'Tip: If this email arrived in your Spam folder, please mark it as "Not Spam" to receive future security updates.',
-  });
-
-  return sendEmail({
-    to,
-    subject,
-    html,
-    text,
-    correlationId,
-    purpose: 'PASSWORD_RESET',
-  });
-};
-
-/**
- * Send welcome & account setup invitation email to newly created Secondary Admin
- * @param {object} options - { to, name, username, hostelName, orgName, activationLink, loginLink, correlationId, adminUserId }
- */
-const sendSecondaryAdminWelcomeEmail = async ({
+const sendStudentAnnouncementEmail = async ({
   to,
-  name,
-  username,
-  hostelName = 'Assigned Hostel',
-  orgName = 'Q2 Connect Suite',
-  activationLink,
-  loginLink,
-  correlationId,
-  adminUserId = null,
+  studentName = 'Student',
+  announcementTitle,
+  announcementSummary,
+  date = 'As announced',
+  time = 'Standard hours',
+  details = 'Please refer to student portal for full notes',
+  actionUrl,
+  supportEmail = null,
+  correlationId = null,
 }) => {
-  const safeName = escapeHtml(name || 'Administrator');
-  const safeUsername = escapeHtml(username || '');
-  const safeHostel = escapeHtml(hostelName || 'Assigned Hostel');
-  const safeOrg = escapeHtml(orgName || 'Q2 Connect Suite');
+  const safeName = escapeHtml(studentName);
+  const safeTitle = escapeHtml(announcementTitle);
+  const safeSummary = escapeHtml(announcementSummary);
+  const safeDate = escapeHtml(date);
+  const safeTime = escapeHtml(time);
+  const safeDetails = escapeHtml(details);
+  const effectiveSupport = supportEmail || getEffectiveSupportEmail();
+
   const frontendUrl = getTrustedFrontendUrl();
-  const cleanActivationLink = (activationLink || `${frontendUrl}/login`).trim();
-  const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=admin`).trim();
+  const cleanActionUrl = (actionUrl || `${frontendUrl}/student/announcements`).trim();
 
-  const subject = `Welcome to Q2 Connect Suite — Activate Your Administrator Account (${hostelName})`;
+  const subject = `A student update from Q2 Connect Suite: ${announcementTitle}`;
+  const preheader = announcementSummary;
 
-  const text = `Welcome to Q2 Connect Suite!\n\nHello ${name},\n\nYou have been designated as a Secondary Administrator for "${hostelName}" under ${orgName}.\n\nYour Account Details:\n- Admin Name: ${name}\n- User ID: ${username}\n- Email: ${to}\n- Assigned Hostel: ${hostelName}\n\nFor security reasons, permanent passwords are never sent via email. Please activate your account and choose your secure password by opening the link below (valid for 48 hours):\n${cleanActivationLink}\n\nAfter setting your password, sign in at:\n${cleanLoginLink}\n\nBest regards,\nPrimary Administration & Security Operations — Q2 Connect Suite`;
+  const text = `A student update from Q2 Connect Suite: ${announcementTitle}
+
+Hello ${studentName},
+
+You are receiving this message because your student account is registered with Q2 Connect Suite.
+
+${announcementTitle}
+
+${announcementSummary}
+
+Details:
+- Date: ${date}
+- Time: ${time}
+- Location or relevant information: ${details}
+
+View announcement:
+${cleanActionUrl}
+
+If you have questions, reply to this email or contact ${effectiveSupport}.
+
+Q2 Connect Suite
+Student communications`;
 
   const contentHtml = `
-    <h2 style="color: #ffffff; font-size: 19px; margin: 0 0 12px 0;">Welcome, ${safeName}! 👋</h2>
-    <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0;">
-      You have been appointed as an <strong>Administrator</strong> for <strong>${safeHostel}</strong> under <strong>${safeOrg}</strong>. Your staff account has been provisioned.
+    <p style="margin: 0 0 14px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+      Hello <strong>${safeName}</strong>,
+    </p>
+    <p style="margin: 0 0 18px 0; font-size: 14px; color: #64748b; line-height: 1.5;">
+      You are receiving this message because your student account is registered with Q2 Connect Suite.
     </p>
 
-    <div style="background-color: #0b132b; border: 1px solid #3a506b; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
-      <p style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px 0; font-weight: 700;">Account Credentials</p>
-      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-        <tr>
-          <td style="color: #94a3b8; padding: 6px 0;">Assigned Role:</td>
-          <td style="color: #ffffff; font-weight: 600; text-align: right;">Secondary Admin</td>
-        </tr>
-        <tr>
-          <td style="color: #94a3b8; padding: 6px 0;">Login User ID:</td>
-          <td style="color: #ffffff; font-weight: 600; font-family: monospace; text-align: right;">${safeUsername}</td>
-        </tr>
-        <tr>
-          <td style="color: #94a3b8; padding: 6px 0;">Hostel Branch:</td>
-          <td style="color: #ffffff; font-weight: 600; text-align: right;">${safeHostel}</td>
-        </tr>
-      </table>
+    <div style="background-color: #f8fafc; border-left: 4px solid #0f172a; padding: 16px; border-radius: 4px; margin-bottom: 20px;">
+      <h2 style="margin: 0 0 6px 0; font-size: 16px; font-weight: 700; color: #0f172a;">${safeTitle}</h2>
+      <p style="margin: 0; font-size: 14px; color: #475569; line-height: 1.5;">${safeSummary}</p>
     </div>
 
-    <div style="background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(99,102,241,0.1)); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 22px; text-align: center; margin-bottom: 24px;">
-      <p style="color: #ffffff; font-weight: 600; font-size: 15px; margin: 0 0 8px 0;">Set Your Private Password</p>
-      <p style="color: #94a3b8; font-size: 13px; margin: 0 0 16px 0;">In accordance with Q2 Security Policies, we never send permanent passwords via email. Click below to choose your secure credentials.</p>
-      <a href="${cleanActivationLink}" style="display: inline-block; background-color: #f59e0b; color: #000000; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; box-shadow: 0 4px 12px rgba(245,158,11,0.3);">
-        Activate Account & Set Password
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px; font-size: 14px; color: #334155; border-collapse: collapse;">
+      <tr>
+        <td style="padding: 6px 0; font-weight: 600; color: #64748b; width: 140px;">Date:</td>
+        <td style="padding: 6px 0; color: #0f172a; font-weight: 500;">${safeDate}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; font-weight: 600; color: #64748b;">Time:</td>
+        <td style="padding: 6px 0; color: #0f172a; font-weight: 500;">${safeTime}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; font-weight: 600; color: #64748b;">Location / Details:</td>
+        <td style="padding: 6px 0; color: #0f172a; font-weight: 500;">${safeDetails}</td>
+      </tr>
+    </table>
+
+    <div style="margin: 24px 0 20px 0;">
+      <a href="${cleanActionUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+        View announcement
       </a>
-      <p style="color: #94a3b8; font-size: 11px; margin: 12px 0 0 0;">This single-use activation link expires in <strong>48 hours</strong>.</p>
     </div>
 
-    <p style="color: #94a3b8; font-size: 13px; line-height: 1.5; margin: 0 0 12px 0;">
-      If the button above does not work, copy and paste this link into your browser:<br/>
-      <a href="${cleanActivationLink}" style="color: #38bdf8; word-break: break-all; font-size: 12px;">${cleanActivationLink}</a>
+    <p style="margin: 20px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">
+      If you have questions, reply to this email or contact <a href="mailto:${effectiveSupport}" style="color: #2563eb; text-decoration: none;">${effectiveSupport}</a>.
     </p>
-
-    <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px; margin-top: 20px;">
-      <p style="color: #94a3b8; font-size: 13px; margin: 0;">
-        Once activated, you can access your dashboard anytime at: <a href="${cleanLoginLink}" style="color: #f59e0b; text-decoration: underline;">Admin Portal Login</a>
-      </p>
-    </div>
   `;
 
   const html = renderBrandedLayout({
-    title: 'Administrator Invitation',
-    subtitle: 'Hostel Operations & Management Platform',
+    title: 'Student Update',
+    subtitle: 'Official Resident Communications',
+    preheader,
     contentHtml,
-    footerNote: 'This email was generated automatically by authorized Primary Admin invitation.',
+    footerNote: 'Q2 Connect Suite &bull; Student communications',
   });
+
+  const unsubscribeUrl = `${frontendUrl}/student/preferences`;
 
   return sendEmail({
     to,
@@ -821,15 +854,14 @@ const sendSecondaryAdminWelcomeEmail = async ({
     html,
     text,
     correlationId,
-    purpose: 'SECONDARY_ADMIN_WELCOME',
-    targetUserId: adminUserId,
-    metadata: { name, username, hostelName, orgName },
+    purpose: 'STUDENT_ANNOUNCEMENT',
+    listUnsubscribe: `<${unsubscribeUrl}>, <mailto:${effectiveSupport}>`,
+    metadata: { announcementTitle, studentName },
   });
 };
 
 /**
  * Send branded welcome & account activation email to student
- * @param {object} options - { to, name, studentName, username, studentCode, studentId, studentDocId, hostel, hostelName, activationLink, loginLink, correlationId }
  */
 const sendStudentWelcomeEmail = async (options) => {
   const { to, activationLink, loginLink, correlationId } = options;
@@ -844,64 +876,95 @@ const sendStudentWelcomeEmail = async (options) => {
   const safeStudentCode = escapeHtml(rawStudentCode);
   const safeHostel = escapeHtml(rawHostel);
 
-  const subject = options.subject || `Your Hostel Admission Details & Account Activation — ${rawHostel} Hostel`;
+  const subject = options.subject || `Welcome to Q2 Connect Suite — Activate Your Resident Account (${rawHostel})`;
+  const preheader = `Your resident admission into ${rawHostel} Hostel is confirmed. Activate your account to sign in.`;
+
   const cleanActivationLink = (activationLink || '').trim();
   const frontendUrl = getTrustedFrontendUrl();
   const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=student`).trim();
 
-  const text = `Welcome to Q2 Connect Suite!\n\nDear ${rawName},\n\nYour resident admission into ${rawHostel} Hostel has been confirmed.\n\nYour Account Details:\n- Resident Name: ${rawName}\n- Hostel: ${rawHostel}\n- User ID: ${rawUsername}\n- Student ID: ${rawStudentCode}\n\nPlease click the link below to activate your account and securely set your password (valid for 48 hours):\n${cleanActivationLink}\n\nOnce activated, you can sign in to the Student Portal at:\n${cleanLoginLink}\n\nIf you have any questions or need assistance, contact our administration at support@q2connect.com.\n\nBest regards,\n${rawHostel} Administration — Q2 Connect Suite`;
+  const text = `Welcome to Q2 Connect Suite!
+
+Hello ${rawName},
+
+Your resident admission into ${rawHostel} Hostel has been confirmed. Your resident account is ready.
+
+Account Details:
+- Resident Name: ${rawName}
+- Hostel Branch: ${rawHostel}
+- User ID: ${rawUsername}
+- Student Code: ${rawStudentCode}
+
+Step 1: Set Your Secure Password
+Please open the link below to activate your account and choose your private password (link expires in 48 hours):
+${cleanActivationLink}
+
+Step 2: Sign In
+After setting your password, sign in to the Student Portal at:
+${cleanLoginLink}
+
+If you have any questions or require assistance, please contact our support team at ${getEffectiveSupportEmail()}.
+
+Best regards,
+${rawHostel} Administration & Operations
+Q2 Connect Suite`;
 
   const contentHtml = `
-    <h2 style="color: #ffffff; font-size: 20px; margin: 0 0 12px 0;">Welcome, ${safeName}! 👋</h2>
-    <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
-      Your resident admission into <strong style="color: #ffffff;">${safeHostel} Hostel</strong> has been officially confirmed by the administration. Your resident profile and room allocation are now set up.
+    <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">
+      Hello <strong>${safeName}</strong>,
+    </p>
+    <p style="margin: 0 0 18px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+      Your resident admission into <strong>${safeHostel} Hostel</strong> has been confirmed. Your resident profile and room allocation are now active in the system.
     </p>
 
-    <div style="background-color: #0b132b; border: 1px solid #3a506b; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
-      <p style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px 0; font-weight: 700;">Resident Account Details</p>
-      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 22px;">
+      <p style="margin: 0 0 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: #64748b;">Resident Account Details</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 14px; border-collapse: collapse;">
         <tr>
-          <td style="color: #94a3b8; padding: 6px 0;">Student Code:</td>
-          <td style="color: #ffffff; font-weight: 600; font-family: monospace; text-align: right;">${safeStudentCode}</td>
+          <td style="color: #64748b; padding: 5px 0;">Student Code:</td>
+          <td style="color: #0f172a; font-weight: 600; text-align: right; font-family: monospace;">${safeStudentCode}</td>
         </tr>
         <tr>
-          <td style="color: #94a3b8; padding: 6px 0;">Login User ID:</td>
-          <td style="color: #ffffff; font-weight: 600; font-family: monospace; text-align: right;">${safeUsername}</td>
+          <td style="color: #64748b; padding: 5px 0;">Login User ID:</td>
+          <td style="color: #0f172a; font-weight: 600; text-align: right; font-family: monospace;">${safeUsername}</td>
         </tr>
         <tr>
-          <td style="color: #94a3b8; padding: 6px 0;">Branch / Hostel:</td>
-          <td style="color: #ffffff; font-weight: 600; text-align: right;">${safeHostel}</td>
+          <td style="color: #64748b; padding: 5px 0;">Hostel Branch:</td>
+          <td style="color: #0f172a; font-weight: 600; text-align: right;">${safeHostel}</td>
         </tr>
       </table>
     </div>
 
-    <div style="background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(99,102,241,0.1)); border: 1px solid rgba(239,68,68,0.3); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
-      <p style="color: #ffffff; font-weight: 600; font-size: 15px; margin: 0 0 8px 0;">Step 1: Set Your Secure Password</p>
-      <p style="color: #94a3b8; font-size: 13px; margin: 0 0 16px 0;">For your security, we do not send passwords via email. Click below to choose your private permanent password.</p>
-      <a href="${cleanActivationLink}" style="display: inline-block; background-color: #ef4444; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; box-shadow: 0 4px 12px rgba(239,68,68,0.3);">
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 22px;">
+      <p style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #0f172a;">Step 1: Set Your Secure Password</p>
+      <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748b;">Permanent passwords are never sent via email for your privacy and protection.</p>
+      <a href="${cleanActivationLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 13px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
         Activate Account & Set Password
       </a>
-      <p style="color: #94a3b8; font-size: 11px; margin: 12px 0 0 0;">This single-use activation link expires in <strong>48 hours</strong>.</p>
+      <p style="margin: 12px 0 0 0; font-size: 12px; color: #64748b;">
+        This single-use activation link expires in <strong>48 hours</strong>.
+      </p>
     </div>
 
-    <p style="color: #94a3b8; font-size: 13px; line-height: 1.5; margin: 0 0 12px 0;">
+    <p style="margin: 0 0 10px 0; font-size: 12px; color: #64748b; line-height: 1.5;">
       If the button above does not work, copy and paste this link into your browser:<br/>
-      <a href="${cleanActivationLink}" style="color: #38bdf8; word-break: break-all; font-size: 12px;">${cleanActivationLink}</a>
+      <a href="${cleanActivationLink}" style="color: #2563eb; word-break: break-all; font-size: 12px;">${cleanActivationLink}</a>
     </p>
 
-    <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 18px; margin-top: 24px;">
-      <p style="color: #94a3b8; font-size: 13px; margin: 0 0 6px 0;">
+    <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 20px;">
+      <p style="margin: 0; font-size: 13px; color: #475569; line-height: 1.5;">
         <strong>Step 2: Sign In</strong><br/>
-        After setting your password, sign in at the <a href="${cleanLoginLink}" style="color: #ef4444; text-decoration: underline;">Student Portal</a>.
+        After choosing your password, you can access your resident dashboard at the <a href="${cleanLoginLink}" style="color: #2563eb; text-decoration: underline;">Student Portal</a>.
       </p>
     </div>
   `;
 
   const html = renderBrandedLayout({
-    title: 'Resident Admission Confirmed',
-    subtitle: 'Smart Resident Onboarding',
+    title: 'Resident Account Activation',
+    subtitle: 'Hostel Onboarding',
+    preheader,
     contentHtml,
-    footerNote: 'Welcome to your new home! Please save this email for your records.',
+    footerNote: 'Welcome to your hostel residence! Please retain this email for your records.',
   });
 
   return sendEmail({
@@ -922,54 +985,305 @@ const sendStudentWelcomeEmail = async (options) => {
 };
 
 /**
- * Send email OTP to Primary Admin for privileged actions (Create/Delete Secondary Admin)
- * @param {object} options - { to, adminName, action, otp, expiresInMinutes, correlationId }
+ * Send password reset email
+ */
+const sendPasswordResetEmail = async ({ to, name = null, resetLink, correlationId }) => {
+  const subject = 'Reset Your Q2 Connect Suite Password';
+  const preheader = 'We received a request to reset your password. This link is valid for 2 hours.';
+  const cleanLink = resetLink.trim();
+  const safeName = name ? escapeHtml(name) : null;
+  const supportEmail = getEffectiveSupportEmail();
+
+  const text = `Password Reset Request — Q2 Connect Suite
+
+${name ? `Hello ${name},\n\n` : ''}We received a request to reset the password for your Q2 Connect Suite account.
+
+Click the link below or copy it into your browser to set a new password (valid for 2 hours):
+${cleanLink}
+
+Security Notice:
+- This single-use password reset link is valid for 2 hours from when it was requested.
+- If you did not make this request, you can safely ignore this email. Your current password remains secure and unchanged.
+
+Need help? Contact support at ${supportEmail}.
+
+Best regards,
+Q2 Connect Suite Security Team`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">
+      ${safeName ? `Hello <strong>${safeName}</strong>,<br/><br/>` : ''}
+      We received a request to reset the password for your Q2 Connect Suite account.
+    </p>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; text-align: center; margin: 20px 0;">
+      <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #0f172a;">Click below to set your new password:</p>
+      <a href="${cleanLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 13px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+        Reset Password
+      </a>
+      <p style="margin: 12px 0 0 0; font-size: 12px; color: #64748b;">
+        This single-use link expires in <strong>2 hours</strong>.
+      </p>
+    </div>
+
+    <p style="margin: 0 0 16px 0; font-size: 12px; color: #64748b; line-height: 1.5;">
+      If the button does not work, copy and paste this link into your browser:<br/>
+      <a href="${cleanLink}" style="color: #2563eb; word-break: break-all; font-size: 12px;">${cleanLink}</a>
+    </p>
+
+    <div style="background-color: #f1f5f9; border-left: 4px solid #64748b; border-radius: 4px; padding: 12px 16px; margin-top: 20px;">
+      <p style="margin: 0; font-size: 12px; color: #475569; line-height: 1.5;">
+        <strong>Security Notice:</strong> If you did not request this password reset, no action is needed. Your password remains unchanged.
+      </p>
+    </div>
+  `;
+
+  const html = renderBrandedLayout({
+    title: 'Password Reset',
+    subtitle: 'Security & Access Control',
+    preheader,
+    contentHtml,
+  });
+
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'PASSWORD_RESET',
+  });
+};
+
+/**
+ * Send Fee Reminder Email to Resident
+ */
+const sendFeeReminderEmail = async ({
+  to,
+  studentName = 'Resident',
+  month = 'Current Billing Cycle',
+  amount,
+  dueDate = 'Immediately',
+  paymentUrl = null,
+  hostelName = 'Hostel',
+  correlationId = null,
+}) => {
+  const safeName = escapeHtml(studentName);
+  const safeMonth = escapeHtml(month);
+  const safeAmount = escapeHtml(String(amount || '0'));
+  const safeHostel = escapeHtml(hostelName);
+  const frontendUrl = getTrustedFrontendUrl();
+  const cleanPaymentUrl = (paymentUrl || `${frontendUrl}/student/fees`).trim();
+  const supportEmail = getEffectiveSupportEmail();
+
+  const subject = `Fee Notice: Pending Hostel Dues for ${month}`;
+  const preheader = `A balance of ₹${amount} is pending for ${month} at ${hostelName}. View and clear dues online.`;
+
+  const text = `Hostel Fee Notice — Q2 Connect Suite
+
+Dear ${studentName},
+
+This is a reminder that your hostel fees for ${month} at ${hostelName} are currently pending.
+
+Summary of Dues:
+- Resident Name: ${studentName}
+- Hostel: ${hostelName}
+- Billing Month: ${month}
+- Amount Due: ₹${amount}
+- Due Date: ${dueDate}
+
+You can review your fee statement and complete online payment through the resident portal:
+${cleanPaymentUrl}
+
+If you have already settled this payment, please disregard this notice or contact management.
+
+Best regards,
+${hostelName} Accounts & Administration
+Q2 Connect Suite`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">
+      Dear <strong>${safeName}</strong>,
+    </p>
+    <p style="margin: 0 0 18px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+      This is a formal notification that your hostel accommodation fee for <strong>${safeMonth}</strong> at <strong>${safeHostel}</strong> is currently pending.
+    </p>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 22px;">
+      <p style="margin: 0 0 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: #64748b;">Fee Statement</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 14px; border-collapse: collapse;">
+        <tr>
+          <td style="color: #64748b; padding: 6px 0;">Billing Cycle:</td>
+          <td style="color: #0f172a; font-weight: 600; text-align: right;">${safeMonth}</td>
+        </tr>
+        <tr>
+          <td style="color: #64748b; padding: 6px 0;">Hostel Branch:</td>
+          <td style="color: #0f172a; font-weight: 600; text-align: right;">${safeHostel}</td>
+        </tr>
+        <tr>
+          <td style="color: #64748b; padding: 6px 0; border-top: 1px solid #e2e8f0; font-weight: 600;">Amount Due:</td>
+          <td style="color: #0f172a; font-weight: 700; font-size: 16px; text-align: right; border-top: 1px solid #e2e8f0;">₹${safeAmount}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="margin: 22px 0;">
+      <a href="${cleanPaymentUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 13px 26px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+        Review & Pay Fees Online
+      </a>
+    </div>
+
+    <p style="margin: 16px 0 0 0; font-size: 12px; color: #64748b; line-height: 1.5;">
+      If you have already settled this payment or have billing questions, please contact administration at <a href="mailto:${supportEmail}" style="color: #2563eb; text-decoration: none;">${supportEmail}</a>.
+    </p>
+  `;
+
+  const html = renderBrandedLayout({
+    title: 'Hostel Fee Due Notice',
+    subtitle: 'Finance & Accounts',
+    preheader,
+    contentHtml,
+  });
+
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'FEE_REMINDER',
+    metadata: { studentName, month, amount, hostelName },
+  });
+};
+
+/**
+ * Send mess request status update email
+ */
+const sendMessRequestUpdate = async ({ to, name, status, leavingDate, returnDate, adminMessage, correlationId }) => {
+  const statusFormatted = status === 'approved' ? 'Approved' : 'Rejected';
+  const statusColor = status === 'approved' ? '#15803d' : '#b91c1c';
+  const subject = `Update on Your Mess Request: ${statusFormatted}`;
+  const preheader = `Your mess leave request has been ${statusFormatted.toLowerCase()}. View details inside.`;
+
+  const text = `Mess Leave Request Update — Q2 Connect Suite
+
+Hello ${name},
+
+Your mess leave request has been ${statusFormatted.toUpperCase()}.
+
+Request Details:
+- Status: ${statusFormatted}
+- Leaving Date: ${leavingDate}
+- Return Date: ${returnDate}
+${adminMessage ? `- Note from Administration: ${adminMessage}\n` : ''}
+Log in to your Student Portal to review your meal calendar:
+${getTrustedFrontendUrl()}/student/mess
+
+Best regards,
+Kitchen & Dining Operations
+Q2 Connect Suite`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155;">Hello <strong>${escapeHtml(name)}</strong>,</p>
+    <p style="margin: 0 0 18px 0; font-size: 14px; color: #475569;">
+      Your mess off / leave request has been evaluated and marked as:
+      <strong style="color: ${statusColor}; text-transform: uppercase;">${escapeHtml(statusFormatted)}</strong>.
+    </p>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 8px; margin: 18px 0;">
+      <p style="margin: 4px 0; font-size: 14px;"><strong>Leaving Date:</strong> ${escapeHtml(leavingDate)}</p>
+      <p style="margin: 4px 0; font-size: 14px;"><strong>Return Date:</strong> ${escapeHtml(returnDate)}</p>
+      ${adminMessage ? `<p style="margin: 8px 0 0 0; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #475569;"><strong>Admin Note:</strong> ${escapeHtml(adminMessage)}</p>` : ''}
+    </div>
+
+    <div style="margin: 20px 0;">
+      <a href="${getTrustedFrontendUrl()}/student/mess" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+        View Meal Schedule
+      </a>
+    </div>
+  `;
+
+  const html = renderBrandedLayout({
+    title: 'Mess Request Status',
+    subtitle: 'Dining & Kitchen Operations',
+    preheader,
+    contentHtml,
+  });
+
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'MESS_REQUEST_UPDATE',
+    metadata: { name, status, leavingDate, returnDate },
+  });
+};
+
+/**
+ * Send email OTP to Primary Admin for privileged actions
  */
 const sendAdminActionOtpEmail = async ({ to, adminName = 'Administrator', action, otp, expiresInMinutes = 5, correlationId }) => {
   const actionLabel =
     action === 'CREATE_SECONDARY_ADMIN'
-      ? 'Create New Secondary Admin'
+      ? 'Create New Secondary Administrator'
       : action === 'DELETE_SECONDARY_ADMIN' || action === 'DEACTIVATE_SECONDARY_ADMIN'
-      ? 'Deactivate Secondary Admin Account'
-      : 'Privileged Admin Management Action';
+      ? 'Deactivate Secondary Administrator Account'
+      : 'Privileged Administrative Action';
 
   const safeAdminName = escapeHtml(adminName);
   const safeAction = escapeHtml(actionLabel);
-  const subject = `[Security] Your Verification Code: ${otp} (${actionLabel})`;
+  const subject = `Security Verification Code: ${otp}`;
+  const preheader = `Your verification code is ${otp}. Valid for ${expiresInMinutes} minutes.`;
 
-  const text = `Q2 Connect Suite Security Verification\n\nHello ${adminName},\n\nYou have requested to perform the following sensitive administrative action:\n${actionLabel}\n\nYour One-Time Verification Code is:\n${otp}\n\nThis verification code expires in ${expiresInMinutes} minutes and is strictly single-use.\n\nSECURITY NOTICE:\nNever share this code with anyone. If you did not initiate this request, someone may be attempting to alter administrator privileges for your hostel. Please contact security immediately.\n\nBest regards,\nQ2 Connect Suite Security Operations`;
+  const text = `Q2 Connect Suite Security Verification
+
+Hello ${adminName},
+
+You initiated a privileged administrative request:
+${actionLabel}
+
+Your One-Time Verification Code is:
+${otp}
+
+This verification code expires in ${expiresInMinutes} minutes and is single-use.
+
+Security Notice:
+Never share this verification code with anyone. Q2 Connect Suite staff will never ask for your verification code.
+
+Best regards,
+Q2 Connect Suite Security Operations`;
 
   const contentHtml = `
-    <h2 style="color: #ffffff; font-size: 18px; margin: 0 0 12px 0;">Privileged Action Verification Required 🛡️</h2>
-    <p style="color: #cbd5e1; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0;">
-      Hello <strong>${safeAdminName}</strong>,<br/>
-      A request has been initiated by your Primary Admin account for:
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155;">
+      Hello <strong>${safeAdminName}</strong>,
+    </p>
+    <p style="margin: 0 0 14px 0; font-size: 14px; color: #475569;">
+      A request has been initiated by your administrator account for:
+      <strong>${safeAction}</strong>
     </p>
 
-    <div style="background-color: #0b132b; border-left: 4px solid #f59e0b; border-radius: 4px; padding: 12px 16px; margin-bottom: 20px;">
-      <p style="color: #ffffff; font-size: 14px; margin: 0; font-weight: 600;">Action: ${safeAction}</p>
-    </div>
-
-    <div style="text-align: center; background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(99,102,241,0.1)); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-      <p style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px 0; font-weight: 700;">One-Time Verification Code</p>
-      <div style="font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #f59e0b; font-family: monospace; margin: 8px 0;">
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; text-align: center; margin: 20px 0;">
+      <p style="margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; color: #64748b;">Verification Code</p>
+      <div style="font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #0f172a; font-family: monospace; margin: 6px 0;">
         ${otp}
       </div>
-      <p style="color: #94a3b8; font-size: 12px; margin: 8px 0 0 0;">Valid for <strong>${expiresInMinutes} minutes</strong> (Single-use)</p>
+      <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">Valid for <strong>${expiresInMinutes} minutes</strong> (Single-use)</p>
     </div>
 
-    <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; padding: 14px;">
-      <p style="color: #fca5a5; font-size: 12px; line-height: 1.5; margin: 0;">
-        <strong>Security Warning:</strong> Never share this code with anyone. Q2 support personnel will never ask for your verification code. If you did not initiate this request, change your password immediately.
+    <div style="background-color: #f1f5f9; border-left: 4px solid #64748b; border-radius: 4px; padding: 12px 16px;">
+      <p style="margin: 0; font-size: 12px; color: #475569; line-height: 1.5;">
+        <strong>Security Notice:</strong> Never share this code with anyone. If you did not initiate this request, change your password immediately.
       </p>
     </div>
   `;
 
   const html = renderBrandedLayout({
     title: 'Verification Code',
-    subtitle: 'Security & Privilege Authorization',
+    subtitle: 'Security & Access Control',
+    preheader,
     contentHtml,
-    footerNote: 'Automated high-security verification notification.',
   });
 
   return sendEmail({
@@ -983,9 +1297,121 @@ const sendAdminActionOtpEmail = async ({ to, adminName = 'Administrator', action
 };
 
 /**
+ * Send welcome & account setup invitation email to newly created Secondary Admin
+ */
+const sendSecondaryAdminWelcomeEmail = async ({
+  to,
+  name,
+  username,
+  hostelName = 'Assigned Hostel',
+  orgName = 'Q2 Connect Suite',
+  activationLink,
+  loginLink,
+  correlationId,
+  adminUserId = null,
+}) => {
+  const safeName = escapeHtml(name || 'Administrator');
+  const safeUsername = escapeHtml(username || '');
+  const safeHostel = escapeHtml(hostelName || 'Assigned Hostel');
+  const safeOrg = escapeHtml(orgName || 'Q2 Connect Suite');
+  const frontendUrl = getTrustedFrontendUrl();
+  const cleanActivationLink = (activationLink || `${frontendUrl}/login`).trim();
+  const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=admin`).trim();
+
+  const subject = `Staff Account Provisioned — Activate Your Administrator Account (${hostelName})`;
+  const preheader = `You have been appointed as an administrator for ${hostelName}. Set your password to get started.`;
+
+  const text = `Welcome to Q2 Connect Suite!
+
+Hello ${name},
+
+You have been appointed as an Administrator for "${hostelName}" under ${orgName}. Your staff account is provisioned.
+
+Account Details:
+- Administrator Name: ${name}
+- User ID: ${username}
+- Assigned Hostel: ${hostelName}
+
+Please open the link below to activate your account and choose your secure password (valid for 48 hours):
+${cleanActivationLink}
+
+After activation, you can sign in anytime at:
+${cleanLoginLink}
+
+Best regards,
+Administration & Operations — Q2 Connect Suite`;
+
+  const contentHtml = `
+    <p style="margin: 0 0 14px 0; font-size: 15px; color: #334155;">Hello <strong>${safeName}</strong>,</p>
+    <p style="margin: 0 0 18px 0; font-size: 14px; color: #475569; line-height: 1.6;">
+      You have been appointed as an <strong>Administrator</strong> for <strong>${safeHostel}</strong> under <strong>${safeOrg}</strong>. Your staff account has been provisioned.
+    </p>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 22px;">
+      <p style="margin: 0 0 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; color: #64748b;">Account Details</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 14px; border-collapse: collapse;">
+        <tr>
+          <td style="color: #64748b; padding: 5px 0;">Assigned Role:</td>
+          <td style="color: #0f172a; font-weight: 600; text-align: right;">Secondary Admin</td>
+        </tr>
+        <tr>
+          <td style="color: #64748b; padding: 5px 0;">Login User ID:</td>
+          <td style="color: #0f172a; font-weight: 600; text-align: right; font-family: monospace;">${safeUsername}</td>
+        </tr>
+        <tr>
+          <td style="color: #64748b; padding: 5px 0;">Hostel Branch:</td>
+          <td style="color: #0f172a; font-weight: 600; text-align: right;">${safeHostel}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 22px;">
+      <p style="margin: 0 0 8px 0; font-size: 15px; font-weight: 700; color: #0f172a;">Set Your Private Password</p>
+      <p style="margin: 0 0 16px 0; font-size: 13px; color: #64748b;">Permanent passwords are never sent via email. Click below to choose your secure credentials.</p>
+      <a href="${cleanActivationLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 13px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+        Activate Account & Set Password
+      </a>
+      <p style="margin: 12px 0 0 0; font-size: 12px; color: #64748b;">This activation link expires in <strong>48 hours</strong>.</p>
+    </div>
+
+    <p style="margin: 0 0 16px 0; font-size: 12px; color: #64748b; line-height: 1.5;">
+      If the button above does not work, copy and paste this link into your browser:<br/>
+      <a href="${cleanActivationLink}" style="color: #2563eb; word-break: break-all; font-size: 12px;">${cleanActivationLink}</a>
+    </p>
+  `;
+
+  const html = renderBrandedLayout({
+    title: 'Staff Account Activation',
+    subtitle: 'Administrator Provisioning',
+    preheader,
+    contentHtml,
+  });
+
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'SECONDARY_ADMIN_WELCOME',
+    targetUserId: adminUserId,
+    metadata: { name, username, hostelName, orgName },
+  });
+};
+
+/**
  * Send notification email to admin when a new student registration is completed
  */
-const sendAdminNewStudentRegisteredNotification = async ({ to, studentName, studentEmail, studentRoom, studentHostel, studentPhone, username, correlationId }) => {
+const sendAdminNewStudentRegisteredNotification = async ({
+  to,
+  studentName,
+  studentEmail,
+  studentRoom,
+  studentHostel,
+  studentPhone,
+  username,
+  correlationId,
+}) => {
   const safeName = escapeHtml(studentName);
   const safeHostel = escapeHtml(studentHostel);
   const safeRoom = escapeHtml(studentRoom || 'Not Assigned');
@@ -994,14 +1420,31 @@ const sendAdminNewStudentRegisteredNotification = async ({ to, studentName, stud
   const safePhone = escapeHtml(studentPhone || 'N/A');
   const frontendUrl = getTrustedFrontendUrl();
 
-  const subject = `New Student Registered: ${studentName} (${studentHostel} - Room ${studentRoom || 'N/A'})`;
-  const text = `New Student Registered Successfully!\n\nDetails:\n- Student Name: ${studentName}\n- Hostel: ${studentHostel}\n- Room No: ${studentRoom || 'Unassigned'}\n- User ID: ${username}\n- Email: ${studentEmail}\n- Phone: ${studentPhone || 'N/A'}\n\nLog in to Admin Panel: ${frontendUrl}/admin/students\n\nBest regards,\nQ2 Connect Suite`;
+  const subject = `New Resident Registered: ${studentName} (${studentHostel} - Room ${studentRoom || 'N/A'})`;
+  const preheader = `A new student has been registered: ${studentName} in room ${studentRoom || 'N/A'}.`;
+
+  const text = `New Resident Registered Successfully
+
+Details:
+- Student Name: ${studentName}
+- Hostel Branch: ${studentHostel}
+- Room Number: ${studentRoom || 'Unassigned'}
+- User ID: ${username}
+- Email: ${studentEmail}
+- Phone: ${studentPhone || 'N/A'}
+
+View in Admin Panel:
+${frontendUrl}/admin/students
+
+Best regards,
+Q2 Connect Suite Operations`;
 
   const contentHtml = `
-    <h2 style="color: #ffffff; font-size: 18px; margin: 0 0 12px 0;">New Resident Registration Confirmed</h2>
-    <p style="color: #cbd5e1; font-size: 14px; margin: 0 0 16px 0;">A new resident student has been officially registered in the system.</p>
+    <p style="margin: 0 0 16px 0; font-size: 14px; color: #334155;">
+      A new resident student has been registered in the system.
+    </p>
 
-    <div style="background-color: #0b132b; border: 1px solid #3a506b; padding: 18px; border-radius: 8px; margin: 16px 0;">
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 8px; margin: 16px 0;">
       <p style="margin: 6px 0; font-size: 13px;"><strong>Student Name:</strong> ${safeName}</p>
       <p style="margin: 6px 0; font-size: 13px;"><strong>Hostel Branch:</strong> ${safeHostel}</p>
       <p style="margin: 6px 0; font-size: 13px;"><strong>Room Number:</strong> ${safeRoom}</p>
@@ -1010,8 +1453,8 @@ const sendAdminNewStudentRegisteredNotification = async ({ to, studentName, stud
       <p style="margin: 6px 0; font-size: 13px;"><strong>Phone:</strong> ${safePhone}</p>
     </div>
 
-    <div style="text-align: center; margin: 24px 0;">
-      <a href="${frontendUrl}/admin/students" style="display: inline-block; padding: 12px 24px; background-color: #f59e0b; color: #000000; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
+    <div style="margin: 20px 0;">
+      <a href="${frontendUrl}/admin/students" style="display: inline-block; padding: 12px 24px; background-color: #0f172a; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
         View in Admin Panel
       </a>
     </div>
@@ -1020,6 +1463,7 @@ const sendAdminNewStudentRegisteredNotification = async ({ to, studentName, stud
   const html = renderBrandedLayout({
     title: 'New Resident Registration',
     subtitle: 'Hostel Administration Alerts',
+    preheader,
     contentHtml,
   });
 
@@ -1053,28 +1497,42 @@ const sendHostelOnboardingWelcomeEmail = async ({
   correlationId,
 }) => {
   const subject = `Welcome to Q2 Connect Suite — Onboarding Complete for ${orgName}`;
+  const preheader = `Your organization ${orgName} has been configured. Access your admin dashboard.`;
   const frontendUrl = getTrustedFrontendUrl();
   const activationUrl = setupUrl || `${frontendUrl}/login`;
 
-  const text = `Welcome to Q2 Connect Suite!\n\nHello ${name},\n\nYour organization "${orgName}" (${branchName}) has been successfully onboarded.\n\nYour Administrator Account:\nEmail: ${to}\nTemporary Password: ${tempPassword || 'Set via activation link'}\n\nAccess your dashboard:\n${activationUrl}\n\nBest regards,\nQ2 Connect Suite Platform Operations Team`;
+  const text = `Welcome to Q2 Connect Suite!
+
+Hello ${name},
+
+Your organization "${orgName}" (${branchName}) has been onboarded and provisioned.
+
+Administrator Account:
+Email: ${to}
+Temporary Password: ${tempPassword || 'Set via activation link'}
+
+Access your dashboard:
+${activationUrl}
+
+Best regards,
+Q2 Connect Suite Platform Operations`;
 
   const contentHtml = `
-    <h2 style="color: #ffffff; font-size: 18px; margin-bottom: 12px;">Organization Onboarding Complete 🎉</h2>
-    <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">Hello <strong>${escapeHtml(name)}</strong>,</p>
-    <p style="font-size: 14px; line-height: 1.6; color: #cbd5e1;">
-      Welcome to Q2 Connect Suite! Your organization <strong>${escapeHtml(orgName)}</strong> and primary branch <strong>${escapeHtml(branchName)}</strong> have been configured and provisioned.
+    <p style="font-size: 14px; line-height: 1.6; color: #334155;">Hello <strong>${escapeHtml(name)}</strong>,</p>
+    <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+      Welcome to Q2 Connect Suite! Your organization <strong>${escapeHtml(orgName)}</strong> and primary branch <strong>${escapeHtml(branchName)}</strong> are provisioned.
     </p>
 
-    <div style="background-color: #0b132b; border: 1px solid #3a506b; border-radius: 8px; padding: 18px; margin: 20px 0;">
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 20px 0;">
       <p style="margin: 4px 0; font-size: 13px;"><strong>Organization:</strong> ${escapeHtml(orgName)}</p>
       <p style="margin: 4px 0; font-size: 13px;"><strong>Initial Branch:</strong> ${escapeHtml(branchName)}</p>
       <p style="margin: 4px 0; font-size: 13px;"><strong>Assigned Role:</strong> ${escapeHtml(role)}</p>
       <p style="margin: 4px 0; font-size: 13px;"><strong>Login Email:</strong> ${escapeHtml(to)}</p>
-      ${tempPassword ? `<p style="margin: 4px 0; font-size: 13px;"><strong>Temporary Password:</strong> <code style="background: #1e293b; padding: 2px 6px; border-radius: 4px;">${escapeHtml(tempPassword)}</code></p>` : ''}
+      ${tempPassword ? `<p style="margin: 4px 0; font-size: 13px;"><strong>Temporary Password:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${escapeHtml(tempPassword)}</code></p>` : ''}
     </div>
 
-    <div style="text-align: center; margin: 28px 0;">
-      <a href="${activationUrl}" style="display: inline-block; padding: 12px 28px; background-color: #f59e0b; color: #000000; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
+    <div style="margin: 24px 0;">
+      <a href="${activationUrl}" style="display: inline-block; padding: 12px 26px; background-color: #0f172a; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
         Access Your Admin Dashboard
       </a>
     </div>
@@ -1083,6 +1541,7 @@ const sendHostelOnboardingWelcomeEmail = async ({
   const html = renderBrandedLayout({
     title: 'Onboarding Complete',
     subtitle: 'Platform Operations',
+    preheader,
     contentHtml,
   });
 
@@ -1094,42 +1553,6 @@ const sendHostelOnboardingWelcomeEmail = async ({
     correlationId,
     purpose: 'HOSTEL_ONBOARDING_WELCOME',
     metadata: { orgName, branchName, role },
-  });
-};
-
-/**
- * Send mess request status update email
- */
-const sendMessRequestUpdate = async ({ to, name, status, leavingDate, returnDate, adminMessage, correlationId }) => {
-  const statusColor = status === 'approved' ? '#22c55e' : '#ef4444';
-  const subject = `Mess Off Request ${status.charAt(0).toUpperCase() + status.slice(1)}`;
-  const text = `Mess Off Request Update\n\nHello ${name},\nYour mess off request has been ${status}.\nLeaving Date: ${leavingDate}\nReturn Date: ${returnDate}\n${adminMessage ? `Admin Note: ${adminMessage}\n` : ''}\nBest regards,\nQ2 Connect Suite`;
-
-  const contentHtml = `
-    <h2 style="color: #ffffff; font-size: 18px;">Mess Off Request Update</h2>
-    <p style="color: #cbd5e1;">Hello <strong>${escapeHtml(name)}</strong>,</p>
-    <p style="color: #cbd5e1;">Your mess off request has been <strong style="color: ${statusColor}; text-transform: uppercase;">${escapeHtml(status)}</strong>.</p>
-    <div style="background-color: #0b132b; border: 1px solid #3a506b; padding: 18px; border-radius: 8px; margin: 20px 0;">
-      <p style="margin: 4px 0;"><strong>Leaving Date:</strong> ${escapeHtml(leavingDate)}</p>
-      <p style="margin: 4px 0;"><strong>Return Date:</strong> ${escapeHtml(returnDate)}</p>
-      ${adminMessage ? `<p style="margin: 4px 0;"><strong>Admin Note:</strong> ${escapeHtml(adminMessage)}</p>` : ''}
-    </div>
-  `;
-
-  const html = renderBrandedLayout({
-    title: 'Mess Request Status',
-    subtitle: 'Dining & Kitchen Operations',
-    contentHtml,
-  });
-
-  return sendEmail({
-    to,
-    subject,
-    html,
-    text,
-    correlationId,
-    purpose: 'MESS_REQUEST_UPDATE',
-    metadata: { name, status, leavingDate, returnDate },
   });
 };
 
@@ -1148,6 +1571,10 @@ const sendStudentCredentials = async ({ to, name, username, password, resetLink,
 };
 
 module.exports = {
+  escapeHtml,
+  maskEmail,
+  isValidEmail,
+  isRoutableEmail,
   getTransporter,
   getSmtpConfigStatus,
   verifySmtpConnection,
@@ -1156,15 +1583,18 @@ module.exports = {
   getResendStatus,
   sendViaResend,
   getSenderAddress,
-  isRoutableEmail,
+  getEffectiveSupportEmail,
+  getTrustedFrontendUrl,
+  renderBrandedLayout,
   sendEmail,
+  sendStudentAnnouncementEmail,
   sendStudentCredentials,
   sendStudentWelcomeEmail,
+  sendFeeReminderEmail,
   sendMessRequestUpdate,
   sendPasswordResetEmail,
   sendAdminNewStudentRegisteredNotification,
   sendHostelOnboardingWelcomeEmail,
   sendAdminActionOtpEmail,
   sendSecondaryAdminWelcomeEmail,
-  getTrustedFrontendUrl,
 };

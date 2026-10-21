@@ -25,6 +25,7 @@
     "test:vouchers": "node src/scripts/test_vouchers.js",
     "test:manual-billing": "node src/scripts/test_manual_renewal_saas_billing.js",
     "test:production": "node src/scripts/test_production_integration_suite.js",
+    "test:deliverability": "node src/scripts/test_deliverability_suite.js",
     "test": "node src/scripts/test_p0_security.js"
   },
   "dependencies": {

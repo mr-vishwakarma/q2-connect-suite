@@ -73,32 +73,20 @@ async function processEmailJob(job) {
         throw new UnrecoverableError(`Student ${studentId} missing or has no email address`);
       }
 
-      // 3. Dispatch Email
-      const mailOptions = {
-        to: student.email,
-        subject: `Fee Reminder: Unpaid Fees for ${month || fee.month}`,
-        text: `Dear ${student.name},\n\nThis is a gentle reminder that your hostel fees for ${month || fee.month} (Amount: ₹${amount || fee.amount}) are currently pending.\n\nPlease clear the dues at your earliest convenience.\n\nThank you,\nQ2 Connect Hostel Management`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333333;">
-            <h2 style="color: #6366f1;">Hostel Fee Due Reminder</h2>
-            <p>Dear <strong>${student.name}</strong>,</p>
-            <p>Your hostel fees for <strong>${month || fee.month}</strong> are currently pending.</p>
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin: 16px 0;">
-              <p style="margin: 4px 0;"><strong>Amount Due:</strong> ₹${amount || fee.amount}</p>
-              <p style="margin: 4px 0;"><strong>Status:</strong> ${fee.status.toUpperCase()}</p>
-            </div>
-            <p>Please clear the pending balance at your earliest convenience to avoid late fees.</p>
-            <p>Best regards,<br/>Q2 Connect Management</p>
-          </div>
-        `,
-      };
-
+      // 3. Dispatch Email via standardized branded template
       try {
-        await emailUtils.sendEmail(mailOptions);
+        await emailUtils.sendFeeReminderEmail({
+          to: student.email,
+          studentName: student.name,
+          month: month || fee.month,
+          amount: amount || fee.amount,
+          hostelName: student.hostel || 'Hostel',
+          correlationId: `fee-reminder-${fee._id}-${Date.now()}`,
+        });
       } catch (err) {
         // Classify error: if invalid recipient or DNS format error, do not retry indefinitely
         if (err.responseCode && err.responseCode >= 500 && err.responseCode < 600) {
-          throw new UnrecoverableError(`Permanent SMTP delivery error (${err.responseCode}): ${err.message}`);
+          throw new UnrecoverableError(`Permanent delivery error (${err.responseCode}): ${err.message}`);
         }
         // Transient network/timeout error: throw standard error for BullMQ retry backoff
         throw err;
@@ -206,6 +194,14 @@ async function processEmailJob(job) {
       }
       await emailUtils.sendAdminActionOtpEmail(payload);
       return { success: true, recipient: to };
+    }
+
+    case 'STUDENT_ANNOUNCEMENT': {
+      if (!payload.to || !payload.announcementTitle) {
+        throw new UnrecoverableError('Missing required announcement fields (to, announcementTitle)');
+      }
+      await emailUtils.sendStudentAnnouncementEmail(payload);
+      return { success: true, recipient: payload.to };
     }
 
     default:

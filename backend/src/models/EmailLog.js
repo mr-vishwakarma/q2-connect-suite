@@ -18,6 +18,7 @@ const emailLogSchema = new mongoose.Schema(
       required: true,
       enum: [
         'STUDENT_WELCOME_ACTIVATION',
+        'STUDENT_ANNOUNCEMENT',
         'PASSWORD_RESET',
         'SECONDARY_ADMIN_WELCOME',
         'ADMIN_ACTION_OTP',
@@ -42,10 +43,15 @@ const emailLogSchema = new mongoose.Schema(
         'PROCESSING',
         'SMTP_ACCEPTED',
         'RESEND_ACCEPTED',
+        'DELIVERED',
+        'BOUNCED',
+        'COMPLAINED',
+        'OPENED',
+        'CLICKED',
         'FAILED_RETRYABLE',
         'FAILED_PERMANENT',
-        'BOUNCED',
         'SUPPRESSED_UNROUTABLE',
+        'SUPPRESSED_BOUNCED',
       ],
       default: 'REQUESTED',
       index: true,
@@ -104,6 +110,26 @@ const emailLogSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    bouncedAt: {
+      type: Date,
+      default: null,
+    },
+    complainedAt: {
+      type: Date,
+      default: null,
+    },
+    bounceReason: {
+      type: String,
+      trim: true,
+    },
+    complaintFeedbackType: {
+      type: String,
+      trim: true,
+    },
+    webhookEventId: {
+      type: String,
+      trim: true,
+    },
     failedAt: {
       type: Date,
       default: null,
@@ -113,6 +139,7 @@ const emailLogSchema = new mongoose.Schema(
 );
 
 emailLogSchema.index({ correlationId: 1, createdAt: -1 });
+emailLogSchema.index({ resendMessageId: 1 });
 emailLogSchema.index({ recipient: 1, purpose: 1, createdAt: -1 });
 emailLogSchema.index({ status: 1, createdAt: -1 });
 
