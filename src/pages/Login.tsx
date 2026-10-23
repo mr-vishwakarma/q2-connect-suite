@@ -1,96 +1,67 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleLogin } from '@react-oauth/google';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AuthLayout } from '@/components/auth/AuthLayout';
 import { WorkspaceSelector } from '@/components/auth/WorkspaceSelector';
+import { GoogleStep2Modal } from '@/components/auth/GoogleStep2Modal';
+import { GoogleInitialDetailsModal } from '@/components/auth/GoogleInitialDetailsModal';
 import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/lib/api';
 import { toast } from 'react-toastify';
 import {
   Eye,
   EyeOff,
-  ShieldCheck,
-  Building2,
   GraduationCap,
-  Lock,
-  Mail,
-  User as UserIcon,
-  ArrowRight,
-  Shield,
+  Building2,
+  ShieldCheck,
   KeyRound,
   RefreshCw,
-  Info,
+  AlertCircle,
 } from 'lucide-react';
-import { GoogleStep2Modal } from '@/components/auth/GoogleStep2Modal';
-import { GoogleInitialDetailsModal } from '@/components/auth/GoogleInitialDetailsModal';
-import { api } from '@/lib/api';
 
-type AuthRole = 'super_admin' | 'admin' | 'student';
+type AuthRole = 'student' | 'admin' | 'super_admin';
 
 const normalizeRole = (role: string | null): AuthRole => {
-  if (!role) return 'admin';
+  if (!role) return 'student';
   const clean = role.toLowerCase().trim();
   if (clean === 'super_admin' || clean === 'superadmin' || clean === 'platform') return 'super_admin';
   if (clean === 'admin' || clean === 'hostel_admin' || clean === 'warden') return 'admin';
   if (clean === 'student' || clean === 'resident') return 'student';
-  return 'admin';
+  return 'student';
 };
 
 interface RoleConfig {
   id: AuthRole;
   label: string;
-  badge: string;
-  title: string;
-  subtitle: string;
   identifierLabel: string;
   identifierPlaceholder: string;
-  identifierIcon: typeof Mail | typeof UserIcon | typeof GraduationCap;
-  ctaText: string;
-  securityFooter: string;
-  icon: typeof ShieldCheck | typeof Building2 | typeof GraduationCap;
+  icon: typeof GraduationCap | typeof Building2 | typeof ShieldCheck;
 }
 
 const ROLE_CONFIGS: Record<AuthRole, RoleConfig> = {
-  super_admin: {
-    id: 'super_admin',
-    label: 'Super Admin',
-    badge: 'PLATFORM CONTROL',
-    title: 'Platform Administration',
-    subtitle: 'Sign in with platform credentials to access multi-tenant infrastructure',
-    identifierLabel: 'Administrator Email',
-    identifierPlaceholder: 'superadmin@hosteliq.com',
-    identifierIcon: Mail,
-    ctaText: 'Sign In to Platform',
-    securityFooter: 'SECURE PLATFORM ACCESS',
-    icon: ShieldCheck,
-  },
-  admin: {
-    id: 'admin',
-    label: 'Hostel Admin',
-    badge: 'OPERATIONS HUB',
-    title: 'Hostel Management Portal',
-    subtitle: 'Manage property rooms, fee ledgers & staff operations',
-    identifierLabel: 'Email or Staff Username',
-    identifierPlaceholder: 'admin@hosteliq.com or username',
-    identifierIcon: UserIcon,
-    ctaText: 'Sign In to Hostel Hub',
-    securityFooter: 'SECURE HOSTEL ACCESS',
-    icon: Building2,
-  },
   student: {
     id: 'student',
     label: 'Student',
-    badge: 'RESIDENT ACCESS',
-    title: 'Student Resident Portal',
-    subtitle: 'Access assigned room details, fee invoices & gate pass requests',
-    identifierLabel: 'Student User ID or Email',
-    identifierPlaceholder: 'e.g. nikhil or resident@hosteliq.com',
-    identifierIcon: GraduationCap,
-    ctaText: 'Sign In to Resident App',
-    securityFooter: 'STUDENT RESIDENT ACCESS',
+    identifierLabel: 'Email or Student Username',
+    identifierPlaceholder: 'resident@hosteliq.com or username',
     icon: GraduationCap,
+  },
+  admin: {
+    id: 'admin',
+    label: 'Admin',
+    identifierLabel: 'Admin Email or Username',
+    identifierPlaceholder: 'admin@hosteliq.com or username',
+    icon: Building2,
+  },
+  super_admin: {
+    id: 'super_admin',
+    label: 'Super Admin',
+    identifierLabel: 'Super Admin Email',
+    identifierPlaceholder: 'superadmin@hosteliq.com',
+    icon: ShieldCheck,
   },
 };
 
@@ -99,12 +70,11 @@ export default function Login() {
   const initialRole = normalizeRole(searchParams.get('role'));
 
   const [selectedRole, setSelectedRole] = useState<AuthRole>(initialRole);
-
-  // Sign In credentials
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   // MFA / OTP step state
   const [mfaData, setMfaData] = useState<{
@@ -141,11 +111,13 @@ export default function Login() {
     }
   }, [searchParams]);
 
-  // Handle incoming OAuth callback query parameters from redirect flow
+  // Handle incoming OAuth callback query parameters
   useEffect(() => {
     const errorParam = searchParams.get('error');
     if (errorParam) {
-      toast.error(decodeURIComponent(errorParam), { toastId: 'oauth-error' });
+      const msg = decodeURIComponent(errorParam);
+      setErrorBanner(msg);
+      toast.error(msg, { toastId: 'oauth-error' });
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('error');
       setSearchParams(newParams, { replace: true });
@@ -160,7 +132,9 @@ export default function Login() {
 
     if (statusParam === 'rejected') {
       const reason = searchParams.get('reason') || 'Please contact administration.';
-      toast.error(`Registration not approved: ${decodeURIComponent(reason)}`, { toastId: 'oauth-rejected' });
+      const msg = `Registration not approved: ${decodeURIComponent(reason)}`;
+      setErrorBanner(msg);
+      toast.error(msg, { toastId: 'oauth-rejected' });
       return;
     }
 
@@ -181,12 +155,9 @@ export default function Login() {
       localStorage.setItem('accessToken', tokenParam);
       localStorage.setItem('refreshToken', refreshParam);
 
-      // Clean tokens from URL bar immediately to prevent exposure in history
       window.history.replaceState({}, document.title, window.location.pathname);
-
       toast.success('Signed in with Google!', { toastId: 'oauth-success' });
-      
-      // Navigate to destination or refresh to let auth context load
+
       if (returnToParam && returnToParam.startsWith('/')) {
         navigate(returnToParam, { replace: true });
       } else {
@@ -224,13 +195,15 @@ export default function Login() {
     setSearchParams({ role: newRole }, { replace: true });
     setPassword('');
     setMfaData(null);
+    setErrorBanner(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorBanner(null);
 
     if (!identifier.trim() || !password) {
-      toast.error('Please enter your credentials', { toastId: 'auth-login-error' });
+      setErrorBanner('Please enter your email and password');
       return;
     }
 
@@ -246,7 +219,6 @@ export default function Login() {
       setIsLoading(false);
 
       if (error) {
-        // Check if backend challenged for MFA / OTP
         if (error.code === 'MFA_REQUIRED' || error.requiresMfa) {
           setMfaData({
             required: true,
@@ -258,8 +230,9 @@ export default function Login() {
           return;
         }
 
-        // Show single error toast with unique toastId to prevent duplicate toasts
-        toast.error(error.message || 'Authentication failed', { toastId: 'auth-login-error' });
+        const msg = error.message || 'Invalid email or password';
+        setErrorBanner(msg);
+        toast.error(msg, { toastId: 'auth-login-error' });
         return;
       }
 
@@ -278,7 +251,8 @@ export default function Login() {
       }
     } catch (err: any) {
       setIsLoading(false);
-      const msg = err?.response?.data?.message || err?.message || 'Authentication failed';
+      const msg = err?.response?.data?.message || err?.message || 'Authentication failed. Please verify credentials.';
+      setErrorBanner(msg);
       toast.error(msg, { toastId: 'auth-login-error' });
     }
   };
@@ -286,7 +260,7 @@ export default function Login() {
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpCode || otpCode.trim().length < 6) {
-      toast.error('Please enter the 6-digit OTP verification code', { toastId: 'auth-login-error' });
+      toast.error('Please enter the 6-digit OTP code', { toastId: 'auth-login-error' });
       return;
     }
 
@@ -345,7 +319,9 @@ export default function Login() {
       setIsLoading(false);
 
       if (result.error) {
-        toast.error(result.error.message || 'Google authentication failed', { toastId: 'auth-login-error' });
+        const msg = result.error.message || 'Google authentication failed';
+        setErrorBanner(msg);
+        toast.error(msg, { toastId: 'auth-login-error' });
         return;
       }
 
@@ -384,7 +360,9 @@ export default function Login() {
       }
     } catch (err: any) {
       setIsLoading(false);
-      toast.error(err?.message || 'Google authentication failed', { toastId: 'auth-login-error' });
+      const msg = err?.message || 'Google authentication failed';
+      setErrorBanner(msg);
+      toast.error(msg, { toastId: 'auth-login-error' });
     }
   };
 
@@ -444,391 +422,280 @@ export default function Login() {
   };
 
   const config = ROLE_CONFIGS[selectedRole];
-  const CurrentIcon = config.icon;
-  const IdentifierIcon = config.identifierIcon;
+
+  if (showWorkspaceSelect) {
+    return (
+      <AuthLayout heading="Select Workspace" subheading="Choose the property you wish to manage">
+        <WorkspaceSelector
+          userName={identifier || 'Admin'}
+          workspaces={workspaces}
+          onSelectWorkspace={() => navigate('/admin/dashboard')}
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#08090C] text-slate-100 flex flex-col justify-center items-center relative overflow-hidden py-12 px-4 selection:bg-red-600 selection:text-white">
-      {/* Background Decorative Thin Circles & Matrix Dots (exact match to reference image) */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        {/* Top-left subtle red outline arc */}
-        <div className="absolute top-10 -left-28 w-[420px] h-[420px] rounded-full border border-red-600/15 pointer-events-none" />
-        <div className="absolute top-0 -left-44 w-[560px] h-[560px] rounded-full border border-red-600/[0.08] pointer-events-none" />
-
-        {/* Bottom-right subtle red outline arc */}
-        <div className="absolute -bottom-24 -right-28 w-[420px] h-[420px] rounded-full border border-red-600/15 pointer-events-none" />
-        <div className="absolute -bottom-40 -right-44 w-[560px] h-[560px] rounded-full border border-red-600/[0.08] pointer-events-none" />
-
-        {/* Left Matrix Dots */}
-        <div className="absolute top-1/3 left-12 hidden lg:grid grid-cols-6 gap-3.5 opacity-25 pointer-events-none">
-          {Array.from({ length: 36 }).map((_, i) => (
-            <span key={i} className="w-1 h-1 rounded-full bg-slate-400" />
-          ))}
-        </div>
-
-        {/* Right Matrix Dots */}
-        <div className="absolute bottom-1/4 right-12 hidden lg:grid grid-cols-6 gap-3.5 opacity-25 pointer-events-none">
-          {Array.from({ length: 36 }).map((_, i) => (
-            <span key={i} className="w-1 h-1 rounded-full bg-slate-400" />
-          ))}
+    <AuthLayout
+      heading="Welcome back"
+      footer={
+        <p>
+          Don't have an account?{' '}
+          <Link
+            to={`/signup?role=${selectedRole === 'admin' ? 'admin' : 'student'}`}
+            className="font-medium text-[#b794f4] hover:text-[#d6bcfa] hover:underline transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#9d4edd] rounded px-1"
+          >
+            Sign up
+          </Link>
+        </p>
+      }
+    >
+      {/* Role Segmented Selector */}
+      <div className="mb-5">
+        <div
+          role="tablist"
+          aria-label="Hosteliq Role Selector"
+          className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-[#161720] border border-white/[0.08]"
+        >
+          {(['student', 'admin', 'super_admin'] as AuthRole[]).map((roleKey) => {
+            const rConfig = ROLE_CONFIGS[roleKey];
+            const isSelected = selectedRole === roleKey;
+            const TabIcon = rConfig.icon;
+            return (
+              <button
+                key={roleKey}
+                type="button"
+                role="tab"
+                id={`tab-${roleKey}`}
+                aria-selected={isSelected}
+                aria-controls={`panel-${roleKey}`}
+                onClick={() => handleRoleChange(roleKey)}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#9d4edd] ${
+                  isSelected
+                    ? 'bg-[#251b38] text-white border border-[#9d4edd]/50 shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03] border border-transparent'
+                }`}
+              >
+                <TabIcon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-[#b794f4]' : 'text-zinc-400'}`} />
+                <span className="truncate">{rConfig.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="w-full max-w-[500px] z-10">
-        {showWorkspaceSelect ? (
-          /* Multi-Tenant Workspace Selector Step */
-          <motion.div
-            key="workspace-selector"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.25 }}
-            className="w-full"
-          >
-            <WorkspaceSelector
-              userName={identifier || 'Admin'}
-              workspaces={workspaces}
-              onSelectWorkspace={() => navigate('/admin/dashboard')}
-            />
-          </motion.div>
-        ) : (
-          /* Unified Hosteliq Authentication Card */
-          <motion.div
-            key="unified-auth-card"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
-            className="w-full"
-          >
-            {/* Brand Header */}
-            <div className="text-center mb-6">
-              <Link to="/" className="inline-flex items-center gap-3.5 group mb-2 focus:outline-none">
-                <div className="w-11 h-11 rounded-2xl bg-white border border-purple-500/40 flex items-center justify-center shadow-lg shadow-purple-950/40 group-hover:border-purple-500 transition-colors p-1 overflow-hidden">
-                  <img
-                    src="/hosteliq-logo.png"
-                    alt="Hosteliq"
-                    width={36}
-                    height={36}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-xl font-black text-white tracking-tight leading-none flex items-center">
-                    <span>Hostel</span><span className="text-[#2dd4bf]">i</span><span className="text-[#fb7185]">q</span>
-                  </span>
-                  <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-widest mt-1">
-                    ACCOMMODATION & HOSTEL PLATFORM
-                  </span>
-                </div>
-              </Link>
-              <p className="text-xs text-slate-400 mt-1">
-                Secure access to your verified operating portal
-              </p>
+      {/* MFA / OTP STEP VIEW */}
+      {mfaData?.required ? (
+        <div className="space-y-4 text-left">
+          <div className="text-center space-y-1 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[#b794f4] flex items-center justify-center mx-auto mb-2">
+              <KeyRound className="w-5 h-5" />
+            </div>
+            <h2 className="text-lg font-bold text-white tracking-tight">Verify Identity</h2>
+            <p className="text-xs text-zinc-400">
+              Enter the 6-digit code sent to <strong className="text-zinc-200">{mfaData.destinationMasked}</strong>
+            </p>
+          </div>
+
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="mfa-otp" className="text-xs font-medium text-zinc-300">
+                6-Digit Verification Code
+              </Label>
+              <Input
+                id="mfa-otp"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="123456"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                className="h-11 text-center text-lg tracking-[0.4em] font-mono font-bold bg-[#161720] border-[#262835] text-white rounded-[10px] focus-visible:border-[#9d4edd] focus-visible:ring-1 focus-visible:ring-[#9d4edd]"
+                autoFocus
+                required
+              />
             </div>
 
-            {/* Main Auth Card Container */}
-            <div className="relative rounded-[24px] bg-[#0E1015] border border-[#1A1D24] shadow-2xl shadow-black/80 backdrop-blur-xl overflow-hidden p-6 sm:p-8">
-              {/* ROLE SWITCHER TABLIST */}
-              <div className="relative mb-6">
-                <div className="flex items-center justify-between text-xs text-slate-300 font-semibold mb-2.5 px-0.5">
-                  <span>Select Workspace Role</span>
-                  <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">ROLE SWITCHER</span>
-                </div>
+            <Button
+              type="submit"
+              disabled={isLoading || otpCode.length < 6}
+              className="w-full h-11 rounded-[10px] bg-[#9d4edd] hover:bg-[#8b5cf6] text-white font-medium text-sm transition-all shadow-md shadow-purple-900/20 disabled:opacity-50"
+            >
+              {isLoading ? 'Verifying Code...' : 'Confirm & Open Portal'}
+            </Button>
 
-                <div
-                  role="tablist"
-                  aria-label="Hosteliq Portal Role Selector"
-                  className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-[#090A0D] border border-[#1A1D24]"
+            <div className="flex items-center justify-between text-xs pt-1">
+              <button
+                type="button"
+                onClick={() => setMfaData(null)}
+                className="text-zinc-400 hover:text-white transition-colors"
+              >
+                ← Back to Sign In
+              </button>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={resendCooldown > 0}
+                className={`flex items-center gap-1 font-medium ${
+                  resendCooldown > 0 ? 'text-zinc-500 cursor-not-allowed' : 'text-[#b794f4] hover:underline'
+                }`}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${resendCooldown > 0 ? 'animate-spin' : ''}`} />
+                <span>{resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        /* STANDARD CREDENTIALS LOGIN FORM */
+        <div id={`panel-${selectedRole}`} role="tabpanel" aria-labelledby={`tab-${selectedRole}`}>
+          {/* Error Banner */}
+          {errorBanner && (
+            <div className="mb-4 p-3 rounded-xl bg-rose-950/30 border border-rose-500/30 flex items-start gap-2 text-xs text-rose-300">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span>{errorBanner}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4 text-left" noValidate>
+            {/* Identifier Input */}
+            <div className="space-y-1.5">
+              <Label htmlFor="login-identifier" className="text-xs font-medium text-zinc-300">
+                {config.identifierLabel}
+              </Label>
+              <Input
+                id="login-identifier"
+                type="text"
+                placeholder={config.identifierPlaceholder}
+                value={identifier}
+                onChange={(e) => {
+                  setIdentifier(e.target.value);
+                  if (errorBanner) setErrorBanner(null);
+                }}
+                className="h-11 px-3.5 bg-[#161720] border-[#262835] text-white placeholder:text-zinc-500 rounded-[10px] text-sm focus-visible:border-[#9d4edd] focus-visible:ring-1 focus-visible:ring-[#9d4edd] transition-colors"
+                required
+                autoComplete="username"
+              />
+            </div>
+
+            {/* Password Input */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="login-password" className="text-xs font-medium text-zinc-300">
+                  Password
+                </Label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-zinc-400 hover:text-[#b794f4] transition-colors focus:outline-none focus:underline"
                 >
-                  {(['super_admin', 'admin', 'student'] as AuthRole[]).map((roleKey) => {
-                    const rConfig = ROLE_CONFIGS[roleKey];
-                    const isSelected = selectedRole === roleKey;
-                    const TabIcon = rConfig.icon;
-                    return (
-                      <button
-                        key={roleKey}
-                        type="button"
-                        role="tab"
-                        id={`tab-${roleKey}`}
-                        aria-selected={isSelected}
-                        aria-controls={`panel-${roleKey}`}
-                        onClick={() => handleRoleChange(roleKey)}
-                        className={`relative flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all duration-150 border ${
-                          isSelected
-                            ? 'bg-[#1A0B0E] text-white border-red-600 shadow-[0_0_12px_rgba(220,38,38,0.25)]'
-                            : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#14161C]'
-                        }`}
-                      >
-                        <TabIcon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-red-500' : 'text-slate-400'}`} />
-                        <span className="truncate">{rConfig.label}</span>
-                      </button>
-                    );
-                  })}
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Input
+                  id="login-password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (errorBanner) setErrorBanner(null);
+                  }}
+                  className="h-11 pl-3.5 pr-10 bg-[#161720] border-[#262835] text-white placeholder:text-zinc-500 rounded-[10px] text-sm focus-visible:border-[#9d4edd] focus-visible:ring-1 focus-visible:ring-[#9d4edd] transition-colors"
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-1 focus:outline-none transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Primary Sign In Button */}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-11 sm:h-12 rounded-[10px] bg-[#9d4edd] hover:bg-[#8b5cf6] text-white font-medium text-sm transition-all duration-150 shadow-md shadow-purple-900/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Signing in...</span>
+                </div>
+              ) : (
+                <span>Sign in</span>
+              )}
+            </Button>
+          </form>
+
+          {/* Google OAuth Section (Available for supported portals) */}
+          {selectedRole === 'student' && (
+            <>
+              {/* Divider: OR */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-white/[0.08]" />
+                </div>
+                <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-wider">
+                  <span className="bg-[#111217] px-3 text-zinc-500">OR</span>
                 </div>
               </div>
 
-              {/* MFA / OTP STEP VIEW */}
-              {mfaData?.required ? (
-                <motion.div
-                  key="mfa-step"
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  className="space-y-4"
-                >
-                  <div className="text-center space-y-1 mb-2">
-                    <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 flex items-center justify-center mx-auto mb-2 shadow-lg">
-                      <KeyRound className="w-6 h-6" />
-                    </div>
-                    <h2 className="text-xl font-bold text-white tracking-tight">Verify Your Identity</h2>
-                    <p className="text-xs text-slate-400">
-                      Enter the 6-digit authentication code sent to <strong className="text-slate-200">{mfaData.destinationMasked}</strong>
-                    </p>
+              <div>
+                {hasValidGoogleClientId ? (
+                  <div className="flex justify-center w-full [&>div]:!w-full [&>div>iframe]:!w-full">
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => {
+                        const msg = 'Google Sign In failed. Please check configuration.';
+                        setErrorBanner(msg);
+                        toast.error(msg, { toastId: 'auth-login-error' });
+                      }}
+                      theme="filled_black"
+                      size="large"
+                      shape="rectangular"
+                      text="continue_with"
+                      width="100%"
+                    />
                   </div>
-
-                  <form onSubmit={handleVerifyOtp} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="mfa-otp" className="text-xs font-semibold text-slate-300">
-                        6-Digit Verification Code
-                      </Label>
-                      <Input
-                        id="mfa-otp"
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        placeholder="123456"
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                        className="h-12 text-center text-lg tracking-[0.4em] font-mono font-bold bg-[#090A0D] border-[#1E222B] text-white rounded-xl focus:border-red-500"
-                        autoFocus
-                        required
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleDemoGoogleLogin}
+                    disabled={isLoading}
+                    className="w-full h-11 flex items-center justify-center gap-2.5 px-4 rounded-[10px] border border-[#262835] bg-[#161720] hover:bg-[#1E202B] text-xs font-semibold text-zinc-200 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#9d4edd]"
+                  >
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                       />
-                    </div>
-
-                    <Button
-                      type="submit"
-                      disabled={isLoading || otpCode.length < 6}
-                      className="w-full h-11 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold shadow-lg shadow-red-600/30"
-                    >
-                      {isLoading ? 'Verifying Code...' : 'Confirm & Open Portal'}
-                    </Button>
-
-                    <div className="flex items-center justify-between text-xs pt-1">
-                      <button
-                        type="button"
-                        onClick={() => setMfaData(null)}
-                        className="text-slate-400 hover:text-white transition-colors"
-                      >
-                        ← Back to Sign In
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleResendOtp}
-                        disabled={resendCooldown > 0}
-                        className={`flex items-center gap-1 font-semibold ${
-                          resendCooldown > 0 ? 'text-slate-500 cursor-not-allowed' : 'text-red-400 hover:underline'
-                        }`}
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${resendCooldown > 0 ? 'animate-spin' : ''}`} />
-                        <span>{resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}</span>
-                      </button>
-                    </div>
-                  </form>
-                </motion.div>
-              ) : (
-                /* STANDARD CREDENTIALS LOGIN VIEW (Matching Attached Reference Image) */
-                <div id={`panel-${selectedRole}`} role="tabpanel" aria-labelledby={`tab-${selectedRole}`}>
-                  {/* Role Header Banner */}
-                  <div className="mb-6 flex items-start gap-3.5 text-left">
-                    {/* Icon Box */}
-                    <div className="w-12 h-12 rounded-2xl bg-[#170B0E] border border-red-500/20 flex items-center justify-center text-red-500 shrink-0 mt-0.5 shadow-sm">
-                      <CurrentIcon className="w-6 h-6" />
-                    </div>
-
-                    {/* Titles */}
-                    <div className="flex-1">
-                      <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest block mb-0.5">
-                        {config.badge}
-                      </span>
-                      <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug">
-                        {config.title}
-                      </h2>
-                      <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                        {config.subtitle}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Authentication Form */}
-                  <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                    {/* Identifier Input */}
-                    <div className="space-y-1.5">
-                      <Label htmlFor="identifier" className="text-xs font-semibold text-slate-200">
-                        {config.identifierLabel}
-                      </Label>
-                      <div className="relative">
-                        <IdentifierIcon className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5 pointer-events-none" />
-                        <Input
-                          id="identifier"
-                          type="text"
-                          placeholder={config.identifierPlaceholder}
-                          value={identifier}
-                          onChange={(e) => setIdentifier(e.target.value)}
-                          className="pl-10 h-11 bg-[#090A0D] border-[#1E222B] text-slate-100 placeholder:text-slate-600 rounded-xl text-xs focus-visible:ring-1 focus-visible:ring-red-500 focus-visible:border-red-500"
-                          required
-                          autoComplete="username"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Password Input */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-xs font-semibold text-slate-200">
-                          Password
-                        </Label>
-                        <Link
-                          to="/forgot-password"
-                          className="text-xs text-slate-400 hover:text-white transition-colors"
-                        >
-                          Forgot Password?
-                        </Link>
-                      </div>
-                      <div className="relative">
-                        <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5 pointer-events-none" />
-                        <Input
-                          id="password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="••••••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="pl-10 pr-10 h-11 bg-[#090A0D] border-[#1E222B] text-slate-100 placeholder:text-slate-600 rounded-xl text-xs focus-visible:ring-1 focus-visible:ring-red-500 focus-visible:border-red-500"
-                          required
-                          autoComplete="current-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          aria-label={showPassword ? 'Hide password' : 'Show password'}
-                          className="absolute right-3.5 top-3 text-slate-400 hover:text-white transition-colors p-0.5"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Sign In CTA Button (Red Glow matching reference image) */}
-                    <Button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full h-11 rounded-xl bg-gradient-to-r from-[#FF1E27] to-[#E50914] hover:from-[#FF333B] hover:to-[#F4111D] text-white font-bold text-xs shadow-lg shadow-red-600/30 transition-all duration-150 flex items-center justify-center gap-2 mt-3 cursor-pointer"
-                    >
-                      {isLoading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Authenticating...</span>
-                        </div>
-                      ) : (
-                        <>
-                          <span>{config.ctaText}</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </>
-                      )}
-                    </Button>
-                  </form>
-
-                  {/* Divider: OR */}
-                  <div className="relative my-5">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-[#1E222B]" />
-                    </div>
-                    <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-wider">
-                      <span className="bg-[#0E1015] px-3 text-slate-500 font-mono">
-                        OR
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Google OAuth Section (Available for Student Resident Portal) */}
-                  {selectedRole === 'student' && (
-                    <div className="mb-4">
-                      {hasValidGoogleClientId ? (
-                        <div className="flex justify-center w-full [&>div]:!w-full [&>div>iframe]:!w-full">
-                          <GoogleLogin
-                            onSuccess={handleGoogleSuccess}
-                            onError={() => toast.error('Google Sign In failed. Please check configuration.', { toastId: 'auth-login-error' })}
-                            theme="filled_black"
-                            size="large"
-                            shape="rectangular"
-                            text="continue_with"
-                            width="100%"
-                          />
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleDemoGoogleLogin}
-                          disabled={isLoading}
-                          className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-[#1E222B] bg-[#090A0D] hover:bg-[#14161C] text-xs font-semibold text-slate-200 transition-all shadow-sm group"
-                        >
-                          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                            <path
-                              fill="#4285F4"
-                              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                            />
-                            <path
-                              fill="#34A853"
-                              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                            />
-                            <path
-                              fill="#FBBC05"
-                              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                            />
-                            <path
-                              fill="#EA4335"
-                              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                            />
-                          </svg>
-                          <span>Continue with Google</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Security Badge Footer (Matching Reference Image) */}
-                  <div className="flex flex-col items-center justify-center gap-1 text-center">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300 tracking-wider">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>{config.securityFooter}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      AES-256 Bit Encrypted • Role Isolation Enforced
-                    </span>
-                  </div>
-
-                  {/* Student Account Notice */}
-                  {selectedRole === 'student' && (
-                    <div className="mt-3 p-2.5 rounded-xl bg-[#090A0D] border border-[#1A1D24] text-left flex items-start gap-2 text-[11px] text-slate-400">
-                      <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                      <span>
-                        New Resident? Accounts are provisioned by your hostel administrator upon room allocation. Contact your property manager for credentials.
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Assistance Footer Link (Matching Reference Image) */}
-            <div className="mt-6 text-center text-xs text-slate-400 space-x-1">
-              <span>Need technical assistance?</span>
-              <Link to="/contact" className="font-semibold text-slate-200 hover:text-white underline underline-offset-4">
-                Contact Hosteliq Technical Support
-              </Link>
-            </div>
-          </motion.div>
-        )}
-      </div>
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Continue with Google</span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Google Step 1: Initial Details Modal for New Residents */}
       {showInitialModal && initialGoogleProfile && (
@@ -847,13 +714,13 @@ export default function Login() {
           isOpen={showGoogleStep2}
           setupToken={googleSetupToken}
           googleProfile={googleProfileData}
-          onSuccess={(u) => {
+          onSuccess={() => {
             setShowGoogleStep2(false);
             navigate('/student/dashboard', { replace: true });
           }}
           onCancel={() => setShowGoogleStep2(false)}
         />
       )}
-    </div>
+    </AuthLayout>
   );
 }

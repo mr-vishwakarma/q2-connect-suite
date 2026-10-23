@@ -39,6 +39,7 @@ const Index = lazy(() => import("./pages/Index"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
 const RegisterAdmin = lazy(() => import("./pages/RegisterAdmin"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const OurTeam = lazy(() => import("./pages/OurTeam"));
@@ -203,11 +204,13 @@ const App = () => (
               <Route path="/contact" element={<PublicOnlyRoute><Contact /></PublicOnlyRoute>} />
               <Route path="/our-team" element={<PublicOnlyRoute><OurTeam /></PublicOnlyRoute>} />
               <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+              <Route path="/signup" element={<PublicOnlyRoute><Signup /></PublicOnlyRoute>} />
+              <Route path="/register" element={<Navigate to="/signup" replace />} />
               <Route path="/admin/login" element={<Navigate to="/login?role=admin" replace />} />
               <Route path="/student/login" element={<Navigate to="/login?role=student" replace />} />
               <Route path="/super-admin/login" element={<Navigate to="/login?role=super_admin" replace />} />
               <Route path="/superadmin/login" element={<Navigate to="/login?role=super_admin" replace />} />
-              <Route path="/register-admin" element={<PublicOnlyRoute><RegisterAdmin /></PublicOnlyRoute>} />
+              <Route path="/register-admin" element={<PublicOnlyRoute><Signup defaultRole="admin" /></PublicOnlyRoute>} />
               <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
               <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
               <Route path="/auth/google/callback" element={<OAuthCallback />} />

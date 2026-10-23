@@ -4,6 +4,7 @@ export const PUBLIC_ROUTES = {
   CONTACT: '/contact',
   OUR_TEAM: '/our-team',
   LOGIN: '/login',
+  SIGNUP: '/signup',
   REGISTER_ADMIN: '/register-admin',
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD: '/reset-password',
