@@ -60,8 +60,8 @@ export function SaaSHeader() {
           >
             <div className="w-full h-full bg-background rounded-[10px] flex items-center justify-center p-1.5 overflow-hidden">
               <img
-                src="/q2-logo.png"
-                alt="Q2 Logo"
+                src="/hosteliq-logo.png"
+                alt="Hosteliq Logo"
                 width={36}
                 height={36}
                 decoding="async"
@@ -70,11 +70,11 @@ export function SaaSHeader() {
             </div>
           </motion.div>
           <div className="flex flex-col">
-            <span className="text-lg font-black tracking-tight text-foreground flex items-center gap-1.5">
-              Q2 <span className="text-primary font-extrabold text-sm tracking-widest uppercase">Hostels</span>
+            <span className="text-lg font-black tracking-tight text-foreground flex items-center">
+              <span>Hostel</span><span className="text-[#2dd4bf]">i</span><span className="text-[#fb7185]">q</span>
             </span>
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider -mt-1">
-              SaaS Operating Suite
+              Accommodation Platform
             </span>
           </div>
         </Link>

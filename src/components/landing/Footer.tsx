@@ -47,8 +47,8 @@ export function Footer() {
                 className="w-12 h-12 flex items-center justify-center overflow-hidden"
               >
                 <img
-                  src="/q2-logo.png"
-                  alt="Q2 Logo"
+                  src="/hosteliq-logo.png"
+                  alt="Hosteliq Logo"
                   width={48}
                   height={48}
                   loading="lazy"
@@ -56,13 +56,13 @@ export function Footer() {
                   className="w-full h-full object-contain"
                 />
               </motion.div>
-              <span className="text-foreground font-bold text-xl">Q2 Group of Hostels</span>
+              <span className="text-foreground font-bold text-xl">Hosteliq</span>
             </Link>
             <p className="text-foreground font-bold text-base">
-              Q2 Girls Hostel — Trusted by 150+ Families for Safe, Comfortable, and Smart Student Living.
+              Hosteliq — Trusted by Students, Working Professionals & Families for Modern, Smart Living.
             </p>
             <p className="text-foreground font-bold text-sm" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>
-              Providing secure accommodation, quality facilities, and a caring environment for every student.
+              Providing secure accommodation, quality facilities, and a caring environment for every resident.
             </p>
             
             {/* Hostel Address */}

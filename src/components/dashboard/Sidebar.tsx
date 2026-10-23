@@ -69,8 +69,8 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
         >
           <div className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden">
             <img
-              src="/q2-logo.png"
-              alt="Q2 Logo"
+              src="/hosteliq-logo.png"
+              alt="Hosteliq Logo"
               width={40}
               height={40}
               decoding="async"
@@ -85,10 +85,10 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
               className="overflow-hidden whitespace-nowrap flex flex-col justify-center text-left"
             >
               <span className="text-sidebar-foreground font-bold text-base tracking-tight leading-tight block">
-                Q2 Management
+                Hosteliq
               </span>
               <span className="text-xs text-muted-foreground font-medium mt-0.5 block">
-                {isAdmin ? 'Admin Panel' : 'Student Panel'}
+                {isAdmin ? 'Admin Portal' : 'Student Portal'}
               </span>
             </motion.div>
           )}

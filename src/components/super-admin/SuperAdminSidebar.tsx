@@ -102,10 +102,10 @@ export function SuperAdminSidebar({
       {/* Header */}
       <div className="p-5 flex items-center justify-between border-b border-border/50 relative">
         <Link to="/super-admin/dashboard" onClick={onClose} className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-1">
+          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-1">
             <img
-              src="/q2-logo.png"
-              alt="Q2 Platform"
+              src="/hosteliq-logo.png"
+              alt="Hosteliq Platform"
               width={36}
               height={36}
               className="w-full h-full object-contain"
@@ -113,8 +113,8 @@ export function SuperAdminSidebar({
           </div>
           {!isCollapsed && (
             <div className="overflow-hidden">
-              <span className="font-bold text-base text-foreground leading-tight block">Q2 Platform</span>
-              <span className="text-xs text-amber-500 font-semibold uppercase tracking-wider">Super Admin</span>
+              <span className="font-bold text-base text-foreground leading-tight block">Hosteliq</span>
+              <span className="text-xs text-purple-400 font-semibold uppercase tracking-wider">Super Admin</span>
             </div>
           )}
         </Link>

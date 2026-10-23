@@ -184,7 +184,7 @@ router.get('/email-diagnostic', async (req, res) => {
 router.get('/', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Q2 Connect Suite API is running 🚀',
+    message: 'Hosteliq API is running 🚀',
     status: 'UP',
     env: process.env.NODE_ENV,
     requestId: req.requestId,

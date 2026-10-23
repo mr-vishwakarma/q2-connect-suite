@@ -248,7 +248,7 @@ export default function CouponsVouchers() {
   const downloadCredentials = () => {
     if (!credentialsModal) return;
     const content = `================================================
-Q2 CONNECT SUITE — SECURE VOUCHER CREDENTIALS
+HOSTELIQ — SECURE VOUCHER CREDENTIALS
 ================================================
 Voucher Name: ${credentialsModal.voucher.name}
 Reference ID: ${credentialsModal.voucher.reference}
@@ -771,7 +771,7 @@ Distribute directly to the authorized organization administrator.
                 <Label className="text-xs font-semibold">Voucher / Campaign Name *</Label>
                 <Input
                   required
-                  placeholder="e.g. Q2 Launch Special ₹2,000"
+                  placeholder="e.g. Hosteliq Launch Special ₹2,000"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="h-9 text-xs"

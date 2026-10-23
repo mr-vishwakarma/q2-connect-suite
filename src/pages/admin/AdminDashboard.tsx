@@ -151,7 +151,7 @@ export default function AdminDashboard() {
               Welcome back, <span className="text-red-500 font-extrabold">{managerName}</span>! 👋
             </h1>
             <p className="text-[11px] sm:text-xs md:text-sm text-zinc-400 mt-0.5 truncate">
-              Manager, {selectedHostel || 'Q2'} Hostel
+              Manager, {selectedHostel || 'Hosteliq'} Hostel
             </p>
             <p className="text-[9px] sm:text-[11px] md:text-xs text-zinc-500 italic mt-1 line-clamp-1 sm:line-clamp-none">
               “A well-managed hostel builds brighter futures.”

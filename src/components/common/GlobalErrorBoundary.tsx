@@ -102,7 +102,7 @@ export class GlobalErrorBoundary extends Component<Props, State> {
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground">
                 {isChunkError
-                  ? 'A new version of Q2 Connect Suite was deployed. Please reload the page to load the latest application updates.'
+                  ? 'A new version of Hosteliq was deployed. Please reload the page to load the latest application updates.'
                   : 'An unexpected runtime error occurred. We have isolated the issue to prevent data corruption.'}
               </p>
               {this.state.error && !isChunkError && (

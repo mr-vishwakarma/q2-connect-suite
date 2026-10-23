@@ -200,7 +200,7 @@ export default function Billing() {
           keyId: reservation.keyId,
           amountPaise: reservation.amountPaise,
           currency: reservation.currency,
-          organizationName: user?.username || 'Q2 Organization',
+          organizationName: user?.username || 'Hosteliq Organization',
           adminEmail: user?.email,
           description: `Discounted Subscription for ${reservation.planName} (${reservation.billingCycle})`,
         },
@@ -253,7 +253,7 @@ export default function Billing() {
           keyId: checkoutInit.keyId,
           amountPaise: checkoutInit.amountPaise,
           currency: checkoutInit.currency,
-          organizationName: user?.username || 'Q2 Organization',
+          organizationName: user?.username || 'Hosteliq Organization',
           adminEmail: user?.email,
           description: `SaaS Manual Plan Renewal - ${checkoutInit.planName} (${checkoutInit.billingCycle})`,
         },
@@ -426,7 +426,7 @@ export default function Billing() {
           <div>
             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-amber-500" />
-              Available Q2 SaaS Subscription Plans
+              Available Hosteliq SaaS Subscription Plans
             </h2>
             <p className="text-sm text-muted-foreground">
               Select a tier matching your hostel chain capacity. Upgrade or adjust anytime.

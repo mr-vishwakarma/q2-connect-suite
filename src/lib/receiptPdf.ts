@@ -80,7 +80,7 @@ export async function generateFeeReceiptPDF(r: FeeReceiptData) {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text('Q2 Group of Hostels', 40, 40);
+  doc.text('Hosteliq', 40, 40);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text(HOSTEL_ADDR, 40, 58);
@@ -186,7 +186,7 @@ export async function generateFeeReceiptPDF(r: FeeReceiptData) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  doc.text('This is an official system-generated Hostel Fee Receipt from Q2 Group of Hostels. Keep it safe for your records.', 40, y);
+  doc.text('This is an official system-generated Hostel Fee Receipt from Hosteliq. Keep it safe for your records.', 40, y);
 
   return doc;
 }
@@ -208,7 +208,7 @@ export async function generateSecurityDepositReceiptPDF(r: SecurityDepositReceip
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text('Q2 Group of Hostels', 40, 40);
+  doc.text('Hosteliq', 40, 40);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text(HOSTEL_ADDR, 40, 58);
@@ -318,7 +318,7 @@ export async function generateSecurityDepositReceiptPDF(r: SecurityDepositReceip
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  doc.text('This is an official system-generated Security Deposit Receipt from Q2 Group of Hostels. Keep it safe for your records.', 40, y);
+  doc.text('This is an official system-generated Security Deposit Receipt from Hosteliq. Keep it safe for your records.', 40, y);
 
   return doc;
 }
@@ -414,7 +414,7 @@ export async function generateHistoryReceipt(data: HistoryReceiptData) {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text('Q2 Group of Hostels', 40, 40);
+  doc.text('Hosteliq', 40, 40);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text(HOSTEL_ADDR, 40, 58);
@@ -475,7 +475,7 @@ export async function generateHistoryReceipt(data: HistoryReceiptData) {
   y += 18;
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  doc.text('This is a system-generated history report from Q2 Group of Hostels.', 40, y);
+  doc.text('This is a system-generated history report from Hosteliq.', 40, y);
 
   return doc;
 }

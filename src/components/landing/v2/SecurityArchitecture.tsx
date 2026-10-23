@@ -47,7 +47,7 @@ export function SecurityArchitecture() {
             Built with security at the core.
           </h2>
           <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
-            Hostel operations deal with sensitive student records, parent emergency contacts, and daily cash transactions. Q2 treats safety as a primary feature.
+            Accommodation operations deal with sensitive resident records, parent emergency contacts, and daily cash transactions. Hosteliq treats safety as a primary feature.
           </p>
         </div>
 

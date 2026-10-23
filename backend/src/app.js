@@ -204,7 +204,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, async () => {
-  console.log(`\n🚀 Q2 Connect Suite Backend running on port ${PORT}`);
+  console.log(`\n🚀 Hosteliq Backend running on port ${PORT}`);
   console.log(`📡 Socket.io enabled`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}\n`);
   

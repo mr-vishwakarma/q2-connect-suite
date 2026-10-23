@@ -27,8 +27,8 @@ export function SidebarHeader({
           className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden"
         >
           <img
-            src="/q2-logo.png"
-            alt="Q2 Logo"
+            src="/hosteliq-logo.png"
+            alt="Hosteliq Logo"
             width={40}
             height={40}
             decoding="async"
@@ -37,8 +37,8 @@ export function SidebarHeader({
         </motion.div>
         {!isCollapsed && (
           <div className="overflow-hidden whitespace-nowrap">
-            <span className="text-foreground font-bold text-base block leading-tight">Dashboard</span>
-            <span className="text-xs text-muted-foreground">Admin Panel</span>
+            <span className="text-foreground font-bold text-base block leading-tight">Hosteliq</span>
+            <span className="text-xs text-muted-foreground">Admin Portal</span>
           </div>
         )}
       </Link>

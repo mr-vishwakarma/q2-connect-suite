@@ -13,9 +13,9 @@
     --popover: 0 0% 4%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 0 100% 45%;
+    --primary: 271 81% 56%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 0 100% 55%;
+    --primary-glow: 271 81% 66%;
 
     --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 98%;
@@ -23,7 +23,7 @@
     --muted: 0 0% 12%;
     --muted-foreground: 0 0% 65%;
 
-    --accent: 0 100% 45%;
+    --accent: 347 95% 68%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -31,36 +31,36 @@
 
     --border: 0 0% 15%;
     --input: 0 0% 15%;
-    --ring: 0 100% 50%;
+    --ring: 271 81% 56%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 2%;
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 0 100% 50%;
+    --sidebar-primary: 271 81% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 0 0% 10%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 0 100% 50%;
+    --sidebar-ring: 271 81% 56%;
 
     /* Custom tokens */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
-    --info: 199 89% 48%;
+    --info: 173 80% 40%;
     --info-foreground: 0 0% 100%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(0 100% 45%) 0%, hsl(0 100% 55%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(271 81% 56%) 0%, hsl(347 95% 68%) 100%);
     --gradient-dark: linear-gradient(180deg, hsl(0 0% 0%) 0%, hsl(0 0% 2%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 4%) 0%, hsl(0 0% 2%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(0 0% 2%) 0%, hsl(0 0% 0%) 50%, hsl(0 100% 20% / 0.2) 100%);
-    --stats-glow: 0 0 30px hsl(0 100% 50% / 0.6), 0 0 60px hsl(0 100% 45% / 0.3);
+    --gradient-hero: linear-gradient(135deg, hsl(0 0% 2%) 0%, hsl(0 0% 0%) 50%, hsl(271 81% 40% / 0.2) 100%);
+    --stats-glow: 0 0 30px hsl(271 81% 56% / 0.6), 0 0 60px hsl(347 95% 68% / 0.3);
 
     /* Shadows */
-    --shadow-glow: 0 0 60px hsl(0 100% 50% / 0.15);
+    --shadow-glow: 0 0 60px hsl(271 81% 56% / 0.15);
     --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.5);
     --shadow-elevated: 0 8px 32px hsl(0 0% 0% / 0.7);
     --glass-bg: hsl(0 0% 4% / 0.7);

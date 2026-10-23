@@ -72,6 +72,15 @@ export default {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        brand: {
+          purple: "#9d78d2",
+          pink: "#fb7185",
+          teal: "#2dd4bf",
+          lavender: "#b794f4",
+          coral: "#ff6b8b",
+          primary: "hsl(var(--primary))",
+          accent: "hsl(var(--accent))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

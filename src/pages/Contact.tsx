@@ -21,8 +21,8 @@ import {
 const contactInfo = [
   {
     icon: Building,
-    title: 'Hostel Address',
-    lines: ['Q2 Girls Hostel', 'Plot No. 8, Manak Vihar', 'Patel Nagar, Raisen Road', 'Bhopal – 462022'],
+    title: 'Operations Office',
+    lines: ['Hosteliq Branch Operations', 'Plot No. 8, Manak Vihar', 'Patel Nagar, Raisen Road', 'Bhopal – 462022'],
   },
   {
     icon: Phone,
@@ -32,7 +32,7 @@ const contactInfo = [
   {
     icon: Mail,
     title: 'Email',
-    lines: ['q2hostel@gmail.com'],
+    lines: ['support@mrvishwakarma.in'],
   },
   {
     icon: Clock,

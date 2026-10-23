@@ -36,7 +36,7 @@ export function SuperAdminTopBar({ title, onMenuToggle, isMenuOpen = false }: Su
 
         <div className="text-right hidden sm:block">
           <p className="text-sm font-medium text-foreground">{user?.name || 'Super Admin'}</p>
-          <p className="text-xs text-muted-foreground">{user?.email || 'superadmin@q2connect.com'}</p>
+          <p className="text-xs text-muted-foreground">{user?.email || 'superadmin@hosteliq.com'}</p>
         </div>
       </div>
     </header>

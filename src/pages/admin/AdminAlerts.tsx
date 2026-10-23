@@ -218,7 +218,7 @@ export default function AdminAlerts() {
     const cleanPhone = student.phone.replace(/[^0-9]/g, '');
     const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
     const msg = encodeURIComponent(
-      `Hello ${student.name}, this is a gentle reminder from Q2 Girls Hostel management. Your monthly hostel fee of ₹${student.fees || ''} for Room ${student.room_no || ''} is currently ${student.status === 'expired' ? `overdue by ${student.daysOverdue} days` : `due soon on ${formatValidDate(student, 'dd MMM yyyy')}`}. Please clear your dues or contact the hostel office. Thank you!`
+      `Hello ${student.name}, this is a gentle reminder from Hosteliq management. Your monthly hostel fee of ₹${student.fees || ''} for Room ${student.room_no || ''} is currently ${student.status === 'expired' ? `overdue by ${student.daysOverdue} days` : `due soon on ${formatValidDate(student, 'dd MMM yyyy')}`}. Please clear your dues or contact the hostel office. Thank you!`
     );
     window.open(`https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${msg}`, '_blank');
   };

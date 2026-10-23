@@ -5,10 +5,10 @@ export function TestimonialsSection() {
   const testimonials: Testimonial[] = [
     {
       quote:
-        'Before Q2, fee tracking and room vacancies lived across three confusing Google Sheets and chaotic WhatsApp groups. Now our wardens and accountants reconcile all 240 beds in under 5 minutes every morning.',
+        'Before Hosteliq, fee tracking and room vacancies lived across three confusing Google Sheets and chaotic WhatsApp groups. Now our wardens and accountants reconcile all 240 beds in under 5 minutes every morning.',
       author: 'Vikramaditya Reddy',
       role: 'Managing Partner',
-      hostelName: 'Q2 Luxury Living & Accommodations',
+      hostelName: 'Hosteliq Living & Accommodations',
       location: 'Hyderabad (Financial District)',
       metrics: 'Collection rate jumped from 76% to 92.4% in 60 days',
     },
@@ -17,13 +17,13 @@ export function TestimonialsSection() {
         'The automated weekend gate pass with parent OTP approval has transformed our safety protocol. Parents love the instant check-in notifications, and our staff saves 3 hours of manual phone calling every Friday.',
       author: 'Sunita Deshmukh',
       role: 'Chief Warden',
-      hostelName: 'Shri Balaji Women’s Residency',
+      hostelName: 'Shri Balaji Residency',
       location: 'Bangalore (Electronic City)',
       metrics: 'Zero gate log discrepancies across 180 residents',
     },
     {
       quote:
-        'The Net Cashflow Analyzer showed us exactly where utility expenses were eating our margins. We identified high electricity wastage on Floor 3 and saved ₹45,000 in our first quarter on Q2.',
+        'The Net Cashflow Analyzer showed us exactly where utility expenses were eating our margins. We identified high electricity wastage on Floor 3 and saved ₹45,000 in our first quarter on Hosteliq.',
       author: 'Anand Kulkarni',
       role: 'Hostel Operations Director',
       hostelName: 'Greenwood Student Housing',
@@ -42,10 +42,10 @@ export function TestimonialsSection() {
             <span>Proven Operator Results</span>
           </div>
           <h2 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-            Loved by hostel operators and residents.
+            Loved by accommodation operators and residents.
           </h2>
           <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
-            Discover how modern student accommodations across India run smoother, more profitable operations with Q2.
+            Discover how modern student accommodations across India run smoother, more profitable operations with Hosteliq.
           </p>
         </div>
 

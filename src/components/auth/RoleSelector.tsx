@@ -98,7 +98,7 @@ export function RoleSelector({ onSelectRole }: RoleSelectorProps) {
           animate={{ opacity: 1, y: 0 }}
           className="text-3xl sm:text-5xl font-black text-foreground tracking-tight"
         >
-          Welcome to <span className="text-primary">Q2</span>
+          Welcome to <span className="text-primary">Hosteliq</span>
         </motion.h2>
 
         <motion.p

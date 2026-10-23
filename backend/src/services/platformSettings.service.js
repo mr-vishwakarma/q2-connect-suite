@@ -4,14 +4,14 @@ const DEFAULT_PLATFORM_SETTINGS = [
   {
     key: 'platform_name',
     category: 'general',
-    value: 'Q2 Connect Suite',
+    value: 'Hosteliq',
     description: 'Official SaaS platform brand name',
     isPublic: true,
   },
   {
     key: 'support_email',
     category: 'general',
-    value: 'support@q2connect.com',
+    value: 'support@mrvishwakarma.in',
     description: 'Central helpdesk and tenant support email',
     isPublic: true,
   },
@@ -125,8 +125,8 @@ const platformSettingsService = {
 
     return {
       general: {
-        platformName: map['platform_name'] || 'Q2 Connect Suite',
-        supportEmail: map['support_email'] || 'support@q2connect.com',
+        platformName: map['platform_name'] || 'Hosteliq',
+        supportEmail: map['support_email'] || 'support@mrvishwakarma.in',
         supportPhone: map['support_phone'] || '+91 9876543210',
         defaultCurrency: map['default_currency'] || 'INR',
         defaultTimezone: map['default_timezone'] || 'Asia/Kolkata (IST)',

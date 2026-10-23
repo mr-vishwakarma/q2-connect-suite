@@ -26,7 +26,7 @@ export function RoleExperiences({ onOpenAuth }: RoleExperiencesProps) {
         'Feature Flag Toggles (Instant Live Sync)',
         'Global Security Audit Trail & Access Logs',
       ],
-      previewHeadline: 'Q2 SaaS Multi-Tenant Command Center',
+      previewHeadline: 'Hosteliq Multi-Property Command Center',
       previewStats: [
         { label: 'Active Organizations', val: '12 Enterprises' },
         { label: 'Total Managed Beds', val: '4,850 Beds' },
@@ -190,7 +190,7 @@ export function RoleExperiences({ onOpenAuth }: RoleExperiencesProps) {
                 <div className="rounded-2xl overflow-hidden border border-slate-800 relative">
                   <img
                     src={activeRole === 'student' ? '/assets/student-lifestyle.jpg' : '/assets/hostel-lifestyle.jpg'}
-                    alt="Q2 Platform Preview"
+                    alt="Hosteliq Platform Preview"
                     width={600}
                     height={176}
                     loading="lazy"
@@ -199,7 +199,7 @@ export function RoleExperiences({ onOpenAuth }: RoleExperiencesProps) {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-4">
                     <span className="text-xs text-slate-200 font-medium">
-                      Live Q2 Platform Experience • Tested by 200+ Operators
+                      Live Hosteliq Platform Experience • Tested by 200+ Operators
                     </span>
                   </div>
                 </div>

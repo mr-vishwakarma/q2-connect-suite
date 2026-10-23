@@ -8,22 +8,22 @@ const teamMembers = [
   {
     name: 'Mr. Abhigyanam Giri',
     role: 'Owner – All Hostels',
-    description: 'Founder and owner of all Q2 hostel branches',
+    description: 'Founder and Director of Hosteliq accommodation properties',
   },
   {
     name: 'Mr. Karan',
     role: 'Web App Developer',
-    description: 'Developed Adda Mess Management System & Q2 Hostel Management System',
+    description: 'Developed Adda Mess Management System & Hosteliq Platform',
   },
   {
     name: 'Deepak Kumar Giri',
-    role: 'Manager – Q2.0 Hostel',
-    description: 'Managing operations at Q2.0 Hostel',
+    role: 'Manager – Branch 01',
+    description: 'Managing operations at Gachibowli accommodation branch',
   },
   {
     name: 'Abhijeet Giri',
-    role: 'Manager – Q2.1 Hostel',
-    description: 'Managing operations at Q2.1 Hostel',
+    role: 'Manager – Branch 02',
+    description: 'Managing operations at Kondapur accommodation branch',
   },
 ];
 
@@ -47,7 +47,7 @@ export default function OurTeam() {
               Meet Our Team!
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              The dedicated people behind Q2 Hostel Management System
+              The dedicated people behind Hosteliq Management Platform
             </p>
           </motion.div>
 

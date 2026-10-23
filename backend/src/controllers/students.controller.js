@@ -463,7 +463,7 @@ const createStudent = async (req, res) => {
       organizationId: orgId || null,
       hostelId: hostelDoc?._id || null,
       hostel,
-      title: 'Welcome to Q2 Connect Suite!',
+      title: 'Welcome to Hosteliq!',
       message: `Hello ${name}, your account has been set up. Welcome to ${hostel} hostel.`,
       type: 'success',
     }], sessionOpts);

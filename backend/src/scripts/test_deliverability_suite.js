@@ -48,7 +48,7 @@ async function runAsyncTest(name, fn) {
 
 async function runAllDeliverabilityTests() {
   console.log('\n================================================================');
-  console.log('🧪 Q2 CONNECT SUITE — DELIVERABILITY & TEMPLATE AUDIT TEST SUITE');
+  console.log('🧪 HOSTELIQ — DELIVERABILITY & TEMPLATE AUDIT TEST SUITE');
   console.log('================================================================\n');
 
   // -------------------------------------------------------------
@@ -101,7 +101,7 @@ async function runAllDeliverabilityTests() {
       subtitle: 'Official Resident Communications',
       preheader: 'Important notice regarding library hours',
       contentHtml: '<p>Announcement content</p>',
-      footerNote: 'Q2 Connect Suite &bull; Student communications',
+      footerNote: 'Hosteliq &bull; Student communications',
       unsubscribeUrl: 'https://mrvishwakarma.in/student/preferences',
     });
 
@@ -110,7 +110,7 @@ async function runAllDeliverabilityTests() {
     assert.ok(html.includes('display: none; font-size: 1px;'), 'Preheader must be hidden for clients');
 
     // Check brand header
-    assert.ok(html.includes('Q2 CONNECT SUITE'), 'Header must contain brand name');
+    assert.ok(html.includes('HOSTELIQ'), 'Header must contain brand name');
     assert.ok(html.includes('Official Resident Communications'), 'Subtitle must be present');
 
     // Check footer & support

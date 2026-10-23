@@ -85,7 +85,7 @@ export default function About() {
                 Our mission is to provide safe, comfortable, affordable, and high-quality hostel living with modern facilities, proper security, and a homely environment for every student.
               </p>
               <p className="text-lg text-foreground font-bold leading-relaxed" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.2)' }}>
-                Q2 Girls Hostel focuses on student comfort, safety, discipline, and quality living experience.
+                Hosteliq focuses on resident comfort, safety, discipline, and quality living experience.
               </p>
             </AnimatedSection>
 
@@ -98,8 +98,8 @@ export default function About() {
                       <TiltCard>
                         <div className="p-6 rounded-2xl bg-card/80 border border-border/30">
                           <Building className="w-10 h-10 text-primary mb-3" />
-                          <div className="text-2xl font-bold text-foreground">Q2</div>
-                          <div className="text-sm text-foreground font-bold" style={{ textShadow: '0 0 8px rgba(255, 255, 255, 0.2)' }}>Group of Hostels</div>
+                          <div className="text-2xl font-bold text-foreground">Hosteliq</div>
+                          <div className="text-sm text-foreground font-bold" style={{ textShadow: '0 0 8px rgba(255, 255, 255, 0.2)' }}>Accommodation Suite</div>
                         </div>
                       </TiltCard>
                       <TiltCard>
@@ -123,7 +123,7 @@ export default function About() {
         <div className="container mx-auto px-6">
           <AnimatedSection direction="scale" className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Q2 Girls Hostel — Trusted by Students & Parents
+              Hosteliq — Trusted by Students, Working Professionals & Parents
             </h2>
           </AnimatedSection>
 
@@ -174,7 +174,7 @@ export default function About() {
               </h2>
 
               <p className="text-foreground font-bold text-lg mb-6 leading-relaxed" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.25)' }}>
-                Q2 Girls Hostel is designed to provide students with a safe, peaceful, and comfortable living environment that feels like home.
+                Hosteliq is designed to provide residents with a safe, peaceful, and comfortable living environment that feels like home.
               </p>
 
               <p className="text-foreground font-bold leading-relaxed mb-4" style={{ textShadow: '0 0 10px rgba(255, 255, 255, 0.2)' }}>
@@ -228,7 +228,7 @@ export default function About() {
               Our Values
             </h2>
             <p className="text-foreground font-bold text-lg max-w-2xl mx-auto" style={{ textShadow: '0 0 12px rgba(255, 255, 255, 0.25)' }}>
-              The principles that guide everything we do at Q2 Group of Hostels
+              The principles that guide everything we do at Hosteliq
             </p>
           </AnimatedSection>
 

@@ -53,15 +53,15 @@ export async function openRazorpaySubscriptionCheckout(
   const razorpayOptions: any = {
     key: options.keyId,
     subscription_id: options.subscriptionId,
-    name: 'Q2 Connect Suite',
-    description: options.description || 'Q2 SaaS Plan Subscription',
+    name: 'Hosteliq',
+    description: options.description || 'Hosteliq SaaS Plan Subscription',
     prefill: {
       name: options.organizationName || '',
       email: options.adminEmail || '',
       contact: options.adminPhone || '',
     },
     theme: {
-      color: '#f59e0b', // Q2 Primary Amber
+      color: '#9333ea', // Hosteliq Brand Purple
     },
     handler: function (response: RazorpaySubscriptionResponse) {
       onSuccess(response);
@@ -120,15 +120,15 @@ export async function openRazorpayOrderCheckout(
     order_id: options.orderId,
     amount: options.amountPaise,
     currency: options.currency || 'INR',
-    name: 'Q2 Connect Suite',
-    description: options.description || 'Q2 SaaS Discounted Subscription',
+    name: 'Hosteliq',
+    description: options.description || 'Hosteliq SaaS Discounted Subscription',
     prefill: {
       name: options.organizationName || '',
       email: options.adminEmail || '',
       contact: options.adminPhone || '',
     },
     theme: {
-      color: '#f59e0b',
+      color: '#9333ea',
     },
     handler: function (response: RazorpayOrderResponse) {
       onSuccess(response);

@@ -76,7 +76,7 @@ export function SecurityTrustSection() {
               Ready to Simplify Your Hostel Management?
             </h3>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Join leading hostels and PG chains running on the Q2 Connect Suite. Onboard your property in minutes.
+              Join leading hostels and PG chains running on Hosteliq. Onboard your property in minutes.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
               <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full px-8 shadow-lg shadow-primary/30">

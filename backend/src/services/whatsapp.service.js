@@ -37,7 +37,7 @@ function cleanPhoneNumber(phone) {
 async function sendLeaveApprovalParentNotification({
   leaveRequestId,
   studentName,
-  hostelName = 'Q2 Hostel',
+  hostelName = 'Hosteliq',
   startDate,
   endDate,
   approverName = 'Hostel Administration',

@@ -91,10 +91,10 @@ export function LeadCaptureModal({ isOpen, onClose }: LeadCaptureModalProps) {
                   <span>Interactive Product Tour</span>
                 </div>
                 <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
-                  Experience Q2 in Action
+                  Experience Hosteliq in Action
                 </h3>
                 <p className="text-sm text-slate-500 mt-1">
-                  Schedule a personalized demo or start a 14-day free pilot for your hostel branch.
+                  Schedule a personalized demo or start a 14-day free pilot for your accommodation property.
                 </p>
               </div>
 
@@ -160,7 +160,7 @@ export function LeadCaptureModal({ isOpen, onClose }: LeadCaptureModalProps) {
                       <Building className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <Input
                         id="hostelName"
-                        placeholder="e.g. Q2 Luxury PG"
+                        placeholder="e.g. Skyline Living & Hostels"
                         value={formData.hostelName}
                         onChange={(e) => setFormData({ ...formData, hostelName: e.target.value })}
                         className="pl-9 bg-slate-50 border-slate-200 text-sm focus:bg-white"

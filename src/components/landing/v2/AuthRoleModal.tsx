@@ -86,7 +86,7 @@ export function AuthRoleModal({ isOpen, onClose }: AuthRoleModalProps) {
           {/* Header */}
           <div className="text-left mb-6">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 border border-purple-100 text-purple-700 text-xs font-semibold mb-3">
-              <span>Q2 Universal Gateway</span>
+              <span>Hosteliq Universal Gateway</span>
             </div>
             <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Select your portal</h3>
             <p className="text-sm text-slate-500 mt-1">

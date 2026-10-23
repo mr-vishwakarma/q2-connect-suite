@@ -50,7 +50,7 @@ export function SmartInsights() {
             <span>Forward-Looking Intelligence</span>
           </div>
           <h2 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-            Q2 doesn't just show what happened.{' '}
+            Hosteliq doesn't just show what happened.{' '}
             <span className="text-purple-600">It helps you understand what's next.</span>
           </h2>
           <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">

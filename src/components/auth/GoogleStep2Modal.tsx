@@ -80,7 +80,7 @@ export function GoogleStep2Modal({
       if (error) {
         toast.error(error.message || 'Setup failed. Please try again.');
       } else {
-        toast.success(`Welcome to Q2, ${user?.name || 'Resident'}! Setup complete.`);
+        toast.success(`Welcome to Hosteliq, ${user?.name || 'Resident'}! Setup complete.`);
         onSuccess(user);
       }
     } catch (err: any) {

@@ -21,8 +21,8 @@ export function LightFooter({ onOpenAuth, onOpenLead }: LightFooterProps) {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0">
                 <img
-                  src="/q2-logo.png"
-                  alt="Q2 Group of Hostels"
+                  src="/hosteliq-logo.png"
+                  alt="Hosteliq"
                   width={40}
                   height={40}
                   loading="lazy"
@@ -31,17 +31,17 @@ export function LightFooter({ onOpenAuth, onOpenLead }: LightFooterProps) {
                 />
               </div>
               <div className="flex flex-col">
-                <span className="text-lg font-black text-white tracking-tight leading-none">
-                  Q2 Group of Hostels
+                <span className="text-lg font-black text-white tracking-tight leading-none flex items-center">
+                  <span>Hostel</span><span className="text-[#2dd4bf]">i</span><span className="text-[#fb7185]">q</span>
                 </span>
                 <span className="text-[10px] text-purple-400 font-semibold tracking-wider uppercase mt-0.5">
-                  Multi-Tenant Hostel SaaS Operating System
+                  Multi-Property Accommodation Platform
                 </span>
               </div>
             </div>
 
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-              Smart Hostel Management. Simplified. Powering student onboarding, room twin allocation, automated fee collection, and daily property operations across India.
+              Smart Accommodation Management. Simplified. Powering resident onboarding, digital twin allocation, automated fee collection, and daily property operations across India.
             </p>
 
             <div className="flex items-center gap-3 pt-2">
@@ -62,7 +62,7 @@ export function LightFooter({ onOpenAuth, onOpenLead }: LightFooterProps) {
               <li><a href="#digital-twin" className="hover:text-white transition-colors">Hostel Digital Twin</a></li>
               <li><a href="#fee-intelligence" className="hover:text-white transition-colors">Fee Intelligence</a></li>
               <li><a href="#operations" className="hover:text-white transition-colors">Smart Operations</a></li>
-              <li><a href="#ai-assistant" className="hover:text-white transition-colors">Q2 AI Assistant</a></li>
+              <li><a href="#ai-assistant" className="hover:text-white transition-colors">Hosteliq AI Assistant</a></li>
             </ul>
           </div>
 
@@ -86,21 +86,21 @@ export function LightFooter({ onOpenAuth, onOpenLead }: LightFooterProps) {
               Locations & Trust
             </span>
             <p className="text-slate-400 text-xs leading-relaxed">
-              <strong className="text-slate-200 block">Q2 Tech Headquarters:</strong>
+              <strong className="text-slate-200 block">Hosteliq Operations Hub:</strong>
               Gachibowli, Financial District, Hyderabad, Telangana — 500032
             </p>
             <p className="text-slate-400 text-xs">
               Direct Support: <span className="text-purple-400 font-semibold">+91 98450 11220</span>
             </p>
             <p className="text-slate-400 text-xs">
-              Email: <span className="text-purple-400 font-semibold">admin@q2hostels.com</span>
+              Email: <span className="text-purple-400 font-semibold">support@mrvishwakarma.in</span>
             </p>
           </div>
         </div>
 
         {/* Bottom copyright row */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} Q2 Group of Hostels. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Hosteliq. All rights reserved.</p>
 
           <div className="flex items-center gap-6">
             <span className="hover:text-slate-300 transition-colors cursor-pointer">Privacy Policy</span>

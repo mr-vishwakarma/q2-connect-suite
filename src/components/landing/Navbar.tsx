@@ -53,8 +53,8 @@ export function Navbar() {
               className="w-12 h-12 flex items-center justify-center overflow-hidden"
             >
               <img
-                src="/q2-logo.png"
-                alt="Q2 Logo"
+                src="/hosteliq-logo.png"
+                alt="Hosteliq Logo"
                 width={48}
                 height={48}
                 decoding="async"

@@ -147,8 +147,8 @@ export function AIAssistantSection() {
                 <Bot className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900">Q2 Intelligence Assistant</h4>
-                <p className="text-[11px] text-slate-500">Connected to live MongoDB tenant database</p>
+                <h4 className="text-sm font-bold text-slate-900">Hosteliq Intelligence Assistant</h4>
+                <p className="text-[11px] text-slate-500">Connected to live accommodation tenant database</p>
               </div>
             </div>
             <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200">

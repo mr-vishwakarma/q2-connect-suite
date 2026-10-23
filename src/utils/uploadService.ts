@@ -2,9 +2,9 @@
  * Unified Memory-Safe Client Media Upload Service (Phase E)
  * 
  * Flow:
- * 1. Authorize: Request short-lived signed ImageKit parameters & tenant-scoped folder from Q2 backend.
+ * 1. Authorize: Request short-lived signed ImageKit parameters & tenant-scoped folder from Hosteliq backend.
  * 2. Direct Upload: Upload file directly from browser to ImageKit CDN (bypassing Node.js server RAM).
- * 3. Confirm: Send verified fileId & URL to Q2 backend to persist MediaMetadata and link asset.
+ * 3. Confirm: Send verified fileId & URL to Hosteliq backend to persist MediaMetadata and link asset.
  * 4. Fallback: If direct CDN upload fails or in mock environment, safely fall back to server-streamed upload.
  */
 
@@ -55,7 +55,7 @@ export async function uploadMedia(file: File, options: UploadOptions): Promise<U
   }
 
   try {
-    // 2. Authorize Upload: Obtain signed ImageKit parameters and tenant folder from Q2 backend
+    // 2. Authorize Upload: Obtain signed ImageKit parameters and tenant folder from Hosteliq backend
     const authRes = await api.post('/upload/authorize', {
       category,
       fileName: file.name,
@@ -90,7 +90,7 @@ export async function uploadMedia(file: File, options: UploadOptions): Promise<U
 
         const { url, fileId, name, size, thumbnailUrl } = ikRes.data;
 
-        // 3. Confirm with Q2 backend
+        // 3. Confirm with Hosteliq backend
         await api.post('/upload/confirm', {
           fileId,
           url,

@@ -946,7 +946,7 @@ const sendFeeReminderEmail = async (req, res) => {
         </p>
 
         <div style="border-top: 1px solid #f1f5f9; padding-top: 14px; margin-top: 20px; font-size: 12px; color: #94a3b8;">
-          <p style="margin: 0;">Sent by ${student.hostel} Hostel Administration via Q2 Connect Suite.</p>
+          <p style="margin: 0;">Sent by ${student.hostel} Hostel Administration via Hosteliq.</p>
         </div>
       </div>
     `;

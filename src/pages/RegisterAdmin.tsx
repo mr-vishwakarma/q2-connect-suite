@@ -188,7 +188,7 @@ export default function RegisterAdmin() {
                 </motion.div>
                 <CardTitle className="text-2xl text-foreground">Create First Admin</CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  Set up the admin account for Q2 Management
+                  Set up the admin account for Hosteliq Management
                 </CardDescription>
               </CardHeader>
               

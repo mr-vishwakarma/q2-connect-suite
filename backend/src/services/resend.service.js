@@ -61,7 +61,7 @@ function getResendClient() {
  * Priority:
  * 1. RESEND_FROM_EMAIL (if set and valid)
  * 2. EMAIL_FROM (if set and matches domain or does not contain @gmail.com / @q2connect.com)
- * 3. Default verified identity: Q2 Connect Suite <noreply@mrvishwakarma.in>
+ * 3. Default verified identity: Hosteliq <noreply@mrvishwakarma.in>
  */
 function getResendSenderAddress() {
   const explicitResendFrom = (process.env.RESEND_FROM_EMAIL || '').trim();
@@ -79,7 +79,7 @@ function getResendSenderAddress() {
     return configuredFrom;
   }
 
-  return 'Q2 Connect Suite <noreply@mrvishwakarma.in>';
+  return 'Hosteliq <noreply@mrvishwakarma.in>';
 }
 
 /**
@@ -169,7 +169,7 @@ function getEffectiveReplyTo(customReplyTo = null) {
   if (configuredReplyTo && configuredReplyTo.includes('@') && !configuredReplyTo.includes('@gmail.com') && !configuredReplyTo.includes('@q2connect.com')) {
     return configuredReplyTo;
   }
-  return 'Q2 Connect Suite Support <support@mrvishwakarma.in>';
+  return 'Hosteliq Support <support@mrvishwakarma.in>';
 }
 
 /**

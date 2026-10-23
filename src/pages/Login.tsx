@@ -60,7 +60,7 @@ const ROLE_CONFIGS: Record<AuthRole, RoleConfig> = {
     title: 'Platform Administration',
     subtitle: 'Sign in with platform credentials to access multi-tenant infrastructure',
     identifierLabel: 'Administrator Email',
-    identifierPlaceholder: 'superadmin@q2connect.com',
+    identifierPlaceholder: 'superadmin@hosteliq.com',
     identifierIcon: Mail,
     ctaText: 'Sign In to Platform',
     securityFooter: 'SECURE PLATFORM ACCESS',
@@ -73,7 +73,7 @@ const ROLE_CONFIGS: Record<AuthRole, RoleConfig> = {
     title: 'Hostel Management Portal',
     subtitle: 'Manage property rooms, fee ledgers & staff operations',
     identifierLabel: 'Email or Staff Username',
-    identifierPlaceholder: 'admin@q2hostels.com or username',
+    identifierPlaceholder: 'admin@hosteliq.com or username',
     identifierIcon: UserIcon,
     ctaText: 'Sign In to Hostel Hub',
     securityFooter: 'SECURE HOSTEL ACCESS',
@@ -86,7 +86,7 @@ const ROLE_CONFIGS: Record<AuthRole, RoleConfig> = {
     title: 'Student Resident Portal',
     subtitle: 'Access assigned room details, fee invoices & gate pass requests',
     identifierLabel: 'Student User ID or Email',
-    identifierPlaceholder: 'e.g. nikhil or resident@q2hostels.com',
+    identifierPlaceholder: 'e.g. nikhil or resident@hosteliq.com',
     identifierIcon: GraduationCap,
     ctaText: 'Sign In to Resident App',
     securityFooter: 'STUDENT RESIDENT ACCESS',
@@ -263,7 +263,7 @@ export default function Login() {
         return;
       }
 
-      toast.success('Welcome back to Q2!', { toastId: 'auth-login-success' });
+      toast.success('Welcome back to Hosteliq!', { toastId: 'auth-login-success' });
 
       // AUTHORITATIVE DESTINATION: Derived strictly from verified server-side role
       const verifiedRole = loggedUser?.role;
@@ -492,7 +492,7 @@ export default function Login() {
             />
           </motion.div>
         ) : (
-          /* Unified Q2 Authentication Card (Exact Reference Architecture) */
+          /* Unified Hosteliq Authentication Card */
           <motion.div
             key="unified-auth-card"
             initial={{ opacity: 0, y: 16 }}
@@ -503,15 +503,21 @@ export default function Login() {
             {/* Brand Header */}
             <div className="text-center mb-6">
               <Link to="/" className="inline-flex items-center gap-3.5 group mb-2 focus:outline-none">
-                <div className="w-11 h-11 rounded-2xl bg-[#14080A] border border-red-500/40 flex items-center justify-center shadow-lg shadow-red-950/40 group-hover:border-red-500 transition-colors">
-                  <span className="text-white font-black text-sm tracking-tight">Q2</span>
+                <div className="w-11 h-11 rounded-2xl bg-white border border-purple-500/40 flex items-center justify-center shadow-lg shadow-purple-950/40 group-hover:border-purple-500 transition-colors p-1 overflow-hidden">
+                  <img
+                    src="/hosteliq-logo.png"
+                    alt="Hosteliq"
+                    width={36}
+                    height={36}
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <div className="flex flex-col text-left">
-                  <span className="text-xl font-black text-white tracking-tight leading-none">
-                    Q2 <span className="text-[#FF1E27] font-extrabold text-sm uppercase tracking-widest">CONNECT</span>
+                  <span className="text-xl font-black text-white tracking-tight leading-none flex items-center">
+                    <span>Hostel</span><span className="text-[#2dd4bf]">i</span><span className="text-[#fb7185]">q</span>
                   </span>
                   <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-widest mt-1">
-                    HOSTEL MANAGEMENT SUITE
+                    ACCOMMODATION & HOSTEL PLATFORM
                   </span>
                 </div>
               </Link>
@@ -531,7 +537,7 @@ export default function Login() {
 
                 <div
                   role="tablist"
-                  aria-label="Q2 Portal Role Selector"
+                  aria-label="Hosteliq Portal Role Selector"
                   className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-[#090A0D] border border-[#1A1D24]"
                 >
                   {(['super_admin', 'admin', 'student'] as AuthRole[]).map((roleKey) => {
@@ -817,7 +823,7 @@ export default function Login() {
             <div className="mt-6 text-center text-xs text-slate-400 space-x-1">
               <span>Need technical assistance?</span>
               <Link to="/contact" className="font-semibold text-slate-200 hover:text-white underline underline-offset-4">
-                Contact Q2 Technical Support
+                Contact Hosteliq Technical Support
               </Link>
             </div>
           </motion.div>

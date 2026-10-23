@@ -41,7 +41,7 @@ export function HowItWorks() {
             <span>Streamlined Onboarding</span>
           </div>
           <h2 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-            How Q2 transforms your hostel.
+            How Hosteliq transforms your property operations.
           </h2>
           <p className="text-base sm:text-lg text-slate-600 mt-4 leading-relaxed">
             Go live in less than a day. Our onboarding team helps you migrate all existing student data seamlessly.

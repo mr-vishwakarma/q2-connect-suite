@@ -43,8 +43,8 @@ export function LightNavbar({ onOpenAuth, onOpenLead }: LightNavbarProps) {
         <a href="#" className="flex items-center gap-3 group select-none">
           <div className="w-10 h-10 rounded-xl bg-white shadow-sm border border-slate-200/80 p-1 flex items-center justify-center shrink-0 group-hover:border-purple-300 transition-colors">
             <img
-              src="/q2-logo.png"
-              alt="Q2 Group of Hostels"
+              src="/hosteliq-logo.png"
+              alt="Hosteliq"
               width={40}
               height={40}
               decoding="async"
@@ -52,11 +52,11 @@ export function LightNavbar({ onOpenAuth, onOpenLead }: LightNavbarProps) {
             />
           </div>
           <div className="flex flex-col text-left">
-            <span className="font-extrabold text-slate-900 text-lg tracking-tight leading-none group-hover:text-purple-600 transition-colors">
-              Q2 <span className="font-medium text-slate-500 text-sm">Hostels</span>
+            <span className="font-extrabold text-slate-900 text-lg tracking-tight leading-none group-hover:text-purple-600 transition-colors flex items-center">
+              <span>Hostel</span><span className="text-[#2dd4bf]">i</span><span className="text-[#fb7185]">q</span>
             </span>
             <span className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-0.5">
-              SaaS Operating System
+              Accommodation Platform
             </span>
           </div>
         </a>

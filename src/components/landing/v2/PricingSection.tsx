@@ -57,7 +57,7 @@ export function PricingSection({ onOpenLead }: PricingSectionProps) {
       features: [
         'Unlimited Residents & Branches',
         'Super Admin Multi-Tenant Control Center',
-        'Q2 Natural-Language AI Assistant ("Ask your hostel")',
+        'Hosteliq Natural-Language AI Assistant ("Ask your hostel")',
         'Predictive Occupancy & Cashflow Forecasting',
         'Custom Role-Based Access Control (RBAC)',
         'Dedicated Cloud Database Cluster & 99.98% SLA',

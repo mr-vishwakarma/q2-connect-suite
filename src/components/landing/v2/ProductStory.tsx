@@ -213,7 +213,7 @@ export function ProductStory() {
 
                 {/* Bottom interactive action */}
                 <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                  <span>Q2 Multi-Tenant Cluster</span>
+                  <span>Hosteliq Multi-Tenant Cluster</span>
                   <span className="text-purple-300 font-medium">99.98% SLA Availability</span>
                 </div>
               </div>

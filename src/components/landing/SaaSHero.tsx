@@ -117,7 +117,7 @@ export function SaaSHero() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-base sm:text-xl text-muted-foreground max-w-2xl mx-auto font-medium"
           >
-            Manage students, rooms, fees, deposits, staff, analytics, and daily hostel operations from one connected Q2 platform.
+            Manage residents, rooms, fees, deposits, staff, analytics, and daily property operations from one connected Hosteliq platform.
           </motion.p>
 
           <motion.div
@@ -152,7 +152,7 @@ export function SaaSHero() {
                 <div className="w-3 h-3 rounded-full bg-rose-500/80" />
                 <div className="w-3 h-3 rounded-full bg-amber-500/80" />
                 <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-                <span className="text-xs font-mono text-muted-foreground ml-2">Q2 Girls Hostel — Interactive Student Fee Matrix</span>
+                <span className="text-xs font-mono text-muted-foreground ml-2">Hosteliq — Interactive Resident Fee Matrix</span>
               </div>
               <div className="flex items-center gap-3 text-xs font-semibold">
                 <span className="flex items-center gap-1 text-emerald-400"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Paid</span>

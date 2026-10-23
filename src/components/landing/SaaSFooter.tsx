@@ -11,8 +11,8 @@ export function SaaSFooter() {
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/40 flex items-center justify-center p-1">
                 <img
-                  src="/q2-logo.png"
-                  alt="Q2 Logo"
+                  src="/hosteliq-logo.png"
+                  alt="Hosteliq Logo"
                   width={32}
                   height={32}
                   loading="lazy"
@@ -20,17 +20,17 @@ export function SaaSFooter() {
                   className="w-full h-full object-contain"
                 />
               </div>
-              <span className="text-base font-black text-foreground">Q2 Group of Hostels</span>
+              <span className="text-base font-black text-foreground">Hosteliq</span>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Smart & Digital Hostel Operating Suite for student housing companies, PG chains, and independent accommodations.
+              Modern Accommodation & Property Management Platform for student housing, resident hostels, and multi-property chains.
             </p>
             <div className="space-y-1 pt-1 text-xs">
               <p className="flex items-center gap-2 text-foreground font-semibold">
                 <Phone className="w-3.5 h-3.5 text-primary" /> +91 96911 60716
               </p>
               <p className="flex items-center gap-2 text-foreground font-semibold">
-                <Mail className="w-3.5 h-3.5 text-primary" /> q2hostel@gmail.com
+                <Mail className="w-3.5 h-3.5 text-primary" /> support@mrvishwakarma.in
               </p>
             </div>
           </div>
@@ -69,14 +69,14 @@ export function SaaSFooter() {
               <li><Link to="/login?role=super_admin" className="hover:text-primary transition-colors">Super Admin Login</Link></li>
               <li><Link to="/login?role=admin" className="hover:text-primary transition-colors">Hostel Admin Sign In</Link></li>
               <li><Link to="/login?role=student" className="hover:text-primary transition-colors">Resident Portal Access</Link></li>
-              <li><Link to="/about" className="hover:text-primary transition-colors">About Q2 Group</Link></li>
+              <li><Link to="/about" className="hover:text-primary transition-colors">About Hosteliq</Link></li>
               <li><Link to="/contact" className="hover:text-primary transition-colors">Support & Help Desk</Link></li>
             </ul>
           </div>
         </div>
 
         <div className="pt-6 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-          <p>© {new Date().getFullYear()} Q2 Group of Hostels SaaS Platform. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Hosteliq Platform. All rights reserved.</p>
           <div className="flex gap-4">
             <span className="text-muted-foreground hover:text-foreground cursor-pointer">Privacy Policy</span>
             <span className="text-muted-foreground hover:text-foreground cursor-pointer">Terms of Service</span>

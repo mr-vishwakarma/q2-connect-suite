@@ -25,9 +25,9 @@ export function LightHero({ onOpenLead, onOpenAuth }: LightHeroProps) {
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-slate-200 shadow-sm text-xs font-semibold text-slate-700 mb-6"
         >
           <span className="flex h-2 w-2 rounded-full bg-purple-600 animate-pulse" />
-          <span className="text-slate-500 font-medium">Q2 GROUP OF HOSTELS</span>
+          <span className="text-slate-500 font-medium">HOSTELIQ</span>
           <span className="text-slate-300">•</span>
-          <span className="text-purple-700">Next-Gen SaaS Platform</span>
+          <span className="text-purple-700">Next-Gen Accommodation Platform</span>
         </motion.div>
 
         {/* Hero Headline */}
@@ -50,7 +50,7 @@ export function LightHero({ onOpenLead, onOpenAuth }: LightHeroProps) {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="text-base sm:text-lg lg:text-xl text-slate-600 max-w-2xl mx-auto mt-6 leading-relaxed font-normal"
         >
-          Q2 brings students, rooms, payments, staff, maintenance, and everyday hostel operations into one intelligent platform.
+          Hosteliq brings residents, rooms, payments, staff, maintenance, and everyday property operations into one intelligent platform.
         </motion.p>
 
         {/* Action CTAs */}

@@ -326,7 +326,7 @@ export default function MessOff() {
                     ) : (
                       <>
                         <Upload className="w-7 h-7 text-primary" />
-                        <p className="text-sm font-medium text-foreground">Upload Q2 Hostel Leave Document</p>
+                        <p className="text-sm font-medium text-foreground">Upload Hostel Leave Document</p>
                         <p className="text-xs text-muted-foreground">JPG, PNG or PDF · Max 1 MB</p>
                       </>
                     )}

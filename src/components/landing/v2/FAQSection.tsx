@@ -8,15 +8,15 @@ export function FAQSection() {
 
   const faqs: FAQItem[] = [
     {
-      question: 'How quickly can I set up my hostel on Q2?',
+      question: 'How quickly can I set up my hostel or accommodation on Hosteliq?',
       answer:
-        'You can go live in under 2 hours. Our onboarding team provides a spreadsheet template to import your building layout, rooms, beds, active students, and pending fee balances with 1 click.',
+        'You can go live in under 2 hours. Our onboarding team provides a spreadsheet template to import your building layout, rooms, beds, active residents, and pending fee balances with 1 click.',
       category: 'General',
     },
     {
       question: 'Can I migrate our existing student and fee data from Excel?',
       answer:
-        'Yes. Q2 includes an automated CSV/Excel importer that validates mobile numbers, room numbers, and deposit amounts. We also offer white-glove assisted data migration for all new properties.',
+        'Yes. Hosteliq includes an automated CSV/Excel importer that validates mobile numbers, room numbers, and deposit amounts. We also offer white-glove assisted data migration for all new properties.',
       category: 'General',
     },
     {
@@ -38,7 +38,7 @@ export function FAQSection() {
       category: 'Billing',
     },
     {
-      question: 'How does Q2 protect our student and financial data?',
+      question: 'How does Hosteliq protect resident and financial data?',
       answer:
         'All data is encrypted in transit and at rest using bank-grade AES-256 encryption on dedicated MongoDB Atlas clusters. Every tenant is strictly isolated to prevent data leakage.',
       category: 'Security',
@@ -46,7 +46,7 @@ export function FAQSection() {
     {
       question: 'Can we add or disable features as our property grows?',
       answer:
-        'Yes. Q2 uses dynamic Feature Flags. You can enable Attendance, Laundry, Maintenance SLA, or the AI Assistant module anytime from your Organization Settings without software redeployments.',
+        'Yes. Hosteliq uses dynamic Feature Flags. You can enable Attendance, Laundry, Maintenance SLA, or the AI Assistant module anytime from your Organization Settings without software redeployments.',
       category: 'Operations',
     },
   ];
@@ -64,7 +64,7 @@ export function FAQSection() {
             Frequently asked questions.
           </h2>
           <p className="text-base text-slate-600 mt-4 leading-relaxed">
-            Everything you need to know about migrating your property to the Q2 operating system.
+            Everything you need to know about migrating your property to the Hosteliq operating system.
           </p>
         </div>
 

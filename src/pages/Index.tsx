@@ -24,7 +24,7 @@ export default function Index() {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
 
   useEffect(() => {
-    document.title = 'Q2 Group of Hostels — Smart Hostel Management Platform';
+    document.title = 'Hosteliq — Modern Hostel & Accommodation Management Platform';
   }, []);
 
   const handleLoginClick = () => {
@@ -71,7 +71,7 @@ export default function Index() {
         {/* Section 9: 12-Card Feature Suite with Micro-Interactions */}
         <FeatureGrid />
 
-        {/* Section 10: How Q2 Works (4 Implementation Milestones) */}
+        {/* Section 10: How Hosteliq Works (4 Implementation Milestones) */}
         <HowItWorks />
 
         {/* Section 11: Security at the Core (RBAC, Tenant Isolation, AES-256 Cloud Encryption) */}

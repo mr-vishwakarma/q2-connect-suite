@@ -16,11 +16,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Q2 Connect Suite',
-        short_name: 'Q2 Connect',
-        description: 'Advanced Hostel Management System',
-        theme_color: '#000000',
-        background_color: '#000000',
+        name: 'Hosteliq',
+        short_name: 'Hosteliq',
+        description: 'Modern Hostel & Accommodation Management Platform',
+        theme_color: '#9333ea',
+        background_color: '#ffffff',
         display: 'standalone'
       },
       workbox: {

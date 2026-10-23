@@ -47,7 +47,7 @@ export function FinalCTA({ onOpenLead }: FinalCTAProps) {
                 className="h-12 px-7 rounded-2xl bg-white/10 hover:bg-white/20 text-white border-white/20 font-semibold text-sm backdrop-blur-sm transition-all"
               >
                 <PhoneCall className="w-4 h-4 mr-2" />
-                <span>Talk to Q2 Hospitality Tech</span>
+                <span>Talk to Hosteliq Property Tech</span>
               </Button>
             </div>
 

@@ -78,7 +78,7 @@ let lastConfigHash = '';
 
 /**
  * Resolves sender address cleanly matching the active mail transport (Resend or SMTP)
- * Defaults to authenticated domain: Q2 Connect Suite <noreply@mrvishwakarma.in>
+ * Defaults to authenticated domain: Hosteliq <noreply@mrvishwakarma.in>
  */
 function getSenderAddress() {
   if (process.env.RESEND_API_KEY) {
@@ -88,7 +88,7 @@ function getSenderAddress() {
   if (configuredFrom && configuredFrom.includes('@') && !configuredFrom.includes('@q2connect.com')) {
     return configuredFrom;
   }
-  return 'Q2 Connect Suite <noreply@mrvishwakarma.in>';
+  return 'Hosteliq <noreply@mrvishwakarma.in>';
 }
 
 /**
@@ -545,7 +545,7 @@ const sendEmail = async ({
     const effectiveReplyTo = replyTo || getEffectiveSupportEmail();
 
     const headers = {
-      'X-Mailer': 'Q2 Connect Suite Mailer v2',
+      'X-Mailer': 'Hosteliq Mailer v2',
       'X-Entity-Ref-ID': effectiveCid,
     };
 
@@ -670,7 +670,7 @@ function renderBrandedLayout({ title, subtitle, preheader, contentHtml, footerNo
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>${escapeHtml(title || 'Q2 Connect Suite')}</title>
+  <title>${escapeHtml(title || 'Hosteliq')}</title>
   <!--[if mso]>
   <style type="text/css">
     body, table, td {font-family: Arial, Helvetica, sans-serif !important;}
@@ -693,8 +693,8 @@ function renderBrandedLayout({ title, subtitle, preheader, contentHtml, footerNo
           <table border="0" cellpadding="0" cellspacing="0" width="100%">
             <tr>
               <td>
-                <span style="font-size: 18px; font-weight: 800; letter-spacing: -0.3px; color: #0f172a; text-transform: uppercase;">Q2 CONNECT SUITE</span>
-                <p style="margin: 3px 0 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; color: #64748b;">${escapeHtml(subtitle || 'Resident & Hostel Management Platform')}</p>
+                <span style="font-size: 18px; font-weight: 800; letter-spacing: -0.3px; color: #0f172a; text-transform: uppercase;">HOSTELIQ</span>
+                <p style="margin: 3px 0 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; color: #64748b;">${escapeHtml(subtitle || 'Accommodation & Resident Platform')}</p>
               </td>
             </tr>
           </table>
@@ -714,7 +714,7 @@ function renderBrandedLayout({ title, subtitle, preheader, contentHtml, footerNo
         <td style="padding: 20px 28px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: left; font-size: 12px; line-height: 1.5; color: #64748b;">
           ${footerNote ? `<p style="margin: 0 0 8px 0; color: #475569;">${footerNote}</p>` : ''}
           <p style="margin: 0 0 4px 0; color: #64748b;">
-            You received this message because your account is registered with <strong>Q2 Connect Suite</strong>.
+            You received this message because your account is registered with <strong>Hosteliq</strong>.
           </p>
           <p style="margin: 0; color: #64748b;">
             Questions or assistance? Contact our team at <a href="mailto:${supportEmail}" style="color: #2563eb; text-decoration: none;">${supportEmail}</a>
@@ -724,7 +724,7 @@ function renderBrandedLayout({ title, subtitle, preheader, contentHtml, footerNo
             <a href="${unsubscribeUrl}" style="color: #64748b; text-decoration: underline;">Manage email preferences or unsubscribe</a>
           </p>` : ''}
           <p style="margin: 10px 0 0 0; font-size: 11px; color: #94a3b8;">
-            &copy; ${currentYear} Q2 Connect Suite &bull; Student & Resident Operations
+            &copy; ${currentYear} Hosteliq &bull; Accommodation & Resident Operations
           </p>
         </td>
       </tr>
@@ -773,14 +773,14 @@ const sendStudentAnnouncementEmail = async ({
   const frontendUrl = getTrustedFrontendUrl();
   const cleanActionUrl = (actionUrl || `${frontendUrl}/student/announcements`).trim();
 
-  const subject = `A student update from Q2 Connect Suite: ${announcementTitle}`;
+  const subject = `A student update from Hosteliq: ${announcementTitle}`;
   const preheader = announcementSummary;
 
-  const text = `A student update from Q2 Connect Suite: ${announcementTitle}
+  const text = `A student update from Hosteliq: ${announcementTitle}
 
 Hello ${studentName},
 
-You are receiving this message because your student account is registered with Q2 Connect Suite.
+You are receiving this message because your student account is registered with Hosteliq.
 
 ${announcementTitle}
 
@@ -796,7 +796,7 @@ ${cleanActionUrl}
 
 If you have questions, reply to this email or contact ${effectiveSupport}.
 
-Q2 Connect Suite
+Hosteliq
 Student communications`;
 
   const contentHtml = `
@@ -804,7 +804,7 @@ Student communications`;
       Hello <strong>${safeName}</strong>,
     </p>
     <p style="margin: 0 0 18px 0; font-size: 14px; color: #64748b; line-height: 1.5;">
-      You are receiving this message because your student account is registered with Q2 Connect Suite.
+      You are receiving this message because your student account is registered with Hosteliq.
     </p>
 
     <div style="background-color: #f8fafc; border-left: 4px solid #0f172a; padding: 16px; border-radius: 4px; margin-bottom: 20px;">
@@ -843,7 +843,7 @@ Student communications`;
     subtitle: 'Official Resident Communications',
     preheader,
     contentHtml,
-    footerNote: 'Q2 Connect Suite &bull; Student communications',
+    footerNote: 'Hosteliq &bull; Student communications',
   });
 
   const unsubscribeUrl = `${frontendUrl}/student/preferences`;
@@ -876,14 +876,14 @@ const sendStudentWelcomeEmail = async (options) => {
   const safeStudentCode = escapeHtml(rawStudentCode);
   const safeHostel = escapeHtml(rawHostel);
 
-  const subject = options.subject || `Welcome to Q2 Connect Suite — Activate Your Resident Account (${rawHostel})`;
+  const subject = options.subject || `Welcome to Hosteliq — Activate Your Resident Account (${rawHostel})`;
   const preheader = `Your resident admission into ${rawHostel} Hostel is confirmed. Activate your account to sign in.`;
 
   const cleanActivationLink = (activationLink || '').trim();
   const frontendUrl = getTrustedFrontendUrl();
   const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=student`).trim();
 
-  const text = `Welcome to Q2 Connect Suite!
+  const text = `Welcome to Hosteliq!
 
 Hello ${rawName},
 
@@ -907,7 +907,7 @@ If you have any questions or require assistance, please contact our support team
 
 Best regards,
 ${rawHostel} Administration & Operations
-Q2 Connect Suite`;
+Hosteliq`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">
@@ -988,15 +988,15 @@ Q2 Connect Suite`;
  * Send password reset email
  */
 const sendPasswordResetEmail = async ({ to, name = null, resetLink, correlationId }) => {
-  const subject = 'Reset Your Q2 Connect Suite Password';
+  const subject = 'Reset Your Hosteliq Password';
   const preheader = 'We received a request to reset your password. This link is valid for 2 hours.';
   const cleanLink = resetLink.trim();
   const safeName = name ? escapeHtml(name) : null;
   const supportEmail = getEffectiveSupportEmail();
 
-  const text = `Password Reset Request — Q2 Connect Suite
+  const text = `Password Reset Request — Hosteliq
 
-${name ? `Hello ${name},\n\n` : ''}We received a request to reset the password for your Q2 Connect Suite account.
+${name ? `Hello ${name},\n\n` : ''}We received a request to reset the password for your Hosteliq account.
 
 Click the link below or copy it into your browser to set a new password (valid for 2 hours):
 ${cleanLink}
@@ -1008,12 +1008,12 @@ Security Notice:
 Need help? Contact support at ${supportEmail}.
 
 Best regards,
-Q2 Connect Suite Security Team`;
+Hosteliq Security Team`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">
       ${safeName ? `Hello <strong>${safeName}</strong>,<br/><br/>` : ''}
-      We received a request to reset the password for your Q2 Connect Suite account.
+      We received a request to reset the password for your Hosteliq account.
     </p>
 
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; text-align: center; margin: 20px 0;">
@@ -1079,7 +1079,7 @@ const sendFeeReminderEmail = async ({
   const subject = `Fee Notice: Pending Hostel Dues for ${month}`;
   const preheader = `A balance of ₹${amount} is pending for ${month} at ${hostelName}. View and clear dues online.`;
 
-  const text = `Hostel Fee Notice — Q2 Connect Suite
+  const text = `Hostel Fee Notice — Hosteliq
 
 Dear ${studentName},
 
@@ -1099,7 +1099,7 @@ If you have already settled this payment, please disregard this notice or contac
 
 Best regards,
 ${hostelName} Accounts & Administration
-Q2 Connect Suite`;
+Hosteliq`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">
@@ -1165,7 +1165,7 @@ const sendMessRequestUpdate = async ({ to, name, status, leavingDate, returnDate
   const subject = `Update on Your Mess Request: ${statusFormatted}`;
   const preheader = `Your mess leave request has been ${statusFormatted.toLowerCase()}. View details inside.`;
 
-  const text = `Mess Leave Request Update — Q2 Connect Suite
+  const text = `Mess Leave Request Update — Hosteliq
 
 Hello ${name},
 
@@ -1181,7 +1181,7 @@ ${getTrustedFrontendUrl()}/student/mess
 
 Best regards,
 Kitchen & Dining Operations
-Q2 Connect Suite`;
+Hosteliq`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155;">Hello <strong>${escapeHtml(name)}</strong>,</p>
@@ -1237,7 +1237,7 @@ const sendAdminActionOtpEmail = async ({ to, adminName = 'Administrator', action
   const subject = `Security Verification Code: ${otp}`;
   const preheader = `Your verification code is ${otp}. Valid for ${expiresInMinutes} minutes.`;
 
-  const text = `Q2 Connect Suite Security Verification
+  const text = `Hosteliq Security Verification
 
 Hello ${adminName},
 
@@ -1250,10 +1250,10 @@ ${otp}
 This verification code expires in ${expiresInMinutes} minutes and is single-use.
 
 Security Notice:
-Never share this verification code with anyone. Q2 Connect Suite staff will never ask for your verification code.
+Never share this verification code with anyone. Hosteliq staff will never ask for your verification code.
 
 Best regards,
-Q2 Connect Suite Security Operations`;
+Hosteliq Security Operations`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155;">
@@ -1304,7 +1304,7 @@ const sendSecondaryAdminWelcomeEmail = async ({
   name,
   username,
   hostelName = 'Assigned Hostel',
-  orgName = 'Q2 Connect Suite',
+  orgName = 'Hosteliq',
   activationLink,
   loginLink,
   correlationId,
@@ -1313,7 +1313,7 @@ const sendSecondaryAdminWelcomeEmail = async ({
   const safeName = escapeHtml(name || 'Administrator');
   const safeUsername = escapeHtml(username || '');
   const safeHostel = escapeHtml(hostelName || 'Assigned Hostel');
-  const safeOrg = escapeHtml(orgName || 'Q2 Connect Suite');
+  const safeOrg = escapeHtml(orgName || 'Hosteliq');
   const frontendUrl = getTrustedFrontendUrl();
   const cleanActivationLink = (activationLink || `${frontendUrl}/login`).trim();
   const cleanLoginLink = (loginLink || `${frontendUrl}/login?role=admin`).trim();
@@ -1321,7 +1321,7 @@ const sendSecondaryAdminWelcomeEmail = async ({
   const subject = `Staff Account Provisioned — Activate Your Administrator Account (${hostelName})`;
   const preheader = `You have been appointed as an administrator for ${hostelName}. Set your password to get started.`;
 
-  const text = `Welcome to Q2 Connect Suite!
+  const text = `Welcome to Hosteliq!
 
 Hello ${name},
 
@@ -1339,7 +1339,7 @@ After activation, you can sign in anytime at:
 ${cleanLoginLink}
 
 Best regards,
-Administration & Operations — Q2 Connect Suite`;
+Administration & Operations — Hosteliq`;
 
   const contentHtml = `
     <p style="margin: 0 0 14px 0; font-size: 15px; color: #334155;">Hello <strong>${safeName}</strong>,</p>
@@ -1437,7 +1437,7 @@ View in Admin Panel:
 ${frontendUrl}/admin/students
 
 Best regards,
-Q2 Connect Suite Operations`;
+Hosteliq Operations`;
 
   const contentHtml = `
     <p style="margin: 0 0 16px 0; font-size: 14px; color: #334155;">
@@ -1496,12 +1496,12 @@ const sendHostelOnboardingWelcomeEmail = async ({
   tempPassword,
   correlationId,
 }) => {
-  const subject = `Welcome to Q2 Connect Suite — Onboarding Complete for ${orgName}`;
+  const subject = `Welcome to Hosteliq — Onboarding Complete for ${orgName}`;
   const preheader = `Your organization ${orgName} has been configured. Access your admin dashboard.`;
   const frontendUrl = getTrustedFrontendUrl();
   const activationUrl = setupUrl || `${frontendUrl}/login`;
 
-  const text = `Welcome to Q2 Connect Suite!
+  const text = `Welcome to Hosteliq!
 
 Hello ${name},
 
@@ -1515,12 +1515,12 @@ Access your dashboard:
 ${activationUrl}
 
 Best regards,
-Q2 Connect Suite Platform Operations`;
+Hosteliq Platform Operations`;
 
   const contentHtml = `
     <p style="font-size: 14px; line-height: 1.6; color: #334155;">Hello <strong>${escapeHtml(name)}</strong>,</p>
     <p style="font-size: 14px; line-height: 1.6; color: #475569;">
-      Welcome to Q2 Connect Suite! Your organization <strong>${escapeHtml(orgName)}</strong> and primary branch <strong>${escapeHtml(branchName)}</strong> are provisioned.
+      Welcome to Hosteliq! Your organization <strong>${escapeHtml(orgName)}</strong> and primary branch <strong>${escapeHtml(branchName)}</strong> are provisioned.
     </p>
 
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 20px 0;">

@@ -127,7 +127,7 @@ export function PlatformExperiences() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent pointer-events-none" />
                     <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-xs bg-background/80 backdrop-blur-md px-4 py-2 rounded-xl border border-border/60">
-                      <span className="font-mono text-muted-foreground font-semibold">Q2 Connect Suite v2.0 • Live Ledger View</span>
+                      <span className="font-mono text-muted-foreground font-semibold">Hosteliq Platform v2.0 • Live Ledger View</span>
                       <Badge variant="outline" className="text-emerald-400 border-emerald-500/40">91.8% Collection Rate</Badge>
                     </div>
                   </div>

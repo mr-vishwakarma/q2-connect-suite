@@ -76,7 +76,7 @@ export function HostelOperationsShowcase() {
               <p className="text-xs text-muted-foreground">Showing 4 rooms with active resident allocations</p>
             </div>
             <Badge variant="outline" className="text-xs font-mono">
-              Branch: Q2 Girls Hostel
+              Branch: Central Campus Wing
             </Badge>
           </div>
 

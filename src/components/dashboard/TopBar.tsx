@@ -19,8 +19,8 @@ export function TopBar({ title, onMenuToggle, showMenu }: TopBarProps) {
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* On mobile, show Logo instead of hamburger menu since we will use bottom nav */}
         <img
-          src="/q2-logo.png"
-          alt="Q2 Logo"
+          src="/hosteliq-logo.png"
+          alt="Hosteliq Logo"
           width={32}
           height={32}
           decoding="async"

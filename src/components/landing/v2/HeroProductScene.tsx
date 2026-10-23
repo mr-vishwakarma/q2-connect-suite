@@ -105,7 +105,7 @@ export function HeroProductScene() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-slate-900">Q2 Connect Control Console</h3>
+              <h3 className="text-base font-bold text-slate-900">Hosteliq Control Console</h3>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Live Sync
