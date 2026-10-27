@@ -45,6 +45,11 @@ import {
   Refrigerator,
   Sparkle,
   Loader2,
+  RefreshCw,
+  Mail,
+  KeyRound,
+  ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { api } from '@/lib/api';
@@ -104,6 +109,9 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingAadhaar, setIsUploadingAadhaar] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [provisioningResult, setProvisioningResult] = useState<any>(null);
+  const [isResendingAdmin, setIsResendingAdmin] = useState(false);
+  const [isResendingWarden, setIsResendingWarden] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
@@ -153,20 +161,10 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
     adminPassword: '',
     adminDesignation: 'General Manager',
 
-    // Stage 4: Subscription & Policies
+    // Stage 4: SaaS Subscription
     planCode: 'STARTER',
     billingCycle: 'MONTHLY',
     trialDays: 14,
-    monthlyRentDueDay: 5,
-    gracePeriodDays: 5,
-    lateFeePerDay: 50,
-    securityDeposit: 5000,
-    hasMess: true,
-    messOffNoticeHours: 24,
-    messRebatePerDay: 120,
-    laundrySlotsPerWeek: 2,
-    curfewTime: '21:30',
-    parentConsentRequired: true,
   });
 
   // Slug auto-generator
@@ -305,6 +303,57 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
+  // Resend Handlers
+  const handleResendAdminInvite = async () => {
+    if (!provisioningResult?.adminAccount?.id) return;
+    try {
+      setIsResendingAdmin(true);
+      const res = await superAdminService.resendInvitation(provisioningResult.adminAccount.id);
+      if (res.success) {
+        toast.success('Admin welcome invitation re-dispatched successfully!');
+        setProvisioningResult((prev: any) => ({
+          ...prev,
+          adminAccount: {
+            ...prev.adminAccount,
+            invitationEmailStatus: res.data?.user?.invitationEmailStatus || 'sent',
+            invitationEmailError: null,
+          },
+        }));
+      } else {
+        toast.error(res.message || 'Failed to resend invitation email');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Error resending invitation');
+    } finally {
+      setIsResendingAdmin(false);
+    }
+  };
+
+  const handleResendWardenInvite = async () => {
+    if (!provisioningResult?.wardenAccount?.id) return;
+    try {
+      setIsResendingWarden(true);
+      const res = await superAdminService.resendInvitation(provisioningResult.wardenAccount.id);
+      if (res.success) {
+        toast.success('Warden invitation re-sent to Hostel Admin successfully!');
+        setProvisioningResult((prev: any) => ({
+          ...prev,
+          wardenAccount: {
+            ...prev.wardenAccount,
+            invitationEmailStatus: res.data?.user?.invitationEmailStatus || 'sent',
+            invitationEmailError: null,
+          },
+        }));
+      } else {
+        toast.error(res.message || 'Failed to resend warden invitation');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Error resending warden invitation');
+    } finally {
+      setIsResendingWarden(false);
+    }
+  };
+
   // Final Submission
   const handleSubmit = async () => {
     if (!validateStep(4)) return;
@@ -312,11 +361,11 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
     try {
       setIsSubmitting(true);
       const res = await superAdminService.createOrganization(formData);
-      if (res.success) {
+      if (res.success && res.data) {
         toast.success(`🎉 Organization '${formData.name}' onboarded successfully!`);
+        setProvisioningResult(res.data);
+        setCurrentStep(5);
         onSuccess?.();
-        onClose();
-        setCurrentStep(1);
       }
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to onboard organization');
@@ -338,26 +387,29 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                 </div>
                 <div>
                   <DialogTitle className="text-xl font-bold text-foreground">
-                    Hostel Organization Onboarding
+                    {currentStep === 5 ? 'Onboarding & Provisioning Complete' : 'Hostel Organization Onboarding'}
                   </DialogTitle>
                   <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                    Stage-by-stage real-world tenant setup with KYC, property branch, administrator, and policies.
+                    {currentStep === 5
+                      ? 'Review the provisioned hostel property, administrator account, warden credentials, and invitation email delivery status.'
+                      : 'Stage-by-stage real-world tenant setup with KYC, property branch, administrator, and policies.'}
                   </DialogDescription>
                 </div>
               </div>
-              <Badge variant="outline" className="border-amber-500/30 text-amber-400 font-mono text-xs px-3 py-1">
-                Step {currentStep} of 4
+              <Badge variant="outline" className={`border-amber-500/30 text-amber-400 font-mono text-xs px-3 py-1 ${currentStep === 5 ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' : ''}`}>
+                {currentStep === 5 ? 'Completed' : `Step ${currentStep} of 4`}
               </Badge>
             </div>
           </DialogHeader>
 
           {/* Stepper Progress Bar */}
-          <div className="grid grid-cols-4 gap-2 mt-5">
+          <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 mt-5">
             {[
               { num: 1, label: 'KYC & Entity', icon: Building2 },
               { num: 2, label: 'Property & Amenities', icon: GitFork },
               { num: 3, label: 'Admin Account', icon: UserCheck },
-              { num: 4, label: 'Plan & Policies', icon: CreditCard },
+              { num: 4, label: 'Subscription Plan', icon: CreditCard },
+              { num: 5, label: 'Provisioning Summary', icon: CheckCircle2 },
             ].map((step) => {
               const isPassed = currentStep > step.num;
               const isCurrent = currentStep === step.num;
@@ -390,6 +442,7 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
             })}
           </div>
         </div>
+
 
         {/* Modal Body - Scrollable Step Views */}
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
@@ -873,12 +926,17 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
             </div>
           )}
 
-          {/* STEP 4: SUBSCRIPTION & OPERATIONAL POLICIES */}
+          {/* STEP 4: SAAS SUBSCRIPTION PLAN & BILLING */}
           {currentStep === 4 && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               {/* Plan Selection Cards */}
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-foreground">SaaS Subscription Tier</Label>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-semibold text-foreground">SaaS Subscription Tier</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Select the Hosteliq platform capacity tier and feature entitlements for this organization.
+                  </p>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {PLAN_OPTIONS.map((plan) => {
                     const isSelected = formData.planCode === plan.code;
@@ -887,9 +945,9 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                       <div
                         key={plan.code}
                         onClick={() => setFormData({ ...formData, planCode: plan.code })}
-                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                        className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
                           isSelected
-                            ? 'bg-amber-500/15 border-amber-500 text-foreground shadow-md'
+                            ? 'bg-amber-500/15 border-amber-500 text-foreground shadow-md ring-1 ring-amber-500/50'
                             : 'bg-card border-border hover:border-border/80 text-muted-foreground'
                         }`}
                       >
@@ -900,10 +958,10 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                             </span>
                             {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-400" />}
                           </div>
-                          <div className="text-base font-bold text-foreground">{plan.price}</div>
-                          <p className="text-[11px] text-muted-foreground mt-1 leading-snug">{plan.desc}</p>
+                          <div className="text-lg font-bold text-foreground">{plan.price}</div>
+                          <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">{plan.desc}</p>
                         </div>
-                        <Badge variant="secondary" className="mt-3 text-[10px] w-fit">
+                        <Badge variant="secondary" className="mt-4 text-[10px] w-fit">
                           {plan.beds}
                         </Badge>
                       </div>
@@ -912,19 +970,19 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                 </div>
               </div>
 
-              {/* Billing Cycle & Trial */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-secondary/30 border border-border">
-                <div className="space-y-1.5">
-                  <Label>Billing Frequency</Label>
+              {/* Billing Cycle & Trial Duration */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-secondary/30 border border-border">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Billing Frequency</Label>
                   <div className="flex rounded-md border border-input p-1 bg-background">
                     {(['MONTHLY', 'QUARTERLY', 'ANNUAL'] as const).map((cycle) => (
                       <button
                         key={cycle}
                         type="button"
                         onClick={() => setFormData({ ...formData, billingCycle: cycle })}
-                        className={`flex-1 py-1 text-xs rounded font-medium transition-all ${
+                        className={`flex-1 py-1.5 text-xs rounded font-medium transition-all ${
                           formData.billingCycle === cycle
-                            ? 'bg-amber-500 text-black shadow'
+                            ? 'bg-amber-500 text-black shadow font-semibold'
                             : 'text-muted-foreground hover:text-foreground'
                         }`}
                       >
@@ -932,13 +990,16 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                       </button>
                     ))}
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Subscription invoices and renewals follow the selected billing cycle.
+                  </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="trialDays">Trial Duration</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="trialDays" className="text-xs font-semibold">Trial Duration</Label>
                   <select
                     id="trialDays"
-                    className="w-full h-9 px-3 bg-background border border-input rounded-md text-xs text-foreground focus:outline-none"
+                    className="w-full h-9 px-3 bg-background border border-input rounded-md text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
                     value={formData.trialDays}
                     onChange={(e) => setFormData({ ...formData, trialDays: Number(e.target.value) })}
                   >
@@ -946,73 +1007,226 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                     <option value={30}>30 Days Extended Trial</option>
                     <option value={0}>Immediate Active Subscription</option>
                   </select>
+                  <p className="text-[11px] text-muted-foreground">
+                    New organizations start in trial status before automated billing commences.
+                  </p>
                 </div>
               </div>
 
-              {/* Living Operations & Policies */}
-              <div className="space-y-3">
-                <Label className="text-sm font-semibold text-foreground">
-                  Living Operations & Rules Configuration
-                </Label>
+              {/* Notice regarding Living Operations separation */}
+              <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 flex items-start gap-3 text-xs text-muted-foreground">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <span className="font-semibold text-foreground">Post-Onboarding Operational Policies:</span>{' '}
+                  Individual hostel operational rules (grace periods, daily late fees, security deposits, night curfews, and laundry allowances) are managed directly by the authorized Hostel Administrator under <strong>Hostel Admin → Settings</strong> for their assigned property.
+                </div>
+              </div>
+            </div>
+          )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="graceDays" className="text-xs">Grace Period (Days)</Label>
-                    <Input
-                      id="graceDays"
-                      type="number"
-                      className="h-8 text-xs"
-                      value={formData.gracePeriodDays}
-                      onChange={(e) => setFormData({ ...formData, gracePeriodDays: Number(e.target.value) })}
-                    />
+          {/* STEP 5: PROVISIONING SUMMARY & INVITATION STATUS */}
+          {currentStep === 5 && provisioningResult && (
+            <div className="space-y-4">
+              {/* Success Banner */}
+              <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-foreground text-sm">
+                    Hostel Onboarded &amp; Accounts Provisioned Successfully!
+                  </h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    The hostel entity has been saved to the database. Single-use cryptographic activation links have been generated and dispatched. Review the provisioning status and email delivery logs below.
+                  </p>
+                </div>
+              </div>
+
+              {/* Partial Failure Warning Banner if any email failed */}
+              {(provisioningResult.adminAccount?.invitationEmailStatus === 'failed' ||
+                provisioningResult.wardenAccount?.invitationEmailStatus === 'failed') && (
+                <div className="p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-200 leading-relaxed">
+                    <strong className="text-amber-300">Action Needed:</strong> One or more invitation emails could not be confirmed by the mail server. You can safely retry sending the invitation at any time using the <em>Resend Invitation</em> buttons below.
                   </div>
+                </div>
+              )}
 
-                  <div className="space-y-1">
-                    <Label htmlFor="lateFee" className="text-xs">Late Fee / Day (₹)</Label>
-                    <Input
-                      id="lateFee"
-                      type="number"
-                      className="h-8 text-xs"
-                      value={formData.lateFeePerDay}
-                      onChange={(e) => setFormData({ ...formData, lateFeePerDay: Number(e.target.value) })}
-                    />
+              {/* Grid 1: Hostel Details */}
+              <div className="p-4 rounded-xl border border-border bg-card/60 space-y-3">
+                <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-amber-400" />
+                    <span className="font-semibold text-sm text-foreground">Hostel Branch Record</span>
                   </div>
+                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 bg-emerald-500/10 text-xs">
+                    {provisioningResult.hostel?.status || 'ACTIVE'}
+                  </Badge>
+                </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="deposit" className="text-xs">Security Deposit (₹)</Label>
-                    <Input
-                      id="deposit"
-                      type="number"
-                      className="h-8 text-xs"
-                      value={formData.securityDeposit}
-                      onChange={(e) => setFormData({ ...formData, securityDeposit: Number(e.target.value) })}
-                    />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-muted-foreground block">Hostel Name</span>
+                    <span className="font-semibold text-foreground">{provisioningResult.hostel?.name || formData.branchName}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block">Branch Code</span>
+                    <span className="font-mono font-semibold text-foreground">{provisioningResult.hostel?.code || formData.branchCode}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block">Bed Capacity</span>
+                    <span className="font-semibold text-foreground">{provisioningResult.hostel?.capacity || formData.capacity} Beds</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block">Gender Scoping</span>
+                    <span className="font-semibold text-foreground">{provisioningResult.hostel?.genderType || formData.genderType}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid 2: Hostel Admin Account */}
+              <div className="p-4 rounded-xl border border-border bg-card/60 space-y-3">
+                <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-blue-400" />
+                    <span className="font-semibold text-sm text-foreground">Hostel Administrator Account</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      Status: {provisioningResult.adminAccount?.status === 'ACTIVE' ? 'ACTIVE (Accepted)' : 'INVITED (Pending Activation)'}
+                    </Badge>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="space-y-1">
-                    <Label htmlFor="curfew" className="text-xs">Night Curfew Timing</Label>
-                    <Input
-                      id="curfew"
-                      type="time"
-                      className="h-8 text-xs"
-                      value={formData.curfewTime}
-                      onChange={(e) => setFormData({ ...formData, curfewTime: e.target.value })}
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <span className="text-muted-foreground block">Administrator Name</span>
+                    <span className="font-semibold text-foreground">{provisioningResult.adminAccount?.name}</span>
                   </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="laundrySlots" className="text-xs">Weekly Laundry Slots</Label>
-                    <Input
-                      id="laundrySlots"
-                      type="number"
-                      className="h-8 text-xs"
-                      value={formData.laundrySlotsPerWeek}
-                      onChange={(e) => setFormData({ ...formData, laundrySlotsPerWeek: Number(e.target.value) })}
-                    />
+                  <div>
+                    <span className="text-muted-foreground block">Login Email</span>
+                    <span className="font-mono text-foreground">{provisioningResult.adminAccount?.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block">Username</span>
+                    <span className="font-mono text-foreground">{provisioningResult.adminAccount?.username}</span>
                   </div>
                 </div>
+
+                <div className="pt-2 border-t border-border/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Welcome Email Status:</span>
+                    {provisioningResult.adminAccount?.invitationEmailStatus === 'sent' ? (
+                      <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs">
+                        Sent (Activation Link Emailed)
+                      </Badge>
+                    ) : provisioningResult.adminAccount?.invitationEmailStatus === 'failed' ? (
+                      <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-xs">
+                        Delivery Failed
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">Queued</Badge>
+                    )}
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResendAdminInvite}
+                    disabled={isResendingAdmin}
+                    className="h-7 text-xs gap-1 border-amber-500/30 hover:border-amber-500/60"
+                  >
+                    {isResendingAdmin ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    Resend Welcome Email
+                  </Button>
+                </div>
+              </div>
+
+              {/* Grid 3: Warden Account */}
+              <div className="p-4 rounded-xl border border-border bg-card/60 space-y-3">
+                <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-purple-400" />
+                    <span className="font-semibold text-sm text-foreground">Warden Account</span>
+                  </div>
+                  {provisioningResult.wardenAccount ? (
+                    <Badge variant="outline" className="text-xs">
+                      Status: {provisioningResult.wardenAccount.status === 'ACTIVE' ? 'ACTIVE (Accepted)' : 'INVITED (Pending Activation)'}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                      Not Provisioned
+                    </Badge>
+                  )}
+                </div>
+
+                {provisioningResult.wardenAccount ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <span className="text-muted-foreground block">Warden Name</span>
+                        <span className="font-semibold text-foreground">{provisioningResult.wardenAccount.name}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Login Email / ID</span>
+                        <span className="font-mono text-foreground">{provisioningResult.wardenAccount.email}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block">Username</span>
+                        <span className="font-mono text-foreground">{provisioningResult.wardenAccount.username}</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs text-muted-foreground flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span>
+                        Warden invitation and activation link were addressed to the Hostel Admin (<strong>{provisioningResult.adminAccount?.email}</strong>) to forward to the Warden.
+                      </span>
+                    </div>
+
+                    <div className="pt-2 border-t border-border/40 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Invitation Status:</span>
+                        {provisioningResult.wardenAccount.invitationEmailStatus === 'sent' ? (
+                          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs">
+                            Sent to Admin for Forwarding
+                          </Badge>
+                        ) : provisioningResult.wardenAccount.invitationEmailStatus === 'failed' ? (
+                          <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-xs">
+                            Delivery Failed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">Queued</Badge>
+                        )}
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResendWardenInvite}
+                        disabled={isResendingWarden}
+                        className="h-7 text-xs gap-1 border-purple-500/30 hover:border-purple-500/60"
+                      >
+                        {isResendingWarden ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                        Resend Warden Invitation
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-xs text-muted-foreground py-2 leading-relaxed">
+                    Warden details were not provided during onboarding. You can provision a dedicated Warden account at any time through the Hostel branch settings in the Super Admin console.
+                  </div>
+                )}
+              </div>
+
+              {/* Security Banner */}
+              <div className="p-3 rounded-lg bg-secondary/30 border border-border/40 text-xs text-muted-foreground flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  <strong>Zero-Trust Credential Security:</strong> No plaintext passwords were sent or displayed. Staff members establish their own confidential passwords upon opening their single-use expiring activation links.
+                </span>
               </div>
             </div>
           )}
@@ -1021,7 +1235,11 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
         {/* Modal Footer */}
         <div className="p-4 border-t border-border/80 bg-card/60 flex items-center justify-between">
           <div>
-            {currentStep > 1 && (
+            {currentStep === 5 ? (
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" /> All records and security tokens stored safely
+              </span>
+            ) : currentStep > 1 && (
               <Button
                 type="button"
                 variant="outline"
@@ -1036,48 +1254,66 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="text-xs"
-            >
-              Cancel
-            </Button>
-
-            {currentStep < 4 ? (
+            {currentStep === 5 ? (
               <Button
                 type="button"
                 size="sm"
-                onClick={handleNext}
-                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs gap-1"
+                onClick={() => {
+                  onClose();
+                  setCurrentStep(1);
+                  setProvisioningResult(null);
+                }}
+                className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs gap-1.5 shadow"
               >
-                Next Step <ChevronRight className="w-4 h-4" />
+                <CheckCircle2 className="w-4 h-4" /> Done &amp; Close
               </Button>
             ) : (
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs gap-1.5 shadow-lg shadow-emerald-500/20"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Provisioning Tenant...
-                  </>
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  className="text-xs"
+                >
+                  Cancel
+                </Button>
+
+                {currentStep < 4 ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleNext}
+                    className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs gap-1"
+                  >
+                    Next Step <ChevronRight className="w-4 h-4" />
+                  </Button>
                 ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" /> Complete Onboarding
-                  </>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs gap-1.5 shadow-lg shadow-emerald-500/20"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Provisioning Tenant...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" /> Complete Onboarding
+                      </>
+                    )}
+                  </Button>
                 )}
-              </Button>
+              </>
             )}
           </div>
         </div>
       </DialogContent>
     </Dialog>
   );
+
 }

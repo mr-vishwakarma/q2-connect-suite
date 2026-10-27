@@ -7,6 +7,10 @@ const settingsSchema = new mongoose.Schema({
   lateFeePerDay: { type: Number, default: 20 },
   gracePeriodDays: { type: Number, default: 5 },
   monthlyRentDueDay: { type: Number, default: 5, min: 1, max: 31 },
+  securityDeposit: { type: Number, default: 5000 },
+  curfewTime: { type: String, default: '21:30', trim: true },
+  weeklyLaundrySlots: { type: Number, default: 2 },
+  laundrySlotsPerWeek: { type: Number, default: 2 },
 }, { timestamps: true });
 
 // Ensure unique settings document per organization + hostel

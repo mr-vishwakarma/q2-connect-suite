@@ -464,6 +464,40 @@ const superAdminController = {
       return res.status(400).json({ success: false, message: error.message });
     }
   },
+
+  // --- Onboarding Invitations & Staff Provisioning ---
+  async resendInvitation(req, res) {
+    try {
+      const result = await organizationService.resendInvitation(req.params.id);
+      await logAuditAction({
+        req,
+        action: 'RESEND_INVITATION',
+        entityType: 'User',
+        entityId: req.params.id,
+        newValue: { invitationEmailStatus: result.user?.invitationEmailStatus },
+      });
+      return res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  async provisionHostelWarden(req, res) {
+    try {
+      const result = await organizationService.provisionWardenForHostel(req.params.id, req.body);
+      await logAuditAction({
+        req,
+        action: 'PROVISION_WARDEN',
+        entityType: 'Hostel',
+        entityId: req.params.id,
+        newValue: result.wardenAccount,
+      });
+      return res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  },
 };
 
 module.exports = superAdminController;
+

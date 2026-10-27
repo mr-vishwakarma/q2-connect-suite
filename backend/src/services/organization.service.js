@@ -7,6 +7,7 @@ const OrganizationFeature = require('../models/OrganizationFeature');
 const Student = require('../models/Student');
 const Room = require('../models/Room');
 const User = require('../models/User');
+const Settings = require('../models/Settings');
 const { DEFAULT_FEATURES } = require('../constants/saas.constants');
 
 const organizationService = {
@@ -117,16 +118,59 @@ const organizationService = {
   },
 
   async createOrganization(data, creatorUserId) {
+    if (!data.name || !data.name.trim()) {
+      throw new Error('Organization name is required');
+    }
+    if (!data.contactEmail || !data.contactEmail.trim()) {
+      throw new Error('Official contact email is required');
+    }
+
     const slug = (data.slug || data.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')).trim();
     const existing = await Organization.findOne({ slug });
-    if (existing) throw new Error('Organization with this slug identifier already exists');
+    if (existing) {
+      throw new Error(`Organization with slug identifier '${slug}' already exists`);
+    }
 
-    // Check if admin user email is already taken
+    // Check if admin user email or username is already taken
     const adminEmail = data.adminEmail ? data.adminEmail.toLowerCase().trim() : null;
-    if (adminEmail) {
-      const existingUser = await User.findOne({ email: adminEmail });
-      if (existingUser) {
+    if (!adminEmail) {
+      throw new Error('Administrator login email is required');
+    }
+    const adminUsername = (data.adminUsername || adminEmail.split('@')[0]).trim();
+
+    const existingAdminUser = await User.findOne({
+      $or: [{ email: adminEmail }, { username: adminUsername }],
+    });
+    if (existingAdminUser) {
+      if (existingAdminUser.email === adminEmail) {
         throw new Error(`An administrator account with email '${adminEmail}' already exists`);
+      }
+      throw new Error(`Username '${adminUsername}' is already taken`);
+    }
+
+    // Check Warden details if provided in onboarding
+    const wardenName = data.wardenName && data.wardenName.trim() ? data.wardenName.trim() : null;
+    const branchCode = (data.branchCode || 'MAIN').toUpperCase().trim();
+
+    let wardenEmail = data.wardenEmail ? data.wardenEmail.toLowerCase().trim() : null;
+    let wardenUsername = data.wardenUsername ? data.wardenUsername.trim() : null;
+
+    if (wardenName) {
+      if (!wardenEmail) {
+        wardenEmail = `warden_${branchCode.toLowerCase()}.${Date.now().toString(36)}@${slug}.hosteliq.internal`;
+      }
+      if (!wardenUsername) {
+        wardenUsername = `warden_${branchCode.toLowerCase()}_${Math.random().toString(36).substring(2, 6)}`;
+      }
+
+      const existingWarden = await User.findOne({
+        $or: [{ email: wardenEmail }, { username: wardenUsername }],
+      });
+      if (existingWarden) {
+        if (existingWarden.email === wardenEmail) {
+          throw new Error(`A user account with email '${wardenEmail}' already exists`);
+        }
+        throw new Error(`Warden username '${wardenUsername}' is already taken`);
       }
     }
 
@@ -199,7 +243,6 @@ const organizationService = {
     }
 
     // 4. Create First Property / Branch Hostel with Amenities & Policy
-    const branchCode = (data.branchCode || 'MAIN').toUpperCase().trim();
     const mainHostel = await Hostel.create({
       organizationId: org._id,
       name: data.branchName ? data.branchName.trim() : `${data.name} - Main Branch`,
@@ -212,7 +255,7 @@ const organizationService = {
       amenities: Array.isArray(data.amenities) ? data.amenities : [],
       contactPhone: data.wardenPhone || data.phone || '',
       contactEmail: data.contactEmail || '',
-      wardenName: data.wardenName || '',
+      wardenName: wardenName || '',
       wardenPhone: data.wardenPhone || '',
       emergencyContact: data.emergencyContact || '',
       status: 'ACTIVE',
@@ -231,57 +274,170 @@ const organizationService = {
       },
     });
 
-    // 5. Create Primary Administrator Account & Organization Owner Membership
-    let adminUser = null;
-    if (adminEmail && data.adminPassword) {
-      const crypto = require('crypto');
-      const activationToken = crypto.randomBytes(32).toString('hex');
-      const activationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    // Initialize hostel operational settings document (Living Operations & Rules)
+    await Settings.findOneAndUpdate(
+      { organizationId: org._id, hostel: branchCode },
+      {
+        $setOnInsert: {
+          organizationId: org._id,
+          hostelId: mainHostel._id,
+          hostel: branchCode,
+          lateFeePerDay: Number(data.lateFeePerDay) || 20,
+          gracePeriodDays: Number(data.gracePeriodDays) || 5,
+          monthlyRentDueDay: Number(data.monthlyRentDueDay) || 5,
+          securityDeposit: Number(data.securityDeposit) || 5000,
+          curfewTime: data.curfewTime || '21:30',
+          weeklyLaundrySlots: Number(data.laundrySlotsPerWeek) || 2,
+          laundrySlotsPerWeek: Number(data.laundrySlotsPerWeek) || 2,
+        },
+      },
+      { upsert: true, new: true }
+    );
 
-      adminUser = await User.create({
-        name: data.adminName ? data.adminName.trim() : `${data.name} Administrator`,
-        email: adminEmail,
-        username: data.adminUsername ? data.adminUsername.trim() : adminEmail.split('@')[0],
-        password: data.adminPassword,
-        phone: data.adminPhone || data.phone || '',
-        role: 'admin',
+    // 5. Create Primary Administrator Account (Secure Token + No Plaintext Password)
+    const crypto = require('crypto');
+    const rawAdminToken = crypto.randomBytes(32).toString('hex');
+    const hashedAdminToken = crypto.createHash('sha256').update(rawAdminToken).digest('hex');
+    const activationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const randomAdminTempPassword = crypto.randomBytes(24).toString('hex') + 'A1!';
+
+    const adminUser = await User.create({
+      name: data.adminName ? data.adminName.trim() : `${data.name} Administrator`,
+      email: adminEmail,
+      username: adminUsername,
+      password: randomAdminTempPassword,
+      phone: data.adminPhone || data.phone || '',
+      role: 'admin',
+      isPrimaryAdmin: true,
+      isSuperAdmin: false,
+      activeOrganizationId: org._id,
+      activeHostelId: mainHostel._id,
+      hostels: [mainHostel.code],
+      status: 'INVITED',
+      isActive: true,
+      mustChangePassword: true,
+      activationToken: hashedAdminToken,
+      activationExpires,
+      invitationEmailStatus: 'pending',
+    });
+
+    await Membership.create({
+      userId: adminUser._id,
+      organizationId: org._id,
+      role: 'ORGANIZATION_OWNER',
+      hostelAccess: ['all', mainHostel.code, mainHostel._id.toString()],
+      status: 'ACTIVE',
+    });
+
+    // 6. Create Warden Account if Warden details are provided
+    let wardenUser = null;
+    let rawWardenToken = null;
+
+    if (wardenName) {
+      rawWardenToken = crypto.randomBytes(32).toString('hex');
+      const hashedWardenToken = crypto.createHash('sha256').update(rawWardenToken).digest('hex');
+      const randomWardenTempPassword = crypto.randomBytes(24).toString('hex') + 'W1!';
+
+      wardenUser = await User.create({
+        name: wardenName,
+        email: wardenEmail,
+        username: wardenUsername,
+        password: randomWardenTempPassword,
+        phone: data.wardenPhone ? data.wardenPhone.trim() : '',
+        role: 'warden',
+        isPrimaryAdmin: false,
+        isSuperAdmin: false,
         activeOrganizationId: org._id,
         activeHostelId: mainHostel._id,
         hostels: [mainHostel.code],
+        status: 'INVITED',
         isActive: true,
-        activationToken,
+        mustChangePassword: true,
+        activationToken: hashedWardenToken,
         activationExpires,
+        invitationEmailStatus: 'pending',
       });
 
       await Membership.create({
-        userId: adminUser._id,
+        userId: wardenUser._id,
         organizationId: org._id,
-        role: 'ORGANIZATION_OWNER',
-        hostelAccess: ['all'],
+        role: 'WARDEN',
+        hostelAccess: [mainHostel.code, mainHostel._id.toString()],
         status: 'ACTIVE',
       });
-
-      // Dispatch welcome & onboarding completion email
-      try {
-        const { sendHostelOnboardingWelcomeEmail } = require('../utils/email');
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
-        const setupUrl = `${frontendUrl}/login?email=${encodeURIComponent(adminEmail)}&activated=true`;
-
-        await sendHostelOnboardingWelcomeEmail({
-          to: adminEmail,
-          name: adminUser.name,
-          orgName: org.name,
-          branchName: mainHostel.name,
-          role: 'Organization Owner & Administrator',
-          setupUrl,
-          tempPassword: data.adminPassword,
-        });
-      } catch (emailErr) {
-        console.warn(`[organization.service] Onboarding email failed: ${emailErr.message}`);
-      }
     }
 
-    // Link creator user if super admin
+    // 7. Dispatch Account Invitations & Record Delivery Status
+    const {
+      sendHostelOnboardingWelcomeEmail,
+      sendWardenInvitationToAdminEmail,
+      getTrustedFrontendUrl,
+    } = require('../utils/email');
+
+    const frontendUrl = getTrustedFrontendUrl();
+    const adminActivationLink = `${frontendUrl}/reset-password?token=${rawAdminToken}&type=activation`;
+    const loginLink = `${frontendUrl}/login?role=admin`;
+
+    try {
+      const adminMailResult = await sendHostelOnboardingWelcomeEmail({
+        to: adminUser.email,
+        name: adminUser.name,
+        username: adminUser.username,
+        orgName: org.name,
+        branchName: mainHostel.name,
+        role: 'Organization Owner & Administrator',
+        activationLink: adminActivationLink,
+        loginLink,
+        correlationId: `onboard-admin-${adminUser._id}-${Date.now()}`,
+      });
+
+      if (adminMailResult) {
+        adminUser.invitationEmailStatus = 'sent';
+        adminUser.invitationEmailSentAt = new Date();
+        adminUser.invitationEmailError = null;
+      } else {
+        adminUser.invitationEmailStatus = 'failed';
+        adminUser.invitationEmailError = 'Email delivery transport returned unconfirmed status';
+      }
+    } catch (emailErr) {
+      adminUser.invitationEmailStatus = 'failed';
+      adminUser.invitationEmailError = emailErr.message;
+    }
+    await adminUser.save();
+
+    if (wardenUser && rawWardenToken) {
+      const wardenActivationLink = `${frontendUrl}/reset-password?token=${rawWardenToken}&type=activation`;
+      try {
+        const wardenMailResult = await sendWardenInvitationToAdminEmail({
+          adminEmail: adminUser.email,
+          adminName: adminUser.name,
+          wardenName: wardenUser.name,
+          wardenEmail: wardenUser.email,
+          wardenUsername: wardenUser.username,
+          wardenPhone: wardenUser.phone,
+          branchName: mainHostel.name,
+          orgName: org.name,
+          activationLink: wardenActivationLink,
+          loginLink,
+          correlationId: `onboard-warden-${wardenUser._id}-${Date.now()}`,
+        });
+
+        if (wardenMailResult) {
+          wardenUser.invitationEmailStatus = 'sent';
+          wardenUser.invitationEmailSentAt = new Date();
+          wardenUser.invitationEmailError = null;
+        } else {
+          wardenUser.invitationEmailStatus = 'failed';
+          wardenUser.invitationEmailError = 'Email delivery transport returned unconfirmed status';
+        }
+      } catch (wEmailErr) {
+        wardenUser.invitationEmailStatus = 'failed';
+        wardenUser.invitationEmailError = wEmailErr.message;
+      }
+      await wardenUser.save();
+    }
+
+    // 8. Link creator user if super admin
     if (creatorUserId && (!adminUser || String(creatorUserId) !== String(adminUser._id))) {
       await Membership.create({
         userId: creatorUserId,
@@ -297,8 +453,291 @@ const organizationService = {
       hostel: mainHostel,
       subscription,
       adminUser,
+      adminAccount: {
+        id: adminUser._id,
+        name: adminUser.name,
+        email: adminUser.email,
+        username: adminUser.username,
+        role: adminUser.role,
+        status: adminUser.status,
+        invitationEmailStatus: adminUser.invitationEmailStatus,
+        invitationEmailSentAt: adminUser.invitationEmailSentAt,
+        invitationEmailError: adminUser.invitationEmailError,
+      },
+      wardenAccount: wardenUser ? {
+        id: wardenUser._id,
+        name: wardenUser.name,
+        email: wardenUser.email,
+        username: wardenUser.username,
+        role: wardenUser.role,
+        status: wardenUser.status,
+        invitationEmailStatus: wardenUser.invitationEmailStatus,
+        invitationEmailSentAt: wardenUser.invitationEmailSentAt,
+        invitationEmailError: wardenUser.invitationEmailError,
+      } : null,
     };
   },
+
+  async resendInvitation(userId) {
+    const crypto = require('crypto');
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    if (user.status === 'ACTIVE' && !user.activationToken) {
+      return {
+        alreadyActive: true,
+        message: 'This account has already completed activation and established its password.',
+        user,
+      };
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const activationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    user.activationToken = hashedToken;
+    user.activationExpires = activationExpires;
+    user.invitationEmailStatus = 'pending';
+    user.invitationEmailError = null;
+    await user.save();
+
+    const {
+      sendHostelOnboardingWelcomeEmail,
+      sendWardenInvitationToAdminEmail,
+      getTrustedFrontendUrl,
+    } = require('../utils/email');
+
+    const frontendUrl = getTrustedFrontendUrl();
+    const activationLink = `${frontendUrl}/reset-password?token=${rawToken}&type=activation`;
+    const loginLink = `${frontendUrl}/login?role=admin`;
+
+    const org = user.activeOrganizationId ? await Organization.findById(user.activeOrganizationId) : null;
+    const orgName = org ? org.name : 'Hosteliq';
+
+    const hostel = user.activeHostelId ? await Hostel.findById(user.activeHostelId) : (org ? await Hostel.findOne({ organizationId: org._id }) : null);
+    const branchName = hostel ? hostel.name : 'Hostel Branch';
+
+    let emailSent = false;
+
+    if (user.role === 'admin') {
+      try {
+        const res = await sendHostelOnboardingWelcomeEmail({
+          to: user.email,
+          name: user.name,
+          username: user.username,
+          orgName,
+          branchName,
+          role: 'Organization Owner & Administrator',
+          activationLink,
+          loginLink,
+          correlationId: `resend-admin-${user._id}-${Date.now()}`,
+        });
+        if (res) {
+          user.invitationEmailStatus = 'sent';
+          user.invitationEmailSentAt = new Date();
+          user.invitationEmailError = null;
+          emailSent = true;
+        } else {
+          user.invitationEmailStatus = 'failed';
+          user.invitationEmailError = 'Email transport returned unconfirmed status';
+        }
+      } catch (err) {
+        user.invitationEmailStatus = 'failed';
+        user.invitationEmailError = err.message;
+      }
+    } else if (user.role === 'warden') {
+      // Find primary admin to send the forwardable invitation
+      const primaryAdmin = await User.findOne({
+        activeOrganizationId: user.activeOrganizationId,
+        role: 'admin',
+        isPrimaryAdmin: true,
+      }) || await User.findOne({
+        activeOrganizationId: user.activeOrganizationId,
+        role: 'admin',
+      });
+
+      const recipientEmail = primaryAdmin ? primaryAdmin.email : user.email;
+      const recipientName = primaryAdmin ? primaryAdmin.name : 'Hostel Administrator';
+
+      try {
+        const res = await sendWardenInvitationToAdminEmail({
+          adminEmail: recipientEmail,
+          adminName: recipientName,
+          wardenName: user.name,
+          wardenEmail: user.email,
+          wardenUsername: user.username,
+          wardenPhone: user.phone,
+          branchName,
+          orgName,
+          activationLink,
+          loginLink,
+          correlationId: `resend-warden-${user._id}-${Date.now()}`,
+        });
+        if (res) {
+          user.invitationEmailStatus = 'sent';
+          user.invitationEmailSentAt = new Date();
+          user.invitationEmailError = null;
+          emailSent = true;
+        } else {
+          user.invitationEmailStatus = 'failed';
+          user.invitationEmailError = 'Email transport returned unconfirmed status';
+        }
+      } catch (err) {
+        user.invitationEmailStatus = 'failed';
+        user.invitationEmailError = err.message;
+      }
+    }
+
+    await user.save();
+
+    return {
+      success: emailSent,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        status: user.status,
+        invitationEmailStatus: user.invitationEmailStatus,
+        invitationEmailSentAt: user.invitationEmailSentAt,
+        invitationEmailError: user.invitationEmailError,
+      },
+    };
+  },
+
+  async provisionWardenForHostel(hostelId, wardenData) {
+    const crypto = require('crypto');
+    const hostel = await Hostel.findById(hostelId);
+    if (!hostel) throw new Error('Hostel branch not found');
+
+    const org = await Organization.findById(hostel.organizationId);
+    if (!org) throw new Error('Associated organization not found');
+
+    const wardenName = wardenData.name && wardenData.name.trim() ? wardenData.name.trim() : null;
+    if (!wardenName) throw new Error('Warden name is required');
+
+    let wardenEmail = wardenData.email ? wardenData.email.toLowerCase().trim() : null;
+    let wardenUsername = wardenData.username ? wardenData.username.trim() : null;
+
+    if (!wardenEmail) {
+      wardenEmail = `warden_${hostel.code.toLowerCase()}.${Date.now().toString(36)}@${org.slug}.hosteliq.internal`;
+    }
+    if (!wardenUsername) {
+      wardenUsername = `warden_${hostel.code.toLowerCase()}_${Math.random().toString(36).substring(2, 6)}`;
+    }
+
+    const existing = await User.findOne({
+      $or: [{ email: wardenEmail }, { username: wardenUsername }],
+    });
+    if (existing) {
+      if (existing.email === wardenEmail) throw new Error(`A user account with email '${wardenEmail}' already exists`);
+      throw new Error(`Username '${wardenUsername}' is already taken`);
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const activationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const randomTempPassword = crypto.randomBytes(24).toString('hex') + 'W1!';
+
+    const wardenUser = await User.create({
+      name: wardenName,
+      email: wardenEmail,
+      username: wardenUsername,
+      password: randomTempPassword,
+      phone: wardenData.phone ? wardenData.phone.trim() : '',
+      role: 'warden',
+      isPrimaryAdmin: false,
+      isSuperAdmin: false,
+      activeOrganizationId: org._id,
+      activeHostelId: hostel._id,
+      hostels: [hostel.code],
+      status: 'INVITED',
+      isActive: true,
+      mustChangePassword: true,
+      activationToken: hashedToken,
+      activationExpires,
+      invitationEmailStatus: 'pending',
+    });
+
+    await Membership.create({
+      userId: wardenUser._id,
+      organizationId: org._id,
+      role: 'WARDEN',
+      hostelAccess: [hostel.code, hostel._id.toString()],
+      status: 'ACTIVE',
+    });
+
+    // Update hostel with warden info
+    hostel.wardenName = wardenName;
+    if (wardenData.phone) hostel.wardenPhone = wardenData.phone.trim();
+    await hostel.save();
+
+    // Send invitation to Primary Admin
+    const primaryAdmin = await User.findOne({
+      activeOrganizationId: org._id,
+      role: 'admin',
+      isPrimaryAdmin: true,
+    }) || await User.findOne({
+      activeOrganizationId: org._id,
+      role: 'admin',
+    });
+
+    const recipientEmail = primaryAdmin ? primaryAdmin.email : wardenEmail;
+    const recipientName = primaryAdmin ? primaryAdmin.name : 'Hostel Administrator';
+
+    const {
+      sendWardenInvitationToAdminEmail,
+      getTrustedFrontendUrl,
+    } = require('../utils/email');
+
+    const frontendUrl = getTrustedFrontendUrl();
+    const activationLink = `${frontendUrl}/reset-password?token=${rawToken}&type=activation`;
+    const loginLink = `${frontendUrl}/login?role=admin`;
+
+    try {
+      const res = await sendWardenInvitationToAdminEmail({
+        adminEmail: recipientEmail,
+        adminName: recipientName,
+        wardenName: wardenUser.name,
+        wardenEmail: wardenUser.email,
+        wardenUsername: wardenUser.username,
+        wardenPhone: wardenUser.phone,
+        branchName: hostel.name,
+        orgName: org.name,
+        activationLink,
+        loginLink,
+        correlationId: `provision-warden-${wardenUser._id}-${Date.now()}`,
+      });
+      if (res) {
+        wardenUser.invitationEmailStatus = 'sent';
+        wardenUser.invitationEmailSentAt = new Date();
+        wardenUser.invitationEmailError = null;
+      } else {
+        wardenUser.invitationEmailStatus = 'failed';
+        wardenUser.invitationEmailError = 'Email transport returned unconfirmed status';
+      }
+    } catch (err) {
+      wardenUser.invitationEmailStatus = 'failed';
+      wardenUser.invitationEmailError = err.message;
+    }
+    await wardenUser.save();
+
+    return {
+      wardenAccount: {
+        id: wardenUser._id,
+        name: wardenUser.name,
+        email: wardenUser.email,
+        username: wardenUser.username,
+        role: wardenUser.role,
+        status: wardenUser.status,
+        invitationEmailStatus: wardenUser.invitationEmailStatus,
+        invitationEmailSentAt: wardenUser.invitationEmailSentAt,
+        invitationEmailError: wardenUser.invitationEmailError,
+      },
+    };
+  },
+
 
   async updateOrganization(id, data) {
     const org = await Organization.findByIdAndUpdate(id, data, { new: true });

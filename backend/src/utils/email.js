@@ -1489,58 +1489,85 @@ Hosteliq Operations`;
 const sendHostelOnboardingWelcomeEmail = async ({
   to,
   name,
+  username,
   orgName,
   branchName,
   role = 'Organization Administrator',
+  activationLink,
   setupUrl,
-  tempPassword,
+  loginLink,
   correlationId,
 }) => {
-  const subject = `Welcome to Hosteliq — Onboarding Complete for ${orgName}`;
-  const preheader = `Your organization ${orgName} has been configured. Access your admin dashboard.`;
+  const subject = `Welcome to Hosteliq — Account Activation for ${orgName}`;
+  const preheader = `Your hostel ${branchName} has been onboarded. Set your password to activate your account.`;
   const frontendUrl = getTrustedFrontendUrl();
-  const activationUrl = setupUrl || `${frontendUrl}/login`;
+  const effectiveActivationUrl = activationLink || setupUrl || `${frontendUrl}/reset-password`;
+  const effectiveLoginUrl = loginLink || `${frontendUrl}/login?role=admin`;
+  const supportEmail = getEffectiveSupportEmail();
 
   const text = `Welcome to Hosteliq!
 
 Hello ${name},
 
-Your organization "${orgName}" (${branchName}) has been onboarded and provisioned.
+Your hostel property "${branchName}" under "${orgName}" has been successfully onboarded and provisioned.
 
-Administrator Account:
-Email: ${to}
-Temporary Password: ${tempPassword || 'Set via activation link'}
+Hostel Administrator Account:
+- Hostel Name: ${branchName}
+- Organization: ${orgName}
+- Assigned Role: ${role}
+- Login Email: ${to}
+${username ? `- Username: ${username}\n` : ''}
+To establish your password and activate your account, open the following single-use activation link (valid for 7 days):
+${effectiveActivationUrl}
 
-Access your dashboard:
-${activationUrl}
+Once activated, you can sign in to Hosteliq at:
+${effectiveLoginUrl}
+
+For security purposes, we never send permanent passwords via email. You will set your own secure password upon clicking the link.
+
+If you have any questions or require assistance, please contact our support desk at ${supportEmail}.
 
 Best regards,
-Hosteliq Platform Operations`;
+Hosteliq Platform Operations Team`;
 
   const contentHtml = `
     <p style="font-size: 14px; line-height: 1.6; color: #334155;">Hello <strong>${escapeHtml(name)}</strong>,</p>
     <p style="font-size: 14px; line-height: 1.6; color: #475569;">
-      Welcome to Hosteliq! Your organization <strong>${escapeHtml(orgName)}</strong> and primary branch <strong>${escapeHtml(branchName)}</strong> are provisioned.
+      Welcome to Hosteliq! Your hostel property <strong>${escapeHtml(branchName)}</strong> under <strong>${escapeHtml(orgName)}</strong> has been successfully provisioned.
     </p>
 
     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 20px 0;">
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Hostel Property:</strong> ${escapeHtml(branchName)}</p>
       <p style="margin: 4px 0; font-size: 13px;"><strong>Organization:</strong> ${escapeHtml(orgName)}</p>
-      <p style="margin: 4px 0; font-size: 13px;"><strong>Initial Branch:</strong> ${escapeHtml(branchName)}</p>
       <p style="margin: 4px 0; font-size: 13px;"><strong>Assigned Role:</strong> ${escapeHtml(role)}</p>
-      <p style="margin: 4px 0; font-size: 13px;"><strong>Login Email:</strong> ${escapeHtml(to)}</p>
-      ${tempPassword ? `<p style="margin: 4px 0; font-size: 13px;"><strong>Temporary Password:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${escapeHtml(tempPassword)}</code></p>` : ''}
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Admin Login Email:</strong> <span style="font-family: monospace; color: #0f172a;">${escapeHtml(to)}</span></p>
+      ${username ? `<p style="margin: 4px 0; font-size: 13px;"><strong>Admin Username:</strong> <span style="font-family: monospace; color: #0f172a;">${escapeHtml(username)}</span></p>` : ''}
     </div>
 
-    <div style="margin: 24px 0;">
-      <a href="${activationUrl}" style="display: inline-block; padding: 12px 26px; background-color: #0f172a; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px;">
-        Access Your Admin Dashboard
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 18px; margin: 18px 0;">
+      <p style="margin: 0; font-size: 13px; color: #166534; line-height: 1.5;">
+        🔒 <strong>Security Notice:</strong> For maximum account security, no permanent passwords are sent over email. Please use the secure button below to set your password and activate your account.
+      </p>
+    </div>
+
+    <div style="margin: 26px 0; text-align: center;">
+      <a href="${effectiveActivationUrl}" style="display: inline-block; padding: 13px 30px; background-color: #f59e0b; color: #000000; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; letter-spacing: 0.2px;">
+        Set Password &amp; Activate Account
       </a>
+      <p style="font-size: 12px; color: #64748b; margin-top: 10px;">
+        This single-use activation link is valid for 7 days.
+      </p>
+    </div>
+
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; line-height: 1.6;">
+      <p style="margin: 0 0 6px 0;"><strong>Signing in later:</strong> Once activated, access the Hosteliq admin portal at <a href="${effectiveLoginUrl}" style="color: #2563eb; text-decoration: underline;">${escapeHtml(effectiveLoginUrl)}</a>.</p>
+      <p style="margin: 0;"><strong>Need support?</strong> Reach our team anytime at <a href="mailto:${supportEmail}" style="color: #2563eb;">${escapeHtml(supportEmail)}</a>.</p>
     </div>
   `;
 
   const html = renderBrandedLayout({
-    title: 'Onboarding Complete',
-    subtitle: 'Platform Operations',
+    title: 'Welcome to Hosteliq',
+    subtitle: 'Hostel Admin Onboarding',
     preheader,
     contentHtml,
   });
@@ -1553,6 +1580,119 @@ Hosteliq Platform Operations`;
     correlationId,
     purpose: 'HOSTEL_ONBOARDING_WELCOME',
     metadata: { orgName, branchName, role },
+  });
+};
+
+/**
+ * Send Warden account invitation email addressed to the Hostel Admin.
+ * The Hostel Admin can forward this email or the activation link to the Warden.
+ */
+const sendWardenInvitationToAdminEmail = async ({
+  adminEmail,
+  adminName,
+  wardenName,
+  wardenEmail,
+  wardenUsername,
+  wardenPhone,
+  branchName,
+  orgName,
+  activationLink,
+  loginLink,
+  correlationId,
+}) => {
+  const subject = `Warden Account Invitation — Action Required for ${branchName}`;
+  const preheader = `A Warden account for ${wardenName} has been provisioned. Please forward the activation link.`;
+  const frontendUrl = getTrustedFrontendUrl();
+  const effectiveActivationUrl = activationLink || `${frontendUrl}/reset-password`;
+  const effectiveLoginUrl = loginLink || `${frontendUrl}/login?role=admin`;
+  const supportEmail = getEffectiveSupportEmail();
+
+  const text = `Hosteliq Warden Account Provisioned
+
+Hello ${adminName},
+
+A dedicated Warden account has been provisioned for your hostel "${branchName}" under "${orgName}".
+
+Warden Account Details:
+- Assigned Hostel: ${branchName}
+- Warden Name: ${wardenName}
+- Login Email: ${wardenEmail}
+- Login Username: ${wardenUsername}
+${wardenPhone ? `- Registered Phone: ${wardenPhone}\n` : ''}
+Action Required from Hostel Administrator:
+Please forward this email or provide the secure single-use activation link below to your Warden (${wardenName}).
+
+Warden Secure Activation Link (Valid for 7 days):
+${effectiveActivationUrl}
+
+The Warden will use this link to establish their initial password and sign in to their branch dashboard at:
+${effectiveLoginUrl}
+
+Security Notice:
+The Warden account is strictly restricted to operations for "${branchName}" and does not possess Organization Owner or Super Admin privileges.
+
+If you have any questions or need to reassign this account, please contact support at ${supportEmail}.
+
+Best regards,
+Hosteliq Platform Operations Team`;
+
+  const contentHtml = `
+    <p style="font-size: 14px; line-height: 1.6; color: #334155;">Hello <strong>${escapeHtml(adminName)}</strong>,</p>
+    <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+      A dedicated Warden account has been successfully provisioned for your hostel property <strong>${escapeHtml(branchName)}</strong> under <strong>${escapeHtml(orgName)}</strong>.
+    </p>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 20px 0;">
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Assigned Hostel:</strong> ${escapeHtml(branchName)}</p>
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Warden Name:</strong> ${escapeHtml(wardenName)}</p>
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Warden Login Email:</strong> <span style="font-family: monospace; color: #0f172a;">${escapeHtml(wardenEmail)}</span></p>
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Warden Username:</strong> <span style="font-family: monospace; color: #0f172a;">${escapeHtml(wardenUsername)}</span></p>
+      ${wardenPhone ? `<p style="margin: 4px 0; font-size: 13px;"><strong>Warden Phone:</strong> ${escapeHtml(wardenPhone)}</p>` : ''}
+      <p style="margin: 4px 0; font-size: 13px;"><strong>Role:</strong> <span style="display: inline-block; padding: 2px 8px; background: #e0f2fe; color: #0369a1; border-radius: 4px; font-weight: 600;">Warden</span></p>
+    </div>
+
+    <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin: 20px 0;">
+      <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 600; color: #1e40af;">
+        📋 Action Required from Hostel Administrator
+      </p>
+      <p style="margin: 0; font-size: 13px; color: #1e3a8a; line-height: 1.5;">
+        Please forward this email or copy the single-use activation link below to your Warden (<strong>${escapeHtml(wardenName)}</strong>). They will need this link to set their password before they can sign in.
+      </p>
+    </div>
+
+    <div style="margin: 26px 0; text-align: center;">
+      <a href="${effectiveActivationUrl}" style="display: inline-block; padding: 13px 30px; background-color: #0f172a; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; letter-spacing: 0.2px;">
+        Warden Activation Link
+      </a>
+      <p style="font-size: 12px; color: #64748b; margin-top: 10px;">
+        Link expires in 7 days and is invalidated after first use.
+      </p>
+      <p style="font-size: 11px; color: #94a3b8; word-break: break-all; margin-top: 4px;">
+        ${escapeHtml(effectiveActivationUrl)}
+      </p>
+    </div>
+
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; line-height: 1.6;">
+      <p style="margin: 0 0 6px 0;"><strong>Signing in:</strong> Wardens sign in via the standard Hosteliq staff portal at <a href="${effectiveLoginUrl}" style="color: #2563eb; text-decoration: underline;">${escapeHtml(effectiveLoginUrl)}</a>.</p>
+      <p style="margin: 0;"><strong>Data Isolation &amp; Security:</strong> The Warden is authorized strictly for branch <em>${escapeHtml(branchName)}</em> and cannot access foreign hostels or administrative settings.</p>
+    </div>
+  `;
+
+  const html = renderBrandedLayout({
+    title: 'Warden Account Invitation',
+    subtitle: 'Hostel Staff Provisioning',
+    preheader,
+    contentHtml,
+  });
+
+  return sendEmail({
+    to: adminEmail,
+    subject,
+    html,
+    text,
+    correlationId,
+    purpose: 'WARDEN_ACCOUNT_INVITATION',
+    metadata: { adminEmail, wardenName, wardenEmail, branchName, orgName },
   });
 };
 
@@ -1595,6 +1735,8 @@ module.exports = {
   sendPasswordResetEmail,
   sendAdminNewStudentRegisteredNotification,
   sendHostelOnboardingWelcomeEmail,
+  sendWardenInvitationToAdminEmail,
   sendAdminActionOtpEmail,
   sendSecondaryAdminWelcomeEmail,
 };
+

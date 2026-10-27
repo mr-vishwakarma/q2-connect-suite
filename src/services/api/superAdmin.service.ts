@@ -205,4 +205,15 @@ export const superAdminService = {
     const res = await api.put('/super-admin/settings', payload);
     return res.data;
   },
+
+  // 14. Account Invitations & Staff Provisioning
+  async resendInvitation(userId: string): Promise<ApiResponse<{ success: boolean; user?: any; alreadyActive?: boolean; message?: string }>> {
+    const res = await api.post(`/super-admin/users/${userId}/resend-invitation`);
+    return res.data;
+  },
+
+  async provisionHostelWarden(hostelId: string, payload: { name: string; email?: string; phone?: string; username?: string }): Promise<ApiResponse<{ wardenAccount: any }>> {
+    const res = await api.post(`/super-admin/hostels/${hostelId}/provision-warden`, payload);
+    return res.data;
+  },
 };

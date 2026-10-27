@@ -22,6 +22,7 @@ router.patch('/organizations/:id/suspend', superAdminController.suspendOrganizat
 router.get('/hostels', superAdminController.getAllHostels);
 router.get('/hostels/metrics', superAdminController.getHostelMetrics);
 router.post('/hostels', superAdminController.createHostel);
+router.post('/hostels/:id/provision-warden', superAdminController.provisionHostelWarden);
 
 // 4. Global User Management
 router.get('/users', superAdminController.getUsers);
@@ -30,6 +31,8 @@ router.patch('/users/:id/status', superAdminController.updateUserStatus);
 router.post('/users/:id/revoke-sessions', superAdminController.revokeUserSessions);
 router.post('/users/:id/unlock', superAdminController.unlockUserAccount);
 router.patch('/users/:id/role', superAdminController.updateUserRole);
+router.post('/users/:id/resend-invitation', superAdminController.resendInvitation);
+
 
 // 5. Plans & Pricing
 router.get('/plans', superAdminController.getPlans);

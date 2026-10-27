@@ -17,22 +17,74 @@ const getSettings = async (req, res) => {
       });
     }
 
-    const filter = { hostel };
-    if (orgId) filter.organizationId = orgId;
+    // 1. Resolve target hostel branch
+    const targetHostelDoc = await Hostel.findOne({ code: hostel });
+    if (!targetHostelDoc) {
+      return res.status(404).json({
+        success: false,
+        code: 'HOSTEL_NOT_FOUND',
+        message: `Hostel branch '${hostel}' not found.`,
+      });
+    }
+
+    // 2. Multi-tenant isolation: verify target branch belongs to user's organization
+    if (!isSuperAdmin && orgId && targetHostelDoc.organizationId.toString() !== orgId.toString()) {
+      return res.status(403).json({
+        success: false,
+        code: 'UNAUTHORIZED_HOSTEL_ACCESS',
+        message: `You are not authorized to view settings for branch '${hostel}'.`,
+      });
+    }
+
+    // 3. Branch-level authorization within the organization
+    if (!isSuperAdmin && req.tenant?.hostelAccess && !req.tenant.hostelAccess.includes('all')) {
+      const allowedAccess = req.tenant.hostelAccess;
+      if (!allowedAccess.includes(hostel) && !allowedAccess.includes(targetHostelDoc._id.toString())) {
+        return res.status(403).json({
+          success: false,
+          code: 'UNAUTHORIZED_HOSTEL_ACCESS',
+          message: `You are not authorized to view settings for branch '${hostel}'.`,
+        });
+      }
+    }
+
+    const filter = { hostel, organizationId: targetHostelDoc.organizationId };
 
     let settings = await Settings.findOne(filter);
+    const hostelDoc = targetHostelDoc;
     
     if (!settings && orgId) {
-      const hostelDoc = await Hostel.findOne({ organizationId: orgId, code: hostel });
-      // Create defaults for this organization & hostel
+      // Create defaults for this organization & hostel, drawing from hostelDoc.settings where available
       settings = await Settings.create({
-        organizationId: orgId,
-        hostelId: hostelDoc?._id || null,
+        organizationId: targetHostelDoc.organizationId,
+        hostelId: targetHostelDoc._id,
         hostel,
-        lateFeePerDay: 20,
-        gracePeriodDays: 5,
-        monthlyRentDueDay: 5,
+        lateFeePerDay: hostelDoc?.settings?.lateFeePerDay ?? 20,
+        gracePeriodDays: hostelDoc?.settings?.gracePeriodDays ?? 5,
+        monthlyRentDueDay: hostelDoc?.settings?.monthlyRentDueDay ?? 5,
+        securityDeposit: hostelDoc?.settings?.securityDeposit ?? 5000,
+        curfewTime: hostelDoc?.settings?.curfewTime ?? '21:30',
+        weeklyLaundrySlots: hostelDoc?.settings?.laundrySlotsPerWeek ?? 2,
+        laundrySlotsPerWeek: hostelDoc?.settings?.laundrySlotsPerWeek ?? 2,
       });
+    } else if (settings) {
+      let needsSave = false;
+      if (settings.securityDeposit === undefined) {
+        settings.securityDeposit = hostelDoc?.settings?.securityDeposit ?? 5000;
+        needsSave = true;
+      }
+      if (!settings.curfewTime) {
+        settings.curfewTime = hostelDoc?.settings?.curfewTime ?? '21:30';
+        needsSave = true;
+      }
+      if (settings.weeklyLaundrySlots === undefined) {
+        settings.weeklyLaundrySlots = hostelDoc?.settings?.laundrySlotsPerWeek ?? 2;
+        settings.laundrySlotsPerWeek = settings.weeklyLaundrySlots;
+        needsSave = true;
+      }
+      if (needsSave) {
+        await settings.save();
+      }
     }
     
     return res.status(200).json({ success: true, data: settings });
@@ -46,7 +98,15 @@ const getSettings = async (req, res) => {
 const updateSettings = async (req, res) => {
   try {
     const { hostel } = req.params;
-    const { lateFeePerDay, gracePeriodDays } = req.body;
+    const {
+      lateFeePerDay,
+      gracePeriodDays,
+      securityDeposit,
+      curfewTime,
+      weeklyLaundrySlots,
+      laundrySlotsPerWeek,
+      monthlyRentDueDay,
+    } = req.body;
     const orgId = req.organizationId || req.tenant?.organizationId;
     const isSuperAdmin = req.tenant?.isSuperAdmin;
 
@@ -58,19 +118,40 @@ const updateSettings = async (req, res) => {
       });
     }
 
-    // Tenant / Branch Authorization Check
+    // 1. Resolve target hostel branch
+    const targetHostelDoc = await Hostel.findOne({ code: hostel });
+    if (!targetHostelDoc) {
+      return res.status(404).json({
+        success: false,
+        code: 'HOSTEL_NOT_FOUND',
+        message: `Hostel branch '${hostel}' not found.`,
+      });
+    }
+
+    // 2. Multi-tenant isolation: verify target branch belongs to user's organization
+    if (!isSuperAdmin && orgId && targetHostelDoc.organizationId.toString() !== orgId.toString()) {
+      return res.status(403).json({
+        success: false,
+        code: 'UNAUTHORIZED_HOSTEL_ACCESS',
+        message: `You are not authorized to modify configuration for branch '${hostel}'.`,
+      });
+    }
+
+    // 3. Branch-level authorization within the organization
     if (!isSuperAdmin && req.tenant?.hostelAccess && !req.tenant.hostelAccess.includes('all')) {
-      if (!req.tenant.hostelAccess.includes(hostel)) {
+      const allowedAccess = req.tenant.hostelAccess;
+      if (!allowedAccess.includes(hostel) && !allowedAccess.includes(targetHostelDoc._id.toString())) {
         return res.status(403).json({
           success: false,
           code: 'UNAUTHORIZED_HOSTEL_ACCESS',
-          message: `You are not authorized to modify fee configuration for branch '${hostel}'.`,
+          message: `You are not authorized to modify configuration for branch '${hostel}'.`,
         });
       }
     }
 
     // Input Validation
     const updateDoc = {};
+    const hostelSettingsUpdate = {};
 
     if (gracePeriodDays !== undefined) {
       const parsedGrace = Number(gracePeriodDays);
@@ -82,6 +163,7 @@ const updateSettings = async (req, res) => {
         });
       }
       updateDoc.gracePeriodDays = parsedGrace;
+      hostelSettingsUpdate['settings.gracePeriodDays'] = parsedGrace;
     }
 
     if (lateFeePerDay !== undefined) {
@@ -94,13 +176,68 @@ const updateSettings = async (req, res) => {
         });
       }
       updateDoc.lateFeePerDay = parsedPenalty;
+      hostelSettingsUpdate['settings.lateFeePerDay'] = parsedPenalty;
+    }
+
+    if (securityDeposit !== undefined) {
+      const parsedDeposit = Number(securityDeposit);
+      if (isNaN(parsedDeposit) || parsedDeposit < 0 || parsedDeposit > 500000) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_SECURITY_DEPOSIT',
+          message: 'Security deposit must be a non-negative monetary amount.',
+        });
+      }
+      updateDoc.securityDeposit = parsedDeposit;
+      hostelSettingsUpdate['settings.securityDeposit'] = parsedDeposit;
+    }
+
+    if (curfewTime !== undefined) {
+      if (typeof curfewTime !== 'string' || !curfewTime.trim()) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_CURFEW_TIME',
+          message: 'Night curfew timing must be a valid time string.',
+        });
+      }
+      const trimmedCurfew = curfewTime.trim();
+      updateDoc.curfewTime = trimmedCurfew;
+      hostelSettingsUpdate['settings.curfewTime'] = trimmedCurfew;
+    }
+
+    const laundryVal = weeklyLaundrySlots !== undefined ? weeklyLaundrySlots : laundrySlotsPerWeek;
+    if (laundryVal !== undefined) {
+      const parsedLaundry = Number(laundryVal);
+      if (!Number.isInteger(parsedLaundry) || parsedLaundry < 0 || parsedLaundry > 50) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_LAUNDRY_SLOTS',
+          message: 'Weekly laundry slots must be an integer between 0 and 50.',
+        });
+      }
+      updateDoc.weeklyLaundrySlots = parsedLaundry;
+      updateDoc.laundrySlotsPerWeek = parsedLaundry;
+      hostelSettingsUpdate['settings.laundrySlotsPerWeek'] = parsedLaundry;
+    }
+
+    if (monthlyRentDueDay !== undefined) {
+      const parsedDueDay = Number(monthlyRentDueDay);
+      if (Number.isInteger(parsedDueDay) && parsedDueDay >= 1 && parsedDueDay <= 31) {
+        updateDoc.monthlyRentDueDay = parsedDueDay;
+        hostelSettingsUpdate['settings.monthlyRentDueDay'] = parsedDueDay;
+      }
     }
 
     const filter = { hostel };
     if (orgId) filter.organizationId = orgId;
 
     const hostelDoc = orgId ? await Hostel.findOne({ organizationId: orgId, code: hostel }) : null;
-    if (hostelDoc) updateDoc.hostelId = hostelDoc._id;
+    if (hostelDoc) {
+      updateDoc.hostelId = hostelDoc._id;
+      if (Object.keys(hostelSettingsUpdate).length > 0) {
+        await Hostel.updateOne({ _id: hostelDoc._id }, { $set: hostelSettingsUpdate });
+      }
+    }
     if (orgId) updateDoc.organizationId = orgId;
 
     const settings = await Settings.findOneAndUpdate(
