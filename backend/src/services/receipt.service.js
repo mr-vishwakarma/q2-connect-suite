@@ -25,10 +25,11 @@ function formatMonthDisplay(monthStr) {
  * 2. Parent Organization
  * 3. Neutral Hosteliq Fallback
  */
-function resolveBranding(hostel, organization) {
-  const orgName = organization?.name || 'Hosteliq';
-  const branchName = hostel?.name || (hostel?.code ? `${orgName} - ${hostel.code}` : orgName);
-  const tagline = hostel?.tagline || organization?.tagline || 'STUDENT LIVING, BRIGHTER FUTURES';
+function resolveBranding(hostel, organization, fallbackHostelName) {
+  const particularHostelName = hostel?.name || fallbackHostelName || (organization?.name && organization.name !== 'Hosteliq' ? organization.name : null) || 'Hostel Campus';
+  const orgName = particularHostelName;
+  const branchName = particularHostelName;
+  const tagline = hostel?.tagline || organization?.tagline || 'STUDENT RESIDENCE & ACCOMMODATION';
 
   // Logo resolution
   const logo = hostel?.logo || organization?.logo || '';
@@ -59,6 +60,7 @@ function resolveBranding(hostel, organization) {
 
   return {
     organizationName: orgName,
+    hostelName: particularHostelName,
     branchName,
     tagline,
     logo,
@@ -73,7 +75,7 @@ function resolveBranding(hostel, organization) {
  * Builds an immutable receipt snapshot
  */
 function buildReceiptSnapshot({ payment, fee, student, hostel, organization, baseUrl }) {
-  const branding = resolveBranding(hostel, organization);
+  const branding = resolveBranding(hostel, organization, payment.hostel || student?.hostel);
   const clientUrl = baseUrl || process.env.CLIENT_URL || 'https://hosteliq.in';
 
   const paymentDate = payment.paymentDate ? new Date(payment.paymentDate) : new Date();

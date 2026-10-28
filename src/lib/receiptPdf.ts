@@ -78,7 +78,7 @@ function normalizeToSnapshot(input: any): FeeReceiptSnapshot {
   }
 
   const receiptNo = input.receipt_no || input.receiptNo || 'RCPT-001';
-  const hostelName = input.hostel || 'Hosteliq Living';
+  const hostelName = input.hostel || input.hostel_name || input.hostelName || input.branchName || 'Hostel Campus';
   const studentName = input.student_name || input.studentName || 'Student';
   const username = input.username || 'resident';
   const studentId = input.student_code || input.studentCode || username;
@@ -132,13 +132,14 @@ function normalizeToSnapshot(input: any): FeeReceiptSnapshot {
       : `Partial payment received. Balance due: Rs. ${remainingBalance.toLocaleString('en-IN')}`,
     isFullSettlement: remainingBalance <= 0,
     branding: {
-      organizationName: 'Hosteliq',
+      organizationName: hostelName,
+      hostelName: hostelName,
       branchName: hostelName,
-      tagline: 'STUDENT LIVING, BRIGHTER FUTURES',
-      logo: '',
-      address: 'Hostel Campus, Student Living Block',
-      phone: '+91 98765 43210',
-      email: 'office@hosteliq.in',
+      tagline: input.tagline || 'STUDENT RESIDENCE & ACCOMMODATION',
+      logo: input.logo || '',
+      address: input.address || input.hostel_address || 'Hostel Campus, Student Living Block',
+      phone: input.phone || input.hostel_phone || '+91 98765 43210',
+      email: input.email || input.hostel_email || 'office@hosteliq.in',
     },
     student: {
       name: studentName,
@@ -196,7 +197,7 @@ export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSn
   const contentWidth = W - margin * 2; // 523.28 pt
 
   // ==========================================
-  // 1. Centered Pale Watermark (~4-5% opacity)
+  // 1. Centered Pale Watermark (~4-5% opacity, NO text name)
   // ==========================================
   // @ts-ignore
   if (doc.GState) {
@@ -204,13 +205,30 @@ export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSn
     doc.saveGraphicsState();
     // @ts-ignore
     doc.setGState(new doc.GState({ opacity: 0.045 }));
-    doc.setTextColor(109, 40, 217); // Purple
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(54);
-    doc.text(snap.branding.branchName || 'HOSTELIQ', W / 2, H / 2 - 10, {
-      align: 'center',
-      angle: 30,
-    });
+
+    // Hostel IQ architectural logo mark watermark (strictly without text name)
+    const cx = W / 2;
+    const cy = H / 2 - 20;
+
+    doc.setDrawColor(109, 40, 217);
+    doc.setFillColor(109, 40, 217);
+    doc.setLineWidth(14);
+
+    // Modern pitched roof
+    doc.line(cx - 105, cy - 5, cx, cy - 80);
+    doc.line(cx, cy - 80, cx + 105, cy - 5);
+
+    // Roof ridge peak emblem
+    doc.circle(cx, cy - 38, 12, 'F');
+
+    // Building pillars & portals
+    doc.roundedRect(cx - 80, cy + 10, 32, 75, 4, 4, 'F');
+    doc.roundedRect(cx - 20, cy + 28, 40, 57, 5, 5, 'F');
+    doc.roundedRect(cx + 48, cy + 10, 32, 75, 4, 4, 'F');
+
+    // Foundation Base
+    doc.roundedRect(cx - 95, cy + 92, 190, 10, 3, 3, 'F');
+
     // @ts-ignore
     doc.restoreGraphicsState();
   }
@@ -220,31 +238,44 @@ export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSn
   // ==========================================
   let y = 40;
 
-  // Left side: Brand, Name, Tagline & Address
+  // Left side: Particular Hostel's Name (Top Left), Tagline & Address
+  const particularHostelName =
+    snap.branding.hostelName ||
+    (snap.branding.organizationName && snap.branding.organizationName !== 'Hosteliq'
+      ? snap.branding.organizationName
+      : null) ||
+    snap.branding.branchName ||
+    (snap.student as any)?.hostel ||
+    'Hostel Campus';
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(15, 23, 42); // Slate 900
-  doc.text(snap.branding.organizationName || 'Hostel Name', margin, y);
+  doc.text(particularHostelName, margin, y);
 
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(124, 58, 237); // Purple 600
-  doc.text(snap.branding.tagline || 'STUDENT LIVING, BRIGHTER FUTURES', margin, y + 11);
+  doc.text(snap.branding.tagline || 'STUDENT RESIDENCE & ACCOMMODATION', margin, y + 11);
 
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 41, 59); // Slate 800
-  doc.text(snap.branding.branchName, margin, y + 28);
+  let nextY = y + 25;
+  if (snap.branding.branchName && snap.branding.branchName !== particularHostelName) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59); // Slate 800
+    doc.text(snap.branding.branchName, margin, nextY);
+    nextY += 14;
+  }
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139); // Slate 500
-  const addressLines = doc.splitTextToSize(snap.branding.address, 240);
-  doc.text(addressLines, margin, y + 40);
+  const addressLines = doc.splitTextToSize(snap.branding.address || '', 240);
+  doc.text(addressLines, margin, nextY);
 
-  const contactY = y + 40 + addressLines.length * 10;
-  doc.text(`Phone: ${snap.branding.phone}`, margin, contactY);
-  doc.text(`Email: ${snap.branding.email}`, margin, contactY + 11);
+  const contactY = nextY + addressLines.length * 10;
+  doc.text(`Phone: ${snap.branding.phone || 'N/A'}`, margin, contactY);
+  doc.text(`Email: ${snap.branding.email || 'N/A'}`, margin, contactY + 11);
 
   // Right side: Fee Receipt Pill
   const pillW = 150;
@@ -573,7 +604,7 @@ export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSn
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(51, 65, 85);
-  doc.text(snap.branding.branchName, W - margin, footerY + 2, { align: 'right' });
+  doc.text(particularHostelName, W - margin, footerY + 2, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
@@ -608,7 +639,7 @@ export async function generateSecurityDepositReceiptPDF(r: SecurityDepositReceip
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text('Hosteliq', 40, 40);
+  doc.text(r.hostel || 'Hostel Campus', 40, 40);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text('Official Security Deposit Statement', 40, 58);
@@ -781,7 +812,7 @@ export async function generateHistoryReceipt(data: HistoryReceiptData) {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text('Hosteliq', 40, 40);
+  doc.text(data.hostel || 'Hostel Campus', 40, 40);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text('Official Payment History Ledger', 40, 58);

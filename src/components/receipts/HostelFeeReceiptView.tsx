@@ -61,26 +61,19 @@ export const HostelFeeReceiptView: React.FC<HostelFeeReceiptViewProps> = ({ rece
       {/* Printable Page Wrapper */}
       <div className="receipt-container relative mx-auto w-full max-w-[760px] overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-7 sm:p-9 shadow-sm print:max-w-none print:border-none print:p-0 print:shadow-none">
         
-        {/* Subtle Centered Logo Watermark (~4-5% opacity) */}
+        {/* Subtle Centered Logo Watermark (~4-5% opacity, NO text name) */}
         <div
           className="watermark-overlay pointer-events-none absolute inset-0 z-0 flex items-center justify-center select-none"
           aria-hidden="true"
         >
-          {branding?.logo ? (
-            <img
-              src={branding.logo}
-              alt=""
-              className="h-72 w-72 object-contain opacity-[0.045] grayscale filter"
-            />
-          ) : (
-            <svg
-              className="h-80 w-80 text-purple-900 opacity-[0.04]"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path d="M12 3L2 12h3v8h6v-5h2v5h6v-8h3L12 3zm0 3.8l5 4.5v6.7h-2v-5H9v5H7v-6.7l5-4.5z" />
-            </svg>
-          )}
+          {/* Hostel IQ Logo Mark watermark (architectural emblem, strictly without text name) */}
+          <svg
+            className="h-80 w-80 text-purple-900 opacity-[0.045]"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M12 3L2 12h3v8h6v-5h2v5h6v-8h3L12 3zm0 3.8l5 4.5v6.7h-2v-5H9v5H7v-6.7l5-4.5z" />
+          </svg>
         </div>
 
         {/* Receipt Content Body (above watermark) */}
@@ -94,7 +87,7 @@ export const HostelFeeReceiptView: React.FC<HostelFeeReceiptViewProps> = ({ rece
                 {branding?.logo ? (
                   <img
                     src={branding.logo}
-                    alt={branding.branchName}
+                    alt={branding.hostelName || branding.branchName}
                     className="h-12 w-12 rounded-xl object-contain border border-slate-100 p-1"
                   />
                 ) : (
@@ -104,19 +97,21 @@ export const HostelFeeReceiptView: React.FC<HostelFeeReceiptViewProps> = ({ rece
                 )}
                 <div>
                   <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 leading-none">
-                    {branding?.organizationName || 'Hosteliq'}
+                    {branding?.hostelName || (branding?.organizationName && branding.organizationName !== 'Hosteliq' ? branding.organizationName : null) || branding?.branchName || 'Hostel Campus'}
                   </h1>
                   <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
-                    {branding?.tagline || 'STUDENT LIVING, BRIGHTER FUTURES'}
+                    {branding?.tagline || 'STUDENT RESIDENCE & ACCOMMODATION'}
                   </p>
                 </div>
               </div>
 
               {/* Branch & Contact Info */}
               <div className="space-y-0.5 text-xs text-slate-600">
-                <div className="font-bold text-slate-800 text-sm">
-                  {branding?.branchName}
-                </div>
+                {branding?.branchName && branding.branchName !== (branding?.hostelName || (branding?.organizationName !== 'Hosteliq' ? branding?.organizationName : null)) && (
+                  <div className="font-bold text-slate-800 text-sm">
+                    {branding.branchName}
+                  </div>
+                )}
                 <div className="max-w-[320px] leading-relaxed text-slate-500">
                   {branding?.address}
                 </div>

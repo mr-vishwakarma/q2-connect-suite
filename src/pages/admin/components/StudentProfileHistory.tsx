@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { getAvatarUrl } from '@/utils/imageUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -76,7 +76,7 @@ export function StudentProfileHistory({
         username: selectedStudent.username,
         student_code: selectedStudent.student_code || selectedStudent.studentCode,
         room_no: selectedStudent.room_no,
-        hostel: selectedStudent.hostel || 'Q2',
+        hostel: p.hostel || selectedStudent.hostel || 'Hostel Campus',
         month: p.month,
         monthly_fee: p.amount,
         late_fee: p.late_fee || 0,
@@ -103,7 +103,7 @@ export function StudentProfileHistory({
         username: selectedStudent.username,
         student_code: selectedStudent.student_code || selectedStudent.studentCode,
         room_no: selectedStudent.room_no,
-        hostel: selectedStudent.hostel || 'Q2',
+        hostel: p.hostel || selectedStudent.hostel || 'Hostel Campus',
         month: p.month,
         monthly_fee: p.amount,
         late_fee: p.late_fee || 0,

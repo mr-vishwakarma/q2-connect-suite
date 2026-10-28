@@ -1,6 +1,7 @@
 export interface HostelBranding {
   organizationName: string;
   branchName: string;
+  hostelName?: string;
   tagline: string;
   logo: string;
   address: string;
