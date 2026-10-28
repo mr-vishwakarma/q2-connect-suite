@@ -11,10 +11,11 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { IndianRupee, Calendar, Check, AlertCircle, Download, Receipt } from 'lucide-react';
+import { IndianRupee, Calendar, Check, AlertCircle, Download, Receipt, Eye, Printer } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'react-toastify';
-import { downloadReceipt, ReceiptData } from '@/lib/receiptPdf';
+import { downloadReceipt, printFeeReceipt, ReceiptData } from '@/lib/receiptPdf';
+import { HostelFeeReceiptModal } from '@/components/receipts/HostelFeeReceiptModal';
 
 interface Fee {
   id: string; month: string; amount: number; paid_date: string | null;
@@ -44,6 +45,8 @@ export default function FeeHistory() {
   const [loading, setLoading] = useState(true);
   const [payingFeeId, setPayingFeeId] = useState<string | null>(null);
   const [settings, setSettings] = useState({ lateFeePerDay: 20, gracePeriodDays: 5 });
+  const [previewReceiptNo, setPreviewReceiptNo] = useState<string | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/login');
@@ -135,6 +138,19 @@ export default function FeeHistory() {
       payment_mode: p.payment_mode, admin_name: p.admin_name, notes: p.notes,
     };
     await downloadReceipt(d);
+  };
+
+  const printFor = async (p: Payment) => {
+    if (!student) return;
+    const d: ReceiptData = {
+      receipt_no: p.receipt_no, payment_date: p.payment_date,
+      student_name: student.name, username: student.username, room_no: student.room_no,
+      hostel: student.hostel, month: p.month, monthly_fee: p.amount,
+      late_fee: p.late_fee, discount: p.discount, security_deposit: p.security_deposit,
+      amount_paid: Number(p.amount) + Number(p.security_deposit),
+      payment_mode: p.payment_mode, admin_name: p.admin_name, notes: p.notes,
+    };
+    await printFeeReceipt(d);
   };
 
   if (authLoading || loading) {
@@ -229,9 +245,40 @@ export default function FeeHistory() {
                         <TableCell className="text-foreground font-bold">₹{(Number(p.amount) + Number(p.security_deposit)).toLocaleString('en-IN')}</TableCell>
                         <TableCell className="text-foreground uppercase text-xs">{p.payment_mode}</TableCell>
                         <TableCell>
-                          <Button size="sm" variant="ghost" onClick={() => downloadFor(p)}>
-                            <Download className="w-4 h-4 mr-1" />PDF
-                          </Button>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2.5 text-xs gap-1 hover:bg-purple-500/10 hover:text-purple-600 hover:border-purple-300"
+                              onClick={() => {
+                                setPreviewReceiptNo(p.receipt_no);
+                                setShowReceiptModal(true);
+                              }}
+                              title="Preview Official Receipt"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>View</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs gap-1"
+                              onClick={() => downloadFor(p)}
+                              title="Download PDF Receipt"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">PDF</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              onClick={() => printFor(p)}
+                              title="Print Receipt"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -243,6 +290,11 @@ export default function FeeHistory() {
         </Card>
       </div>
 
+      <HostelFeeReceiptModal
+        open={showReceiptModal}
+        onOpenChange={setShowReceiptModal}
+        receiptNo={previewReceiptNo}
+      />
     </DashboardLayout>
   );
 }

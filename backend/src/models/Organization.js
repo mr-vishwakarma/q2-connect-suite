@@ -5,6 +5,7 @@ const organizationSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     logo: { type: String },
+    tagline: { type: String, trim: true },
     legalName: { type: String, trim: true },
     contactEmail: { type: String, required: true, lowercase: true, trim: true },
     phone: { type: String, trim: true },

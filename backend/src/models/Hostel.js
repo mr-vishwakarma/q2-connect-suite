@@ -21,6 +21,8 @@ const hostelSchema = new mongoose.Schema(
     wardenName: { type: String, trim: true },
     wardenPhone: { type: String, trim: true },
     emergencyContact: { type: String, trim: true },
+    logo: { type: String, trim: true },
+    tagline: { type: String, trim: true },
     status: { type: String, enum: ['ACTIVE', 'SUSPENDED', 'INACTIVE', 'ARCHIVED'], default: 'ACTIVE' },
     settings: {
       lateFeePerDay: { type: Number, default: 20 },

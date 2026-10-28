@@ -4,8 +4,9 @@ const FeePayment = require('../models/FeePayment');
 const SecurityDeposit = require('../models/SecurityDeposit');
 const Student = require('../models/Student');
 const Notification = require('../models/Notification');
-
+const InvoiceSequence = require('../models/InvoiceSequence');
 const feeService = require('../services/fee.service');
+const receiptService = require('../services/receipt.service');
 const { calculateCycleDueDate, getNextMonthlyDueDate, calculateBillingPeriod } = require('../utils/billingCycle');
 
 // @desc    Get complete fee management data for admin
@@ -451,7 +452,7 @@ const collectPayment = async (req, res) => {
     const {
       studentId, hostel, month, amount, lateFee, discount, securityDeposit,
       receivedAmount, paymentMode, notes, receiptNo, depositReceiptNo: reqDepositReceiptNo,
-      receiptUrl, idempotencyKey: bodyIdempotencyKey
+      receiptUrl, idempotencyKey: bodyIdempotencyKey, transactionId, bankName
     } = req.body;
 
     idempotencyKey = req.headers['idempotency-key'] || bodyIdempotencyKey;
@@ -597,8 +598,21 @@ const collectPayment = async (req, res) => {
     }
 
     // Generate or validate distinct receipt numbers
+    let generatedFeeReceiptNo = null;
+    if (feeCore > 0 && !receiptNo) {
+      const branchCode = actualHostel ? actualHostel.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() : 'RCPT';
+      if (orgId) {
+        try {
+          generatedFeeReceiptNo = await InvoiceSequence.getNextReceiptNumber(orgId, branchCode);
+        } catch {
+          generatedFeeReceiptNo = `RCPT-FEE-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+        }
+      } else {
+        generatedFeeReceiptNo = `RCPT-FEE-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+      }
+    }
     const feeReceiptNo = feeCore > 0
-      ? (receiptNo || `RCPT-FEE-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`)
+      ? (receiptNo || generatedFeeReceiptNo)
       : null;
     const depositReceiptNo = numSecDeposit > 0
       ? (reqDepositReceiptNo || (feeCore === 0 ? receiptNo : null) || `RCPT-DEP-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`)
@@ -690,6 +704,8 @@ const collectPayment = async (req, res) => {
       adminName: req.user.name,
       month,
       notes: notes || null,
+      transactionId: transactionId || null,
+      bankName: bankName || null,
       idempotencyKey: idempotencyKey || null,
     }], sessionOpts);
     const payment = payments[0];
@@ -820,12 +836,28 @@ const collectPayment = async (req, res) => {
       notes,
     } : null;
 
+    let receiptSnapshot = null;
+    if (feeCore > 0 && primaryReceiptNo) {
+      try {
+        const origin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
+        receiptSnapshot = await receiptService.getReceiptByNumber(primaryReceiptNo, {
+          user: req.user,
+          tenant: req.tenant,
+          isSuperAdmin,
+          baseUrl: origin,
+        });
+      } catch (snapErr) {
+        // Non-blocking fallback
+      }
+    }
+
     return res.status(200).json({
       success: true,
       data: {
         payment,
         feeReceipt,
         depositReceipt,
+        receiptSnapshot,
       }
     });
   } catch (error) {

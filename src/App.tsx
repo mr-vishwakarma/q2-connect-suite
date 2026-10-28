@@ -88,6 +88,7 @@ const ImpersonationCenter = lazy(() => import("./pages/super-admin/Impersonation
 const SystemHealth = lazy(() => import("./pages/super-admin/SystemHealth"));
 const PlatformReports = lazy(() => import("./pages/super-admin/PlatformReports"));
 const PlatformSettings = lazy(() => import("./pages/super-admin/PlatformSettings"));
+const VerifyReceiptPage = lazy(() => import("./pages/verify/VerifyReceiptPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -215,6 +216,8 @@ const App = () => (
               <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
               <Route path="/auth/google/callback" element={<OAuthCallback />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
+              <Route path="/verify-receipt" element={<VerifyReceiptPage />} />
+              <Route path="/receipts/verify/:receiptNo" element={<VerifyReceiptPage />} />
 
               {/* Student Protected Routes */}
               <Route path="/student" element={<StudentShell />}>

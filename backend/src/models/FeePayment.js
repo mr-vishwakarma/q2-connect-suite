@@ -20,6 +20,9 @@ const feePaymentSchema = new mongoose.Schema(
     depositReceiptNo: { type: String, trim: true },
     receiptUrl: { type: String },
     notes: { type: String },
+    transactionId: { type: String, trim: true },
+    bankName: { type: String, trim: true },
+    receiptSnapshot: { type: mongoose.Schema.Types.Mixed },
     idempotencyKey: { type: String, sparse: true, index: true },
   },
   { timestamps: true }

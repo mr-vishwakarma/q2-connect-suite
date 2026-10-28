@@ -1,3 +1,6 @@
+import QRCode from 'qrcode';
+import { FeeReceiptSnapshot } from '@/types/receipt';
+
 export interface ReceiptData {
   receipt_no: string;
   payment_date: string;
@@ -19,6 +22,8 @@ export interface ReceiptData {
   notes?: string | null;
   deposit_collected_separately?: number | null;
   deposit_receipt_no?: string | null;
+  course?: string;
+  yearSemester?: string;
 }
 
 export interface FeeReceiptData {
@@ -34,13 +39,17 @@ export interface FeeReceiptData {
   monthly_fee: number;
   late_fee: number;
   discount: number;
-  amount_paid: number; // ONLY amount allocated to fee liability
+  amount_paid: number;
   remaining_fee_balance?: number;
   payment_mode: string;
   admin_name?: string | null;
   notes?: string | null;
   deposit_collected_separately?: number | null;
   deposit_receipt_no?: string | null;
+  course?: string;
+  yearSemester?: string;
+  transactionId?: string;
+  bankName?: string;
 }
 
 export interface SecurityDepositReceiptData {
@@ -51,7 +60,7 @@ export interface SecurityDepositReceiptData {
   student_code?: string;
   room_no: string | null;
   hostel: string;
-  deposit_amount: number; // ONLY security deposit collected
+  deposit_amount: number;
   total_required?: number;
   previously_paid?: number;
   remaining_balance?: number;
@@ -60,141 +69,532 @@ export interface SecurityDepositReceiptData {
   notes?: string | null;
 }
 
-const HOSTEL_ADDR = 'Plot No. 8, Manak Vihar, Bhopal • +91 9691160716 • q2hostel@gmail.com';
+/**
+ * Normalizes any fee receipt input into a comprehensive FeeReceiptSnapshot
+ */
+function normalizeToSnapshot(input: any): FeeReceiptSnapshot {
+  if (input?.branding && input?.student && input?.billing && input?.financials) {
+    return input as FeeReceiptSnapshot;
+  }
+
+  const receiptNo = input.receipt_no || input.receiptNo || 'RCPT-001';
+  const hostelName = input.hostel || 'Hosteliq Living';
+  const studentName = input.student_name || input.studentName || 'Student';
+  const username = input.username || 'resident';
+  const studentId = input.student_code || input.studentCode || username;
+  const roomNo = input.room_no || input.roomNo || 'N/A';
+  const month = input.month || 'Current Month';
+  const billingPeriod = input.billing_period || input.billingPeriod || month;
+  const paymentMode = (input.payment_mode || input.paymentMode || 'UPI').toUpperCase();
+  const paymentDate = input.payment_date || input.paymentDate || new Date().toISOString();
+  const amountPaid = input.amount_paid !== undefined ? Number(input.amount_paid) : (input.amount !== undefined ? Number(input.amount) : 0);
+  const monthlyFee = Number(input.monthly_fee || input.amount || amountPaid);
+  const lateFee = Number(input.late_fee || input.lateFee || 0);
+  const discount = Number(input.discount || 0);
+  const remainingBalance = Number(input.remaining_fee_balance || input.remainingBalance || 0);
+  const adminName = input.admin_name || input.adminName || 'Hostel Warden';
+  const notes = input.notes ? [input.notes] : [
+    'This is a system-generated receipt and does not require a physical signature.',
+    'For any query, please contact the hostel office.',
+  ];
+
+  const lineItems = [
+    { index: 1, particulars: 'Hostel Rent', amount: monthlyFee, isDeduction: false },
+  ];
+  let idx = 2;
+  if (lateFee > 0) {
+    lineItems.push({ index: idx++, particulars: 'Late Fee / Surcharge', amount: lateFee, isDeduction: false });
+  }
+  if (discount > 0) {
+    lineItems.push({ index: idx++, particulars: 'Concession / Fee Discount', amount: discount, isDeduction: true });
+  }
+
+  const invoiceNo = `INV-${receiptNo.replace(/^RCPT-|^HLQ-/, '')}`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://hosteliq.in';
+  const verificationUrl = `${origin}/verify-receipt?no=${encodeURIComponent(receiptNo)}`;
+
+  return {
+    receiptNo,
+    invoiceNo,
+    issuedAt: paymentDate,
+    receiptDate: new Date(paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+    paymentDate: new Date(paymentDate).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }),
+    status: remainingBalance <= 0 ? 'PAID' : 'PARTIALLY PAID',
+    confirmationMessage: remainingBalance <= 0
+      ? 'Payment received successfully.'
+      : `Partial payment received. Balance due: Rs. ${remainingBalance.toLocaleString('en-IN')}`,
+    isFullSettlement: remainingBalance <= 0,
+    branding: {
+      organizationName: 'Hosteliq',
+      branchName: hostelName,
+      tagline: 'STUDENT LIVING, BRIGHTER FUTURES',
+      logo: '',
+      address: 'Hostel Campus, Student Living Block',
+      phone: '+91 98765 43210',
+      email: 'office@hosteliq.in',
+    },
+    student: {
+      name: studentName,
+      studentId,
+      username,
+      course: input.course || 'B.Tech / Degree Residency',
+      yearSemester: input.yearSemester || 'Academic Resident',
+      roomNo,
+    },
+    billing: {
+      month,
+      dueDate: new Date(paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      paymentDate: new Date(paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      billingPeriod,
+      numberOfDays: 'Full Month',
+    },
+    lineItems,
+    financials: {
+      subtotal: monthlyFee,
+      lateFee,
+      discount,
+      totalAmount: Math.max(0, monthlyFee + lateFee - discount),
+      amountPaid,
+      remainingBalance,
+    },
+    paymentDetails: {
+      method: paymentMode,
+      transactionId: input.transactionId || receiptNo.slice(-10).toUpperCase(),
+      paidAmount: amountPaid,
+      paymentStatus: 'Success',
+      bankOrApp: input.bankName || (paymentMode === 'UPI' ? 'UPI' : paymentMode === 'CASH' ? 'Cash Counter' : 'Bank Transfer'),
+      receivedBy: adminName,
+    },
+    verificationUrl,
+    notes,
+  };
+}
 
 /**
- * Generates an authoritative Hostel Fee Receipt.
- * Financial total reflects ONLY the monthly fee liability (rent + late fee - discount).
- * If security deposit was collected in the same operation, it is referenced as an
- * informational section ONLY and is NOT added to the fee subtotal or total.
+ * Generates an authoritative Master Hostel Fee Receipt PDF matching the reference template.
+ * Layout: A4 portrait, lavender pill, green PAID card, two-card student/billing split,
+ * itemized breakdown table, centered pale logo watermark, payment details card, QR code, and footer.
  */
-export async function generateFeeReceiptPDF(r: FeeReceiptData) {
-  const { default: jsPDF } = await import('jspdf');
+export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSnapshot | ReceiptData) {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
+
+  const snap = normalizeToSnapshot(input);
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-  const W = doc.internal.pageSize.getWidth();
+  const W = doc.internal.pageSize.getWidth(); // 595.28 pt
+  const H = doc.internal.pageSize.getHeight(); // 841.89 pt
+  const margin = 36;
+  const contentWidth = W - margin * 2; // 523.28 pt
+
+  // ==========================================
+  // 1. Centered Pale Watermark (~4-5% opacity)
+  // ==========================================
+  // @ts-ignore
+  if (doc.GState) {
+    // @ts-ignore
+    doc.saveGraphicsState();
+    // @ts-ignore
+    doc.setGState(new doc.GState({ opacity: 0.045 }));
+    doc.setTextColor(109, 40, 217); // Purple
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(54);
+    doc.text(snap.branding.branchName || 'HOSTELIQ', W / 2, H / 2 - 10, {
+      align: 'center',
+      angle: 30,
+    });
+    // @ts-ignore
+    doc.restoreGraphicsState();
+  }
+
+  // ==========================================
+  // 2. Top Header & Issuer Information
+  // ==========================================
   let y = 40;
 
-  // Header band
-  doc.setFillColor(15, 23, 42); // Slate 900
-  doc.rect(0, 0, W, 80, 'F');
-  doc.setTextColor(255, 255, 255);
+  // Left side: Brand, Name, Tagline & Address
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text('Hosteliq', 40, 40);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text(HOSTEL_ADDR, 40, 58);
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('HOSTEL FEE RECEIPT', W - 40, 40, { align: 'right' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text(`#${r.receipt_no}`, W - 40, 58, { align: 'right' });
+  doc.setFontSize(18);
+  doc.setTextColor(15, 23, 42); // Slate 900
+  doc.text(snap.branding.organizationName || 'Hostel Name', margin, y);
 
-  y = 110;
-  doc.setTextColor(20, 20, 20);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(124, 58, 237); // Purple 600
+  doc.text(snap.branding.tagline || 'STUDENT LIVING, BRIGHTER FUTURES', margin, y + 11);
+
   doc.setFontSize(10);
-
-  const row = (l: string, v: string) => {
-    doc.setFont('helvetica', 'bold');
-    doc.text(l, 40, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(v, 180, y);
-    y += 18;
-  };
-
-  const formattedDate = r.payment_date ? new Date(r.payment_date).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
-  row('Receipt Date:', formattedDate);
-  row('Hostel Branch:', r.hostel);
-  row('Student Name:', r.student_name);
-  row('Student Identifier:', r.student_code ? `${r.username} (${r.student_code})` : `@${r.username}`);
-  row('Room No:', r.room_no || 'N/A');
-  row('Billing Month:', r.month);
-  if (r.billing_period) row('Billing Period:', r.billing_period);
-  row('Payment Mode:', (r.payment_mode || 'CASH').toUpperCase());
-  if (r.admin_name) row('Received By:', r.admin_name);
-
-  y += 6;
-  doc.setDrawColor(220);
-  doc.line(40, y, W - 40, y);
-  y += 18;
-
-  const item = (desc: string, amt: number, isMinus = false) => {
-    if (amt <= 0) return;
-    doc.setFont('helvetica', 'normal');
-    doc.text(desc, 40, y);
-    doc.setFont('helvetica', 'bold');
-    const txt = `${isMinus ? '-' : ''}Rs. ${amt.toLocaleString('en-IN')}`;
-    doc.text(txt, W - 40, y, { align: 'right' });
-    y += 18;
-  };
-
-  item('Monthly Hostel Rent', r.monthly_fee);
-  item('Late Fee', r.late_fee);
-  item('Discount / Concession', r.discount, true);
-
-  y += 6;
-  doc.setFillColor(245, 245, 245);
-  doc.rect(40, y, W - 80, 28, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(15, 23, 42);
-  doc.text('TOTAL FEE AMOUNT PAID', 50, y + 18);
-  doc.text(`Rs. ${r.amount_paid.toLocaleString('en-IN')}`, W - 50, y + 18, { align: 'right' });
-  y += 40;
+  doc.setTextColor(30, 41, 59); // Slate 800
+  doc.text(snap.branding.branchName, margin, y + 28);
 
-  if (r.remaining_fee_balance && r.remaining_fee_balance > 0) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(180, 83, 9);
-    doc.text(`Remaining Fee Balance Due: Rs. ${r.remaining_fee_balance.toLocaleString('en-IN')}`, 40, y);
-    y += 18;
-  }
-
-  // INFORMATIONAL SECTION: Security Deposit Collected Separately
-  if (r.deposit_collected_separately && r.deposit_collected_separately > 0) {
-    doc.setFillColor(240, 249, 255); // Sky 50
-    doc.setDrawColor(186, 230, 253); // Sky 200
-    doc.rect(40, y, W - 80, 46, 'FD');
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(3, 105, 161); // Sky 700
-    doc.text(`Security Deposit Collected Separately: Rs. ${r.deposit_collected_separately.toLocaleString('en-IN')}`, 50, y + 17);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Security Deposit Receipt No.: ${r.deposit_receipt_no || 'Issued Separately'}`, 50, y + 32);
-
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.text('(Separate Security Deposit Receipt issued. Not included in fee total above)', W - 50, y + 32, { align: 'right' });
-    y += 58;
-  }
-
-  if (r.notes) {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Notes / Reference: ${r.notes}`, 40, y);
-    y += 20;
-  }
-
-  // Footer
-  y = doc.internal.pageSize.getHeight() - 60;
-  doc.setDrawColor(200);
-  doc.line(40, y, W - 40, y);
-  y += 18;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.setTextColor(120, 120, 120);
-  doc.text('This is an official system-generated Hostel Fee Receipt from Hosteliq. Keep it safe for your records.', 40, y);
+  doc.setTextColor(100, 116, 139); // Slate 500
+  const addressLines = doc.splitTextToSize(snap.branding.address, 240);
+  doc.text(addressLines, margin, y + 40);
+
+  const contactY = y + 40 + addressLines.length * 10;
+  doc.text(`Phone: ${snap.branding.phone}`, margin, contactY);
+  doc.text(`Email: ${snap.branding.email}`, margin, contactY + 11);
+
+  // Right side: Fee Receipt Pill
+  const pillW = 150;
+  const pillH = 34;
+  const pillX = W - margin - pillW;
+  doc.setFillColor(245, 237, 255); // #f5edff
+  doc.setDrawColor(221, 214, 254); // #ddd6fe
+  doc.roundedRect(pillX, 36, pillW, pillH, 8, 8, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(126, 34, 206); // Purple 700
+  doc.text('FEE RECEIPT', pillX + pillW / 2, 49, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105); // Slate 600
+  doc.text(`# ${snap.receiptNo}`, pillX + pillW / 2, 62, { align: 'center' });
+
+  // Right side: Green Confirmation Card
+  const greenW = 165;
+  const greenH = 34;
+  const greenX = W - margin - greenW;
+  doc.setFillColor(236, 253, 245); // #ecfdf5
+  doc.setDrawColor(167, 243, 208); // #a7f3d0
+  doc.roundedRect(greenX, 76, greenW, greenH, 7, 7, 'FD');
+
+  // Green circle checkmark
+  doc.setFillColor(16, 185, 129); // Emerald 500
+  doc.circle(greenX + 16, 93, 8, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('✓', greenX + 16, 96, { align: 'center' });
+
+  // Status text
+  doc.setTextColor(4, 120, 87); // Emerald 700
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text(snap.status, greenX + 30, 90);
+
+  doc.setTextColor(6, 95, 70);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text(snap.isFullSettlement ? 'Payment received successfully.' : 'Partial payment received.', greenX + 30, 101);
+
+  // Right side: Meta Key-Values Table
+  let metaY = 118;
+  const drawMetaRow = (label: string, val: string) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(label, W - margin - 120, metaY);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text(`: ${val}`, W - margin - 55, metaY);
+    metaY += 12;
+  };
+
+  drawMetaRow('Receipt Date', snap.receiptDate);
+  drawMetaRow('Payment Date', snap.paymentDate);
+  drawMetaRow('Invoice No.', snap.invoiceNo);
+  drawMetaRow('Receipt No.', snap.receiptNo);
+
+  // ==========================================
+  // 3. Side-by-Side Cards (Student & Billing)
+  // ==========================================
+  y = 172;
+  const cardW = (contentWidth - 14) / 2;
+  const cardH = 92;
+
+  // --- Left Card: Student Details ---
+  const leftX = margin;
+  doc.setFillColor(252, 250, 255); // #fcfaff
+  doc.setDrawColor(237, 233, 254); // #ede9fe
+  doc.roundedRect(leftX, y, cardW, cardH, 7, 7, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(109, 40, 217); // Purple 700
+  doc.text('STUDENT DETAILS', leftX + 10, y + 15);
+
+  doc.setDrawColor(241, 238, 255);
+  doc.line(leftX + 10, y + 20, leftX + cardW - 10, y + 20);
+
+  let stuRowY = y + 33;
+  const drawStuRow = (l: string, v: string) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(l, leftX + 10, stuRowY);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text(`: ${v}`, leftX + 85, stuRowY);
+    stuRowY += 13;
+  };
+
+  drawStuRow('Name', snap.student.name);
+  drawStuRow('Student ID', snap.student.studentId);
+  drawStuRow('Course', snap.student.course);
+  drawStuRow('Year / Semester', snap.student.yearSemester);
+  drawStuRow('Room No.', snap.student.roomNo);
+
+  // --- Right Card: Billing Period ---
+  const rightX = margin + cardW + 14;
+  doc.setFillColor(252, 250, 255);
+  doc.setDrawColor(237, 233, 254);
+  doc.roundedRect(rightX, y, cardW, cardH, 7, 7, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(109, 40, 217);
+  doc.text('BILLING PERIOD', rightX + 10, y + 15);
+
+  doc.setDrawColor(241, 238, 255);
+  doc.line(rightX + 10, y + 20, rightX + cardW - 10, y + 20);
+
+  let billRowY = y + 33;
+  const drawBillRow = (l: string, v: string) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(l, rightX + 10, billRowY);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text(`: ${v}`, rightX + 85, billRowY);
+    billRowY += 13;
+  };
+
+  drawBillRow('Month', snap.billing.month);
+  drawBillRow('Due Date', snap.billing.dueDate);
+  drawBillRow('Payment Date', snap.billing.paymentDate);
+  drawBillRow('No. of Days', snap.billing.numberOfDays);
+
+  // ==========================================
+  // 4. Fee Breakdown Table
+  // ==========================================
+  y = y + cardH + 18;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(109, 40, 217);
+  doc.text('FEE BREAKDOWN', margin, y);
+
+  y += 7;
+  const tableBody = snap.lineItems.map((item, idx) => [
+    String(item.index || idx + 1),
+    item.particulars,
+    `${item.isDeduction ? '-' : ''}${Number(item.amount).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`,
+  ]);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'Particulars', 'Amount (Rs.)']],
+    body: tableBody,
+    theme: 'plain',
+    headStyles: {
+      fillColor: [246, 239, 254], // #f6effe
+      textColor: [51, 65, 85],
+      fontStyle: 'bold',
+      fontSize: 8.5,
+      halign: 'left',
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: 6,
+      textColor: [30, 41, 59],
+      lineColor: [241, 238, 255],
+      lineWidth: 0.5,
+    },
+    columnStyles: {
+      0: { cellWidth: 35, halign: 'center', textColor: [148, 163, 184] },
+      1: { halign: 'left' },
+      2: { cellWidth: 100, halign: 'right', fontStyle: 'bold' },
+    },
+    margin: { left: margin, right: margin },
+  });
+
+  // @ts-ignore
+  let afterTableY = doc.lastAutoTable.finalY;
+
+  // Lavender Total Band
+  const totalBandH = 28;
+  doc.setFillColor(245, 237, 255); // #f5edff
+  doc.setDrawColor(221, 214, 254);
+  doc.roundedRect(margin, afterTableY, contentWidth, totalBandH, 5, 5, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(107, 33, 168); // Purple 800
+  doc.text('TOTAL AMOUNT PAID', margin + 12, afterTableY + 18);
+
+  doc.setFontSize(11);
+  doc.text(
+    `Rs. ${Number(snap.financials.amountPaid).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`,
+    W - margin - 12,
+    afterTableY + 18,
+    { align: 'right' }
+  );
+
+  y = afterTableY + totalBandH + 16;
+
+  // Remaining balance alert if any
+  if (snap.financials.remainingBalance > 0) {
+    doc.setFillColor(254, 243, 199); // Amber 100
+    doc.setDrawColor(251, 191, 36);
+    doc.roundedRect(margin, y, contentWidth, 20, 4, 4, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(146, 64, 14);
+    doc.text('Remaining Unpaid Balance Due:', margin + 10, y + 13);
+    doc.text(
+      `Rs. ${Number(snap.financials.remainingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      W - margin - 10,
+      y + 13,
+      { align: 'right' }
+    );
+    y += 28;
+  }
+
+  // ==========================================
+  // 5. Payment Details Card & Verification QR
+  // ==========================================
+  const payCardW = contentWidth - 110;
+  const payCardH = 80;
+
+  // Left: Payment Details Card
+  doc.setFillColor(244, 252, 246); // #f4fcf6
+  doc.setDrawColor(187, 247, 208); // #bbf7d0
+  doc.roundedRect(margin, y, payCardW, payCardH, 7, 7, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(21, 128, 61); // Emerald 700
+  doc.text('PAYMENT DETAILS', margin + 10, y + 15);
+
+  doc.setDrawColor(220, 252, 231);
+  doc.line(margin + 10, y + 20, margin + payCardW - 10, y + 20);
+
+  let payRowY = y + 33;
+  const drawPayRow = (l: string, v: string, isGreen = false) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(l, margin + 10, payRowY);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(isGreen ? 22 : 30, isGreen ? 163 : 41, isGreen ? 74 : 59);
+    doc.text(`: ${v}`, margin + 120, payRowY);
+    payRowY += 12;
+  };
+
+  drawPayRow('Payment Method', snap.paymentDetails.method);
+  drawPayRow('Transaction ID / UTR', snap.paymentDetails.transactionId);
+  drawPayRow(
+    'Paid Amount',
+    `Rs. ${Number(snap.paymentDetails.paidAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+  );
+  drawPayRow('Payment Status', snap.paymentDetails.paymentStatus, true);
+  drawPayRow('Bank / UPI App', snap.paymentDetails.bankOrApp);
+
+  // Right: QR Code Box
+  const qrBoxX = margin + payCardW + 12;
+  const qrBoxW = contentWidth - payCardW - 12; // ~98 pt
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(qrBoxX, y, qrBoxW, payCardH, 7, 7, 'FD');
+
+  try {
+    const qrDataUrl = await QRCode.toDataURL(snap.verificationUrl, {
+      margin: 1,
+      width: 120,
+    });
+    doc.addImage(qrDataUrl, 'PNG', qrBoxX + (qrBoxW - 56) / 2, y + 6, 56, 56);
+  } catch (qrErr) {
+    console.error('Failed to render QR on PDF:', qrErr);
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Scan to verify this receipt', qrBoxX + qrBoxW / 2, y + 71, { align: 'center' });
+
+  y += payCardH + 14;
+
+  // ==========================================
+  // 6. Notes Section
+  // ==========================================
+  const notesH = 34;
+  doc.setFillColor(251, 250, 255);
+  doc.setDrawColor(241, 238, 255);
+  doc.roundedRect(margin, y, contentWidth, notesH, 6, 6, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(88, 28, 135);
+  doc.text('Notes', margin + 10, y + 13);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('•  This is a system-generated receipt and does not require a physical signature.', margin + 12, y + 23);
+  doc.text('•  For any query, please contact the hostel office.', margin + 12, y + 32);
+
+  // ==========================================
+  // 7. Footer Section
+  // ==========================================
+  const footerY = H - 42;
+  doc.setDrawColor(241, 245, 249);
+  doc.line(margin, footerY - 10, W - margin, footerY - 10);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(126, 34, 206);
+  doc.text('Thank you!', margin, footerY + 2);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('For being a part of our hostel community.', margin, footerY + 12);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  doc.text(snap.branding.branchName, W - margin, footerY + 2, { align: 'right' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text('Managed with 💜 by Hosteliq', W - margin, footerY + 12, { align: 'right' });
 
   return doc;
 }
 
 /**
- * Generates an authoritative Security Deposit Receipt.
- * Labelled clearly as "Security Deposit Receipt" and reflects ONLY the security deposit liability.
- * Does not include monthly rent or late fees in the payable total.
+ * Downloads the Master Fee Receipt PDF
+ */
+export async function downloadFeeReceipt(r: FeeReceiptData | FeeReceiptSnapshot | ReceiptData) {
+  const doc = await generateFeeReceiptPDF(r);
+  const snap = normalizeToSnapshot(r);
+  const sanitizedReceiptNo = (snap.receiptNo || 'Receipt').replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`Hostel-Receipt-${sanitizedReceiptNo}.pdf`);
+}
+
+/**
+ * Generates an authoritative Security Deposit Receipt PDF
  */
 export async function generateSecurityDepositReceiptPDF(r: SecurityDepositReceiptData) {
   const { default: jsPDF } = await import('jspdf');
@@ -211,7 +611,7 @@ export async function generateSecurityDepositReceiptPDF(r: SecurityDepositReceip
   doc.text('Hosteliq', 40, 40);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(HOSTEL_ADDR, 40, 58);
+  doc.text('Official Security Deposit Statement', 40, 58);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.text('SECURITY DEPOSIT RECEIPT', W - 40, 40, { align: 'right' });
@@ -265,12 +665,12 @@ export async function generateSecurityDepositReceiptPDF(r: SecurityDepositReceip
   item('Security Deposit Amount Collected Now', r.deposit_amount);
 
   y += 6;
-  doc.setFillColor(236, 253, 245); // Emerald 50
-  doc.setDrawColor(167, 243, 208); // Emerald 200
+  doc.setFillColor(236, 253, 245);
+  doc.setDrawColor(167, 243, 208);
   doc.rect(40, y, W - 80, 28, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.setTextColor(6, 78, 59); // Emerald 900
+  doc.setTextColor(6, 78, 59);
   doc.text('TOTAL DEPOSIT RECEIVED', 50, y + 18);
   doc.text(`Rs. ${r.deposit_amount.toLocaleString('en-IN')}`, W - 50, y + 18, { align: 'right' });
   y += 44;
@@ -287,9 +687,8 @@ export async function generateSecurityDepositReceiptPDF(r: SecurityDepositReceip
   }
   y += 24;
 
-  // Clear Legal / Informational Box
-  doc.setFillColor(248, 250, 252); // Slate 50
-  doc.setDrawColor(226, 232, 240); // Slate 200
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
   doc.rect(40, y, W - 80, 48, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
@@ -310,7 +709,6 @@ export async function generateSecurityDepositReceiptPDF(r: SecurityDepositReceip
     y += 20;
   }
 
-  // Footer
   y = doc.internal.pageSize.getHeight() - 60;
   doc.setDrawColor(200);
   doc.line(40, y, W - 40, y);
@@ -323,24 +721,21 @@ export async function generateSecurityDepositReceiptPDF(r: SecurityDepositReceip
   return doc;
 }
 
-export async function downloadFeeReceipt(r: FeeReceiptData) {
-  const doc = await generateFeeReceiptPDF(r);
-  doc.save(`Fee-Receipt-${r.receipt_no}.pdf`);
-}
-
 export async function downloadSecurityDepositReceipt(r: SecurityDepositReceiptData) {
   const doc = await generateSecurityDepositReceiptPDF(r);
   doc.save(`SecurityDeposit-Receipt-${r.receipt_no}.pdf`);
 }
 
-export async function downloadBothReceipts(feeReceipt: FeeReceiptData, depositReceipt: SecurityDepositReceiptData) {
+export async function downloadBothReceipts(
+  feeReceipt: FeeReceiptData | FeeReceiptSnapshot,
+  depositReceipt: SecurityDepositReceiptData
+) {
   await downloadFeeReceipt(feeReceipt);
-  // Brief pause so browser downloads both files reliably
   await new Promise((resolve) => setTimeout(resolve, 350));
   await downloadSecurityDepositReceipt(depositReceipt);
 }
 
-export async function getFeeReceiptBlob(r: FeeReceiptData): Promise<Blob> {
+export async function getFeeReceiptBlob(r: FeeReceiptData | FeeReceiptSnapshot): Promise<Blob> {
   const doc = await generateFeeReceiptPDF(r);
   return doc.output('blob');
 }
@@ -350,39 +745,12 @@ export async function getSecurityDepositReceiptBlob(r: SecurityDepositReceiptDat
   return doc.output('blob');
 }
 
-/**
- * Legacy / General receipt PDF generator retained for backward compatibility.
- * Redirects to generateFeeReceiptPDF when no security deposit is bundled,
- * or handles combined data safely.
- */
-export async function generateReceiptPDF(r: ReceiptData) {
-  const feeData: FeeReceiptData = {
-    receipt_no: r.receipt_no,
-    payment_date: r.payment_date,
-    student_name: r.student_name,
-    username: r.username,
-    student_code: r.student_code,
-    room_no: r.room_no,
-    hostel: r.hostel,
-    month: r.month,
-    billing_period: r.billing_period,
-    monthly_fee: r.monthly_fee,
-    late_fee: r.late_fee,
-    discount: r.discount,
-    amount_paid: r.amount_paid > 0 ? (r.amount_paid - (r.security_deposit || 0)) : r.monthly_fee,
-    remaining_fee_balance: r.remaining_fee_balance,
-    payment_mode: r.payment_mode,
-    admin_name: r.admin_name,
-    notes: r.notes,
-    deposit_collected_separately: r.security_deposit > 0 ? r.security_deposit : r.deposit_collected_separately,
-    deposit_receipt_no: r.deposit_receipt_no,
-  };
-  return generateFeeReceiptPDF(feeData);
+export async function generateReceiptPDF(r: ReceiptData | FeeReceiptSnapshot) {
+  return generateFeeReceiptPDF(r);
 }
 
-export async function downloadReceipt(r: ReceiptData) {
-  const doc = await generateReceiptPDF(r);
-  doc.save(`Receipt-${r.receipt_no}.pdf`);
+export async function downloadReceipt(r: ReceiptData | FeeReceiptSnapshot) {
+  return downloadFeeReceipt(r);
 }
 
 export interface HistoryReceiptData {
@@ -408,7 +776,6 @@ export async function generateHistoryReceipt(data: HistoryReceiptData) {
   const W = doc.internal.pageSize.getWidth();
   let y = 40;
 
-  // Header
   doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, W, 80, 'F');
   doc.setTextColor(255, 255, 255);
@@ -417,7 +784,7 @@ export async function generateHistoryReceipt(data: HistoryReceiptData) {
   doc.text('Hosteliq', 40, 40);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(HOSTEL_ADDR, 40, 58);
+  doc.text('Official Payment History Ledger', 40, 58);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.text('PAYMENT HISTORY', W - 40, 40, { align: 'right' });
@@ -443,18 +810,17 @@ export async function generateHistoryReceipt(data: HistoryReceiptData) {
   row('Hostel:', data.hostel);
 
   y += 20;
-  
   const totalPaid = data.payments.reduce((sum, p) => sum + Number(p.amount), 0);
 
   autoTable(doc, {
     startY: y,
     head: [['Date', 'Receipt No.', 'Fee Month', 'Mode', 'Amount Paid']],
-    body: data.payments.map(p => [
+    body: data.payments.map((p) => [
       new Date(p.payment_date).toLocaleDateString('en-IN'),
       p.receipt_no,
       p.month,
       p.payment_mode.toUpperCase(),
-      `Rs. ${p.amount.toLocaleString('en-IN')}`
+      `Rs. ${p.amount.toLocaleString('en-IN')}`,
     ]),
     theme: 'grid',
     headStyles: { fillColor: [15, 23, 42] },
@@ -490,7 +856,7 @@ export async function getHistoryReceiptBlob(data: HistoryReceiptData): Promise<B
   return doc.output('blob');
 }
 
-export async function printFeeReceipt(r: FeeReceiptData) {
+export async function printFeeReceipt(r: FeeReceiptData | FeeReceiptSnapshot | ReceiptData) {
   const doc = await generateFeeReceiptPDF(r);
   const blob = doc.output('blob');
   const url = URL.createObjectURL(blob);
@@ -509,4 +875,3 @@ export async function printSecurityDepositReceipt(r: SecurityDepositReceiptData)
     win.focus();
   }
 }
-

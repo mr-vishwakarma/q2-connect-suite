@@ -21,6 +21,8 @@ import {
   ArrowRight,
   Receipt,
   User,
+  Eye,
+  Printer,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { extractFloor } from './StudentFeeMatrix';
@@ -31,7 +33,9 @@ import {
   SecurityDepositReceiptData,
   downloadFeeReceipt,
   downloadSecurityDepositReceipt,
+  printFeeReceipt,
 } from '@/lib/receiptPdf';
+import { HostelFeeReceiptModal } from '@/components/receipts/HostelFeeReceiptModal';
 
 interface StudentProfileHistoryProps {
   open: boolean;
@@ -58,6 +62,9 @@ export function StudentProfileHistory({
   openCollect,
   onSelectAnotherStudent,
 }: StudentProfileHistoryProps) {
+  const [previewReceiptNo, setPreviewReceiptNo] = useState<string | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+
   if (!selectedStudent) return null;
 
   const handleDownloadFeeReceipt = async (p: any) => {
@@ -84,6 +91,33 @@ export function StudentProfileHistory({
       await downloadFeeReceipt(data);
     } catch {
       downloadHistoryForStudent(selectedStudent);
+    }
+  };
+
+  const handlePrintFeeReceipt = async (p: any) => {
+    try {
+      const data: FeeReceiptData = {
+        receipt_no: p.receipt_no,
+        payment_date: p.payment_date,
+        student_name: selectedStudent.name,
+        username: selectedStudent.username,
+        student_code: selectedStudent.student_code || selectedStudent.studentCode,
+        room_no: selectedStudent.room_no,
+        hostel: selectedStudent.hostel || 'Q2',
+        month: p.month,
+        monthly_fee: p.amount,
+        late_fee: p.late_fee || 0,
+        discount: p.discount || 0,
+        amount_paid: p.amount,
+        payment_mode: p.payment_mode,
+        admin_name: p.admin_name,
+        notes: p.notes,
+        deposit_collected_separately: p.security_deposit > 0 ? p.security_deposit : null,
+        deposit_receipt_no: p.deposit_receipt_no || null,
+      };
+      await printFeeReceipt(data);
+    } catch {
+      // Fallback
     }
   };
 
@@ -514,11 +548,32 @@ export function StudentProfileHistory({
                             <Button
                               size="sm"
                               variant="ghost"
+                              className="h-7 w-7 p-0 hover:bg-purple-500/20 text-purple-600 rounded-lg"
+                              onClick={() => {
+                                setPreviewReceiptNo(p.receipt_no);
+                                setShowReceiptModal(true);
+                              }}
+                              title={`Preview Official Receipt #${p.receipt_no}`}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
                               className="h-7 w-7 p-0 hover:bg-primary/20 hover:text-primary rounded-lg"
                               onClick={() => handleDownloadFeeReceipt(p)}
                               title={`Download Hostel Fee Receipt #${p.receipt_no}`}
                             >
                               <Download className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 hover:bg-slate-200 text-slate-600 rounded-lg"
+                              onClick={() => handlePrintFeeReceipt(p)}
+                              title={`Print Receipt #${p.receipt_no}`}
+                            >
+                              <Printer className="w-3.5 h-3.5" />
                             </Button>
                             {(p.deposit_receipt_no || p.security_deposit > 0) && (
                               <Button
@@ -542,6 +597,12 @@ export function StudentProfileHistory({
           </div>
         </div>
       </DialogContent>
+
+      <HostelFeeReceiptModal
+        open={showReceiptModal}
+        onOpenChange={setShowReceiptModal}
+        receiptNo={previewReceiptNo}
+      />
     </Dialog>
   );
 }

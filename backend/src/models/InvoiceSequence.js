@@ -43,4 +43,24 @@ invoiceSequenceSchema.statics.getNextInvoiceNumber = async function (organizatio
   return `${prefix}-${year}-${paddedSeq}`;
 };
 
+/**
+ * Atomically generates the next sequential receipt number for an organization / branch.
+ * e.g. Q2G-2025-10-0012 or RCPT-2026-0001
+ * Concurrency-safe: uses MongoDB findOneAndUpdate with $inc
+ */
+invoiceSequenceSchema.statics.getNextReceiptNumber = async function (organizationId, prefix = 'RCPT', period = null) {
+  const now = new Date();
+  const currentPeriod = period || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const year = now.getFullYear();
+
+  const record = await this.findOneAndUpdate(
+    { organizationId, year, prefix: `RCPT-${prefix}-${currentPeriod}` },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  );
+
+  const paddedSeq = String(record.seq).padStart(4, '0');
+  return `${prefix}-${currentPeriod}-${paddedSeq}`;
+};
+
 module.exports = mongoose.model('InvoiceSequence', invoiceSequenceSchema);

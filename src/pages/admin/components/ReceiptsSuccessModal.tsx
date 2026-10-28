@@ -26,7 +26,9 @@ import {
   Layers,
   ArrowDownToLine,
   ExternalLink,
+  Eye,
 } from 'lucide-react';
+import { HostelFeeReceiptModal } from '@/components/receipts/HostelFeeReceiptModal';
 import {
   FeeReceiptData,
   SecurityDepositReceiptData,
@@ -60,6 +62,7 @@ export function ReceiptsSuccessModal({
   const [downloadingBoth, setDownloadingBoth] = useState(false);
   const [downloadingFee, setDownloadingFee] = useState(false);
   const [downloadingDeposit, setDownloadingDeposit] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const hasFeeReceipt = Boolean(feeReceipt && feeReceipt.amount_paid >= 0 && feeReceipt.receipt_no);
   const hasDepositReceipt = Boolean(
@@ -223,6 +226,15 @@ export function ReceiptsSuccessModal({
                 <Button
                   size="sm"
                   variant="outline"
+                  className="h-8 text-xs border-purple-500/30 text-purple-600 hover:bg-purple-500/10"
+                  onClick={() => setShowPreview(true)}
+                >
+                  <Eye className="w-3.5 h-3.5 mr-1.5" />
+                  View Receipt
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   className="h-8 text-xs border-border"
                   onClick={handlePrintFee}
                 >
@@ -334,6 +346,12 @@ export function ReceiptsSuccessModal({
           </Button>
         </div>
       </DialogContent>
+
+      <HostelFeeReceiptModal
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        receiptNo={feeReceipt?.receipt_no}
+      />
     </Dialog>
   );
 }

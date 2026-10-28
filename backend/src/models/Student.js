@@ -22,6 +22,8 @@ const studentSchema = new mongoose.Schema(
     profilePhoto: { type: String }, // ImageKit URL
     profilePhotoFileId: { type: String }, // ImageKit fileId for deletion
     studentCode: { type: String, trim: true }, // e.g., Q2S2026001
+    course: { type: String, trim: true, default: 'General' },
+    yearSemester: { type: String, trim: true, default: '' },
     isActive: { type: Boolean, default: true },
     status: {
       type: String,
