@@ -1,8 +1,11 @@
 /**
  * Middleware to restrict routes to student residents only.
  * Must be used AFTER the `protect` middleware.
+ * Also enforces the Mandatory Policy Acceptance Gate.
  */
-const studentOnly = (req, res, next) => {
+const { verifyPolicyGate } = require('./policyGate.middleware');
+
+const studentOnly = async (req, res, next) => {
   if (!req.user || req.user.role !== 'student') {
     return res.status(403).json({
       success: false,
@@ -10,7 +13,9 @@ const studentOnly = (req, res, next) => {
       message: 'Access denied. Student resident role required.',
     });
   }
-  next();
+
+  // Authoritatively enforce Mandatory Policy Gate
+  return verifyPolicyGate(req, res, next);
 };
 
 module.exports = { studentOnly };

@@ -7,3 +7,4 @@ export * from './feedback.service';
 export * from './laundry.service';
 export * from './dashboard.service';
 export * from './settings.service';
+export * from './policy.service';

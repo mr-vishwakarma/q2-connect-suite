@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { uploadMedia } from '@/utils/uploadService';
 import { getAvatarUrl } from '@/utils/imageUtils';
 import { formatDateDMY } from '@/utils/dateUtils';
+import { StudentPolicyLibrary } from '@/components/student/StudentPolicyLibrary';
 
 export default function Profile() {
   const { profile: authProfile, refreshProfile, signOut } = useAuth();
@@ -319,6 +320,9 @@ export default function Profile() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Policies & Document Library */}
+        <StudentPolicyLibrary hostelName={formData.hostel || authProfile?.hostel || undefined} />
 
         {/* Clean Separate Logout Section */}
         <div className="flex justify-center mt-6">

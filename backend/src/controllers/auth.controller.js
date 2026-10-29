@@ -238,6 +238,14 @@ const handleUnifiedLogin = async (req, res, defaultPortal) => {
     userPayload.isPrimaryAdmin = isPrimary;
     userPayload.is_primary = isPrimary;
 
+    let policyStatus = null;
+    if (user.role === 'student') {
+      try {
+        const { getStudentPolicyStatus } = require('../services/hostelPolicy.service');
+        policyStatus = await getStudentPolicyStatus(user, studentProfile);
+      } catch (e) {}
+    }
+
     return res.status(200).json({
       success: true,
       portal: requestedPortal,
@@ -247,6 +255,7 @@ const handleUnifiedLogin = async (req, res, defaultPortal) => {
       student: studentProfile,
       organization: resolvedOrgFeatures.organization,
       features: resolvedOrgFeatures.features,
+      policyStatus,
     });
   } catch (error) {
     console.error('Unified login error:', error);
@@ -977,12 +986,21 @@ const getMe = async (req, res) => {
     userPayload.isPrimaryAdmin = isPrimary;
     userPayload.is_primary = isPrimary;
 
+    let policyStatus = null;
+    if (req.user.role === 'student') {
+      try {
+        const { getStudentPolicyStatus } = require('../services/hostelPolicy.service');
+        policyStatus = await getStudentPolicyStatus(req.user, studentProfile);
+      } catch (e) {}
+    }
+
     return res.status(200).json({
       success: true,
       user: userPayload,
       student: studentProfile,
       organization: resolvedOrgFeatures.organization,
       features: resolvedOrgFeatures.features,
+      policyStatus,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });

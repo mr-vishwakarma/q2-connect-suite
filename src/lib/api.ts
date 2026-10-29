@@ -168,6 +168,14 @@ api.interceptors.response.use(
       }
     }
 
+    // Intercept Policy Acceptance Gate enforcement
+    if (error.response?.status === 403 && error.response?.data?.code === 'POLICY_ACCEPTANCE_REQUIRED') {
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/accept-policies') && !window.location.pathname.includes('/login')) {
+        window.location.href = '/student/accept-policies';
+        return Promise.reject(error);
+      }
+    }
+
     // Deduplicate and notify for systemic network or server-side failure modes (skip auth routes as login components handle their own toasts)
     const status = error.response?.status;
     const isSystemic = status === 429 || (status && status >= 500) || error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED';

@@ -17,6 +17,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useHostel } from '@/contexts/HostelContext';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AdminPolicyManagement } from '@/components/admin/policies/AdminPolicyManagement';
+import { FileText, Sliders } from 'lucide-react';
 import { api } from '@/lib/api';
 
 export default function AdminSettings() {
@@ -127,6 +130,23 @@ export default function AdminSettings() {
         </Badge>
       </div>
 
+      <Tabs defaultValue="policies" className="space-y-6">
+        <TabsList className="bg-secondary/40 border border-border p-1">
+          <TabsTrigger value="policies" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-amber-500 data-[state=active]:text-black">
+            <FileText className="w-3.5 h-3.5" />
+            Policies &amp; Documents
+          </TabsTrigger>
+          <TabsTrigger value="operations" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-amber-500 data-[state=active]:text-black">
+            <Sliders className="w-3.5 h-3.5" />
+            Operational Rules &amp; Facilities
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="policies" className="space-y-6 mt-4">
+          <AdminPolicyManagement selectedHostel={selectedHostel} branchName={branchDisplay} />
+        </TabsContent>
+
+        <TabsContent value="operations" className="space-y-6 mt-4">
       {/* Main Living Operations & Rules Card */}
       <Card className="border-border shadow-sm">
         <CardHeader className="border-b border-border/60 pb-4">
@@ -283,6 +303,8 @@ export default function AdminSettings() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

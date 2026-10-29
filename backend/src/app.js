@@ -41,6 +41,8 @@ const billingRoutes = require('./routes/billing.routes');
 const hostelsRoutes = require('./routes/hostels.routes');
 const adminManagementRoutes = require('./routes/adminManagement.routes');
 const receiptRoutes = require('./routes/receipt.routes');
+const policiesRoutes = require('./routes/policies.routes');
+const { verifyPolicyGate } = require('./middleware/policyGate.middleware');
 const { superAdminVoucherRoutes, checkoutVoucherRoutes } = require('./routes/voucher.routes');
 const { requestLogger } = require('./middleware/requestLogger.middleware');
 const { requestIdMiddleware } = require('./middleware/requestId.middleware');
@@ -120,6 +122,10 @@ app.use('/health', healthRoutes);
 // Mount auth routes (supports both direct domain /auth/google/callback and /api/auth/google/callback)
 app.use('/auth', authRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/policies', policiesRoutes);
+
+// Mandatory Student Policy Acceptance Gate: Blocks protected student endpoints when policy acceptance is pending
+app.use('/api', verifyPolicyGate);
 app.use('/api/students', studentsRoutes);
 app.use('/api/rooms', roomsRoutes);
 app.use('/api/fees', feesRoutes);

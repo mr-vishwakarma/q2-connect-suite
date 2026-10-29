@@ -46,6 +46,7 @@ const OurTeam = lazy(() => import("./pages/OurTeam"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword.tsx"));
 const OAuthCallback = lazy(() => import("./pages/OAuthCallback"));
+const PolicyAcceptanceGate = lazy(() => import("./pages/student/PolicyAcceptanceGate"));
 const StudentDashboard = lazy(() => import("./pages/student/StudentDashboard"));
 const Profile = lazy(() => import("./pages/student/Profile"));
 const MessOff = lazy(() => import("./pages/student/MessOff"));
@@ -222,6 +223,7 @@ const App = () => (
               {/* Student Protected Routes */}
               <Route path="/student" element={<StudentShell />}>
                 <Route index element={<Navigate to="/student/dashboard" replace />} />
+                <Route path="accept-policies" element={<PolicyAcceptanceGate />} />
                 <Route path="dashboard" element={<StudentDashboard />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="mess-off" element={<MessOff />} />
