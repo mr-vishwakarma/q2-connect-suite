@@ -74,25 +74,22 @@ export class GlobalErrorBoundary extends Component<Props, State> {
     this.setState({ hasError: false, error: null });
   };
 
-  private handleHardReload = () => {
+  private handleHardReload = async () => {
     try {
       sessionStorage.clear();
+      localStorage.removeItem('app_chunk_reload_time');
       if ('caches' in window) {
-        caches.keys().then((names) => {
-          names.forEach((name) => caches.delete(name));
-        });
+        const names = await caches.keys();
+        await Promise.all(names.map((name) => caches.delete(name)));
       }
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          registrations.forEach((reg) => reg.unregister());
-        });
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((reg) => reg.unregister()));
       }
     } catch {
       // Ignore
     }
-    setTimeout(() => {
-      window.location.reload();
-    }, 50);
+    window.location.reload();
   };
 
   public render() {
