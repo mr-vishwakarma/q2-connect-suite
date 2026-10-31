@@ -28,6 +28,7 @@ out/
 backend/.env
 backend/.env.*
 !backend/.env.example
+!backend/.env.bootstrap.example
 
 # Editor directories and files
 .vscode/*

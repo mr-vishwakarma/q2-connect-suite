@@ -9,7 +9,9 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "db:reset": "npm --prefix backend run db:reset"
+    "db:reset": "npm --prefix backend run db:reset",
+    "seed:super-admin": "npm --prefix backend run seed:super-admin",
+    "test:superadmin": "npm --prefix backend run test:superadmin"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

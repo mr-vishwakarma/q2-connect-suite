@@ -10,7 +10,7 @@
     "build": "echo 'No build step required'",
     "db:reset": "node src/scripts/resetDatabase.js",
     "seed:saas": "node src/scripts/seedSaaSEnvironment.js",
-    "seed:superadmin": "node src/scripts/seedSuperAdmin.js",
+    "seed:superadmin": "node src/scripts/bootstrapSuperAdmin.js",
     "test:p0": "node src/scripts/test_p0_security.js",
     "test:tenant": "node src/scripts/test_phase_b_multitenant.js",
     "test:perf": "node src/scripts/test_phase_c_performance.js",
@@ -27,7 +27,9 @@
     "test:production": "node src/scripts/test_production_integration_suite.js",
     "test:deliverability": "node src/scripts/test_deliverability_suite.js",
     "test:policies": "node src/scripts/test_policy_acceptance_suite.js",
-    "test": "node src/scripts/test_p0_security.js"
+    "test": "node src/scripts/test_p0_security.js",
+    "seed:super-admin": "node src/scripts/bootstrapSuperAdmin.js",
+    "test:superadmin": "node src/scripts/test_super_admin_bootstrap.js"
   },
   "dependencies": {
     "@imagekit/nodejs": "^7.10.0",
