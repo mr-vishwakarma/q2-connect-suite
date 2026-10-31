@@ -51,35 +51,36 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('three') || id.includes('@react-three')) {
-              return 'vendor-three';
-            }
-            if (id.includes('xlsx')) {
-              return 'vendor-sheets';
-            }
-            if (id.includes('jspdf') || id.includes('html2canvas')) {
-              return 'vendor-pdf';
-            }
-            if (id.includes('recharts')) {
-              return 'vendor-charts';
-            }
-            if (id.includes('@tanstack/react-query')) {
-              return 'vendor-query';
-            }
-            if (id.includes('socket.io-client')) {
-              return 'vendor-socket';
-            }
-            if (id.includes('lucide-react') || id.includes('framer-motion') || id.includes('@radix-ui')) {
-              return 'vendor-ui';
-            }
+          const normalizedId = id.replace(/\\/g, '/');
+          if (normalizedId.includes('node_modules')) {
             if (
-              id.includes('/react/') ||
-              id.includes('/react-dom/') ||
-              id.includes('/react-router-dom/') ||
-              id.includes('/react-router/')
+              normalizedId.includes('/react/') ||
+              normalizedId.includes('/react-dom/') ||
+              normalizedId.includes('/react-router-dom/') ||
+              normalizedId.includes('/react-router/')
             ) {
               return 'vendor-react';
+            }
+            if (normalizedId.includes('three') || normalizedId.includes('@react-three')) {
+              return 'vendor-three';
+            }
+            if (normalizedId.includes('xlsx')) {
+              return 'vendor-sheets';
+            }
+            if (normalizedId.includes('jspdf') || normalizedId.includes('html2canvas')) {
+              return 'vendor-pdf';
+            }
+            if (normalizedId.includes('recharts')) {
+              return 'vendor-charts';
+            }
+            if (normalizedId.includes('@tanstack/react-query')) {
+              return 'vendor-query';
+            }
+            if (normalizedId.includes('socket.io-client')) {
+              return 'vendor-socket';
+            }
+            if (normalizedId.includes('lucide-react') || normalizedId.includes('framer-motion') || normalizedId.includes('@radix-ui')) {
+              return 'vendor-ui';
             }
           }
         }

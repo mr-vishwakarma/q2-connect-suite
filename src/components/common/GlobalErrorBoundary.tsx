@@ -32,6 +32,9 @@ export class GlobalErrorBoundary extends Component<Props, State> {
         // If we haven't auto-reloaded in the last 15 seconds, automatically reload to pull fresh assets
         if (!lastReload || now - parseInt(lastReload, 10) > 15000) {
           sessionStorage.setItem('app_chunk_reload_time', now.toString());
+          if ('caches' in window) {
+            caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
+          }
           window.location.reload();
           return { hasError: false, error: null };
         }
@@ -74,10 +77,22 @@ export class GlobalErrorBoundary extends Component<Props, State> {
   private handleHardReload = () => {
     try {
       sessionStorage.clear();
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((reg) => reg.unregister());
+        });
+      }
     } catch {
       // Ignore
     }
-    window.location.reload();
+    setTimeout(() => {
+      window.location.reload();
+    }, 50);
   };
 
   public render() {
