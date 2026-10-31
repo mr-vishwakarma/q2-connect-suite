@@ -126,3 +126,4 @@ npm run test:superadmin
 - Scenario 9: Refusal to overwrite existing account with same email/username.
 - Scenario 10: Acceptance by authentication, JWT token, and RBAC middleware (`requireSuperAdmin`).
 - Scenario 11: Non-interference with existing operational collections (hostels, students, organizations).
+
