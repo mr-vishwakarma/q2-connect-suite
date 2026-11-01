@@ -155,6 +155,33 @@ async function bootstrapSuperAdmin(options = {}) {
     });
 
     if (existingSuperAdmin) {
+      const shouldResetPassword = options.resetPassword || process.env.RESET_SUPERADMIN_PASSWORD === 'true' || process.argv.includes('--reset-password');
+      if (shouldResetPassword) {
+        logger.info(`🔄 Existing Super Admin detected (ID: ${existingSuperAdmin._id}). Resetting password and clearing any lockouts...`);
+        existingSuperAdmin.password = superAdminPassword;
+        existingSuperAdmin.failedLoginAttempts = 0;
+        existingSuperAdmin.lockUntil = null;
+        existingSuperAdmin.isActive = true;
+        existingSuperAdmin.status = 'ACTIVE';
+        await existingSuperAdmin.save();
+
+        const freshUser = await User.findById(existingSuperAdmin._id);
+        const isPasswordValid = await freshUser.comparePassword(superAdminPassword);
+        if (!isPasswordValid) {
+          throw new Error('SECURITY_SELF_CHECK_FAILED: Password hash comparison test failed.');
+        }
+
+        logger.info('✅ Super Administrator password updated and account unlocked successfully.');
+        if (localConnection) await mongoose.disconnect();
+        if (shouldExit) process.exit(0);
+        return {
+          success: true,
+          passwordReset: true,
+          user: freshUser.toJSON(),
+          message: 'Super Admin password reset and account unlocked.',
+        };
+      }
+
       logger.info(`ℹ️ A Super Administrator already exists in database "${actualDbName}" (ID: ${existingSuperAdmin._id}, username: ${existingSuperAdmin.username}, email: ${existingSuperAdmin.email}).`);
       logger.info('🛡️ Exiting safely without creating duplicate or unexpectedly modifying existing account.');
       if (localConnection) await mongoose.disconnect();
