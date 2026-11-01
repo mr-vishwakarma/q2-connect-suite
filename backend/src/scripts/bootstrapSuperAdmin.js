@@ -122,9 +122,13 @@ async function bootstrapSuperAdmin(options = {}) {
   if (mongoose.connection.readyState === 0) {
     localConnection = true;
     try {
-      await mongoose.connect(mongoUri, {
+      const connectOptions = {
         serverSelectionTimeoutMS: 15000,
-      });
+      };
+      if (mongoUri.startsWith('mongodb+srv://') && !mongoUri.includes('authSource=')) {
+        connectOptions.authSource = process.env.MONGO_AUTH_SOURCE || 'admin';
+      }
+      await mongoose.connect(mongoUri, connectOptions);
     } catch (connErr) {
       logger.error(`❌ DATABASE CONNECTION FAILED: Unable to reach MongoDB host. (${connErr.message})`);
       if (shouldExit) process.exit(1);
