@@ -51,14 +51,14 @@ The command checks for variables in `backend/.env.bootstrap` (ignored by Git) an
    ```
 2. Open `backend/.env.bootstrap` and configure your credentials:
    ```env
-   MONGODB_URI=mongodb+srv://hosteliq_prodtest:Mayur2003%21%40%23%24@backend.avegemq.mongodb.net/hosteliq_prodtest?retryWrites=true&w=majority
+   MONGODB_URI=mongodb+srv://<username>:<encoded_password>@<host>/<db_name>?retryWrites=true&w=majority
    EXPECTED_DB_NAME=hosteliq_prodtest
    ALLOW_SUPERADMIN_BOOTSTRAP=true
 
    SUPERADMIN_NAME=Super Administrator
    SUPERADMIN_USERNAME=superadmin
-   SUPERADMIN_EMAIL=superadmin@hosteliq.in
-   SUPERADMIN_PASSWORD=Super12345Admin!@#$
+   SUPERADMIN_EMAIL=superadmin@example.com
+   SUPERADMIN_PASSWORD=ReplaceWithStrongPassword123!
    ```
 3. Run the bootstrap command:
    ```bash
@@ -73,8 +73,8 @@ The command checks for variables in `backend/.env.bootstrap` (ignored by Git) an
 ```bash
 ALLOW_SUPERADMIN_BOOTSTRAP=true \
 EXPECTED_DB_NAME=hosteliq_prodtest \
-SUPERADMIN_EMAIL=superadmin@hosteliq.in \
-SUPERADMIN_PASSWORD="Super12345Admin!@#$" \
+SUPERADMIN_EMAIL=superadmin@example.com \
+SUPERADMIN_PASSWORD="ReplaceWithStrongPassword123!" \
 npm run seed:super-admin
 ```
 
@@ -85,7 +85,7 @@ npm run seed:super-admin
 ```bash
 ALLOW_SUPERADMIN_BOOTSTRAP=true \
 EXPECTED_DB_NAME=hosteliq_prodtest \
-npm run seed:super-admin -- --email superadmin@hosteliq.in --password "Super12345Admin!@#$" --username superadmin
+npm run seed:super-admin -- --email superadmin@example.com --password "ReplaceWithStrongPassword123!" --username superadmin
 ```
 
 ---
@@ -96,8 +96,8 @@ npm run seed:super-admin -- --email superadmin@hosteliq.in --password "Super1234
 2. Navigate to the Super Admin portal login:
    - URL: `/super-admin/login` or `/login?role=super_admin`
 3. Enter credentials:
-   - **Identifier (Email or Username):** `superadmin` or `superadmin@hosteliq.in`
-   - **Password:** `Super12345Admin!@#$`
+   - **Identifier (Email or Username):** `superadmin` or `superadmin@example.com`
+   - **Password:** `<your_configured_password>`
 4. The system validates:
    - Password hash verification (`User.comparePassword`).
    - Portal authorization check (`isRoleAllowedForPortal(user, 'SUPER_ADMIN')`).
