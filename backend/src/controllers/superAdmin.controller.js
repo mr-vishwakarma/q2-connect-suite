@@ -247,6 +247,37 @@ const superAdminController = {
     }
   },
 
+  async deletePlan(req, res) {
+    try {
+      const plan = await planService.deletePlan(req.params.id);
+      await logAuditAction({
+        req,
+        action: 'DELETE_PLAN',
+        entityType: 'Plan',
+        entityId: plan._id,
+        newValue: { name: plan.name, code: plan.code },
+      });
+      return res.status(200).json({ success: true, message: 'Plan deleted successfully', data: plan });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  async seedDefaultPlans(req, res) {
+    try {
+      const plans = await planService.seedDefaultPlans();
+      await logAuditAction({
+        req,
+        action: 'SEED_DEFAULT_PLANS',
+        entityType: 'Plan',
+        newValue: { count: plans.length },
+      });
+      return res.status(200).json({ success: true, message: 'Default plans seeded successfully', data: plans });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  },
+
   // --- Subscriptions ---
   async getSubscriptions(req, res) {
     try {
@@ -295,6 +326,86 @@ const superAdminController = {
     try {
       const features = await featureService.getFeatureCatalog();
       return res.status(200).json({ success: true, data: features });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  },
+
+  async createFeature(req, res) {
+    try {
+      const feature = await featureService.createFeature(req.body);
+      await logAuditAction({
+        req,
+        action: 'CREATE_FEATURE',
+        entityType: 'Feature',
+        entityId: feature._id,
+        newValue: req.body,
+      });
+      return res.status(201).json({ success: true, data: feature });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  async updateFeature(req, res) {
+    try {
+      const feature = await featureService.updateFeature(req.params.id, req.body);
+      await logAuditAction({
+        req,
+        action: 'UPDATE_FEATURE',
+        entityType: 'Feature',
+        entityId: feature._id,
+        newValue: req.body,
+      });
+      return res.status(200).json({ success: true, data: feature });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  async toggleFeatureDefault(req, res) {
+    try {
+      const { defaultEnabled } = req.body;
+      const feature = await featureService.toggleFeatureDefault(req.params.id, defaultEnabled);
+      await logAuditAction({
+        req,
+        action: 'TOGGLE_FEATURE_DEFAULT',
+        entityType: 'Feature',
+        entityId: feature._id,
+        newValue: { defaultEnabled },
+      });
+      return res.status(200).json({ success: true, data: feature });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  async deleteFeature(req, res) {
+    try {
+      const feature = await featureService.deleteFeature(req.params.id);
+      await logAuditAction({
+        req,
+        action: 'DELETE_FEATURE',
+        entityType: 'Feature',
+        entityId: feature._id,
+        newValue: { key: feature.key, name: feature.name },
+      });
+      return res.status(200).json({ success: true, message: 'Feature deleted successfully', data: feature });
+    } catch (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  async seedDefaultFeatures(req, res) {
+    try {
+      const features = await featureService.seedDefaultFeatures();
+      await logAuditAction({
+        req,
+        action: 'SEED_DEFAULT_FEATURES',
+        entityType: 'Feature',
+        newValue: { count: features.length },
+      });
+      return res.status(200).json({ success: true, message: 'Default features seeded successfully', data: features });
     } catch (error) {
       return res.status(500).json({ success: false, message: error.message });
     }

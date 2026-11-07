@@ -1,10 +1,29 @@
-import { useEffect, useState } from 'react';
-import { CreditCard, Check, Plus, Edit, Loader2 } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import {
+  CreditCard,
+  Check,
+  Plus,
+  Edit2,
+  Trash2,
+  Loader2,
+  Sparkles,
+  RefreshCw,
+  Search,
+  Building,
+  Users,
+  HardDrive,
+  CheckCircle2,
+  AlertTriangle,
+  Sliders,
+  DollarSign,
+  ShieldAlert,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -13,174 +32,623 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { superAdminService } from '@/services/api/superAdmin.service';
-import { SubscriptionPlan } from '@/types';
+import { SubscriptionPlan, FeatureDefinition } from '@/types';
 import { toast } from 'react-toastify';
+
+const STANDARD_FEATURE_OPTIONS: { key: string; label: string }[] = [
+  { key: 'student_management', label: 'Student Management' },
+  { key: 'room_management', label: 'Room & Bed Management' },
+  { key: 'fee_management', label: 'Fee Collection & Matrix' },
+  { key: 'security_deposit', label: 'Security Deposits' },
+  { key: 'expense_management', label: 'Expense Tracker' },
+  { key: 'attendance', label: 'Attendance & Gate Passes' },
+  { key: 'mess_management', label: 'Mess & Leave Requests' },
+  { key: 'laundry', label: 'Laundry Booking' },
+  { key: 'complaints', label: 'Complaints & Suggestions' },
+  { key: 'reports', label: 'Financial & Occupancy Reports' },
+  { key: 'advanced_analytics', label: 'Advanced Analytics & AI' },
+  { key: 'custom_branding', label: 'White-label & Custom Branding' },
+  { key: 'biometric_integration', label: 'Biometric Attendance Hardware' },
+  { key: 'api_access', label: 'External API & Webhooks' },
+];
 
 export default function PlanManagement() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [featuresList, setFeaturesList] = useState<FeatureDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  // Dialog state
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
+  const [deletingPlan, setDeletingPlan] = useState<SubscriptionPlan | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Form edit state
+  // Form state
   const [formData, setFormData] = useState({
     name: '',
+    code: '',
+    description: '',
     priceMonthly: 0,
     priceYearly: 0,
-    description: '',
     isPopular: false,
+    isActive: true,
+    maxStudents: 100,
+    maxRooms: 50,
+    maxHostels: 1,
+    maxStaff: 5,
+    storageGb: 5,
+    includedFeatures: [] as string[],
   });
 
   useEffect(() => {
     fetchPlans();
+    fetchFeatures();
   }, []);
 
   const fetchPlans = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const res = await superAdminService.getPlans();
       if (res.success && res.data) {
         setPlans(res.data);
+      } else {
+        setPlans([]);
       }
-    } catch (error) {
-      console.error('Failed to fetch plans:', error);
-      toast.error('Failed to load subscription plans');
+    } catch (err: any) {
+      console.error('Failed to fetch plans:', err);
+      setError(err?.response?.data?.message || err?.message || 'Failed to load subscription plans');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchFeatures = async () => {
+    try {
+      const res = await superAdminService.getFeatures();
+      if (res.success && res.data && res.data.length > 0) {
+        setFeaturesList(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not fetch feature catalog for plan checklist:', err);
+    }
+  };
+
+  const availableFeatures = useMemo(() => {
+    if (featuresList.length > 0) {
+      return featuresList.map((f) => ({ key: f.key, label: f.name }));
+    }
+    return STANDARD_FEATURE_OPTIONS;
+  }, [featuresList]);
+
+  const handleSeedDefaults = async () => {
+    try {
+      setIsSeeding(true);
+      const res = await superAdminService.seedDefaultPlans();
+      if (res.success && res.data) {
+        setPlans(res.data);
+        toast.success(`Standard pricing tiers initialized (${res.data.length} plans)`);
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to initialize default plans');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const handleOpenCreate = () => {
+    setFormData({
+      name: '',
+      code: '',
+      description: '',
+      priceMonthly: 2999,
+      priceYearly: 29990,
+      isPopular: false,
+      isActive: true,
+      maxStudents: 100,
+      maxRooms: 40,
+      maxHostels: 1,
+      maxStaff: 5,
+      storageGb: 5,
+      includedFeatures: [
+        'student_management',
+        'room_management',
+        'fee_management',
+        'security_deposit',
+        'attendance',
+        'complaints',
+        'reports',
+      ],
+    });
+    setIsCreateOpen(true);
   };
 
   const handleOpenEdit = (plan: SubscriptionPlan) => {
     setEditingPlan(plan);
     setFormData({
       name: plan.name || '',
+      code: plan.code || '',
+      description: plan.description || '',
       priceMonthly: plan.priceMonthly || 0,
       priceYearly: plan.priceYearly || 0,
-      description: plan.description || '',
       isPopular: plan.isPopular || false,
+      isActive: plan.isActive ?? true,
+      maxStudents: plan.limits?.maxStudents ?? 0,
+      maxRooms: plan.limits?.maxRooms ?? 50,
+      maxHostels: plan.limits?.maxHostels ?? 1,
+      maxStaff: plan.limits?.maxStaff ?? 5,
+      storageGb: plan.limits?.storageGb ?? 5,
+      includedFeatures: plan.includedFeatures || [],
+    });
+  };
+
+  const handleToggleFeatureCheck = (featureKey: string) => {
+    setFormData((prev) => {
+      const exists = prev.includedFeatures.includes(featureKey);
+      return {
+        ...prev,
+        includedFeatures: exists
+          ? prev.includedFeatures.filter((k) => k !== featureKey)
+          : [...prev.includedFeatures, featureKey],
+      };
     });
   };
 
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingPlan) return;
-
     try {
       setIsSaving(true);
-      const planId = (editingPlan as any)._id || editingPlan.id;
       const payload: any = {
-        name: formData.name,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
         priceMonthly: Number(formData.priceMonthly),
         priceYearly: Number(formData.priceYearly),
-        description: formData.description,
         isPopular: formData.isPopular,
+        isActive: formData.isActive,
+        limits: {
+          maxStudents: Number(formData.maxStudents),
+          maxRooms: Number(formData.maxRooms),
+          maxHostels: Number(formData.maxHostels),
+          maxStaff: Number(formData.maxStaff),
+          storageGb: Number(formData.storageGb),
+        },
+        includedFeatures: formData.includedFeatures,
       };
 
-      const res = await superAdminService.updatePlan(planId, payload);
-      if (res.success) {
-        toast.success(`Plan '${formData.name}' updated successfully`);
-        setEditingPlan(null);
-        fetchPlans();
+      if (editingPlan) {
+        const planId = (editingPlan as any)._id || editingPlan.id;
+        const res = await superAdminService.updatePlan(planId, payload);
+        if (res.success) {
+          toast.success(`Plan '${formData.name}' updated successfully`);
+          setEditingPlan(null);
+          fetchPlans();
+        }
+      } else {
+        payload.code = (formData.code || formData.name).toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+        const res = await superAdminService.createPlan(payload);
+        if (res.success) {
+          toast.success(`Plan '${formData.name}' created successfully`);
+          setIsCreateOpen(false);
+          fetchPlans();
+        }
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to update plan pricing');
+      toast.error(error?.response?.data?.message || 'Failed to save subscription plan');
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleDeletePlan = async () => {
+    if (!deletingPlan) return;
+    const planId = (deletingPlan as any)._id || deletingPlan.id;
+    try {
+      setIsSaving(true);
+      await superAdminService.deletePlan(planId);
+      toast.success(`Plan '${deletingPlan.name}' deleted successfully`);
+      setDeletingPlan(null);
+      fetchPlans();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to delete plan');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const filteredPlans = useMemo(() => {
+    return plans.filter((plan) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        plan.name.toLowerCase().includes(q) ||
+        (plan.code && plan.code.toLowerCase().includes(q)) ||
+        (plan.description && plan.description.toLowerCase().includes(q));
+
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && plan.isActive !== false) ||
+        (statusFilter === 'inactive' && plan.isActive === false);
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [plans, searchQuery, statusFilter]);
+
   return (
     <div className="space-y-6">
+      {/* Header & Primary Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Subscription Plans & Pricing</h1>
-          <p className="text-sm text-muted-foreground">Manage SaaS pricing tiers, feature packages, and billing definitions.</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Subscription Plans & Pricing</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Manage SaaS pricing tiers, tenant capacity quotas, feature entitlements, and billing definitions.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchPlans}
+            disabled={isLoading}
+            className="h-9 text-xs"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleOpenCreate}
+            className="h-9 text-xs bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Create Plan
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {plans.map((plan) => {
-          return (
-            <Card
-              key={plan._id || plan.id}
-              className={`border flex flex-col justify-between ${
-                plan.isPopular
-                  ? 'border-amber-500/60 shadow-lg shadow-amber-500/5 bg-gradient-to-b from-card to-amber-500/5'
-                  : 'border-border/60'
-              }`}
-            >
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-bold">{plan.name}</CardTitle>
-                  {plan.isPopular && <Badge className="bg-amber-500 text-black font-bold text-[10px]">MOST POPULAR</Badge>}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">{plan.description}</p>
-                <div className="pt-4 flex items-baseline justify-between">
-                  <div>
-                    <span className="text-3xl font-black text-foreground">₹{plan.priceMonthly?.toLocaleString()}</span>
-                    <span className="text-xs text-muted-foreground"> / month</span>
-                  </div>
-                  {plan.priceYearly ? (
-                    <span className="text-xs text-emerald-400 font-mono">
-                      ₹{plan.priceYearly?.toLocaleString()} / yr
-                    </span>
-                  ) : null}
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase">Included Modules:</span>
-                  <ul className="space-y-1 text-xs">
-                    {plan.includedFeatures?.map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-foreground">
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>{f.replace(/_/g, ' ')}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </CardContent>
-
-              <CardFooter className="pt-4 border-t border-border/50">
-                <Button
-                  variant="outline"
-                  className="w-full text-xs hover:border-amber-500/60"
-                  onClick={() => handleOpenEdit(plan)}
-                >
-                  <Edit className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
-                  Edit Plan Limits
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
+      {/* Summary Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="p-3.5 rounded-xl bg-card border border-border/60">
+          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block">Total Tiers</span>
+          <span className="text-lg sm:text-xl font-bold text-foreground mt-0.5 block">{plans.length}</span>
+        </div>
+        <div className="p-3.5 rounded-xl bg-card border border-border/60">
+          <span className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider block">Active For Billing</span>
+          <span className="text-lg sm:text-xl font-bold text-emerald-400 mt-0.5 block">
+            {plans.filter((p) => p.isActive !== false).length}
+          </span>
+        </div>
+        <div className="p-3.5 rounded-xl bg-card border border-border/60">
+          <span className="text-[11px] font-medium text-amber-400 uppercase tracking-wider block">Highlighted Tier</span>
+          <span className="text-sm sm:text-base font-bold text-amber-400 mt-1 block truncate">
+            {plans.find((p) => p.isPopular)?.name || 'None Selected'}
+          </span>
+        </div>
+        <div className="p-3.5 rounded-xl bg-card border border-border/60">
+          <span className="text-[11px] font-medium text-purple-400 uppercase tracking-wider block">Standard Modules</span>
+          <span className="text-lg sm:text-xl font-bold text-purple-400 mt-0.5 block">{availableFeatures.length}</span>
+        </div>
       </div>
 
-      {/* Edit Plan Limits Dialog */}
-      <Dialog open={!!editingPlan} onOpenChange={(open) => !open && setEditingPlan(null)}>
-        <DialogContent className="max-w-md">
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card p-3 rounded-xl border border-border/60">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search plans by name, code or description..."
+            className="pl-9 h-9 text-xs bg-background/50 border-border/70"
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+          {(['all', 'active', 'inactive'] as const).map((st) => (
+            <button
+              key={st}
+              onClick={() => setStatusFilter(st)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${
+                statusFilter === st
+                  ? 'bg-amber-500 text-black font-semibold shadow-sm'
+                  : 'bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary'
+              }`}
+            >
+              {st}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-between gap-3 text-destructive">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-5 h-5 shrink-0" />
+            <span className="text-xs sm:text-sm font-medium">{error}</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchPlans} className="text-xs h-8">
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Loading Skeletons */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((idx) => (
+            <div key={idx} className="p-6 rounded-2xl bg-card border border-border/60 animate-pulse space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="h-6 bg-muted rounded w-1/3" />
+                <div className="h-5 bg-muted rounded w-20" />
+              </div>
+              <div className="h-4 bg-muted rounded w-3/4" />
+              <div className="h-10 bg-muted rounded w-1/2" />
+              <div className="space-y-2 pt-4">
+                <div className="h-4 bg-muted rounded w-full" />
+                <div className="h-4 bg-muted rounded w-5/6" />
+                <div className="h-4 bg-muted rounded w-4/6" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredPlans.length === 0 ? (
+        /* Empty State */
+        <div className="text-center py-16 px-4 border border-dashed border-border/80 rounded-2xl bg-card/40">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3">
+            <CreditCard className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-semibold text-foreground">
+            {plans.length === 0 ? 'No Subscription Plans Configured' : 'No Matching Plans Found'}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+            {plans.length === 0
+              ? 'No subscription plans have been initialized yet. Seed the default SaaS packages (Starter, Growth, Professional, Enterprise) to enable tenant billing.'
+              : `No subscription plans match your search "${searchQuery}".`}
+          </p>
+
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+            {plans.length === 0 ? (
+              <Button
+                onClick={handleSeedDefaults}
+                disabled={isSeeding}
+                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs h-9"
+              >
+                {isSeeding ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Initializing Pricing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Initialize Standard Plan Catalog
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('all');
+                }}
+                className="text-xs"
+              >
+                Clear Filters
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleOpenCreate} className="text-xs">
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              Create Custom Plan
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* Plan Cards Grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredPlans.map((plan) => {
+            const planId = (plan as any)._id || plan.id;
+            const maxStudents = plan.limits?.maxStudents;
+            const maxRooms = plan.limits?.maxRooms;
+            const maxHostels = plan.limits?.maxHostels;
+            const storageGb = plan.limits?.storageGb;
+
+            return (
+              <Card
+                key={planId}
+                className={`border flex flex-col justify-between transition-all duration-200 relative ${
+                  plan.isPopular
+                    ? 'border-amber-500/70 shadow-lg shadow-amber-500/5 bg-gradient-to-b from-card via-card to-amber-500/5'
+                    : 'border-border/60 bg-card hover:border-border'
+                }`}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg font-bold text-foreground">{plan.name}</CardTitle>
+                      {plan.code && (
+                        <Badge variant="outline" className="text-[10px] font-mono uppercase bg-secondary/40 text-muted-foreground border-border">
+                          {plan.code}
+                        </Badge>
+                      )}
+                    </div>
+                    {plan.isPopular && (
+                      <Badge className="bg-amber-500 text-black font-bold text-[10px] shrink-0">
+                        MOST POPULAR
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2 min-h-[32px]">
+                    {plan.description || 'General subscription tier.'}
+                  </p>
+
+                  <div className="pt-3 flex items-baseline justify-between border-t border-border/40 mt-2">
+                    <div>
+                      <span className="text-2xl sm:text-3xl font-black text-foreground">
+                        ₹{plan.priceMonthly?.toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-xs text-muted-foreground"> / month</span>
+                    </div>
+                    {plan.priceYearly ? (
+                      <div className="text-right">
+                        <span className="text-xs text-emerald-400 font-mono font-semibold block">
+                          ₹{plan.priceYearly?.toLocaleString('en-IN')} / yr
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">Billed annually</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-4 pt-1">
+                  {/* Capacity Bounds */}
+                  <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-secondary/30 border border-border/50 text-xs">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Max Students</span>
+                      <span className="font-semibold text-foreground">
+                        {maxStudents === 0 || maxStudents === null ? 'Unlimited' : `${maxStudents} residents`}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Max Rooms</span>
+                      <span className="font-semibold text-foreground">
+                        {maxRooms === 0 || maxRooms === null ? 'Unlimited' : `${maxRooms} rooms`}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Max Hostels</span>
+                      <span className="font-semibold text-foreground">
+                        {maxHostels === 0 || maxHostels === null ? 'Unlimited' : `${maxHostels} property`}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Cloud Storage</span>
+                      <span className="font-semibold text-foreground">
+                        {storageGb ? `${storageGb} GB` : 'Standard'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Included Features */}
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+                      Included Modules ({plan.includedFeatures?.length || 0}):
+                    </span>
+                    <ul className="space-y-1.5 text-xs max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                      {plan.includedFeatures && plan.includedFeatures.length > 0 ? (
+                        plan.includedFeatures.map((f) => (
+                          <li key={f} className="flex items-center gap-2 text-foreground/90">
+                            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="capitalize">{f.replace(/_/g, ' ')}</span>
+                          </li>
+                        ))
+                      ) : (
+                        <li className="text-muted-foreground italic text-xs">No specific modules mapped</li>
+                      )}
+                    </ul>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="pt-3 border-t border-border/50 flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs hover:border-amber-500/60"
+                    onClick={() => handleOpenEdit(plan)}
+                  >
+                    <Edit2 className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
+                    Edit Plan Limits
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setDeletingPlan(plan)}
+                    title="Delete Plan"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create / Edit Plan Limits Dialog */}
+      <Dialog
+        open={isCreateOpen || !!editingPlan}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsCreateOpen(false);
+            setEditingPlan(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto w-[95vw]">
           <DialogHeader>
-            <DialogTitle>Edit Plan Limits: {editingPlan?.name}</DialogTitle>
+            <DialogTitle>
+              {editingPlan ? `Edit Plan Limits: ${editingPlan.name}` : 'Create Subscription Plan'}
+            </DialogTitle>
             <DialogDescription>
-              Adjust pricing rates and operational bounds. Changes apply to newly onboarded tenants and active renewals.
+              Configure pricing rates, operational capacity limits, and bundled feature modules.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSavePlan} className="space-y-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="planName" className="text-xs">Plan Display Name</Label>
+                <Input
+                  id="planName"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g. Starter Plan"
+                  required
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="planCode" className="text-xs">Plan Code (Unique)</Label>
+                <Input
+                  id="planCode"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                  placeholder="e.g. STARTER"
+                  disabled={!!editingPlan}
+                  required
+                  className="h-9 text-xs font-mono uppercase"
+                />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
-              <Label htmlFor="planName" className="text-xs">Plan Display Name</Label>
-              <Input
-                id="planName"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-                className="h-9 text-xs"
+              <Label htmlFor="planDesc" className="text-xs">Description</Label>
+              <Textarea
+                id="planDesc"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Target demographic and value proposition..."
+                rows={2}
+                className="text-xs resize-none"
               />
             </div>
 
+            {/* Pricing Rates */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="monthlyPrice" className="text-xs">Monthly Price (₹)</Label>
@@ -209,37 +677,192 @@ export default function PlanManagement() {
               </div>
             </div>
 
-
-            <div className="flex items-center gap-2 pt-2">
-              <input
-                id="isPopular"
-                type="checkbox"
-                checked={formData.isPopular}
-                onChange={(e) => setFormData({ ...formData, isPopular: e.target.checked })}
-                className="w-4 h-4 rounded border-border text-amber-500 focus:ring-amber-500"
-              />
-              <Label htmlFor="isPopular" className="text-xs cursor-pointer">
-                Highlight as "Most Popular" plan on public pricing pages
+            {/* Capacity Bounds */}
+            <div className="space-y-2 pt-2 border-t border-border/50">
+              <Label className="text-xs font-bold text-foreground block">
+                Operational Capacity Bounds (0 = Unlimited)
               </Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground block">Max Students</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.maxStudents}
+                    onChange={(e) => setFormData({ ...formData, maxStudents: Number(e.target.value) })}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground block">Max Rooms</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.maxRooms}
+                    onChange={(e) => setFormData({ ...formData, maxRooms: Number(e.target.value) })}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground block">Max Hostels</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.maxHostels}
+                    onChange={(e) => setFormData({ ...formData, maxHostels: Number(e.target.value) })}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground block">Storage (GB)</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.storageGb}
+                    onChange={(e) => setFormData({ ...formData, storageGb: Number(e.target.value) })}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Included Features Checklist */}
+            <div className="space-y-2 pt-2 border-t border-border/50">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-foreground">
+                  Bundled Feature Modules ({formData.includedFeatures.length} selected)
+                </Label>
+                <div className="flex gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setFormData((p) => ({ ...p, includedFeatures: availableFeatures.map((f) => f.key) }))}
+                    className="text-amber-400 hover:underline"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-muted-foreground">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData((p) => ({ ...p, includedFeatures: [] }))}
+                    className="text-muted-foreground hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar p-2 rounded-xl bg-secondary/20 border border-border/50">
+                {availableFeatures.map((feat) => {
+                  const checked = formData.includedFeatures.includes(feat.key);
+                  return (
+                    <label
+                      key={feat.key}
+                      className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                        checked
+                          ? 'bg-amber-500/10 border-amber-500/30 text-foreground font-medium'
+                          : 'bg-card/50 border-border/40 text-muted-foreground hover:bg-secondary/40'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => handleToggleFeatureCheck(feat.key)}
+                        className="w-3.5 h-3.5 rounded border-border text-amber-500 focus:ring-amber-500"
+                      />
+                      <span className="truncate">{feat.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Toggles */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+              <div className="flex items-center gap-2">
+                <input
+                  id="isPopular"
+                  type="checkbox"
+                  checked={formData.isPopular}
+                  onChange={(e) => setFormData({ ...formData, isPopular: e.target.checked })}
+                  className="w-4 h-4 rounded border-border text-amber-500 focus:ring-amber-500"
+                />
+                <Label htmlFor="isPopular" className="text-xs cursor-pointer">
+                  Highlight as "Most Popular"
+                </Label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  id="isActive"
+                  type="checkbox"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="w-4 h-4 rounded border-border text-amber-500 focus:ring-amber-500"
+                />
+                <Label htmlFor="isActive" className="text-xs cursor-pointer">
+                  Active for Onboarding
+                </Label>
+              </div>
             </div>
 
             <DialogFooter className="pt-3">
-              <Button type="button" variant="outline" onClick={() => setEditingPlan(null)} disabled={isSaving}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setEditingPlan(null);
+                }}
+                disabled={isSaving}
+                className="text-xs"
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaving} className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
+              <Button
+                type="submit"
+                disabled={isSaving}
+                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs"
+              >
                 {isSaving ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Saving...
                   </>
-                ) : (
+                ) : editingPlan ? (
                   'Save Plan Changes'
+                ) : (
+                  'Create Plan'
                 )}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Alert */}
+      <AlertDialog
+        open={!!deletingPlan}
+        onOpenChange={(open) => !open && setDeletingPlan(null)}
+      >
+        <AlertDialogContent className="max-w-md w-[95vw]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Subscription Plan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <span className="font-semibold text-foreground">"{deletingPlan?.name}"</span>?
+              Existing subscribed organizations will maintain their current billing cycle, but new tenants cannot select this plan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving} className="text-xs">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePlan}
+              disabled={isSaving}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs font-semibold"
+            >
+              {isSaving ? 'Deleting...' : 'Delete Plan'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

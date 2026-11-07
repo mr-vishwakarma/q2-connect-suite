@@ -12,7 +12,7 @@ export type SaasRole =
   | 'STAFF'
   | 'STUDENT';
 
-export type PlanTier = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE' | 'CUSTOM';
+export type PlanTier = 'STARTER' | 'GROWTH' | 'PROFESSIONAL' | 'ENTERPRISE' | 'CUSTOM' | (string & {});
 
 export type FeatureKey =
   | 'student_management'
@@ -223,7 +223,9 @@ export interface TenantSubscription {
 }
 
 export interface FeatureDefinition {
-  key: FeatureKey;
+  _id?: string;
+  id?: string;
+  key: string;
   name: string;
   description: string;
   category: 'core' | 'operations' | 'finance' | 'advanced';

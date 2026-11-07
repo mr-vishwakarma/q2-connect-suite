@@ -37,7 +37,9 @@ router.post('/users/:id/resend-invitation', superAdminController.resendInvitatio
 // 5. Plans & Pricing
 router.get('/plans', superAdminController.getPlans);
 router.post('/plans', superAdminController.createPlan);
+router.post('/plans/seed-defaults', superAdminController.seedDefaultPlans);
 router.put('/plans/:id', superAdminController.updatePlan);
+router.delete('/plans/:id', superAdminController.deletePlan);
 
 // 6. Subscriptions
 router.get('/subscriptions', superAdminController.getSubscriptions);
@@ -46,6 +48,11 @@ router.post('/subscriptions/:id/extend-trial', superAdminController.extendSubscr
 
 // 7. Feature Catalog & Gating
 router.get('/features', superAdminController.getFeatures);
+router.post('/features', superAdminController.createFeature);
+router.post('/features/seed-defaults', superAdminController.seedDefaultFeatures);
+router.put('/features/:id', superAdminController.updateFeature);
+router.patch('/features/:id/toggle', superAdminController.toggleFeatureDefault);
+router.delete('/features/:id', superAdminController.deleteFeature);
 router.post('/features/toggle', superAdminController.toggleOrgFeature);
 
 // 8. Compliance & Audit Logs

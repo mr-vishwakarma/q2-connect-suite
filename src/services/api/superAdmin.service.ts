@@ -123,6 +123,16 @@ export const superAdminService = {
     return res.data;
   },
 
+  async deletePlan(id: string): Promise<ApiResponse<any>> {
+    const res = await api.delete(`/super-admin/plans/${id}`);
+    return res.data;
+  },
+
+  async seedDefaultPlans(): Promise<ApiResponse<SubscriptionPlan[]>> {
+    const res = await api.post('/super-admin/plans/seed-defaults');
+    return res.data;
+  },
+
   // 6. Subscriptions
   async getSubscriptions(
     params?: { status?: string; search?: string; page?: number; limit?: number },
@@ -145,6 +155,31 @@ export const superAdminService = {
   // 7. Feature Catalog & Gating
   async getFeatures(): Promise<ApiResponse<FeatureDefinition[]>> {
     const res = await api.get('/super-admin/features');
+    return res.data;
+  },
+
+  async createFeature(payload: Partial<FeatureDefinition>): Promise<ApiResponse<FeatureDefinition>> {
+    const res = await api.post('/super-admin/features', payload);
+    return res.data;
+  },
+
+  async updateFeature(id: string, payload: Partial<FeatureDefinition>): Promise<ApiResponse<FeatureDefinition>> {
+    const res = await api.put(`/super-admin/features/${id}`, payload);
+    return res.data;
+  },
+
+  async toggleFeature(id: string, defaultEnabled: boolean): Promise<ApiResponse<FeatureDefinition>> {
+    const res = await api.patch(`/super-admin/features/${id}/toggle`, { defaultEnabled });
+    return res.data;
+  },
+
+  async deleteFeature(id: string): Promise<ApiResponse<any>> {
+    const res = await api.delete(`/super-admin/features/${id}`);
+    return res.data;
+  },
+
+  async seedDefaultFeatures(): Promise<ApiResponse<FeatureDefinition[]>> {
+    const res = await api.post('/super-admin/features/seed-defaults');
     return res.data;
   },
 

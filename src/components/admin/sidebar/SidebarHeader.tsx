@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,24 +20,18 @@ export function SidebarHeader({
         onClick={onClose}
         className={cn("flex items-center gap-3 select-none", isCollapsed && "justify-center w-full")}
       >
-        <motion.div
-          whileHover={{ rotate: 180 }}
-          transition={{ duration: 0.3 }}
-          className="w-10 h-10 flex items-center justify-center shrink-0 overflow-hidden"
-        >
-          <img
-            src="/hosteliq-logo.png"
-            alt="Hosteliq Logo"
-            width={40}
-            height={40}
-            decoding="async"
-            className="w-full h-full object-contain"
-          />
-        </motion.div>
+        <img
+          src="/hosteliq-logo.png"
+          alt="Hosteliq Logo"
+          width={40}
+          height={40}
+          decoding="async"
+          className="h-10 w-auto max-w-[42px] object-contain shrink-0"
+        />
         {!isCollapsed && (
-          <div className="overflow-hidden whitespace-nowrap">
-            <span className="text-foreground font-bold text-base block leading-tight">Hosteliq</span>
-            <span className="text-xs text-muted-foreground">Admin Portal</span>
+          <div className="overflow-hidden whitespace-nowrap flex flex-col justify-center">
+            <span className="text-foreground font-bold text-base block leading-tight tracking-tight">Hosteliq</span>
+            <span className="text-[11px] text-muted-foreground font-medium mt-0.5">Admin Portal</span>
           </div>
         )}
       </Link>
