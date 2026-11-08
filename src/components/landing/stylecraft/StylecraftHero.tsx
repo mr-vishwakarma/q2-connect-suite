@@ -11,31 +11,31 @@ export interface StylecraftHeroProps {
 export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
   return (
     <section
-      className="relative w-full rounded-[22px] sm:rounded-[30px] md:rounded-[38px] overflow-hidden flex flex-col justify-between min-h-[540px] sm:min-h-[620px] md:min-h-[680px] lg:min-h-[740px] xl:min-h-[780px] shadow-[inset_0_0_100px_rgba(0,0,0,0.4)]"
-      aria-label="Hosteliq Platform Introduction"
+      className="relative w-full h-full flex-1 rounded-[20px] sm:rounded-[28px] md:rounded-[36px] overflow-hidden flex flex-col justify-between min-h-[500px] sm:min-h-[580px] md:min-h-[640px] shadow-[inset_0_0_80px_rgba(0,0,0,0.45)]"
+      aria-label="Hostel IQ Platform Introduction"
     >
       {/* 1. Configurable Hero Background Image & Atmospheric Lighting */}
       <HeroBackground imageSrc={imageSrc} />
 
-      {/* 2. Top Navigation Bar Overlay */}
+      {/* 2. Top Dual-Pocket Curved Notch Navigation Bar */}
       <StylecraftNavbar onConnect={onConnect} />
 
       {/* 3. Centered Editorial Headline, Supporting Text & Compact Rounded CTA */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-5 sm:px-8 md:px-12 py-12 sm:py-16 md:py-20 max-w-4xl mx-auto my-auto">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-5 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto my-auto">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-4 sm:space-y-5"
+          className="space-y-3.5 sm:space-y-4 md:space-y-5"
         >
           {/* Main Headline */}
-          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-[68px] font-bold text-white tracking-tight leading-[1.12] drop-shadow-sm font-sans">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-[64px] font-bold text-white tracking-tight leading-[1.12] drop-shadow-md font-sans">
             A Smarter Way to Manage <br className="hidden sm:inline" />
             Your Hostel
           </h1>
 
           {/* Supporting Description */}
-          <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/85 font-normal max-w-2xl mx-auto leading-relaxed drop-shadow-sm px-2">
+          <p className="text-xs sm:text-base md:text-lg text-white/85 font-normal max-w-2xl mx-auto leading-relaxed drop-shadow px-2">
             One platform for managing hostel operations, students, rooms and payments.
           </p>
         </motion.div>
@@ -45,7 +45,7 @@ export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-8 sm:mt-10 md:mt-12"
+          className="mt-6 sm:mt-8 md:mt-10"
         >
           <button
             onClick={onConnect}
@@ -54,16 +54,15 @@ export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
             aria-label="Connect With Us"
           >
             <span>Connect With Us</span>
-            <span className="w-8 h-8 rounded-full bg-white text-[#E8503A] flex items-center justify-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 shadow-sm">
-              <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+            <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white text-[#E8503A] flex items-center justify-center transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 shadow-sm">
+              <ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
             </span>
           </button>
         </motion.div>
       </div>
 
-      {/* Bottom spacer for aesthetic vertical equilibrium */}
-      <div className="h-6 sm:h-10 pointer-events-none" />
+      {/* Bottom spacer for aesthetic vertical equilibrium (matching the navbar height) */}
+      <div className="h-[40px] sm:h-[60px] pointer-events-none" />
     </section>
   );
 }
-

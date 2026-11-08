@@ -51,89 +51,160 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
   ];
 
   return (
-    <header className="relative z-20 w-full px-5 sm:px-8 md:px-12 pt-6 sm:pt-8 pb-4">
-      <div className="flex items-center justify-between gap-4">
-        {/* Left: Official Hosteliq Logo (Rendered directly, no square container) */}
+    <header className="relative w-full z-30 select-none">
+      {/* 
+        ========================================================================
+        1. TOP-LEFT WHITE POCKET: HOSTEL IQ LOGO
+        Directly matches the Stylecraft Design reference:
+        - White pocket background holding the logo
+        - Rounded bottom-right corner (rounded-br)
+        - Inverted concave fillets on top-right and bottom-left
+        ========================================================================
+      */}
+      <div className="absolute top-0 left-0 bg-white h-[58px] sm:h-[68px] md:h-[76px] pl-5 sm:pl-7 md:pl-9 pr-6 sm:pr-8 md:pr-10 rounded-br-[22px] sm:rounded-br-[28px] md:rounded-br-[32px] flex items-center z-20 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
         <Link
           to="/"
-          className="flex items-center gap-2.5 sm:gap-3 group select-none shrink-0"
-          aria-label="Hosteliq Home"
+          className="flex items-center gap-2.5 sm:gap-3 group"
+          aria-label="Hostel IQ Home"
         >
           <img
             src="/hosteliq-logo.png"
-            alt="Hosteliq Platform"
-            width={40}
-            height={40}
-            className="h-9 sm:h-10 w-auto max-w-[42px] object-contain transition-transform duration-200 group-hover:scale-105"
+            alt="Hostel IQ Platform"
+            width={38}
+            height={38}
+            className="h-8 sm:h-9 md:h-10 w-auto max-w-[42px] object-contain transition-transform duration-200 group-hover:scale-105"
           />
-          <span className="font-bold text-lg sm:text-xl text-white tracking-tight leading-none">
-            Hosteliq
+          <span className="font-extrabold text-base sm:text-lg md:text-xl text-slate-950 tracking-tight leading-none">
+            Hostel IQ
           </span>
         </Link>
 
-        {/* Center: Desktop Navigation Links (Exactly 4 items on one line) */}
+        {/* Top-Right Inverted Concave Fillet (Transitions from pocket to top dark edge) */}
+        <svg
+          className="absolute top-0 -right-[22px] sm:-right-[28px] md:-right-[32px] w-[22px] sm:w-[28px] md:w-[32px] h-[22px] sm:h-[28px] md:h-[32px] text-white fill-current pointer-events-none"
+          viewBox="0 0 28 28"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path d="M 0 0 L 0 28 A 28 28 0 0 0 28 0 Z" />
+        </svg>
+
+        {/* Bottom-Left Inverted Concave Fillet (Transitions from pocket to left dark edge) */}
+        <svg
+          className="absolute left-0 -bottom-[22px] sm:-bottom-[28px] md:-bottom-[32px] w-[22px] sm:w-[28px] md:w-[32px] h-[22px] sm:h-[28px] md:h-[32px] text-white fill-current pointer-events-none"
+          viewBox="0 0 28 28"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path d="M 0 0 L 28 0 A 28 28 0 0 0 0 28 Z" />
+        </svg>
+      </div>
+
+      {/* 
+        ========================================================================
+        2. TOP-RIGHT WHITE POCKET: BUTTONS
+        Directly matches the Stylecraft Design reference:
+        - White pocket background holding Connect With Us & (↗) Arrow Button
+        - Rounded bottom-left corner (rounded-bl)
+        - Inverted concave fillets on top-left and bottom-right
+        ========================================================================
+      */}
+      <div className="absolute top-0 right-0 bg-white h-[58px] sm:h-[68px] md:h-[76px] pl-6 sm:pl-8 md:pl-10 pr-5 sm:pr-7 md:pr-9 rounded-bl-[22px] sm:rounded-bl-[28px] md:rounded-bl-[32px] flex items-center gap-2.5 sm:gap-3.5 z-20 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
+        {/* Top-Left Inverted Concave Fillet (Transitions from pocket to top dark edge) */}
+        <svg
+          className="absolute top-0 -left-[22px] sm:-left-[28px] md:-left-[32px] w-[22px] sm:w-[28px] md:w-[32px] h-[22px] sm:h-[28px] md:h-[32px] text-white fill-current pointer-events-none"
+          viewBox="0 0 28 28"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path d="M 28 0 L 28 28 A 28 28 0 0 1 0 0 Z" />
+        </svg>
+
+        {/* Bottom-Right Inverted Concave Fillet (Transitions from pocket to right dark edge) */}
+        <svg
+          className="absolute right-0 -bottom-[22px] sm:-bottom-[28px] md:-bottom-[32px] w-[22px] sm:w-[28px] md:w-[32px] h-[22px] sm:h-[28px] md:h-[32px] text-white fill-current pointer-events-none"
+          viewBox="0 0 28 28"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path d="M 28 0 L 0 0 A 28 28 0 0 1 28 28 Z" />
+        </svg>
+
+        {/* Desktop Action 1: Login */}
+        <button
+          onClick={handleLoginClick}
+          type="button"
+          className="hidden lg:flex items-center gap-1.5 text-slate-800 hover:text-black font-semibold text-xs sm:text-sm px-3 py-1.5 rounded-full hover:bg-slate-100 transition-colors"
+          aria-label="Login"
+        >
+          <span>Login</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />
+        </button>
+
+        {/* Desktop Action 2: Connect With Us Pill Button (Exact Stylecraft reference) */}
+        <button
+          onClick={handleConnectClick}
+          type="button"
+          className="hidden sm:inline-flex rounded-full bg-slate-950 hover:bg-black text-white px-5 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 active:scale-95"
+          aria-label="Connect With Us"
+        >
+          Connect with us
+        </button>
+
+        {/* Desktop Action 3: Separate Circular Arrow Button (Exact Stylecraft reference) */}
+        <button
+          onClick={handleLoginClick}
+          type="button"
+          className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-950 hover:bg-black text-white items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+          title="Login to Portal"
+          aria-label="Login to Portal"
+        >
+          <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+        </button>
+
+        {/* Mobile Quick Action Pill */}
+        <button
+          onClick={handleConnectClick}
+          type="button"
+          className="sm:hidden rounded-full bg-slate-950 text-white px-3.5 py-1.5 text-xs font-semibold"
+        >
+          Connect
+        </button>
+
+        {/* Mobile Hamburger Drawer Trigger */}
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          type="button"
+          className="md:hidden p-1.5 text-slate-900 hover:bg-slate-100 rounded-lg transition-colors focus:outline-none"
+          aria-label={isMobileMenuOpen ? 'Close Menu' : 'Open Menu'}
+        >
+          {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      </div>
+
+      {/* 
+        ========================================================================
+        3. CENTER NAVIGATION BAR (FLOATING OVER THE DARK HERO BACKGROUND)
+        Exactly aligned in height with the two white pockets:
+        - 4 items: Platform, Solutions, Features, About
+        - White text directly on the dark background
+        ========================================================================
+      */}
+      <div className="w-full h-[58px] sm:h-[68px] md:h-[76px] flex items-center justify-center pointer-events-none px-4">
         <nav
-          className="hidden md:flex items-center gap-8 lg:gap-10 select-none"
+          className="hidden md:flex items-center gap-7 lg:gap-11 pointer-events-auto"
           aria-label="Main Navigation"
         >
           {navLinks.map((item) => (
             <a
               key={item.label}
               href={item.href}
-              className="text-white/85 hover:text-white text-sm font-medium tracking-wide transition-colors duration-200 relative py-1 after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[1.5px] after:bg-white after:transition-all hover:after:w-full"
+              className="text-white/85 hover:text-white text-sm font-medium tracking-wide transition-colors duration-200 relative py-1 hover:drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)]"
             >
               {item.label}
             </a>
           ))}
         </nav>
-
-        {/* Right: Actions (Desktop) */}
-        <div className="hidden sm:flex items-center gap-3 md:gap-4 shrink-0 select-none">
-          {/* Login with Separate Circular Arrow Icon Beside It */}
-          <button
-            onClick={handleLoginClick}
-            type="button"
-            className="group flex items-center gap-2 text-white hover:text-white/90 font-medium text-xs sm:text-sm transition-colors py-1.5 px-2 rounded-full focus:outline-none focus:ring-2 focus:ring-white/40"
-            aria-label="Login to Hosteliq Portal"
-          >
-            <span className="font-medium">Login</span>
-            <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 group-hover:bg-white/20 border border-white/25 flex items-center justify-center text-white transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-              <ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </span>
-          </button>
-
-          {/* Connect With Us: Rounded Pill-Shaped Button */}
-          <button
-            onClick={handleConnectClick}
-            type="button"
-            className="rounded-full bg-black/60 hover:bg-black/85 text-white border border-white/20 hover:border-white/40 px-5 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold backdrop-blur-md shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
-          >
-            Connect With Us
-          </button>
-        </div>
-
-        {/* Mobile Hamburger & Quick Login Button */}
-        <div className="flex sm:hidden items-center gap-2">
-          <button
-            onClick={handleLoginClick}
-            type="button"
-            className="flex items-center gap-1.5 text-white bg-white/10 border border-white/20 px-3 py-1.5 rounded-full text-xs font-medium"
-            aria-label="Login"
-          >
-            <span>Login</span>
-            <ArrowUpRight className="w-3 h-3" />
-          </button>
-
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            type="button"
-            className="p-2 text-white hover:bg-white/15 rounded-xl transition-colors focus:outline-none"
-            aria-label={isMobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
-            aria-expanded={isMobileMenuOpen}
-          >
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
       </div>
 
       {/* Mobile Drawer Overlay */}
@@ -147,12 +218,12 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
             >
               <img
                 src="/hosteliq-logo.png"
-                alt="Hosteliq Platform"
+                alt="Hostel IQ"
                 width={36}
                 height={36}
                 className="h-9 w-auto object-contain"
               />
-              <span className="font-bold text-lg text-white">Hosteliq</span>
+              <span className="font-bold text-lg text-white">Hostel IQ</span>
             </Link>
 
             <button
@@ -198,4 +269,3 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
     </header>
   );
 }
-

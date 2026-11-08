@@ -10,16 +10,16 @@ export function StylecraftLandingPage({ heroImageSrc }: StylecraftLandingPagePro
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
 
   useEffect(() => {
-    document.title = 'Hosteliq — A Smarter Way to Manage Your Hostel';
+    document.title = 'Hostel IQ — A Smarter Way to Manage Your Hostel';
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-[#E2E6EA] flex items-center justify-center p-3 sm:p-5 md:p-8 lg:p-10 xl:p-12 overflow-x-hidden antialiased font-sans selection:bg-[#E8503A] selection:text-white">
+    <div className="min-h-screen lg:h-screen w-full bg-[#E2E6EA] flex items-center justify-center p-2.5 sm:p-3.5 md:p-4 lg:p-5 box-border overflow-hidden antialiased font-sans selection:bg-[#E8503A] selection:text-white">
       {/* 
         The Centered White Outer Container with Generously Rounded Corners
-        Faithfully replicating the Stylecraft Design reference framing
+        In full-screen mode, this fills the screen proportionally, framing the hero with an even white border.
       */}
-      <main className="w-full max-w-[1380px] bg-white rounded-[28px] sm:rounded-[36px] md:rounded-[44px] p-3 sm:p-4 md:p-5 lg:p-6 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.12)] border border-white/80 transition-all duration-300">
+      <main className="w-full h-full max-w-[1680px] flex-1 flex flex-col bg-white rounded-[26px] sm:rounded-[34px] md:rounded-[42px] p-2 sm:p-2.5 md:p-3 lg:p-3.5 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.12)] border border-white/80 transition-all duration-300 overflow-hidden">
         <StylecraftHero
           imageSrc={heroImageSrc}
           onConnect={() => setIsLeadModalOpen(true)}
@@ -34,4 +34,3 @@ export function StylecraftLandingPage({ heroImageSrc }: StylecraftLandingPagePro
     </div>
   );
 }
-
