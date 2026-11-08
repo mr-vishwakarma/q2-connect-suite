@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 export interface HeroBackgroundProps {
   /**
    * Configurable background image path or URL.
@@ -14,30 +12,26 @@ export interface HeroBackgroundProps {
 export function HeroBackground({
   imageSrc = '/assets/hero-modern-lounge.jpg',
   altText = 'Modern hostel lounge interior with minimalist architecture, comfortable seating, warm lighting and indoor plants',
-  overlayOpacity = 0.55,
+  overlayOpacity = 0.32,
 }: HeroBackgroundProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
-
   return (
     <div className="absolute inset-0 w-full h-full select-none pointer-events-none overflow-hidden">
       {/* Fallback solid background while image loads */}
       <div className="absolute inset-0 bg-[#16181B]" />
 
-      {/* Hero Image */}
+      {/* Hero Image — rendered eagerly and persistently so it never disappears or flashes black on refresh */}
       <img
         src={imageSrc}
         alt={altText}
         loading="eager"
+        fetchPriority="high"
         decoding="async"
-        onLoad={() => setIsLoaded(true)}
-        className={`w-full h-full object-cover object-center transition-opacity duration-700 ease-out ${
-          isLoaded ? 'opacity-100' : 'opacity-0'
-        }`}
+        className="w-full h-full object-cover object-center"
       />
 
-      {/* Multi-layered cinematic gradient overlays for optimal text readability */}
-      {/* Top gradient for navbar readability */}
-      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/75 via-black/40 to-transparent" />
+      {/* Multi-layered cinematic gradient overlays for optimal text readability while keeping the room interior vibrant */}
+      {/* Top subtle vignette for navbar readability */}
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/50 via-black/20 to-transparent" />
 
       {/* Center uniform overlay for high-contrast headline readability */}
       <div
@@ -46,7 +40,7 @@ export function HeroBackground({
       />
 
       {/* Bottom ambient gradient to ground the floor */}
-      <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
     </div>
   );
 }

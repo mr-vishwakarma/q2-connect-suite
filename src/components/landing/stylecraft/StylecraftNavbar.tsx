@@ -54,18 +54,20 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
     <header className="relative w-full z-30 select-none">
       {/* 
         ========================================================================
-        MAIN NAVBAR ROW: 3-COLUMN FLEX LAYOUT
-        - Left: Hostel IQ Logo Pocket (w-[260px] to w-[340px] shrink-0)
-        - Center: Nav Links (flex-1 flex justify-center) -> 100% EQUAL GAP ON BOTH SIDES!
-        - Right: Buttons Pocket (w-[260px] to w-[340px] shrink-0, exact match to left)
+        MAIN NAVBAR: 3-PART CSS GRID LAYOUT
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)
+        - Left: Hostel IQ Logo Pocket (justify-self-start)
+        - Center: Rounded Capsule Navigation (justify-self-center)
+        - Right: Actions Pocket (justify-self-end)
+        Guarantees exact mathematical centering of the navigation capsule!
         ========================================================================
       */}
-      <div className="w-full flex items-center justify-between">
+      <div className="w-full grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center">
         {/* 
           1. TOP-LEFT WHITE POCKET (HOSTEL IQ LOGO)
-          Fixed width equal to the right pocket to guarantee mathematical centering of nav links.
+          Seamlessly connected to the white frame with pure CSS box-shadow inverted fillets (no SVG, zero seams).
         */}
-        <div className="relative bg-white h-[60px] sm:h-[68px] md:h-[76px] w-[220px] sm:w-[280px] md:w-[320px] lg:w-[350px] shrink-0 pl-5 sm:pl-7 md:pl-8 pr-4 rounded-br-[24px] sm:rounded-br-[30px] flex items-center z-20">
+        <div className="justify-self-start relative bg-white h-[58px] sm:h-[66px] md:h-[74px] w-[210px] sm:w-[260px] md:w-[290px] lg:w-[330px] shrink-0 pl-4 sm:pl-6 md:pl-7 pr-4 rounded-br-[24px] sm:rounded-br-[30px] flex items-center z-20">
           <Link
             to="/"
             className="flex items-center gap-2.5 sm:gap-3 group"
@@ -76,50 +78,54 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
               alt="Hostel IQ Platform"
               width={38}
               height={38}
-              className="h-8 sm:h-9 md:h-10 w-auto max-w-[42px] object-contain transition-transform duration-200 group-hover:scale-105"
+              className="h-7 sm:h-8 md:h-9 w-auto max-w-[40px] object-contain transition-transform duration-200 group-hover:scale-105"
             />
             <span className="font-extrabold text-base sm:text-lg md:text-xl text-slate-950 tracking-tight leading-none">
               Hostel IQ
             </span>
           </Link>
 
-          {/* Top-Right Inverted Concave Fillet (with 1px overlap to prevent hairline seams) */}
-          <svg
-            className="absolute top-0 -right-[27px] w-[28px] h-[28px] text-white fill-current pointer-events-none"
-            viewBox="0 0 28 28"
-            shapeRendering="geometricPrecision"
+          {/* Top-Right Pure CSS Inverted Fillet (Seamless curve into top border, 1px overlap prevents hairline cracks) */}
+          <div
+            className="absolute top-0 left-[calc(100%-1px)] w-[26px] sm:w-[28px] h-[26px] sm:h-[28px] overflow-hidden pointer-events-none"
             aria-hidden="true"
           >
-            <path d="M -1 -1 L -1 29 A 28 28 0 0 0 29 -1 Z" />
-          </svg>
+            <div
+              className="absolute top-0 left-0 w-[52px] sm:w-[56px] h-[52px] sm:h-[56px] rounded-full"
+              style={{ boxShadow: '0 0 0 50px #ffffff' }}
+            />
+          </div>
 
-          {/* Bottom-Left Inverted Concave Fillet (with 1px overlap to prevent hairline seams) */}
-          <svg
-            className="absolute left-0 -bottom-[27px] w-[28px] h-[28px] text-white fill-current pointer-events-none"
-            viewBox="0 0 28 28"
-            shapeRendering="geometricPrecision"
+          {/* Bottom-Left Pure CSS Inverted Fillet (Seamless curve into left border, 1px overlap prevents hairline cracks) */}
+          <div
+            className="absolute top-[calc(100%-1px)] left-0 w-[26px] sm:w-[28px] h-[26px] sm:h-[28px] overflow-hidden pointer-events-none"
             aria-hidden="true"
           >
-            <path d="M -1 -1 L 29 -1 A 28 28 0 0 0 -1 29 Z" />
-          </svg>
+            <div
+              className="absolute top-0 left-0 w-[52px] sm:w-[56px] h-[52px] sm:h-[56px] rounded-full"
+              style={{ boxShadow: '0 0 0 50px #ffffff' }}
+            />
+          </div>
         </div>
 
         {/* 
-          2. CENTER NAVIGATION LINKS (FLOATING OVER DARK HERO)
-          Using flex-1 with justify-center guarantees that:
-          Distance(Platform to Left Pocket) === Distance(About to Right Pocket)!
-          Zero asymmetry. 100% equal margins on both sides!
+          2. CENTER NAVIGATION CAPSULE (MATHEMATICALLY CENTERED)
+          - Rounded pill-shaped container with dark translucent background
+          - 4-column CSS Grid: grid-template-columns: repeat(4, minmax(0, 1fr))
+          - Each item occupies an equal-width column with centered text
+          - Distance(Left Edge -> Platform) === Distance(About -> Right Edge)
         */}
-        <div className="flex-1 hidden md:flex items-center justify-center px-4">
+        <div className="justify-self-center hidden md:flex items-center px-2">
           <nav
-            className="flex items-center gap-7 lg:gap-11"
+            className="grid grid-cols-4 items-center bg-black/45 backdrop-blur-md border border-white/10 rounded-full px-5 lg:px-7 py-2 shadow-[0_4px_24px_rgba(0,0,0,0.25)]"
+            style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}
             aria-label="Main Navigation"
           >
             {navLinks.map((item) => (
               <a
                 key={item.label}
                 href={item.href}
-                className="text-white/85 hover:text-white text-sm font-medium tracking-wide transition-colors duration-200 py-1 hover:drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)] whitespace-nowrap"
+                className="text-white/80 hover:text-white text-xs lg:text-sm font-medium tracking-wide transition-colors duration-200 py-1 px-3 lg:px-4 text-center whitespace-nowrap hover:drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)]"
               >
                 {item.label}
               </a>
@@ -128,31 +134,33 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
         </div>
 
         {/* 
-          3. TOP-RIGHT WHITE POCKET (BUTTONS)
-          Exact same width as Left Pocket (w-[220px] to w-[350px] shrink-0) to maintain perfect center balance.
+          3. TOP-RIGHT WHITE POCKET (ACTIONS)
+          Seamlessly connected to the white frame with pure CSS box-shadow inverted fillets (no SVG, zero seams).
         */}
-        <div className="relative bg-white h-[60px] sm:h-[68px] md:h-[76px] w-[220px] sm:w-[280px] md:w-[320px] lg:w-[350px] shrink-0 pr-5 sm:pr-7 md:pr-8 pl-4 rounded-bl-[24px] sm:rounded-bl-[30px] flex items-center justify-end gap-2.5 sm:gap-3.5 z-20">
-          {/* Top-Left Inverted Concave Fillet (with 1px overlap to prevent hairline seams) */}
-          <svg
-            className="absolute top-0 -left-[27px] w-[28px] h-[28px] text-white fill-current pointer-events-none"
-            viewBox="0 0 28 28"
-            shapeRendering="geometricPrecision"
+        <div className="justify-self-end relative bg-white h-[58px] sm:h-[66px] md:h-[74px] w-[210px] sm:w-[260px] md:w-[290px] lg:w-[330px] shrink-0 pr-4 sm:pl-4 sm:pr-6 md:pr-7 rounded-bl-[24px] sm:rounded-bl-[30px] flex items-center justify-end gap-2 sm:gap-3 z-20">
+          {/* Top-Left Pure CSS Inverted Fillet (Seamless curve into top border, 1px overlap prevents hairline cracks) */}
+          <div
+            className="absolute top-0 right-[calc(100%-1px)] w-[26px] sm:w-[28px] h-[26px] sm:h-[28px] overflow-hidden pointer-events-none"
             aria-hidden="true"
           >
-            <path d="M 29 -1 L 29 29 A 28 28 0 0 1 -1 -1 Z" />
-          </svg>
+            <div
+              className="absolute top-0 right-0 w-[52px] sm:w-[56px] h-[52px] sm:h-[56px] rounded-full"
+              style={{ boxShadow: '0 0 0 50px #ffffff' }}
+            />
+          </div>
 
-          {/* Bottom-Right Inverted Concave Fillet (with 1px overlap to prevent hairline seams) */}
-          <svg
-            className="absolute right-0 -bottom-[27px] w-[28px] h-[28px] text-white fill-current pointer-events-none"
-            viewBox="0 0 28 28"
-            shapeRendering="geometricPrecision"
+          {/* Bottom-Right Pure CSS Inverted Fillet (Seamless curve into right border, 1px overlap prevents hairline cracks) */}
+          <div
+            className="absolute top-[calc(100%-1px)] right-0 w-[26px] sm:w-[28px] h-[26px] sm:h-[28px] overflow-hidden pointer-events-none"
             aria-hidden="true"
           >
-            <path d="M 29 -1 L -1 -1 A 28 28 0 0 1 29 29 Z" />
-          </svg>
+            <div
+              className="absolute top-0 right-0 w-[52px] sm:w-[56px] h-[52px] sm:h-[56px] rounded-full"
+              style={{ boxShadow: '0 0 0 50px #ffffff' }}
+            />
+          </div>
 
-          {/* Desktop Action 1: Login */}
+          {/* Desktop Action 1: Login text with diagonal arrow */}
           <button
             onClick={handleLoginClick}
             type="button"
@@ -163,11 +171,11 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
             <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />
           </button>
 
-          {/* Desktop Action 2: Connect with us Pill Button (Black pill with white text) */}
+          {/* Desktop Action 2: Connect with us Pill Button (Slate-950 pill with white text) */}
           <button
             onClick={handleConnectClick}
             type="button"
-            className="hidden sm:inline-flex rounded-full bg-slate-950 hover:bg-black text-white px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 whitespace-nowrap"
+            className="hidden sm:inline-flex rounded-full bg-slate-950 hover:bg-black text-white px-3.5 sm:px-4 md:px-5 py-2 text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 whitespace-nowrap"
             aria-label="Connect With Us"
           >
             Connect with us
@@ -177,18 +185,18 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
           <button
             onClick={handleLoginClick}
             type="button"
-            className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-950 hover:bg-black text-white items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
+            className="hidden sm:flex w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-slate-950 hover:bg-black text-white items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
             title="Login to Portal"
             aria-label="Login to Portal"
           >
-            <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+            <ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
           </button>
 
           {/* Mobile Quick Action Pill */}
           <button
             onClick={handleConnectClick}
             type="button"
-            className="sm:hidden rounded-full bg-slate-950 text-white px-3.5 py-1.5 text-xs font-semibold"
+            className="sm:hidden rounded-full bg-slate-950 text-white px-3 py-1.5 text-xs font-semibold"
           >
             Connect
           </button>
