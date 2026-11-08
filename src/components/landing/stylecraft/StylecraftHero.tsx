@@ -66,3 +66,4 @@ export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
     </section>
   );
 }
+

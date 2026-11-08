@@ -198,3 +198,4 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
     </header>
   );
 }
+

@@ -34,3 +34,4 @@ export function StylecraftLandingPage({ heroImageSrc }: StylecraftLandingPagePro
     </div>
   );
 }
+
