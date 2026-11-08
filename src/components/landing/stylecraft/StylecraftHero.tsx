@@ -14,7 +14,7 @@ export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
 
   return (
     <section
-      className="relative w-full h-full flex-1 rounded-[18px] sm:rounded-[24px] md:rounded-[30px] overflow-hidden flex flex-col justify-between min-h-[500px] sm:min-h-[580px] md:min-h-[640px] shadow-[inset_0_0_80px_rgba(0,0,0,0.3)]"
+      className="relative w-full h-full flex-1 rounded-[16px] sm:rounded-[24px] md:rounded-[30px] overflow-hidden flex flex-col justify-between min-h-[460px] sm:min-h-[580px] md:min-h-[640px] shadow-[inset_0_0_80px_rgba(0,0,0,0.3)]"
       aria-label="Hostel IQ Platform Introduction"
     >
       {/* 1. Configurable Hero Background Image & Atmospheric Lighting */}
@@ -24,15 +24,15 @@ export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
       <StylecraftNavbar onConnect={onConnect} />
 
       {/* 3. Centered Editorial Headline, Supporting Text & Compact Rounded CTA */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-5 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto my-auto">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-4 sm:px-8 md:px-12 py-6 sm:py-12 md:py-16 max-w-4xl mx-auto my-auto">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-3.5 sm:space-y-4 md:space-y-5"
+          className="space-y-3 sm:space-y-4 md:space-y-5"
         >
           {/* Main Headline with multi-stage shadow for effortless readability against the warm room */}
-          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-[64px] font-bold text-white tracking-tight leading-[1.12] drop-shadow-[0_3px_12px_rgba(0,0,0,0.8)] filter drop-shadow-[0_8px_32px_rgba(0,0,0,0.5)] font-sans">
+          <h1 className="text-2xl xs:text-3xl sm:text-5xl md:text-6xl lg:text-[64px] font-bold text-white tracking-tight leading-[1.12] drop-shadow-[0_3px_12px_rgba(0,0,0,0.8)] filter drop-shadow-[0_8px_32px_rgba(0,0,0,0.5)] font-sans">
             A Smarter Way to Manage <br className="hidden sm:inline" />
             Your Hostel
           </h1>
