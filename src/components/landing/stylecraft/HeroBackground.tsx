@@ -12,40 +12,55 @@ export interface HeroBackgroundProps {
 }
 
 export function HeroBackground({
-  imageSrc = defaultHeroLounge,
+  imageSrc,
   altText = 'Modern hostel lounge interior with minimalist architecture, comfortable seating, warm lighting and indoor plants',
-  overlayOpacity = 0.22,
+  overlayOpacity = 0.12,
 }: HeroBackgroundProps) {
-  return (
-    <div className="absolute inset-0 w-full h-full select-none pointer-events-none overflow-hidden">
-      {/* Warm ambient fallback background */}
-      <div className="absolute inset-0 bg-[#2A2624]" />
+  // Triple-guarded image source resolution: prop -> imported asset -> public asset
+  const resolvedSrc = imageSrc || defaultHeroLounge || '/assets/hero-modern-lounge.jpg';
 
-      {/* Hero Image — eager, high priority, and immediately visible on page load/refresh */}
+  return (
+    <div
+      className="absolute inset-0 w-full h-full select-none pointer-events-none overflow-hidden bg-cover bg-center bg-no-repeat bg-[#2A2624]"
+      style={{
+        backgroundImage: `url(${resolvedSrc})`,
+      }}
+    >
+      {/* 
+        Native HTML <img> element:
+        - Must have "absolute inset-0" to take exact dimensions without being hidden by stacking context
+        - z-0 ensures it stays behind overlays (z-[1]) and on top of container background
+        - decoding="sync" / fetchPriority="high" ensures instant frame-0 rendering
+      */}
       <img
-        src={imageSrc}
+        src={resolvedSrc}
         alt={altText}
         loading="eager"
         fetchPriority="high"
-        decoding="async"
-        className="w-full h-full object-cover object-center"
+        decoding="sync"
+        className="absolute inset-0 w-full h-full object-cover object-center z-0"
+        onError={(e) => {
+          // If the bundled path ever fails, seamlessly fall back to public asset
+          const target = e.currentTarget;
+          if (target.src !== '/assets/hero-modern-lounge.jpg') {
+            target.src = '/assets/hero-modern-lounge.jpg';
+          }
+        }}
       />
 
-      {/* Multi-layered cinematic gradient overlays for optimal text readability while keeping the room interior vibrant & visible */}
-      {/* 1. Top vignette for navbar contrast */}
-      <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
+      {/* Subtle top vignette for navbar contrast (subtle, non-intrusive) */}
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/40 via-black/15 to-transparent z-[1]" />
 
-      {/* 2. Soft uniform overlay so the natural warm room lighting remains bright and vivid */}
-      <div
-        className="absolute inset-0 bg-black"
-        style={{ opacity: overlayOpacity }}
-      />
+      {/* Gentle center contrast wash so the warm room lighting stays bright and visible */}
+      {overlayOpacity > 0 && (
+        <div
+          className="absolute inset-0 bg-black z-[1]"
+          style={{ opacity: overlayOpacity }}
+        />
+      )}
 
-      {/* 3. Focused radial gradient behind the center headline for maximum text legibility */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.38)_0%,rgba(0,0,0,0.15)_50%,transparent_75%)]" />
-
-      {/* 4. Bottom grounding vignette */}
-      <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/55 via-black/15 to-transparent" />
+      {/* Subtle bottom vignette to ground the floor */}
+      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/40 via-black/10 to-transparent z-[1]" />
     </div>
   );
 }

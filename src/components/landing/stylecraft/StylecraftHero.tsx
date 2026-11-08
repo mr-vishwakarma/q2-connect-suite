@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
 import { HeroBackground } from './HeroBackground';
 import { StylecraftNavbar } from './StylecraftNavbar';
+import defaultHeroLounge from '@/assets/hero-modern-lounge.jpg';
 
 export interface StylecraftHeroProps {
   imageSrc?: string;
@@ -9,13 +10,15 @@ export interface StylecraftHeroProps {
 }
 
 export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
+  const activeImage = imageSrc || defaultHeroLounge || '/assets/hero-modern-lounge.jpg';
+
   return (
     <section
-      className="relative w-full h-full flex-1 rounded-[18px] sm:rounded-[24px] md:rounded-[30px] overflow-hidden flex flex-col justify-between min-h-[500px] sm:min-h-[580px] md:min-h-[640px] shadow-[inset_0_0_80px_rgba(0,0,0,0.45)]"
+      className="relative w-full h-full flex-1 rounded-[18px] sm:rounded-[24px] md:rounded-[30px] overflow-hidden flex flex-col justify-between min-h-[500px] sm:min-h-[580px] md:min-h-[640px] shadow-[inset_0_0_80px_rgba(0,0,0,0.3)]"
       aria-label="Hostel IQ Platform Introduction"
     >
       {/* 1. Configurable Hero Background Image & Atmospheric Lighting */}
-      <HeroBackground imageSrc={imageSrc} />
+      <HeroBackground imageSrc={activeImage} />
 
       {/* 2. Top Dual-Pocket Curved Notch Navigation Bar */}
       <StylecraftNavbar onConnect={onConnect} />
