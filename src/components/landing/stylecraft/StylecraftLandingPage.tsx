@@ -18,8 +18,9 @@ export function StylecraftLandingPage({ heroImageSrc }: StylecraftLandingPagePro
       {/* 
         The Centered White Outer Container with Generously Rounded Corners
         In full-screen mode, this fills the screen proportionally, framing the hero with an even white border.
+        pt-0 ensures top-left and top-right white pockets merge with outer white frame seamlessly (no black clipping arcs).
       */}
-      <main className="w-full h-full max-w-[1680px] flex-1 flex flex-col bg-white rounded-[26px] sm:rounded-[34px] md:rounded-[42px] p-2 sm:p-2.5 md:p-3 lg:p-3.5 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.12)] border border-white/80 transition-all duration-300 overflow-hidden">
+      <main className="w-full h-full max-w-[1680px] flex-1 flex flex-col bg-white rounded-[26px] sm:rounded-[34px] md:rounded-[42px] px-2 sm:px-2.5 md:px-3 lg:px-3.5 pb-2 sm:pb-2.5 md:pb-3 lg:pb-3.5 pt-0 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.12)] border border-white/80 transition-all duration-300 overflow-hidden">
         <StylecraftHero
           imageSrc={heroImageSrc}
           onConnect={() => setIsLeadModalOpen(true)}

@@ -54,157 +54,155 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
     <header className="relative w-full z-30 select-none">
       {/* 
         ========================================================================
-        1. TOP-LEFT WHITE POCKET: HOSTEL IQ LOGO
-        Directly matches the Stylecraft Design reference:
-        - White pocket background holding the logo
-        - Rounded bottom-right corner (rounded-br)
-        - Inverted concave fillets on top-right and bottom-left
+        MAIN NAVBAR ROW: 3-COLUMN FLEX LAYOUT
+        - Left: Hostel IQ Logo Pocket (w-[260px] to w-[340px] shrink-0)
+        - Center: Nav Links (flex-1 flex justify-center) -> 100% EQUAL GAP ON BOTH SIDES!
+        - Right: Buttons Pocket (w-[260px] to w-[340px] shrink-0, exact match to left)
         ========================================================================
       */}
-      <div className="absolute top-0 left-0 bg-white h-[58px] sm:h-[68px] md:h-[76px] pl-5 sm:pl-7 md:pl-9 pr-6 sm:pr-8 md:pr-10 rounded-br-[22px] sm:rounded-br-[28px] md:rounded-br-[32px] flex items-center z-20 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
-        <Link
-          to="/"
-          className="flex items-center gap-2.5 sm:gap-3 group"
-          aria-label="Hostel IQ Home"
-        >
-          <img
-            src="/hosteliq-logo.png"
-            alt="Hostel IQ Platform"
-            width={38}
-            height={38}
-            className="h-8 sm:h-9 md:h-10 w-auto max-w-[42px] object-contain transition-transform duration-200 group-hover:scale-105"
-          />
-          <span className="font-extrabold text-base sm:text-lg md:text-xl text-slate-950 tracking-tight leading-none">
-            Hostel IQ
-          </span>
-        </Link>
+      <div className="w-full flex items-center justify-between">
+        {/* 
+          1. TOP-LEFT WHITE POCKET (HOSTEL IQ LOGO)
+          Fixed width equal to the right pocket to guarantee mathematical centering of nav links.
+        */}
+        <div className="relative bg-white h-[60px] sm:h-[68px] md:h-[76px] w-[220px] sm:w-[280px] md:w-[320px] lg:w-[350px] shrink-0 pl-5 sm:pl-7 md:pl-8 pr-4 rounded-br-[24px] sm:rounded-br-[30px] flex items-center z-20">
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 sm:gap-3 group"
+            aria-label="Hostel IQ Home"
+          >
+            <img
+              src="/hosteliq-logo.png"
+              alt="Hostel IQ Platform"
+              width={38}
+              height={38}
+              className="h-8 sm:h-9 md:h-10 w-auto max-w-[42px] object-contain transition-transform duration-200 group-hover:scale-105"
+            />
+            <span className="font-extrabold text-base sm:text-lg md:text-xl text-slate-950 tracking-tight leading-none">
+              Hostel IQ
+            </span>
+          </Link>
 
-        {/* Top-Right Inverted Concave Fillet (Transitions from pocket to top dark edge) */}
-        <svg
-          className="absolute top-0 -right-[22px] sm:-right-[28px] md:-right-[32px] w-[22px] sm:w-[28px] md:w-[32px] h-[22px] sm:h-[28px] md:h-[32px] text-white fill-current pointer-events-none"
-          viewBox="0 0 28 28"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path d="M 0 0 L 0 28 A 28 28 0 0 0 28 0 Z" />
-        </svg>
+          {/* Top-Right Inverted Concave Fillet (with 1px overlap to prevent hairline seams) */}
+          <svg
+            className="absolute top-0 -right-[27px] w-[28px] h-[28px] text-white fill-current pointer-events-none"
+            viewBox="0 0 28 28"
+            shapeRendering="geometricPrecision"
+            aria-hidden="true"
+          >
+            <path d="M -1 -1 L -1 29 A 28 28 0 0 0 29 -1 Z" />
+          </svg>
 
-        {/* Bottom-Left Inverted Concave Fillet (Transitions from pocket to left dark edge) */}
-        <svg
-          className="absolute left-0 -bottom-[22px] sm:-bottom-[28px] md:-bottom-[32px] w-[22px] sm:w-[28px] md:w-[32px] h-[22px] sm:h-[28px] md:h-[32px] text-white fill-current pointer-events-none"
-          viewBox="0 0 28 28"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path d="M 0 0 L 28 0 A 28 28 0 0 0 0 28 Z" />
-        </svg>
-      </div>
+          {/* Bottom-Left Inverted Concave Fillet (with 1px overlap to prevent hairline seams) */}
+          <svg
+            className="absolute left-0 -bottom-[27px] w-[28px] h-[28px] text-white fill-current pointer-events-none"
+            viewBox="0 0 28 28"
+            shapeRendering="geometricPrecision"
+            aria-hidden="true"
+          >
+            <path d="M -1 -1 L 29 -1 A 28 28 0 0 0 -1 29 Z" />
+          </svg>
+        </div>
 
-      {/* 
-        ========================================================================
-        2. TOP-RIGHT WHITE POCKET: BUTTONS
-        Directly matches the Stylecraft Design reference:
-        - White pocket background holding Connect With Us & (↗) Arrow Button
-        - Rounded bottom-left corner (rounded-bl)
-        - Inverted concave fillets on top-left and bottom-right
-        ========================================================================
-      */}
-      <div className="absolute top-0 right-0 bg-white h-[58px] sm:h-[68px] md:h-[76px] pl-6 sm:pl-8 md:pl-10 pr-5 sm:pr-7 md:pr-9 rounded-bl-[22px] sm:rounded-bl-[28px] md:rounded-bl-[32px] flex items-center gap-2.5 sm:gap-3.5 z-20 shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
-        {/* Top-Left Inverted Concave Fillet (Transitions from pocket to top dark edge) */}
-        <svg
-          className="absolute top-0 -left-[22px] sm:-left-[28px] md:-left-[32px] w-[22px] sm:w-[28px] md:w-[32px] h-[22px] sm:h-[28px] md:h-[32px] text-white fill-current pointer-events-none"
-          viewBox="0 0 28 28"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path d="M 28 0 L 28 28 A 28 28 0 0 1 0 0 Z" />
-        </svg>
+        {/* 
+          2. CENTER NAVIGATION LINKS (FLOATING OVER DARK HERO)
+          Using flex-1 with justify-center guarantees that:
+          Distance(Platform to Left Pocket) === Distance(About to Right Pocket)!
+          Zero asymmetry. 100% equal margins on both sides!
+        */}
+        <div className="flex-1 hidden md:flex items-center justify-center px-4">
+          <nav
+            className="flex items-center gap-7 lg:gap-11"
+            aria-label="Main Navigation"
+          >
+            {navLinks.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                className="text-white/85 hover:text-white text-sm font-medium tracking-wide transition-colors duration-200 py-1 hover:drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)] whitespace-nowrap"
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
+        </div>
 
-        {/* Bottom-Right Inverted Concave Fillet (Transitions from pocket to right dark edge) */}
-        <svg
-          className="absolute right-0 -bottom-[22px] sm:-bottom-[28px] md:-bottom-[32px] w-[22px] sm:w-[28px] md:w-[32px] h-[22px] sm:h-[28px] md:h-[32px] text-white fill-current pointer-events-none"
-          viewBox="0 0 28 28"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path d="M 28 0 L 0 0 A 28 28 0 0 1 28 28 Z" />
-        </svg>
+        {/* 
+          3. TOP-RIGHT WHITE POCKET (BUTTONS)
+          Exact same width as Left Pocket (w-[220px] to w-[350px] shrink-0) to maintain perfect center balance.
+        */}
+        <div className="relative bg-white h-[60px] sm:h-[68px] md:h-[76px] w-[220px] sm:w-[280px] md:w-[320px] lg:w-[350px] shrink-0 pr-5 sm:pr-7 md:pr-8 pl-4 rounded-bl-[24px] sm:rounded-bl-[30px] flex items-center justify-end gap-2.5 sm:gap-3.5 z-20">
+          {/* Top-Left Inverted Concave Fillet (with 1px overlap to prevent hairline seams) */}
+          <svg
+            className="absolute top-0 -left-[27px] w-[28px] h-[28px] text-white fill-current pointer-events-none"
+            viewBox="0 0 28 28"
+            shapeRendering="geometricPrecision"
+            aria-hidden="true"
+          >
+            <path d="M 29 -1 L 29 29 A 28 28 0 0 1 -1 -1 Z" />
+          </svg>
 
-        {/* Desktop Action 1: Login */}
-        <button
-          onClick={handleLoginClick}
-          type="button"
-          className="hidden lg:flex items-center gap-1.5 text-slate-800 hover:text-black font-semibold text-xs sm:text-sm px-3 py-1.5 rounded-full hover:bg-slate-100 transition-colors"
-          aria-label="Login"
-        >
-          <span>Login</span>
-          <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />
-        </button>
+          {/* Bottom-Right Inverted Concave Fillet (with 1px overlap to prevent hairline seams) */}
+          <svg
+            className="absolute right-0 -bottom-[27px] w-[28px] h-[28px] text-white fill-current pointer-events-none"
+            viewBox="0 0 28 28"
+            shapeRendering="geometricPrecision"
+            aria-hidden="true"
+          >
+            <path d="M 29 -1 L -1 -1 A 28 28 0 0 1 29 29 Z" />
+          </svg>
 
-        {/* Desktop Action 2: Connect With Us Pill Button (Exact Stylecraft reference) */}
-        <button
-          onClick={handleConnectClick}
-          type="button"
-          className="hidden sm:inline-flex rounded-full bg-slate-950 hover:bg-black text-white px-5 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 active:scale-95"
-          aria-label="Connect With Us"
-        >
-          Connect with us
-        </button>
+          {/* Desktop Action 1: Login */}
+          <button
+            onClick={handleLoginClick}
+            type="button"
+            className="hidden xl:flex items-center gap-1.5 text-slate-800 hover:text-black font-semibold text-xs sm:text-sm px-2.5 py-1.5 rounded-full hover:bg-slate-100 transition-colors whitespace-nowrap"
+            aria-label="Login"
+          >
+            <span>Login</span>
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />
+          </button>
 
-        {/* Desktop Action 3: Separate Circular Arrow Button (Exact Stylecraft reference) */}
-        <button
-          onClick={handleLoginClick}
-          type="button"
-          className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-950 hover:bg-black text-white items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
-          title="Login to Portal"
-          aria-label="Login to Portal"
-        >
-          <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-        </button>
+          {/* Desktop Action 2: Connect with us Pill Button (Black pill with white text) */}
+          <button
+            onClick={handleConnectClick}
+            type="button"
+            className="hidden sm:inline-flex rounded-full bg-slate-950 hover:bg-black text-white px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 whitespace-nowrap"
+            aria-label="Connect With Us"
+          >
+            Connect with us
+          </button>
 
-        {/* Mobile Quick Action Pill */}
-        <button
-          onClick={handleConnectClick}
-          type="button"
-          className="sm:hidden rounded-full bg-slate-950 text-white px-3.5 py-1.5 text-xs font-semibold"
-        >
-          Connect
-        </button>
+          {/* Desktop Action 3: Separate Circular Arrow Button */}
+          <button
+            onClick={handleLoginClick}
+            type="button"
+            className="hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-950 hover:bg-black text-white items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 shrink-0"
+            title="Login to Portal"
+            aria-label="Login to Portal"
+          >
+            <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+          </button>
 
-        {/* Mobile Hamburger Drawer Trigger */}
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          type="button"
-          className="md:hidden p-1.5 text-slate-900 hover:bg-slate-100 rounded-lg transition-colors focus:outline-none"
-          aria-label={isMobileMenuOpen ? 'Close Menu' : 'Open Menu'}
-        >
-          {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-      </div>
+          {/* Mobile Quick Action Pill */}
+          <button
+            onClick={handleConnectClick}
+            type="button"
+            className="sm:hidden rounded-full bg-slate-950 text-white px-3.5 py-1.5 text-xs font-semibold"
+          >
+            Connect
+          </button>
 
-      {/* 
-        ========================================================================
-        3. CENTER NAVIGATION BAR (FLOATING OVER THE DARK HERO BACKGROUND)
-        Exactly aligned in height with the two white pockets:
-        - 4 items: Platform, Solutions, Features, About
-        - White text directly on the dark background
-        ========================================================================
-      */}
-      <div className="w-full h-[58px] sm:h-[68px] md:h-[76px] flex items-center justify-center pointer-events-none px-4">
-        <nav
-          className="hidden md:flex items-center gap-7 lg:gap-11 pointer-events-auto"
-          aria-label="Main Navigation"
-        >
-          {navLinks.map((item) => (
-            <a
-              key={item.label}
-              href={item.href}
-              className="text-white/85 hover:text-white text-sm font-medium tracking-wide transition-colors duration-200 relative py-1 hover:drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)]"
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
+          {/* Mobile Hamburger Drawer Trigger */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            type="button"
+            className="md:hidden p-1.5 text-slate-900 hover:bg-slate-100 rounded-lg transition-colors focus:outline-none"
+            aria-label={isMobileMenuOpen ? 'Close Menu' : 'Open Menu'}
+          >
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Drawer Overlay */}

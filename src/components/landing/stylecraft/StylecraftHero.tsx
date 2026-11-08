@@ -11,7 +11,7 @@ export interface StylecraftHeroProps {
 export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
   return (
     <section
-      className="relative w-full h-full flex-1 rounded-[20px] sm:rounded-[28px] md:rounded-[36px] overflow-hidden flex flex-col justify-between min-h-[500px] sm:min-h-[580px] md:min-h-[640px] shadow-[inset_0_0_80px_rgba(0,0,0,0.45)]"
+      className="relative w-full h-full flex-1 rounded-b-[20px] sm:rounded-b-[28px] md:rounded-b-[36px] rounded-t-none overflow-hidden flex flex-col justify-between min-h-[500px] sm:min-h-[580px] md:min-h-[640px] shadow-[inset_0_0_80px_rgba(0,0,0,0.45)]"
       aria-label="Hostel IQ Platform Introduction"
     >
       {/* 1. Configurable Hero Background Image & Atmospheric Lighting */}
@@ -61,7 +61,7 @@ export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
         </motion.div>
       </div>
 
-      {/* Bottom spacer for aesthetic vertical equilibrium (matching the navbar height) */}
+      {/* Bottom spacer for aesthetic vertical equilibrium */}
       <div className="h-[40px] sm:h-[60px] pointer-events-none" />
     </section>
   );
