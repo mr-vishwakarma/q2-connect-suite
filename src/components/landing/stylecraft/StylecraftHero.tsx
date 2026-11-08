@@ -28,14 +28,14 @@ export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="space-y-3.5 sm:space-y-4 md:space-y-5"
         >
-          {/* Main Headline */}
-          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-[64px] font-bold text-white tracking-tight leading-[1.12] drop-shadow-md font-sans">
+          {/* Main Headline with multi-stage shadow for effortless readability against the warm room */}
+          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-[64px] font-bold text-white tracking-tight leading-[1.12] drop-shadow-[0_3px_12px_rgba(0,0,0,0.8)] filter drop-shadow-[0_8px_32px_rgba(0,0,0,0.5)] font-sans">
             A Smarter Way to Manage <br className="hidden sm:inline" />
             Your Hostel
           </h1>
 
           {/* Supporting Description */}
-          <p className="text-xs sm:text-base md:text-lg text-white/85 font-normal max-w-2xl mx-auto leading-relaxed drop-shadow px-2">
+          <p className="text-xs sm:text-base md:text-lg text-white font-medium max-w-2xl mx-auto leading-relaxed drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] px-2">
             One platform for managing hostel operations, students, rooms and payments.
           </p>
         </motion.div>

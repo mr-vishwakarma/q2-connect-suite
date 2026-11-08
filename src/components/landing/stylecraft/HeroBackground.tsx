@@ -1,7 +1,9 @@
+import defaultHeroLounge from '@/assets/hero-modern-lounge.jpg';
+
 export interface HeroBackgroundProps {
   /**
    * Configurable background image path or URL.
-   * Defaults to the local asset /assets/hero-modern-lounge.jpg.
+   * Defaults to the bundled local asset hero-modern-lounge.jpg.
    * Can be easily swapped when final hostel photography is provided.
    */
   imageSrc?: string;
@@ -10,16 +12,16 @@ export interface HeroBackgroundProps {
 }
 
 export function HeroBackground({
-  imageSrc = '/assets/hero-modern-lounge.jpg',
+  imageSrc = defaultHeroLounge,
   altText = 'Modern hostel lounge interior with minimalist architecture, comfortable seating, warm lighting and indoor plants',
-  overlayOpacity = 0.32,
+  overlayOpacity = 0.22,
 }: HeroBackgroundProps) {
   return (
     <div className="absolute inset-0 w-full h-full select-none pointer-events-none overflow-hidden">
-      {/* Fallback solid background while image loads */}
-      <div className="absolute inset-0 bg-[#16181B]" />
+      {/* Warm ambient fallback background */}
+      <div className="absolute inset-0 bg-[#2A2624]" />
 
-      {/* Hero Image — rendered eagerly and persistently so it never disappears or flashes black on refresh */}
+      {/* Hero Image — eager, high priority, and immediately visible on page load/refresh */}
       <img
         src={imageSrc}
         alt={altText}
@@ -29,19 +31,21 @@ export function HeroBackground({
         className="w-full h-full object-cover object-center"
       />
 
-      {/* Multi-layered cinematic gradient overlays for optimal text readability while keeping the room interior vibrant */}
-      {/* Top subtle vignette for navbar readability */}
-      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/50 via-black/20 to-transparent" />
+      {/* Multi-layered cinematic gradient overlays for optimal text readability while keeping the room interior vibrant & visible */}
+      {/* 1. Top vignette for navbar contrast */}
+      <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
 
-      {/* Center uniform overlay for high-contrast headline readability */}
+      {/* 2. Soft uniform overlay so the natural warm room lighting remains bright and vivid */}
       <div
         className="absolute inset-0 bg-black"
         style={{ opacity: overlayOpacity }}
       />
 
-      {/* Bottom ambient gradient to ground the floor */}
-      <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+      {/* 3. Focused radial gradient behind the center headline for maximum text legibility */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.38)_0%,rgba(0,0,0,0.15)_50%,transparent_75%)]" />
+
+      {/* 4. Bottom grounding vignette */}
+      <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/55 via-black/15 to-transparent" />
     </div>
   );
 }
-
