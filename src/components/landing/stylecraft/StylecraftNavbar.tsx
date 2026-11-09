@@ -12,6 +12,14 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
     navigate('/login');
   };
 
+  const handleConnectClick = () => {
+    if (onConnect) {
+      onConnect();
+    } else {
+      navigate('/connect');
+    }
+  };
+
   const navLinks = [
     { label: 'Platform', href: '#platform' },
     { label: 'Solutions', href: '#solutions' },
@@ -151,7 +159,7 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
 
           {/* Desktop Only: Connect with us Pill Button (Slate-950 pill with white text) */}
           <button
-            onClick={onConnect}
+            onClick={handleConnectClick}
             type="button"
             className="hidden sm:inline-flex rounded-full bg-slate-950 hover:bg-black text-white px-3.5 sm:px-4 md:px-5 py-2 text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 whitespace-nowrap"
             aria-label="Connect With Us"

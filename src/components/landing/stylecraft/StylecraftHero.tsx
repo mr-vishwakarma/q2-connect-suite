@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { HeroBackground } from './HeroBackground';
 import { StylecraftNavbar } from './StylecraftNavbar';
 import defaultHeroLounge from '@/assets/hero-modern-lounge.jpg';
@@ -10,7 +11,16 @@ export interface StylecraftHeroProps {
 }
 
 export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
+  const navigate = useNavigate();
   const activeImage = imageSrc || defaultHeroLounge || '/assets/hero-modern-lounge.jpg';
+
+  const handleConnect = () => {
+    if (onConnect) {
+      onConnect();
+    } else {
+      navigate('/connect');
+    }
+  };
 
   return (
     <section
@@ -21,7 +31,7 @@ export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
       <HeroBackground imageSrc={activeImage} />
 
       {/* 2. Top Dual-Pocket Curved Notch Navigation Bar */}
-      <StylecraftNavbar onConnect={onConnect} />
+      <StylecraftNavbar onConnect={handleConnect} />
 
       {/* 3. Centered Editorial Headline, Supporting Text & Compact Rounded CTA */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-4 sm:px-8 md:px-12 py-6 sm:py-12 md:py-16 max-w-4xl mx-auto my-auto">
@@ -51,7 +61,7 @@ export function StylecraftHero({ imageSrc, onConnect }: StylecraftHeroProps) {
           className="mt-6 sm:mt-8 md:mt-10"
         >
           <button
-            onClick={onConnect}
+            onClick={handleConnect}
             type="button"
             className="group inline-flex items-center gap-3.5 pl-6 pr-2.5 py-2 sm:py-2.5 bg-[#E8503A] hover:bg-[#D43F2A] text-white rounded-full font-semibold text-xs sm:text-sm tracking-wide shadow-xl shadow-[#E8503A]/30 hover:shadow-2xl hover:shadow-[#E8503A]/40 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#E8503A]/60"
             aria-label="Connect With Us"

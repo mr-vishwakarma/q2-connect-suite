@@ -42,6 +42,7 @@ const hostelsRoutes = require('./routes/hostels.routes');
 const adminManagementRoutes = require('./routes/adminManagement.routes');
 const receiptRoutes = require('./routes/receipt.routes');
 const policiesRoutes = require('./routes/policies.routes');
+const enquiryRoutes = require('./routes/enquiry.routes');
 const { verifyPolicyGate } = require('./middleware/policyGate.middleware');
 const { superAdminVoucherRoutes, checkoutVoucherRoutes } = require('./routes/voucher.routes');
 const { requestLogger } = require('./middleware/requestLogger.middleware');
@@ -152,6 +153,8 @@ app.use('/api/admins', adminManagementRoutes);
 app.use('/api/admin-management', adminManagementRoutes);
 app.use('/api/receipts', receiptRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/enquiries', enquiryRoutes);
+app.use('/api/connect', enquiryRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -1,5 +1,6 @@
 export const PUBLIC_ROUTES = {
   HOME: '/',
+  CONNECT: '/connect',
   ABOUT: '/about',
   CONTACT: '/contact',
   OUR_TEAM: '/our-team',
