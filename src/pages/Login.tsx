@@ -452,7 +452,7 @@ export default function Login() {
         glowColor="coral"
       >
         {/* Role Segmented Capsule Selector */}
-        <div className="flex items-center justify-between p-1 rounded-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md mb-6">
+        <div className="flex items-center justify-between p-1 rounded-full bg-white/[0.04] border border-white/[0.08] backdrop-blur-md mb-5 sm:mb-6">
           {(['student', 'admin', 'super_admin'] as AuthRole[]).map((roleKey) => {
             const isSelected = selectedRole === roleKey;
             const rConfig = ROLE_CONFIGS[roleKey];
@@ -466,7 +466,7 @@ export default function Login() {
                 aria-selected={isSelected}
                 aria-controls={`panel-${roleKey}`}
                 onClick={() => handleRoleChange(roleKey)}
-                className={`flex-1 py-1.5 px-2.5 rounded-full text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 px-2 xs:px-2.5 rounded-full text-[11px] xs:text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1 sm:gap-1.5 ${
                   isSelected
                     ? 'bg-gradient-to-r from-white/[0.18] to-white/[0.08] text-white shadow-sm border border-white/20'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]'
@@ -552,9 +552,9 @@ export default function Login() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-3.5 text-left" noValidate>
-              {/* Identifier Input Pill */}
-              <div className="rounded-full bg-[#181924]/90 border border-white/[0.10] focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 h-13 px-5 flex items-center transition-all">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5 text-left" noValidate>
+              {/* Identifier Input Pill — EXACT equal height and width as password pill */}
+              <div className="h-[52px] sm:h-[56px] w-full rounded-full bg-[#181924]/90 border border-white/[0.10] focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 px-4 sm:px-5 flex items-center transition-all box-border">
                 <span className="text-zinc-400 font-medium text-xs sm:text-sm mr-2 shrink-0 select-none">
                   {config.fieldPrefix}
                 </span>
@@ -573,8 +573,8 @@ export default function Login() {
                 />
               </div>
 
-              {/* Password Input Pill with glowing circular arrow submit button */}
-              <div className="rounded-full bg-[#181924]/90 border border-white/[0.10] focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 h-13 pl-5 pr-1.5 flex items-center justify-between transition-all">
+              {/* Password Input Pill — EXACT equal height, width, and border styling */}
+              <div className="h-[52px] sm:h-[56px] w-full rounded-full bg-[#181924]/90 border border-white/[0.10] focus-within:border-white/30 focus-within:ring-2 focus-within:ring-white/10 pl-4 sm:pl-5 pr-1.5 flex items-center justify-between transition-all box-border">
                 <div className="flex items-center flex-1 mr-2 min-w-0">
                   <span className="text-zinc-400 font-medium text-xs sm:text-sm mr-2 shrink-0 select-none">
                     Password:
@@ -594,13 +594,13 @@ export default function Login() {
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                   {/* Subtle eye toggle */}
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="text-zinc-500 hover:text-zinc-300 p-1.5 rounded-full transition-colors focus:outline-none"
+                    className="text-zinc-500 hover:text-zinc-300 p-1 sm:p-1.5 rounded-full transition-colors focus:outline-none"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -610,12 +610,12 @@ export default function Login() {
                     type="submit"
                     disabled={isLoading}
                     aria-label="Sign In"
-                    className="w-10 h-10 rounded-full bg-gradient-to-r from-[#ff4d5a] to-[#ff2a5f] hover:from-[#ff5e6a] hover:to-[#ff3a6d] text-white flex items-center justify-center shrink-0 shadow-[0_0_18px_rgba(255,75,90,0.6)] hover:shadow-[0_0_25px_rgba(255,75,90,0.85)] hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:scale-100 cursor-pointer focus:outline-none"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-r from-[#ff4d5a] to-[#ff2a5f] hover:from-[#ff5e6a] hover:to-[#ff3a6d] text-white flex items-center justify-center shrink-0 shadow-[0_0_18px_rgba(255,75,90,0.6)] hover:shadow-[0_0_25px_rgba(255,75,90,0.85)] hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:scale-100 cursor-pointer focus:outline-none"
                   >
                     {isLoading ? (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
-                      <ArrowRight className="w-4 h-4 text-white stroke-[2.5]" />
+                      <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white stroke-[2.5]" />
                     )}
                   </button>
                 </div>
@@ -633,7 +633,7 @@ export default function Login() {
             </form>
 
             {/* Divider: OR */}
-            <div className="flex items-center gap-3 my-5">
+            <div className="flex items-center gap-3 my-4 sm:my-5">
               <div className="flex-1 h-px bg-white/[0.08]" />
               <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 select-none">
                 OR
@@ -641,13 +641,13 @@ export default function Login() {
               <div className="flex-1 h-px bg-white/[0.08]" />
             </div>
 
-            {/* Social Login Buttons: Apple, Google (with official logo), Twitter/X */}
-            <div className="grid grid-cols-3 gap-3">
+            {/* Social Login Buttons: Apple & Google (Twitter/X removed as requested) */}
+            <div className="grid grid-cols-2 gap-3">
               {/* Apple */}
               <button
                 type="button"
                 onClick={() => toast.info('Apple Sign In is coming soon!')}
-                className="h-12 rounded-2xl bg-[#181924]/80 border border-white/[0.08] hover:bg-white/[0.05] hover:border-white/20 text-white flex items-center justify-center transition-all group"
+                className="h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-[#181924]/80 border border-white/[0.08] hover:bg-white/[0.05] hover:border-white/20 text-white flex items-center justify-center transition-all group"
                 title="Sign in with Apple"
               >
                 <svg className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" viewBox="0 0 170 170">
@@ -656,7 +656,7 @@ export default function Login() {
               </button>
 
               {/* Google with official logo */}
-              <div className="relative h-12 rounded-2xl bg-[#181924]/80 border border-white/[0.08] hover:bg-white/[0.05] hover:border-white/20 transition-all flex items-center justify-center group overflow-hidden">
+              <div className="relative h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-[#181924]/80 border border-white/[0.08] hover:bg-white/[0.05] hover:border-white/20 transition-all flex items-center justify-center group overflow-hidden">
                 {hasValidGoogleClientId ? (
                   <div className="absolute inset-0 opacity-0 overflow-hidden flex items-center justify-center cursor-pointer">
                     <GoogleLogin
@@ -701,25 +701,13 @@ export default function Login() {
                   </svg>
                 </button>
               </div>
-
-              {/* Twitter / X */}
-              <button
-                type="button"
-                onClick={() => toast.info('X (Twitter) Sign In is coming soon!')}
-                className="h-12 rounded-2xl bg-[#181924]/80 border border-white/[0.08] hover:bg-white/[0.05] hover:border-white/20 text-white flex items-center justify-center transition-all group"
-                title="Sign in with X"
-              >
-                <svg className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
-              </button>
             </div>
 
             {/* Bottom Link: Don't have an account yet? Sign up */}
-            <p className="text-center text-xs text-zinc-400 mt-6">
+            <p className="text-center text-xs text-zinc-400 mt-5 sm:mt-6">
               Don't have an account yet?{' '}
               <Link
-                to={`/signup?role=${selectedRole === 'admin' ? 'admin' : 'student'}`}
+                to="/signup"
                 className="font-semibold text-[#ff4d5a] hover:text-[#ff6b77] hover:underline transition-colors"
               >
                 Sign up

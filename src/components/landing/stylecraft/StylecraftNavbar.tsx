@@ -53,9 +53,9 @@ export function StylecraftNavbar({ onConnect }: StylecraftNavbarProps) {
             <img
               src="/hosteliq-logo.png"
               alt="Hostel IQ Platform"
-              width={44}
-              height={44}
-              className="h-8 xs:h-9 sm:h-10 md:h-11 w-auto max-w-[42px] xs:max-w-[48px] sm:max-w-[52px] object-contain transition-transform duration-200 group-hover:scale-105"
+              width={48}
+              height={48}
+              className="h-9 xs:h-10 sm:h-11 md:h-12 w-auto max-w-[48px] xs:max-w-[54px] sm:max-w-[58px] object-contain transition-transform duration-200 group-hover:scale-105"
             />
             {/* Desktop Brand Text — Hidden on mobile as per requirement */}
             <span className="hidden sm:inline font-extrabold text-base sm:text-lg md:text-xl text-slate-950 tracking-tight leading-none whitespace-nowrap">
