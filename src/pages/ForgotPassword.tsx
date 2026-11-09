@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { api } from '@/lib/api';
 import { toast } from 'react-toastify';
@@ -44,7 +41,6 @@ export default function ForgotPassword() {
         setErrorMsg(serverMessage);
         toast.error(serverMessage);
       } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        // If client timeout occurred, the server already processed and saved the token
         setIsSubmitted(true);
       } else if (error.code === 'ERR_NETWORK') {
         const msg = 'Network error: Unable to reach the server. Please check your internet connection.';
@@ -65,12 +61,14 @@ export default function ForgotPassword() {
       <AuthLayout
         heading="Check your email"
         subheading="Password reset instructions dispatched"
+        variant="default"
+        glowColor="purple"
         footer={
           <p>
             Remembered your credentials?{' '}
             <Link
               to="/login"
-              className="font-medium text-[#b794f4] hover:text-[#d6bcfa] hover:underline transition-colors"
+              className="font-semibold text-purple-400 hover:text-purple-300 hover:underline transition-colors"
             >
               Sign in
             </Link>
@@ -78,24 +76,25 @@ export default function ForgotPassword() {
         }
       >
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-[#b794f4] flex items-center justify-center mx-auto">
-            <Mail className="w-6 h-6" />
+          <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mx-auto">
+            <Mail className="w-7 h-7" />
           </div>
 
           <p className="text-xs text-zinc-300 leading-relaxed">
             If an account exists with <strong className="text-white">{email}</strong>, we have sent instructions to reset your password.
           </p>
 
-          <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/20 text-left text-xs text-purple-200/90 leading-relaxed">
+          <div className="p-3.5 rounded-2xl bg-purple-950/20 border border-purple-500/20 text-left text-xs text-purple-200/90 leading-relaxed">
             💡 <strong>Tip:</strong> Please check your <strong>Spam / Junk</strong> folder if the link does not appear in your main inbox within a few minutes.
           </div>
 
-          <Button
+          <button
+            type="button"
             onClick={() => navigate('/login')}
-            className="w-full h-11 rounded-[10px] bg-[#9d4edd] hover:bg-[#8b5cf6] text-white font-medium text-sm transition-all shadow-md shadow-purple-900/20"
+            className="w-full h-12 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] hover:from-[#9d4edd] hover:to-[#8b5cf6] text-white font-semibold text-sm transition-all shadow-[0_0_20px_rgba(139,92,246,0.35)]"
           >
             Return to Login
-          </Button>
+          </button>
         </div>
       </AuthLayout>
     );
@@ -103,14 +102,16 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout
-      heading="Reset password"
+      heading="Reset Password"
       subheading="Enter your email address or user ID to receive a password reset link"
+      variant="default"
+      glowColor="purple"
       footer={
         <p>
           Remember your password?{' '}
           <Link
             to="/login"
-            className="font-medium text-[#b794f4] hover:text-[#d6bcfa] hover:underline transition-colors"
+            className="font-semibold text-purple-400 hover:text-purple-300 hover:underline transition-colors"
           >
             Sign in
           </Link>
@@ -118,7 +119,7 @@ export default function ForgotPassword() {
       }
     >
       {errorMsg && (
-        <div className="mb-4 p-3 rounded-xl bg-rose-950/30 border border-rose-500/30 flex items-start gap-2 text-xs text-rose-300">
+        <div className="mb-4 p-3 rounded-2xl bg-rose-950/40 border border-rose-500/30 flex items-start gap-2.5 text-xs text-rose-300">
           <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
           <span>{errorMsg}</span>
         </div>
@@ -126,10 +127,10 @@ export default function ForgotPassword() {
 
       <form onSubmit={handleSubmit} className="space-y-4 text-left" noValidate>
         <div className="space-y-1.5">
-          <Label htmlFor="forgot-email" className="text-xs font-medium text-zinc-300">
+          <label htmlFor="forgot-email" className="text-xs font-medium text-zinc-300 block">
             Email Address or User ID
-          </Label>
-          <Input
+          </label>
+          <input
             id="forgot-email"
             type="text"
             placeholder="resident@example.com or username"
@@ -140,14 +141,14 @@ export default function ForgotPassword() {
             }}
             required
             autoComplete="username"
-            className="h-11 px-3.5 bg-[#161720] border-[#262835] text-white placeholder:text-zinc-500 rounded-[10px] text-sm focus-visible:border-[#9d4edd] focus-visible:ring-1 focus-visible:ring-[#9d4edd] transition-colors"
+            className="w-full h-12 px-4 rounded-2xl bg-[#181926]/90 border border-white/[0.08] focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/15 text-sm text-white placeholder:text-zinc-500 outline-none transition-all"
           />
         </div>
 
-        <Button
+        <button
           type="submit"
           disabled={isLoading}
-          className="w-full h-11 sm:h-12 rounded-[10px] bg-[#9d4edd] hover:bg-[#8b5cf6] text-white font-medium text-sm transition-all duration-150 shadow-md shadow-purple-900/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+          className="w-full h-12 rounded-full bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] hover:from-[#9d4edd] hover:to-[#8b5cf6] text-white font-semibold text-sm transition-all shadow-[0_0_20px_rgba(139,92,246,0.35)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
         >
           {isLoading ? (
             <div className="flex items-center justify-center gap-2">
@@ -160,7 +161,7 @@ export default function ForgotPassword() {
               <ArrowRight className="w-4 h-4" />
             </span>
           )}
-        </Button>
+        </button>
       </form>
     </AuthLayout>
   );
