@@ -61,7 +61,7 @@ const genReceiptNo = () =>
   `RCPT-${format(new Date(), 'yyyyMMdd')}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
 export default function FeeManagement() {
-  const { selectedHostel } = useHostel();
+  const { selectedHostel, selectedHostelId, isLoading: hostelLoading } = useHostel();
   const { profile } = useAuth();
   const navigate = useNavigate();
 
@@ -151,14 +151,24 @@ export default function FeeManagement() {
   }, [searchQuery]);
 
   const fetchData = useCallback(async (isMounted?: () => boolean) => {
+    const targetBranch = selectedHostel || selectedHostelId;
+    if (hostelLoading && !targetBranch) {
+      return;
+    }
+
     try {
       const [response, settingsResponse] = await Promise.all([
         feeService.getFeeDashboard({
-          hostel: selectedHostel,
+          hostel: selectedHostel || undefined,
           page: currentPage,
           limit: 100,
         }),
-        settingsService.getHostelSettings(selectedHostel),
+        targetBranch
+          ? settingsService.getHostelSettings(targetBranch).catch((err) => {
+              console.warn('FeeManagement settings fallback:', err);
+              return { success: false, data: null };
+            })
+          : Promise.resolve({ success: false, data: null }),
       ]);
 
       if (isMounted && !isMounted()) return;
@@ -174,19 +184,21 @@ export default function FeeManagement() {
       }
 
       if (settingsResponse.success && settingsResponse.data) {
-        setLateFeeSetting(settingsResponse.data.lateFeePerDay || 20);
-        setGracePeriodSetting(settingsResponse.data.gracePeriodDays || 5);
+        setLateFeeSetting(settingsResponse.data.lateFeePerDay ?? 20);
+        setGracePeriodSetting(settingsResponse.data.gracePeriodDays ?? 5);
       }
     } catch (e) {
       if (isMounted && !isMounted()) return;
       console.error(e);
-      toast.error('Failed to load fee data');
+      toast.error('Failed to load fee data', { toastId: 'fee-load-error' });
     } finally {
       if (!isMounted || isMounted()) {
-        setLoading(false);
+        if (!hostelLoading || targetBranch) {
+          setLoading(false);
+        }
       }
     }
-  }, [selectedHostel, currentPage]);
+  }, [selectedHostel, selectedHostelId, hostelLoading, currentPage]);
 
   useEffect(() => {
     let active = true;

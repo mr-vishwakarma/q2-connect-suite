@@ -32,9 +32,32 @@ const hostelController = {
         filter.organizationId = orgId;
       }
 
-      // Restrict staff who only have access to specific branches
+      // Restrict staff who only have access to specific branches (supports both ObjectIds and branch codes like 'MAIN')
       if (req.tenant?.hostelAccess && !req.tenant.hostelAccess.includes('all') && !isSuperAdmin) {
-        filter._id = { $in: req.tenant.hostelAccess };
+        const accessObjectIds = [];
+        const accessCodes = [];
+        req.tenant.hostelAccess.forEach((entry) => {
+          const val = String(entry || '').trim();
+          if (!val) return;
+          if (/^[0-9a-fA-F]{24}$/.test(val)) {
+            accessObjectIds.push(new mongoose.Types.ObjectId(val));
+          } else {
+            accessCodes.push(val.toUpperCase(), val);
+          }
+        });
+
+        const accessConditions = [];
+        if (accessObjectIds.length > 0) accessConditions.push({ _id: { $in: accessObjectIds } });
+        if (accessCodes.length > 0) accessConditions.push({ code: { $in: accessCodes } });
+
+        if (accessConditions.length === 1) {
+          Object.assign(filter, accessConditions[0]);
+        } else if (accessConditions.length > 1) {
+          filter.$and = filter.$and || [];
+          filter.$and.push({ $or: accessConditions });
+        } else {
+          filter._id = { $in: [] };
+        }
       }
 
       if (status && status !== 'all') {
@@ -47,13 +70,16 @@ const hostelController = {
 
       if (search) {
         const searchRegex = { $regex: search.trim(), $options: 'i' };
-        filter.$or = [
-          { name: searchRegex },
-          { code: searchRegex },
-          { address: searchRegex },
-          { wardenName: searchRegex },
-          { city: searchRegex },
-        ];
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            { name: searchRegex },
+            { code: searchRegex },
+            { address: searchRegex },
+            { wardenName: searchRegex },
+            { city: searchRegex },
+          ],
+        });
       }
 
       const pageNum = Math.max(1, parseInt(page, 10) || 1);

@@ -21,9 +21,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminPolicyManagement } from '@/components/admin/policies/AdminPolicyManagement';
 import { FileText, Sliders } from 'lucide-react';
 import { api } from '@/lib/api';
+import { settingsService } from '@/services/api';
 
 export default function AdminSettings() {
-  const { selectedHostel, currentBranch } = useHostel();
+  const { selectedHostel, selectedHostelId, currentBranch, isLoading: hostelLoading } = useHostel();
   const [lateFeePerDay, setLateFeePerDay] = useState<number>(20);
   const [gracePeriodDays, setGracePeriodDays] = useState<number>(5);
   const [securityDeposit, setSecurityDeposit] = useState<number>(5000);
@@ -33,10 +34,14 @@ export default function AdminSettings() {
   const [saving, setSaving] = useState(false);
 
   const fetchSettings = useCallback(async () => {
-    if (!selectedHostel) return;
+    const targetBranch = selectedHostelId || selectedHostel;
+    if (!targetBranch) {
+      if (!hostelLoading) setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const res = await api.get(`/settings/${selectedHostel}`);
+      const res = await api.get(`/settings/${targetBranch}`);
       if (res.data?.success && res.data.data) {
         const d = res.data.data;
         setLateFeePerDay(d.lateFeePerDay ?? 20);
@@ -47,11 +52,11 @@ export default function AdminSettings() {
       }
     } catch (error) {
       console.error('Failed to load hostel settings:', error);
-      toast.error('Failed to load operational settings for this hostel branch');
+      toast.error('Failed to load operational settings for this hostel branch', { toastId: 'settings-load-error' });
     } finally {
       setLoading(false);
     }
-  }, [selectedHostel]);
+  }, [selectedHostel, selectedHostelId, hostelLoading]);
 
   useEffect(() => {
     fetchSettings();
@@ -79,9 +84,15 @@ export default function AdminSettings() {
       return;
     }
 
+    const targetBranch = selectedHostelId || selectedHostel;
+    if (!targetBranch) {
+      toast.error('Please select a hostel branch first.');
+      return;
+    }
+
     try {
       setSaving(true);
-      await api.put(`/settings/${selectedHostel}`, {
+      await api.put(`/settings/${targetBranch}`, {
         lateFeePerDay: Number(lateFeePerDay),
         gracePeriodDays: Number(gracePeriodDays),
         securityDeposit: Number(securityDeposit),
@@ -89,7 +100,8 @@ export default function AdminSettings() {
         weeklyLaundrySlots: Number(weeklyLaundrySlots),
         laundrySlotsPerWeek: Number(weeklyLaundrySlots),
       });
-      toast.success(`Operational policies for branch '${selectedHostel}' saved successfully!`);
+      settingsService.clearCache();
+      toast.success(`Operational policies for branch '${selectedHostel || branchDisplay}' saved successfully!`);
     } catch (error: any) {
       console.error('Failed to save settings:', error);
       toast.error(error.response?.data?.message || 'Failed to update settings');
@@ -126,7 +138,7 @@ export default function AdminSettings() {
         </div>
         <Badge variant="outline" className="border-amber-500/40 text-amber-300 bg-amber-500/10 px-3 py-1 text-xs w-fit flex items-center gap-1.5">
           <Building2 className="w-3.5 h-3.5" />
-          Branch: {selectedHostel}
+          Branch: {selectedHostel || branchDisplay}
         </Badge>
       </div>
 
@@ -143,7 +155,11 @@ export default function AdminSettings() {
         </TabsList>
 
         <TabsContent value="policies" className="space-y-6 mt-4">
-          <AdminPolicyManagement selectedHostel={selectedHostel} branchName={branchDisplay} />
+          <AdminPolicyManagement
+            selectedHostel={selectedHostel}
+            selectedHostelId={selectedHostelId}
+            branchName={branchDisplay}
+          />
         </TabsContent>
 
         <TabsContent value="operations" className="space-y-6 mt-4">

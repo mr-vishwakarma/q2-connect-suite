@@ -60,16 +60,29 @@ export function HostelProvider({ children }: { children: ReactNode }) {
   });
 
   const [selectedHostelCode, setSelectedHostelCode] = useState<string>(() => {
-    return sessionStorage.getItem('selectedHostel') || 'Q2';
+    const saved = sessionStorage.getItem('selectedHostel');
+    if (saved) return saved;
+    try {
+      const cached = localStorage.getItem('cached_hostel_branches');
+      const parsed: HostelBranch[] = cached ? JSON.parse(cached) : [];
+      const savedId = sessionStorage.getItem('selectedHostelId') || localStorage.getItem('selectedHostelId');
+      const matched = parsed.find((b) => b._id === savedId) || parsed.find((b) => b.status === 'ACTIVE') || parsed[0];
+      return matched?.code || '';
+    } catch {
+      return '';
+    }
   });
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    return Boolean(localStorage.getItem('accessToken') && !sessionStorage.getItem('selectedHostel'));
+  });
   const [error, setError] = useState<string | null>(null);
 
   // Fetch branches dynamically from API
   const fetchBranches = useCallback(async () => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
+      setIsLoading(false);
       return;
     }
 
@@ -104,6 +117,11 @@ export function HostelProvider({ children }: { children: ReactNode }) {
           sessionStorage.setItem('selectedHostelId', matched._id);
           sessionStorage.setItem('selectedHostel', matched.code || matched.name);
           localStorage.setItem('selectedHostelId', matched._id);
+        } else {
+          // Safe fallback if organization has no explicit branches returned
+          setSelectedHostelIdState(null);
+          const fallbackCode = storedCode || 'MAIN';
+          setSelectedHostelCode(fallbackCode);
         }
       }
     } catch (err: any) {
@@ -118,14 +136,25 @@ export function HostelProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchBranches();
 
-    // Re-fetch on login / auth change events
     const handleAuthChange = () => fetchBranches();
+    const handleAuthLogout = () => {
+      setBranches([]);
+      setSelectedHostelIdState(null);
+      setSelectedHostelCode('');
+      setError(null);
+      setIsLoading(false);
+    };
+
     window.addEventListener('storage', handleAuthChange);
     window.addEventListener('auth:login_success', handleAuthChange);
+    window.addEventListener('auth:logout', handleAuthLogout);
+    window.addEventListener('auth:unauthorized', handleAuthLogout);
 
     return () => {
       window.removeEventListener('storage', handleAuthChange);
       window.removeEventListener('auth:login_success', handleAuthChange);
+      window.removeEventListener('auth:logout', handleAuthLogout);
+      window.removeEventListener('auth:unauthorized', handleAuthLogout);
     };
   }, [fetchBranches]);
 
@@ -169,6 +198,7 @@ export function HostelProvider({ children }: { children: ReactNode }) {
   // Compute active branch object
   const currentBranch = useMemo(() => {
     if (!selectedHostelId) {
+      if (!selectedHostelCode) return null;
       return branches.find((b) => b.code.toUpperCase() === selectedHostelCode.toUpperCase()) || null;
     }
     return branches.find((b) => b._id === selectedHostelId) || null;
@@ -177,7 +207,7 @@ export function HostelProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       selectedHostelId,
-      selectedHostel: currentBranch?.code || selectedHostelCode || 'Q2',
+      selectedHostel: currentBranch?.code || selectedHostelCode || '',
       currentBranch,
       branches,
       isLoading,

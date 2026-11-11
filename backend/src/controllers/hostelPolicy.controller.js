@@ -1,5 +1,6 @@
 const {
   MANDATORY_CATEGORIES,
+  resolveCanonicalHostelId,
   listDocuments,
   getHostelPolicyReadiness,
   uploadAndCreateDraft,
@@ -21,12 +22,13 @@ const Student = require('../models/Student');
 const getPolicySettings = async (req, res) => {
   try {
     const organizationId = req.organizationId || req.tenant?.organizationId;
-    const hostelId = req.query.hostelId || req.headers['x-hostel-id'] || req.tenant?.hostelId || null;
+    const rawHostelId = req.query.hostelId || req.headers['x-hostel-id'] || req.tenant?.hostelId || null;
 
     if (!organizationId) {
       return res.status(403).json({ success: false, message: 'Organization tenant context required' });
     }
 
+    const hostelId = await resolveCanonicalHostelId(organizationId, rawHostelId);
     const data = await listDocuments(organizationId, hostelId);
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -42,16 +44,23 @@ const getPolicySettings = async (req, res) => {
 const uploadPolicyDraft = async (req, res) => {
   try {
     const organizationId = req.organizationId || req.tenant?.organizationId;
-    let hostelId = null;
-    if (req.body.hostelId && req.body.hostelId !== 'all' && req.body.hostelId !== 'null') {
-      hostelId = req.body.hostelId;
+    let rawHostelId = null;
+    if (
+      req.body.hostelId &&
+      req.body.hostelId !== 'all' &&
+      req.body.hostelId !== 'null' &&
+      req.body.hostelId !== 'undefined'
+    ) {
+      rawHostelId = req.body.hostelId;
     } else if (req.body.scope === 'BRANCH') {
-      hostelId = req.headers['x-hostel-id'] || req.tenant?.hostelId || null;
+      rawHostelId = req.headers['x-hostel-id'] || req.tenant?.hostelId || null;
     }
 
     if (!organizationId) {
       return res.status(403).json({ success: false, message: 'Organization tenant context required' });
     }
+
+    const hostelId = await resolveCanonicalHostelId(organizationId, rawHostelId);
 
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({ success: false, message: 'No PDF file uploaded' });

@@ -32,6 +32,54 @@ const CATEGORY_METADATA = {
   },
 };
 
+const isValidObjectIdHex = (val) => {
+  if (!val) return false;
+  if (val instanceof mongoose.Types.ObjectId) return true;
+  return /^[0-9a-fA-F]{24}$/.test(String(val).trim());
+};
+
+/**
+ * Resolves any hostel identifier (canonical ObjectId, branch code like "MAIN",
+ * branch name, or "all"/"null") into a safe ObjectId or null (organization-wide scope).
+ * Prevents Mongoose CastError when a branch code string is supplied as hostelId.
+ */
+const resolveCanonicalHostelId = async (organizationId, hostelIdentifier) => {
+  if (!hostelIdentifier) return null;
+  if (hostelIdentifier instanceof mongoose.Types.ObjectId) return hostelIdentifier;
+
+  const raw = String(hostelIdentifier).trim();
+  if (!raw || ['all', 'null', 'undefined', 'org', 'organization'].includes(raw.toLowerCase())) {
+    return null;
+  }
+
+  if (isValidObjectIdHex(raw)) {
+    return new mongoose.Types.ObjectId(raw);
+  }
+
+  if (organizationId) {
+    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const caseInsensitiveRegex = new RegExp(`^${escaped}$`, 'i');
+    const hostelDoc = await Hostel.findOne({
+      organizationId,
+      isDeleted: { $ne: true },
+      $or: [
+        { code: raw },
+        { code: raw.toUpperCase() },
+        { code: caseInsensitiveRegex },
+        { name: caseInsensitiveRegex },
+      ],
+    })
+      .select('_id')
+      .lean();
+
+    if (hostelDoc?._id) {
+      return hostelDoc._id;
+    }
+  }
+
+  return null;
+};
+
 /**
  * Resolves the applicable published versions for a given organization and optional branch.
  * Hierarchical resolution:
@@ -39,16 +87,17 @@ const CATEGORY_METADATA = {
  * 2. Organization-wide default if published (hostelId = null)
  */
 const resolveApplicablePolicies = async (organizationId, hostelId = null) => {
+  const resolvedHostelId = await resolveCanonicalHostelId(organizationId, hostelId);
   const result = {};
 
   for (const category of MANDATORY_CATEGORIES) {
     let publishedVersion = null;
 
-    // 1. Check branch-specific override if hostelId provided
-    if (hostelId) {
+    // 1. Check branch-specific override if resolvedHostelId provided
+    if (resolvedHostelId) {
       publishedVersion = await HostelPolicyVersion.findOne({
         organizationId,
-        hostelId,
+        hostelId: resolvedHostelId,
         category,
         status: 'PUBLISHED',
       })
@@ -121,12 +170,13 @@ const getHostelPolicyReadiness = async (organizationId, hostelId = null) => {
  * Lists all documents and status for an organization and branch.
  */
 const listDocuments = async (organizationId, hostelId = null) => {
-  const readiness = await getHostelPolicyReadiness(organizationId, hostelId);
+  const resolvedHostelId = await resolveCanonicalHostelId(organizationId, hostelId);
+  const readiness = await getHostelPolicyReadiness(organizationId, resolvedHostelId);
 
   // Retrieve existing document records
   const query = { organizationId };
-  if (hostelId) {
-    query.$or = [{ hostelId }, { hostelId: null }];
+  if (resolvedHostelId) {
+    query.$or = [{ hostelId: resolvedHostelId }, { hostelId: null }];
   } else {
     query.hostelId = null;
   }
@@ -139,7 +189,9 @@ const listDocuments = async (organizationId, hostelId = null) => {
   const documentsByCategory = {};
   MANDATORY_CATEGORIES.forEach((cat) => {
     // Find branch-specific first, then org-level
-    const branchDoc = docs.find((d) => d.category === cat && String(d.hostelId) === String(hostelId));
+    const branchDoc = resolvedHostelId
+      ? docs.find((d) => d.category === cat && d.hostelId && String(d.hostelId) === String(resolvedHostelId))
+      : null;
     const orgDoc = docs.find((d) => d.category === cat && !d.hostelId);
     const chosenDoc = branchDoc || orgDoc || null;
 
@@ -180,6 +232,8 @@ const uploadAndCreateDraft = async ({
     throw error;
   }
 
+  const resolvedHostelId = await resolveCanonicalHostelId(organizationId, hostelId);
+
   // Extract and process text
   const extractionResult = await extractAndProcessPdf(fileBuffer, {
     defaultTitle: title || CATEGORY_METADATA[category]?.title,
@@ -188,14 +242,14 @@ const uploadAndCreateDraft = async ({
   // Find or create parent HostelPolicyDocument
   let document = await HostelPolicyDocument.findOne({
     organizationId,
-    hostelId: hostelId || null,
+    hostelId: resolvedHostelId || null,
     category,
   });
 
   if (!document) {
     document = await HostelPolicyDocument.create({
       organizationId,
-      hostelId: hostelId || null,
+      hostelId: resolvedHostelId || null,
       category,
       title: title || CATEGORY_METADATA[category]?.title,
       description: CATEGORY_METADATA[category]?.description,
@@ -218,7 +272,7 @@ const uploadAndCreateDraft = async ({
   const draftVersion = await HostelPolicyVersion.create({
     documentId: document._id,
     organizationId,
-    hostelId: hostelId || null,
+    hostelId: resolvedHostelId || null,
     category,
     versionNumber: nextVersionNumber,
     versionLabel: versionLabel || `v${nextVersionNumber}.0`,
@@ -441,7 +495,7 @@ const getStudentPolicyStatus = async (user, studentDoc = null) => {
   }
 
   const organizationId = student.organizationId || user.activeOrganizationId;
-  const hostelId = student.hostelId || user.activeHostelId;
+  const hostelId = student.hostelId || user.activeHostelId || student.hostel || null;
 
   // Resolve readiness and applicable versions
   const readiness = await getHostelPolicyReadiness(organizationId, hostelId);
@@ -543,7 +597,7 @@ const recordStudentAcceptance = async ({
   }
 
   const organizationId = student.organizationId || user.activeOrganizationId;
-  const hostelId = student.hostelId || user.activeHostelId;
+  const hostelId = student.hostelId || user.activeHostelId || student.hostel || null;
 
   // Retrieve applicable versions to verify authenticity
   const resolved = await resolveApplicablePolicies(organizationId, hostelId);
@@ -637,6 +691,7 @@ const getStudentAcceptanceHistory = async (studentId) => {
 module.exports = {
   MANDATORY_CATEGORIES,
   CATEGORY_METADATA,
+  resolveCanonicalHostelId,
   resolveApplicablePolicies,
   getHostelPolicyReadiness,
   listDocuments,

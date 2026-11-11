@@ -44,11 +44,13 @@ import { PolicyDocumentViewer } from '@/components/policies/PolicyDocumentViewer
 
 interface AdminPolicyManagementProps {
   selectedHostel: string;
+  selectedHostelId?: string | null;
   branchName?: string;
 }
 
 export function AdminPolicyManagement({
   selectedHostel,
+  selectedHostelId,
   branchName,
 }: AdminPolicyManagementProps) {
   const [loading, setLoading] = useState(true);
@@ -93,18 +95,20 @@ export function AdminPolicyManagement({
 
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
+  const targetHostelParam = selectedHostelId || selectedHostel;
+
   const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await policyService.getSettings(selectedHostel);
+      const res = await policyService.getSettings(targetHostelParam || undefined);
       setData(res);
     } catch (err: any) {
       console.error('Failed to load policy settings:', err);
-      toast.error('Failed to load hostel policy configuration');
+      toast.error('Failed to load hostel policy configuration', { toastId: 'policy-load-error' });
     } finally {
       setLoading(false);
     }
-  }, [selectedHostel]);
+  }, [targetHostelParam]);
 
   useEffect(() => {
     fetchSettings();
@@ -162,8 +166,8 @@ export function AdminPolicyManagement({
       formData.append('title', uploadTitle.trim());
       formData.append('versionLabel', uploadVersionLabel.trim());
       formData.append('effectiveDate', uploadEffectiveDate);
-      if (selectedHostel) {
-        formData.append('hostelId', selectedHostel);
+      if (targetHostelParam) {
+        formData.append('hostelId', targetHostelParam);
       }
 
       const res = await policyService.uploadDraft(formData);

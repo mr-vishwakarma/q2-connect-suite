@@ -55,12 +55,14 @@ export default function FeeHistory() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const studentHostel = profile?.hostel || 'Q2';
+      const studentHostel = profile?.hostel || '';
       const [sRes, fRes, pRes, settingsRes] = await Promise.all([
         api.get('/students/me'),
         api.get('/fees'),
         api.get('/fees/payments'),
-        settingsService.getHostelSettings(studentHostel),
+        studentHostel
+          ? settingsService.getHostelSettings(studentHostel).catch(() => ({ success: false, data: null }))
+          : Promise.resolve({ success: false, data: null }),
       ]);
 
       if (sRes.data?.success) {
@@ -75,7 +77,7 @@ export default function FeeHistory() {
         });
 
         if (studentData.hostel && studentData.hostel !== studentHostel) {
-          const freshSettings = await settingsService.getHostelSettings(studentData.hostel);
+          const freshSettings = await settingsService.getHostelSettings(studentData.hostel).catch(() => ({ success: false, data: null }));
           if (freshSettings.success && freshSettings.data) {
             setSettings({
               lateFeePerDay: freshSettings.data.lateFeePerDay ?? 20,

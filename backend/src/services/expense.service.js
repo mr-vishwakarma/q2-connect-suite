@@ -2,18 +2,30 @@ const mongoose = require('mongoose');
 const Expense = require('../models/Expense');
 const Hostel = require('../models/Hostel');
 
+const isValidObjectIdHex = (val) =>
+  typeof val === 'string' ? /^[0-9a-fA-F]{24}$/.test(val.trim()) : val instanceof mongoose.Types.ObjectId;
+
 const expenseService = {
   async getExpenses({ organizationId, hostelId, category, month, page = 1, limit = 20 }) {
     const filter = {};
     if (organizationId) filter.organizationId = organizationId;
 
     if (hostelId && hostelId !== 'All') {
-      if (mongoose.Types.ObjectId.isValid(hostelId)) {
-        filter.$or = [{ hostelId }, { hostel: hostelId }];
+      if (isValidObjectIdHex(hostelId)) {
+        const hostelObjQuery = { _id: hostelId };
+        if (organizationId) hostelObjQuery.organizationId = organizationId;
+        const hostelDoc = await Hostel.findOne(hostelObjQuery).select('code').lean();
+        if (hostelDoc?.code) {
+          filter.$or = [{ hostelId }, { hostel: hostelDoc.code }, { hostel: hostelId }];
+        } else {
+          filter.$or = [{ hostelId }, { hostel: hostelId }];
+        }
       } else {
-        const hostelDoc = await Hostel.findOne({ code: hostelId }).lean();
+        const hostelQuery = { code: String(hostelId).trim() };
+        if (organizationId) hostelQuery.organizationId = organizationId;
+        const hostelDoc = await Hostel.findOne(hostelQuery).lean();
         if (hostelDoc) {
-          filter.$or = [{ hostelId: hostelDoc._id }, { hostel: hostelId }];
+          filter.$or = [{ hostelId: hostelDoc._id }, { hostel: hostelDoc.code }, { hostel: hostelId }];
         } else {
           filter.hostel = hostelId;
         }
@@ -53,30 +65,44 @@ const expenseService = {
 
   async createExpense(data, userId, organizationId, hostelId) {
     let resolvedHostelId = null;
+    let resolvedHostelCode = null;
     const hostelCode = data.hostel || data.hostelId || hostelId || null;
 
-    if (mongoose.Types.ObjectId.isValid(hostelId)) {
-      resolvedHostelId = hostelId;
-    } else if (mongoose.Types.ObjectId.isValid(data.hostelId)) {
+    if (isValidObjectIdHex(data.hostelId)) {
       resolvedHostelId = data.hostelId;
+    } else if (isValidObjectIdHex(hostelId)) {
+      resolvedHostelId = hostelId;
+    }
+
+    if (resolvedHostelId) {
+      const hQuery = { _id: resolvedHostelId };
+      if (organizationId) hQuery.organizationId = organizationId;
+      const hostelDoc = await Hostel.findOne(hQuery).select('code').lean();
+      if (hostelDoc?.code) resolvedHostelCode = hostelDoc.code;
     } else if (hostelCode && hostelCode !== 'All') {
       const query = { code: hostelCode };
       if (organizationId) query.organizationId = organizationId;
       const hostelDoc = await Hostel.findOne(query);
       if (hostelDoc) {
         resolvedHostelId = hostelDoc._id;
+        resolvedHostelCode = hostelDoc.code;
       }
     }
 
     const cleanData = { ...data };
     delete cleanData.organizationId; // Prevent untrusted body override
 
+    const finalHostelCode =
+      data.hostel && data.hostel !== 'All'
+        ? data.hostel
+        : resolvedHostelCode || (hostelCode && hostelCode !== 'All' && !isValidObjectIdHex(hostelCode) ? hostelCode : null);
+
     const expense = await Expense.create({
       ...cleanData,
       createdBy: userId,
       organizationId: organizationId,
       hostelId: resolvedHostelId,
-      hostel: hostelCode !== 'All' ? hostelCode : null,
+      hostel: finalHostelCode,
     });
     return expense;
   },
@@ -91,4 +117,3 @@ const expenseService = {
 };
 
 module.exports = { expenseService };
-

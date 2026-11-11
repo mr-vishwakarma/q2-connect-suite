@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Fee = require('../models/Fee');
 const FeePayment = require('../models/FeePayment');
 const SecurityDeposit = require('../models/SecurityDeposit');
@@ -12,6 +13,12 @@ const {
   normalizeToDateOnly,
 } = require('../utils/billingCycle');
 
+const isValidObjectIdHex = (val) => {
+  if (!val) return false;
+  if (val instanceof mongoose.Types.ObjectId) return true;
+  return /^[0-9a-fA-F]{24}$/.test(String(val).trim());
+};
+
 const feeService = {
   async getDashboardData({
     hostel,
@@ -25,8 +32,33 @@ const feeService = {
     const limitAmount = parseInt(limit);
 
     const studentMatch = { isActive: { $ne: false } };
-    if (organizationId) studentMatch.organizationId = organizationId;
-    if (hostel && hostel !== 'All') studentMatch.hostel = hostel;
+    let normalizedOrgId = organizationId;
+    if (organizationId && !(organizationId instanceof mongoose.Types.ObjectId) && isValidObjectIdHex(organizationId)) {
+      normalizedOrgId = new mongoose.Types.ObjectId(String(organizationId).trim());
+    }
+    if (normalizedOrgId) studentMatch.organizationId = normalizedOrgId;
+
+    if (hostel && hostel !== 'All') {
+      const cleanHostel = String(hostel).trim();
+      if (isValidObjectIdHex(cleanHostel)) {
+        const hObjId = new mongoose.Types.ObjectId(cleanHostel);
+        const hDoc = await Hostel.findById(hObjId).select('code').lean();
+        studentMatch.$or = hDoc?.code
+          ? [{ hostelId: hObjId }, { hostel: hDoc.code }]
+          : [{ hostelId: hObjId }];
+      } else {
+        const escaped = cleanHostel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const hostelRegex = new RegExp(`^${escaped}$`, 'i');
+        const hQuery = { code: hostelRegex, isDeleted: { $ne: true } };
+        if (normalizedOrgId) hQuery.organizationId = normalizedOrgId;
+        const hDoc = await Hostel.findOne(hQuery).select('_id code').lean();
+        if (hDoc?._id) {
+          studentMatch.$or = [{ hostel: hostelRegex }, { hostelId: hDoc._id }];
+        } else {
+          studentMatch.hostel = hostelRegex;
+        }
+      }
+    }
 
     const sortDirection = String(sortOrder).toLowerCase() === 'desc' ? -1 : 1;
     const sortStage = {};
@@ -208,21 +240,27 @@ const feeService = {
     // Determine target hostel
     const targetHostel = student.hostel || 'Q2';
     const targetHostelId = student.hostelId || hostelId;
+    const effectiveOrgId = student.organizationId || organizationId || null;
 
     // Load hostel configuration & settings
     let hostelDoc = null;
-    if (targetHostelId) {
+    if (isValidObjectIdHex(targetHostelId)) {
       hostelDoc = await Hostel.findById(targetHostelId).lean();
     }
-    if (!hostelDoc && organizationId) {
-      hostelDoc = await Hostel.findOne({ organizationId, code: targetHostel }).lean();
+    if (!hostelDoc && effectiveOrgId) {
+      hostelDoc = await Hostel.findOne({ organizationId: effectiveOrgId, code: targetHostel }).lean();
     }
 
     let settings = null;
-    if (organizationId) {
-      settings = await Settings.findOne({ organizationId, hostel: targetHostel }).lean();
-    }
-    if (!settings) {
+    if (effectiveOrgId) {
+      settings = await Settings.findOne({
+        organizationId: effectiveOrgId,
+        $or: [
+          { hostel: targetHostel },
+          ...(hostelDoc?._id ? [{ hostelId: hostelDoc._id }] : []),
+        ],
+      }).lean();
+    } else {
       settings = await Settings.findOne({ hostel: targetHostel }).lean();
     }
 

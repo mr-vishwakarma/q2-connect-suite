@@ -1,5 +1,20 @@
 import { createContext, useContext, useEffect, useState, useMemo, useCallback, ReactNode } from 'react';
 import { api, getSocket, disconnectSocket } from '@/lib/api';
+import { settingsService } from '@/services/api/settings.service';
+
+const clearTenantCache = () => {
+  try {
+    sessionStorage.removeItem('selectedHostelId');
+    sessionStorage.removeItem('selectedHostel');
+    sessionStorage.removeItem('selectedOrganizationId');
+    localStorage.removeItem('selectedHostelId');
+    localStorage.removeItem('selectedOrganizationId');
+    localStorage.removeItem('cached_hostel_branches');
+    settingsService.clearCache();
+  } catch {
+    // ignore storage errors
+  }
+};
 
 export interface User {
   id: string;
@@ -203,6 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for unauthorized events from axios interceptor
     const handleUnauthorized = () => {
+      clearTenantCache();
       setAuthState(LOGGED_OUT_STATE);
       disconnectSocket();
     };
@@ -215,6 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleAuthSuccess = useCallback((data: any) => {
     const { accessToken, refreshToken, user: userData, student } = data;
+    clearTenantCache();
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
 
@@ -267,6 +284,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (socketErr) {
       console.warn('Socket connection failed:', socketErr);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('auth:login_success'));
     }
 
     return mappedUser;
@@ -447,9 +468,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      clearTenantCache();
       // Single setState → 1 re-render on logout
       setAuthState(LOGGED_OUT_STATE);
       disconnectSocket();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:logout'));
+      }
     }
   }, []);
 
