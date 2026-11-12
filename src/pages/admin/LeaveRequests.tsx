@@ -38,6 +38,23 @@ interface LeaveRequest {
   parentPhone?: string | null;
 }
 
+interface MessRequestApiRecord {
+  _id: string;
+  userId?: { _id?: string; name?: string; username?: string } | null;
+  studentId?: { name?: string; roomNo?: string; parentPhone?: string | null } | null;
+  leavingDate: string;
+  returnDate: string;
+  reason: string | null;
+  status: string | null;
+  adminMessage: string | null;
+  createdAt: string;
+  hostel: string | null;
+  documentUrl?: string | null;
+  documentName?: string | null;
+  parentMobile?: string | null;
+  approvedDate?: string | null;
+}
+
 export default function LeaveRequests() {
   const { user, isAdmin, loading } = useAuth();
   const { selectedHostel } = useHostel();
@@ -56,9 +73,9 @@ export default function LeaveRequests() {
     try {
       const response = await api.get('/mess-requests', { params: { hostel: selectedHostel } });
       if (response.data?.success) {
-        const reqs = response.data.data.map((r: any) => ({
+        const reqs = (response.data.data as MessRequestApiRecord[]).map((r) => ({
           id: r._id,
-          user_id: r.userId?._id,
+          user_id: r.userId?._id || '',
           leaving_date: r.leavingDate,
           return_date: r.returnDate,
           reason: r.reason,

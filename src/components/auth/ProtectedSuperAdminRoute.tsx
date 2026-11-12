@@ -14,7 +14,7 @@ export function ProtectedSuperAdminRoute({ children }: { children: ReactNode }) 
   }
 
   // Check if authenticated user is Super Admin
-  const isSuperAdmin = user?.isSuperAdmin || (user as any)?.role === 'super_admin' || user?.email === 'superadmin@q2connect.com';
+  const isSuperAdmin = user?.isSuperAdmin || user?.role === 'super_admin' || user?.email === 'superadmin@q2connect.com';
 
   if (!user) {
     return <Navigate to="/login?role=super_admin" replace />;

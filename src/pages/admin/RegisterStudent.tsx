@@ -45,6 +45,21 @@ import { StudentIDCard } from '@/components/admin/StudentIDCard';
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { ReceiptsSuccessModal } from './components/ReceiptsSuccessModal';
 import { FeeReceiptData, SecurityDepositReceiptData } from '@/lib/receiptPdf';
+import type { Room as ApiRoom } from '@/types';
+import { getErrorMessage } from '@/utils/errorHandling';
+
+interface PendingApplicant {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  hostel?: string;
+}
+
+type Html2CanvasFn = (
+  element: HTMLElement,
+  options?: { scale?: number; useCORS?: boolean; backgroundColor?: string | null }
+) => Promise<HTMLCanvasElement>;
 
 interface Room {
   id: string;
@@ -97,12 +112,12 @@ function RegisterStudentContent() {
 
   const [searchParams] = useSearchParams();
   const applicantIdParam = searchParams.get('applicantId');
-  const [pendingApplicants, setPendingApplicants] = useState<any[]>([]);
+  const [pendingApplicants, setPendingApplicants] = useState<PendingApplicant[]>([]);
   const [selectedApplicantId, setSelectedApplicantId] = useState<string>(applicantIdParam || '');
 
   const idCardRef = useRef<HTMLDivElement>(null);
 
-  const applyApplicantData = useCallback((applicant: any) => {
+  const applyApplicantData = useCallback((applicant: PendingApplicant) => {
     if (!applicant) return;
     const userEmail = (applicant.email || '').toLowerCase().trim();
     setSelectedApplicantId(applicant.id);
@@ -124,7 +139,7 @@ function RegisterStudentContent() {
         if (res.data?.success && res.data.data) {
           setPendingApplicants(res.data.data);
           if (applicantIdParam) {
-            const found = res.data.data.find((a: any) => a.id === applicantIdParam);
+            const found = (res.data.data as PendingApplicant[]).find((a) => a.id === applicantIdParam);
             if (found) applyApplicantData(found);
           }
         }
@@ -153,14 +168,14 @@ function RegisterStudentContent() {
   // Fetch available rooms
   const fetchRooms = useCallback(async () => {
     try {
-      const params: any = { limit: 100 };
+      const params: { limit: number; hostelId?: string; hostel?: string } = { limit: 100 };
       if (selectedHostelId) params.hostelId = selectedHostelId;
       if (selectedHostel) params.hostel = selectedHostel;
       const response = await api.get('/rooms', { params });
       if (response.data?.success && Array.isArray(response.data.data)) {
-        const mapped = response.data.data.map((r: any) => ({
-          id: r._id || r.id,
-          room_number: r.roomNumber || r.room_number,
+        const mapped = response.data.data.map((r: ApiRoom & { room_number?: string; occupied_count?: number }) => ({
+          id: r._id || r.id || '',
+          room_number: r.roomNumber || r.room_number || '',
           capacity: r.capacity ?? 2,
           occupied_count: r.occupiedCount ?? r.occupied_count ?? 0,
           status: r.status || ((r.occupiedCount ?? 0) >= (r.capacity ?? 2) ? 'full' : 'available'),
@@ -363,9 +378,9 @@ function RegisterStudentContent() {
         fetchRooms();
         setViewMode('form');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error registering student:', error);
-      toast.error(error.response?.data?.message || 'Failed to register student');
+      toast.error(getErrorMessage(error, 'Failed to register student'));
     } finally {
       setIsSubmitting(false);
     }
@@ -378,7 +393,7 @@ function RegisterStudentContent() {
     try {
       toast.info('Generating high-resolution ID card...');
       const html2canvasModule = await import('html2canvas');
-      const html2canvas = (html2canvasModule.default || html2canvasModule) as any;
+      const html2canvas = (html2canvasModule.default || html2canvasModule) as unknown as Html2CanvasFn;
       const canvas = await html2canvas(cardElem, {
         scale: 2.5,
         useCORS: true,

@@ -8,6 +8,11 @@ const {
   getSubscriptionStatus,
   createSubscription,
   verifySubscription,
+  recordPaymentFailed,
+  startTrial,
+  previewUpgrade,
+  requestDowngrade,
+  cancelScheduledDowngrade,
   cancelSubscription,
   getBillingHistory,
 } = require('../controllers/billing.controller');
@@ -32,7 +37,12 @@ router.get('/subscription', getSubscriptionStatus);
 router.get('/status', getSubscriptionStatus);
 router.post('/subscriptions/create', billingLimiter, createSubscription);
 router.post('/subscriptions/verify', billingLimiter, verifySubscription);
+router.post('/subscriptions/payment-failed', billingLimiter, recordPaymentFailed);
 router.post('/subscriptions/cancel', billingLimiter, cancelSubscription);
+router.post('/subscription/trial', billingLimiter, startTrial);
+router.post('/subscription/upgrade/preview', billingLimiter, previewUpgrade);
+router.post('/subscription/downgrade', billingLimiter, requestDowngrade);
+router.delete('/subscription/downgrade', billingLimiter, cancelScheduledDowngrade);
 router.get('/history', getBillingHistory);
 
 module.exports = router;

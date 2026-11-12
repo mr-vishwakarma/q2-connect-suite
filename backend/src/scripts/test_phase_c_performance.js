@@ -130,19 +130,61 @@ async function runPhaseCTestSuite() {
     // STEP 2: SETUP DETERMINISTIC FIXTURES
     // -------------------------------------------------------------
     console.log('\n--- STEP 2: Establishing Deterministic Test Personas & Fixtures ---');
-    let orgA = await Organization.findOne({ slug: 'q2-hostels' });
-    if (!orgA) orgA = await Organization.findOne();
-    if (!orgA) throw new Error('Base organization not found');
+    let orgA = await Organization.findOne({ slug: 'q2-hostels' }) || await Organization.findOne();
+    if (!orgA) {
+      orgA = await Organization.create({
+        name: 'Q2 Hostel Management Pvt Ltd',
+        slug: 'q2-hostels',
+        contactEmail: 'admin@q2hostels.com',
+        status: 'ACTIVE',
+      });
+    }
 
     let orgAHostel = await Hostel.findOne({ organizationId: orgA._id, isDeleted: false });
-    const hostelCode = orgAHostel ? orgAHostel.code : 'Q2';
+    if (!orgAHostel) {
+      orgAHostel = await Hostel.create({
+        organizationId: orgA._id,
+        name: 'Q2 Branch Main',
+        code: 'Q2',
+        capacity: 150,
+        status: 'ACTIVE',
+      });
+    }
+    const hostelCode = orgAHostel.code;
 
-    const adminUser = await User.findOne({ username: 'Abhi1006' }) || await User.findOne({ role: 'admin' });
-    const studentUser = await User.findOne({ role: 'student' });
-    const superAdminUser = await User.findOne({ username: 'superadmin' }) || await User.findOne({ role: 'super_admin' });
+    let adminUser = await User.findOne({ username: 'Abhi1006' }) || await User.findOne({ role: 'admin', activeOrganizationId: orgA._id });
+    if (!adminUser) {
+      adminUser = await User.create({
+        name: 'Abhishek Admin',
+        email: 'admin_perf_q2@q2test.com',
+        username: 'Abhi1006',
+        password: 'TestPassword@123',
+        role: 'admin',
+        activeOrganizationId: orgA._id,
+        hostels: [hostelCode],
+        isActive: true,
+        registrationStatus: 'active',
+      });
+    }
+    await Membership.findOneAndUpdate(
+      { userId: adminUser._id, organizationId: orgA._id },
+      { userId: adminUser._id, organizationId: orgA._id, role: 'ORGANIZATION_OWNER', status: 'ACTIVE', hostelAccess: ['all'] },
+      { upsert: true }
+    );
 
-    if (!adminUser || !superAdminUser) {
-      throw new Error('Required admin or superadmin users missing');
+    const studentUser = await User.findOne({ role: 'student', activeOrganizationId: orgA._id });
+    let superAdminUser = await User.findOne({ username: 'superadmin' }) || await User.findOne({ role: 'super_admin' });
+    if (!superAdminUser) {
+      superAdminUser = await User.create({
+        name: 'Super Administrator',
+        email: 'superadmin@q2connect.com',
+        username: 'superadmin',
+        password: 'SuperAdmin@123',
+        role: 'super_admin',
+        isSuperAdmin: true,
+        isActive: true,
+        registrationStatus: 'active',
+      });
     }
 
     const adminToken = jwt.sign({ id: adminUser._id }, process.env.JWT_SECRET, { expiresIn: '1h' });

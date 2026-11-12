@@ -17,6 +17,7 @@ export interface PolicyStructuredContent {
 export interface PolicyVersionItem {
   id: string;
   _id?: string;
+  versionId?: string;
   documentId: string;
   category: 'TERMS_AND_CONDITIONS' | 'RULES_AND_REGULATIONS' | 'HOSTEL_POLICIES';
   categoryLabel?: string;
@@ -41,6 +42,28 @@ export interface PolicyVersionItem {
   acceptedAt?: string | null;
   publishedAt?: string;
   isImmutable?: boolean;
+  isBranchOverride?: boolean;
+}
+
+export interface PolicyDocumentRecord {
+  _id: string;
+  id?: string;
+  organizationId?: string;
+  hostelId?: string | null;
+  category: 'TERMS_AND_CONDITIONS' | 'RULES_AND_REGULATIONS' | 'HOSTEL_POLICIES';
+  title: string;
+  description?: string;
+  status?: string;
+  currentPublishedVersionId?: PolicyVersionItem | null;
+  draftVersionId?: PolicyVersionItem | null;
+}
+
+export interface PolicyExtractionSummary {
+  pageCount?: number;
+  isScanned?: boolean;
+  extractionStatus?: string;
+  extractionNotes?: string;
+  contentHash?: string;
 }
 
 export interface PolicyReadiness {
@@ -72,7 +95,7 @@ export interface PolicySettingsResponse {
       category: string;
       defaultTitle: string;
       description: string;
-      document: any;
+      document: PolicyDocumentRecord | null;
       isBranchOverride: boolean;
     }
   >;
@@ -107,7 +130,9 @@ export const policyService = {
     return res.data.data;
   },
 
-  uploadDraft: async (formData: FormData): Promise<{ document: any; version: PolicyVersionItem; extraction: any }> => {
+  uploadDraft: async (
+    formData: FormData
+  ): Promise<{ document: PolicyDocumentRecord; version: PolicyVersionItem; extraction: PolicyExtractionSummary }> => {
     const res = await api.post('/policies/upload-draft', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

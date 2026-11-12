@@ -235,7 +235,7 @@ export default function AdminAnalytics() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(apiStats.byEndpoint).map(([endpoint, count]: [string, any], index) => (
+                  {Object.entries((apiStats.byEndpoint || {}) as Record<string, number>).map(([endpoint, count], index) => (
                     <tr key={index} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">{endpoint}</td>
                       <td className="px-4 py-3 text-right text-muted-foreground">{count.toLocaleString()}</td>

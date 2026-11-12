@@ -3,6 +3,7 @@ const router = express.Router();
 const superAdminController = require('../controllers/superAdmin.controller');
 const { protect } = require('../middleware/auth.middleware');
 const { requireSuperAdmin } = require('../middleware/rbac.middleware');
+const { voucherValidateLimiter, voucherRedeemLimiter } = require('./voucher.routes');
 
 // All routes here strictly require Super Admin authentication
 router.use(protect, requireSuperAdmin);
@@ -17,6 +18,14 @@ router.get('/organizations/:id', superAdminController.getOrganization);
 router.post('/organizations', superAdminController.createOrganization);
 router.put('/organizations/:id', superAdminController.updateOrganization);
 router.patch('/organizations/:id/suspend', superAdminController.suspendOrganization);
+router.post('/organizations/:id/subscription/initiate-payment', superAdminController.initiateOrgPayment);
+router.post('/organizations/:id/subscription/verify-payment', superAdminController.verifyOrgPayment);
+router.post('/organizations/:id/subscription/payment-failed', superAdminController.recordOrgPaymentFailure);
+router.post('/organizations/:id/subscription/trial', superAdminController.startOrgTrial);
+router.post('/organizations/:id/subscription/voucher/preview', voucherValidateLimiter, superAdminController.previewOrgVoucher);
+router.post('/organizations/:id/subscription/voucher/redeem', voucherRedeemLimiter, superAdminController.redeemOrgVoucher);
+router.post('/organizations/:id/subscription/voucher/reserve-partial', voucherRedeemLimiter, superAdminController.reserveOrgVoucherPartial);
+router.post('/organizations/:id/subscription/voucher/verify-partial', voucherRedeemLimiter, superAdminController.verifyOrgVoucherPartial);
 
 // 3. Hostels / Branches
 router.get('/hostels', superAdminController.getAllHostels);
@@ -43,6 +52,7 @@ router.delete('/plans/:id', superAdminController.deletePlan);
 
 // 6. Subscriptions
 router.get('/subscriptions', superAdminController.getSubscriptions);
+router.get('/subscriptions/:id', superAdminController.getSubscriptionById);
 router.put('/subscriptions/:id', superAdminController.updateSubscription);
 router.post('/subscriptions/:id/extend-trial', superAdminController.extendSubscriptionTrial);
 

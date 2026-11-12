@@ -4,6 +4,7 @@ import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { AuthLayout } from '@/components/auth/AuthLayout';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
+import { getErrorMessage } from '@/utils/errorHandling';
 import { toast } from 'react-toastify';
 
 export default function Signup() {
@@ -103,9 +104,9 @@ export default function Signup() {
       } else {
         navigate('/login?role=student', { replace: true });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      const msg = err?.response?.data?.message || err?.message || 'Unable to create account. Please try again.';
+      const msg = getErrorMessage(err, 'Unable to create account. Please try again.');
       setErrors((prev) => ({ ...prev, general: msg }));
       toast.error(msg, { toastId: 'signup-error' });
     }

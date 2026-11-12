@@ -69,31 +69,95 @@ export interface SecurityDepositReceiptData {
   notes?: string | null;
 }
 
+export type ReceiptSnapshotInput =
+  | FeeReceiptData
+  | FeeReceiptSnapshot
+  | ReceiptData
+  | ({
+      receipt_no?: string;
+      receiptNo?: string;
+      hostel?: string;
+      hostel_name?: string;
+      hostelName?: string;
+      branchName?: string;
+      student_name?: string;
+      studentName?: string;
+      username?: string;
+      student_code?: string;
+      studentCode?: string;
+      room_no?: string | null;
+      roomNo?: string | null;
+      month?: string;
+      billing_period?: string;
+      billingPeriod?: string;
+      payment_mode?: string;
+      paymentMode?: string;
+      payment_date?: string;
+      paymentDate?: string;
+      amount_paid?: number;
+      amount?: number;
+      monthly_fee?: number;
+      late_fee?: number;
+      lateFee?: number;
+      discount?: number;
+      remaining_fee_balance?: number;
+      remainingBalance?: number;
+      admin_name?: string | null;
+      adminName?: string | null;
+      notes?: string | null;
+      tagline?: string;
+      logo?: string;
+      address?: string;
+      hostel_address?: string;
+      phone?: string;
+      hostel_phone?: string;
+      email?: string;
+      hostel_email?: string;
+      course?: string;
+      yearSemester?: string;
+      transactionId?: string;
+      bankName?: string;
+    } & Partial<FeeReceiptSnapshot>);
+
+interface JsPdfWithPlugins {
+  GState?: new (options: { opacity: number }) => unknown;
+  saveGraphicsState?: () => void;
+  setGState?: (gState: unknown) => void;
+  restoreGraphicsState?: () => void;
+  lastAutoTable?: { finalY: number };
+}
+
+function isFeeReceiptSnapshot(value: ReceiptSnapshotInput): value is FeeReceiptSnapshot {
+  const candidate = value as Partial<FeeReceiptSnapshot>;
+  return Boolean(candidate?.branding && candidate?.student && candidate?.billing && candidate?.financials);
+}
+
 /**
  * Normalizes any fee receipt input into a comprehensive FeeReceiptSnapshot
  */
-function normalizeToSnapshot(input: any): FeeReceiptSnapshot {
-  if (input?.branding && input?.student && input?.billing && input?.financials) {
-    return input as FeeReceiptSnapshot;
+function normalizeToSnapshot(input: ReceiptSnapshotInput): FeeReceiptSnapshot {
+  if (isFeeReceiptSnapshot(input)) {
+    return input;
   }
 
-  const receiptNo = input.receipt_no || input.receiptNo || 'RCPT-001';
-  const hostelName = input.hostel || input.hostel_name || input.hostelName || input.branchName || 'Hostel Campus';
-  const studentName = input.student_name || input.studentName || 'Student';
-  const username = input.username || 'resident';
-  const studentId = input.student_code || input.studentCode || username;
-  const roomNo = input.room_no || input.roomNo || 'N/A';
-  const month = input.month || 'Current Month';
-  const billingPeriod = input.billing_period || input.billingPeriod || month;
-  const paymentMode = (input.payment_mode || input.paymentMode || 'UPI').toUpperCase();
-  const paymentDate = input.payment_date || input.paymentDate || new Date().toISOString();
-  const amountPaid = input.amount_paid !== undefined ? Number(input.amount_paid) : (input.amount !== undefined ? Number(input.amount) : 0);
-  const monthlyFee = Number(input.monthly_fee || input.amount || amountPaid);
-  const lateFee = Number(input.late_fee || input.lateFee || 0);
-  const discount = Number(input.discount || 0);
-  const remainingBalance = Number(input.remaining_fee_balance || input.remainingBalance || 0);
-  const adminName = input.admin_name || input.adminName || 'Hostel Warden';
-  const notes = input.notes ? [input.notes] : [
+  const raw = input as Record<string, string | number | null | undefined>;
+  const receiptNo = String(raw.receipt_no || raw.receiptNo || 'RCPT-001');
+  const hostelName = String(raw.hostel || raw.hostel_name || raw.hostelName || raw.branchName || 'Hostel Campus');
+  const studentName = String(raw.student_name || raw.studentName || 'Student');
+  const username = String(raw.username || 'resident');
+  const studentId = String(raw.student_code || raw.studentCode || username);
+  const roomNo = String(raw.room_no || raw.roomNo || 'N/A');
+  const month = String(raw.month || 'Current Month');
+  const billingPeriod = String(raw.billing_period || raw.billingPeriod || month);
+  const paymentMode = String(raw.payment_mode || raw.paymentMode || 'UPI').toUpperCase();
+  const paymentDate = String(raw.payment_date || raw.paymentDate || new Date().toISOString());
+  const amountPaid = raw.amount_paid !== undefined ? Number(raw.amount_paid) : (raw.amount !== undefined ? Number(raw.amount) : 0);
+  const monthlyFee = Number(raw.monthly_fee || raw.amount || amountPaid);
+  const lateFee = Number(raw.late_fee || raw.lateFee || 0);
+  const discount = Number(raw.discount || 0);
+  const remainingBalance = Number(raw.remaining_fee_balance || raw.remainingBalance || 0);
+  const adminName = String(raw.admin_name || raw.adminName || 'Hostel Warden');
+  const notes = raw.notes ? [String(raw.notes)] : [
     'This is a system-generated receipt and does not require a physical signature.',
     'For any query, please contact the hostel office.',
   ];
@@ -135,18 +199,18 @@ function normalizeToSnapshot(input: any): FeeReceiptSnapshot {
       organizationName: hostelName,
       hostelName: hostelName,
       branchName: hostelName,
-      tagline: input.tagline || 'STUDENT RESIDENCE & ACCOMMODATION',
-      logo: input.logo || '',
-      address: input.address || input.hostel_address || 'Hostel Campus, Student Living Block',
-      phone: input.phone || input.hostel_phone || '+91 98765 43210',
-      email: input.email || input.hostel_email || 'office@hosteliq.in',
+      tagline: String(raw.tagline || 'STUDENT RESIDENCE & ACCOMMODATION'),
+      logo: String(raw.logo || ''),
+      address: String(raw.address || raw.hostel_address || 'Hostel Campus, Student Living Block'),
+      phone: String(raw.phone || raw.hostel_phone || '+91 98765 43210'),
+      email: String(raw.email || raw.hostel_email || 'office@hosteliq.in'),
     },
     student: {
       name: studentName,
       studentId,
       username,
-      course: input.course || 'B.Tech / Degree Residency',
-      yearSemester: input.yearSemester || 'Academic Resident',
+      course: String(raw.course || 'B.Tech / Degree Residency'),
+      yearSemester: String(raw.yearSemester || 'Academic Resident'),
       roomNo,
     },
     billing: {
@@ -167,10 +231,10 @@ function normalizeToSnapshot(input: any): FeeReceiptSnapshot {
     },
     paymentDetails: {
       method: paymentMode,
-      transactionId: input.transactionId || receiptNo.slice(-10).toUpperCase(),
+      transactionId: String(raw.transactionId || receiptNo.slice(-10).toUpperCase()),
       paidAmount: amountPaid,
       paymentStatus: 'Success',
-      bankOrApp: input.bankName || (paymentMode === 'UPI' ? 'UPI' : paymentMode === 'CASH' ? 'Cash Counter' : 'Bank Transfer'),
+      bankOrApp: String(raw.bankName || (paymentMode === 'UPI' ? 'UPI' : paymentMode === 'CASH' ? 'Cash Counter' : 'Bank Transfer')),
       receivedBy: adminName,
     },
     verificationUrl,
@@ -191,6 +255,7 @@ export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSn
 
   const snap = normalizeToSnapshot(input);
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const extDoc = doc as unknown as JsPdfWithPlugins;
   const W = doc.internal.pageSize.getWidth(); // 595.28 pt
   const H = doc.internal.pageSize.getHeight(); // 841.89 pt
   const margin = 36;
@@ -199,12 +264,9 @@ export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSn
   // ==========================================
   // 1. Centered Pale Watermark (~4-5% opacity, NO text name)
   // ==========================================
-  // @ts-ignore
-  if (doc.GState) {
-    // @ts-ignore
-    doc.saveGraphicsState();
-    // @ts-ignore
-    doc.setGState(new doc.GState({ opacity: 0.045 }));
+  if (extDoc.GState && extDoc.saveGraphicsState && extDoc.setGState && extDoc.restoreGraphicsState) {
+    extDoc.saveGraphicsState();
+    extDoc.setGState(new extDoc.GState({ opacity: 0.045 }));
 
     // Hostel IQ architectural logo mark watermark (strictly without text name)
     const cx = W / 2;
@@ -229,8 +291,7 @@ export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSn
     // Foundation Base
     doc.roundedRect(cx - 95, cy + 92, 190, 10, 3, 3, 'F');
 
-    // @ts-ignore
-    doc.restoreGraphicsState();
+    extDoc.restoreGraphicsState();
   }
 
   // ==========================================
@@ -245,7 +306,7 @@ export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSn
       ? snap.branding.organizationName
       : null) ||
     snap.branding.branchName ||
-    (snap.student as any)?.hostel ||
+    snap.student?.hostel ||
     'Hostel Campus';
 
   doc.setFont('helvetica', 'bold');
@@ -456,8 +517,7 @@ export async function generateFeeReceiptPDF(input: FeeReceiptData | FeeReceiptSn
     margin: { left: margin, right: margin },
   });
 
-  // @ts-ignore
-  let afterTableY = doc.lastAutoTable.finalY;
+  const afterTableY = extDoc.lastAutoTable?.finalY ?? y + 60;
 
   // Lavender Total Band
   const totalBandH = 28;
@@ -858,8 +918,8 @@ export async function generateHistoryReceipt(data: HistoryReceiptData) {
     margin: { top: 40, left: 40, right: 40 },
   });
 
-  // @ts-ignore
-  y = doc.lastAutoTable.finalY + 30;
+  const extHistoryDoc = doc as unknown as JsPdfWithPlugins;
+  y = (extHistoryDoc.lastAutoTable?.finalY ?? y + 60) + 30;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);

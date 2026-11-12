@@ -1,49 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { api } from '@/lib/api';
-
-export interface HostelBranch {
-  _id: string;
-  organizationId?: string | { _id: string; name: string; slug: string };
-  code: string;
-  name: string;
-  slug?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  pincode?: string;
-  genderType?: 'BOYS' | 'GIRLS' | 'COED';
-  capacity?: number;
-  totalRooms?: number;
-  status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE' | 'ARCHIVED';
-  wardenName?: string;
-  wardenPhone?: string;
-  contactPhone?: string;
-  contactEmail?: string;
-  metrics?: {
-    capacity: number;
-    occupied: number;
-    vacant: number;
-    roomCount: number;
-    studentCount: number;
-    occupancyRate: number;
-  };
-}
-
-export type HostelType = string;
-
-interface HostelContextType {
-  selectedHostelId: string | null;
-  selectedHostel: string;
-  currentBranch: HostelBranch | null;
-  branches: HostelBranch[];
-  isLoading: boolean;
-  error: string | null;
-  refetchBranches: () => Promise<void>;
-  setSelectedHostelId: (id: string) => void;
-  setSelectedHostel: (hostelIdentifier: string) => void;
-}
-
-const HostelContext = createContext<HostelContextType | undefined>(undefined);
+import { getErrorMessage } from '@/utils/errorHandling';
+import { HostelBranch, HostelContext } from './hostelContextInstance';
 
 export function HostelProvider({ children }: { children: ReactNode }) {
   const [branches, setBranches] = useState<HostelBranch[]>(() => {
@@ -124,9 +82,10 @@ export function HostelProvider({ children }: { children: ReactNode }) {
           setSelectedHostelCode(fallbackCode);
         }
       }
-    } catch (err: any) {
-      console.warn('Could not fetch hostel branches from backend:', err.message);
-      setError(err.response?.data?.message || err.message);
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, 'Failed to fetch hostel branches');
+      console.warn('Could not fetch hostel branches from backend:', msg);
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -226,10 +185,3 @@ export function HostelProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useHostel() {
-  const context = useContext(HostelContext);
-  if (context === undefined) {
-    throw new Error('useHostel must be used within a HostelProvider');
-  }
-  return context;
-}

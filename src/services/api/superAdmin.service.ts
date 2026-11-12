@@ -3,6 +3,7 @@ import {
   ApiResponse,
   Organization,
   HostelBranch,
+  HostelGenderType,
   SubscriptionPlan,
   FeatureDefinition,
   AuditLogItem,
@@ -14,7 +15,169 @@ import {
   SystemHealthData,
   PlatformSettings,
   HostelMetricsData,
+  PaginationMeta,
+  PricingSnapshot,
+  ScheduledPlanChange,
+  SubscriptionHistoryItem,
+  TenantSubscription,
 } from '@/types';
+import { ApplyVoucherResponse } from './voucher.service';
+
+export interface PopulatedOrganizationRef {
+  _id?: string;
+  id?: string;
+  name?: string;
+  slug?: string;
+  contactEmail?: string;
+  status?: string;
+}
+
+export interface PopulatedPlanRef extends Partial<SubscriptionPlan> {
+  _id?: string;
+  id?: string;
+  name?: string;
+  price?: number;
+}
+
+export interface SaasSubscriptionRecord {
+  _id: string;
+  id?: string;
+  organizationId?: PopulatedOrganizationRef | string;
+  planId?: PopulatedPlanRef | string;
+  status: TenantSubscription['status'] | string;
+  activationMethod?: TenantSubscription['activationMethod'] | 'ADMIN_OVERRIDE' | string;
+  billingCycle: 'MONTHLY' | 'YEARLY' | string;
+  agreedPriceRupees?: number;
+  pricingSnapshot?: PricingSnapshot;
+  scheduledPlanChange?: ScheduledPlanChange;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  trialStartsAt?: string;
+  trialEndsAt?: string;
+  trialUsed?: boolean;
+  lastVoucherReference?: string;
+  nearExpiry?: {
+    isNearExpiry?: boolean;
+    daysRemaining?: number;
+  };
+  usage?: {
+    studentCount?: number;
+    roomCount?: number;
+    hostelCount?: number;
+    staffCount?: number;
+  };
+  history?: (SubscriptionHistoryItem & { action?: string; reason?: string })[];
+  subscriptionHistory?: (SubscriptionHistoryItem & { action?: string; reason?: string })[];
+}
+
+export interface SaasPaymentRecord {
+  _id: string;
+  createdAt: string;
+  planId?: { _id?: string; name?: string } | null;
+  amount: number;
+  status: string;
+  razorpayPaymentId?: string;
+  failureReason?: string;
+  orderId?: string;
+}
+
+export interface SaasInvoiceRecord {
+  _id: string;
+  invoiceNumber: string;
+  planName?: string;
+  createdAt: string;
+  amountPaidRupees?: number;
+}
+
+export interface SaasVoucherRedemptionRecord {
+  _id: string;
+  voucherId?: {
+    _id?: string;
+    name?: string;
+    reference?: string;
+  };
+  planId?: {
+    _id?: string;
+    name?: string;
+  };
+  billingCycle?: string;
+  finalPayableRupees?: number;
+}
+
+export interface SubscriptionInspectData {
+  subscription: SaasSubscriptionRecord;
+  payments: SaasPaymentRecord[];
+  invoices: SaasInvoiceRecord[];
+  voucherRedemptions: SaasVoucherRedemptionRecord[];
+}
+
+export interface OrgFeatureToggleState {
+  featureKey: string;
+  enabled: boolean;
+  configuration?: Record<string, unknown>;
+}
+
+export interface OrganizationDetailResponse extends Organization {
+  hostels: HostelBranch[];
+  subscription?: SaasSubscriptionRecord | null;
+  features: OrgFeatureToggleState[];
+}
+
+export interface ProvisionedAccountSummary {
+  id: string;
+  name?: string;
+  email?: string;
+  username?: string;
+  status?: string;
+  temporaryPassword?: string;
+  invitationEmailStatus?: string;
+  invitationEmailError?: string | null;
+}
+
+export interface TenantOnboardingResult {
+  organization: Organization;
+  hostel: HostelBranch;
+  subscription?: SaasSubscriptionRecord;
+  adminUser?: ProvisionedAccountSummary;
+  adminAccount?: ProvisionedAccountSummary;
+  wardenAccount?: ProvisionedAccountSummary;
+}
+
+export interface HostelDirectoryItem extends Omit<HostelBranch, 'organizationId'> {
+  organizationId?: PopulatedOrganizationRef | string;
+}
+
+export interface InitiateGatewayPaymentData {
+  orderId: string;
+  keyId: string;
+  amountPaise: number;
+  currency?: string;
+  planName?: string;
+  checkoutSessionId?: string;
+}
+
+export interface VerifiedPaymentResult {
+  subscription?: SaasSubscriptionRecord;
+  invoiceNumber?: string;
+  status?: string;
+  trialDays?: number;
+}
+
+export interface CreateHostelPayload {
+  organizationId?: string;
+  name: string;
+  code: string;
+  capacity?: number;
+  genderType?: HostelGenderType | string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  wardenName?: string;
+  wardenPhone?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+}
 
 export const superAdminService = {
   // 1. Dashboard & Detailed Analytics
@@ -29,17 +192,24 @@ export const superAdminService = {
   },
 
   // 2. Organization Management
-  async getOrganizations(params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<ApiResponse<{ organizations: Organization[]; pagination?: any } | Organization[]>> {
+  async getOrganizations(params?: {
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<{ organizations: Organization[]; pagination?: PaginationMeta } | Organization[]>> {
     const res = await api.get('/super-admin/organizations', { params });
     return res.data;
   },
 
-  async getOrganizationById(id: string): Promise<ApiResponse<Organization & { hostels: HostelBranch[]; subscription: any; features: any[] }>> {
+  async getOrganizationById(id: string): Promise<ApiResponse<OrganizationDetailResponse>> {
     const res = await api.get(`/super-admin/organizations/${id}`);
     return res.data;
   },
 
-  async createOrganization(payload: OnboardTenantPayload | (Partial<Organization> & { genderType?: string })): Promise<ApiResponse<{ organization: Organization; hostel: HostelBranch; adminUser?: any }>> {
+  async createOrganization(
+    payload: OnboardTenantPayload | (Partial<Organization> & { genderType?: string })
+  ): Promise<ApiResponse<TenantOnboardingResult>> {
     const res = await api.post('/super-admin/organizations', payload);
     return res.data;
   },
@@ -56,9 +226,16 @@ export const superAdminService = {
 
   // 3. Hostel Management
   async getHostels(
-    params?: { organizationId?: string; search?: string; page?: number; limit?: number },
+    params?: {
+      organizationId?: string;
+      status?: string;
+      genderType?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
     options?: { signal?: AbortSignal }
-  ): Promise<ApiResponse<{ hostels: any[]; pagination: any } | HostelBranch[]>> {
+  ): Promise<ApiResponse<{ hostels: HostelDirectoryItem[]; pagination?: PaginationMeta } | HostelDirectoryItem[]>> {
     const res = await api.get('/super-admin/hostels', { params, signal: options?.signal });
     return res.data;
   },
@@ -68,16 +245,24 @@ export const superAdminService = {
     return res.data;
   },
 
-  async createHostel(payload: any): Promise<ApiResponse<HostelBranch>> {
+  async createHostel(payload: CreateHostelPayload): Promise<ApiResponse<HostelBranch>> {
     const res = await api.post('/super-admin/hostels', payload);
     return res.data;
   },
 
   // 4. Global User Management
   async getUsers(
-    params?: { search?: string; role?: string; isActive?: string | boolean; page?: number; limit?: number },
+    params?: {
+      search?: string;
+      role?: string;
+      status?: string;
+      isLocked?: boolean;
+      isActive?: string | boolean;
+      page?: number;
+      limit?: number;
+    },
     options?: { signal?: AbortSignal }
-  ): Promise<ApiResponse<{ users: SaasUserListItem[]; pagination: any }>> {
+  ): Promise<ApiResponse<{ users: SaasUserListItem[]; pagination: PaginationMeta }>> {
     const res = await api.get('/super-admin/users', { params, signal: options?.signal });
     return res.data;
   },
@@ -87,22 +272,22 @@ export const superAdminService = {
     return res.data;
   },
 
-  async updateUserStatus(id: string, isActive: boolean, reason?: string): Promise<ApiResponse<any>> {
+  async updateUserStatus(id: string, isActive: boolean, reason?: string): Promise<ApiResponse<SaasUserListItem>> {
     const res = await api.patch(`/super-admin/users/${id}/status`, { isActive, reason });
     return res.data;
   },
 
-  async revokeUserSessions(id: string): Promise<ApiResponse<any>> {
+  async revokeUserSessions(id: string): Promise<ApiResponse<{ revoked?: boolean }>> {
     const res = await api.post(`/super-admin/users/${id}/revoke-sessions`);
     return res.data;
   },
 
-  async unlockUserAccount(id: string): Promise<ApiResponse<any>> {
+  async unlockUserAccount(id: string): Promise<ApiResponse<{ unlocked?: boolean }>> {
     const res = await api.post(`/super-admin/users/${id}/unlock`);
     return res.data;
   },
 
-  async updateUserRole(id: string, role: string): Promise<ApiResponse<any>> {
+  async updateUserRole(id: string, role: string): Promise<ApiResponse<SaasUserListItem>> {
     const res = await api.patch(`/super-admin/users/${id}/role`, { role });
     return res.data;
   },
@@ -123,7 +308,7 @@ export const superAdminService = {
     return res.data;
   },
 
-  async deletePlan(id: string): Promise<ApiResponse<any>> {
+  async deletePlan(id: string): Promise<ApiResponse<{ deleted?: boolean }>> {
     const res = await api.delete(`/super-admin/plans/${id}`);
     return res.data;
   },
@@ -133,22 +318,118 @@ export const superAdminService = {
     return res.data;
   },
 
-  // 6. Subscriptions
+  // 6. Subscriptions & Tenant Onboarding Activation
   async getSubscriptions(
-    params?: { status?: string; search?: string; page?: number; limit?: number },
+    params?: {
+      status?: string;
+      billingCycle?: string;
+      activationMethod?: string;
+      hasScheduledChange?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
     options?: { signal?: AbortSignal }
-  ): Promise<ApiResponse<{ subscriptions: any[]; pagination: any }>> {
+  ): Promise<ApiResponse<{ subscriptions: SaasSubscriptionRecord[]; pagination: PaginationMeta }>> {
     const res = await api.get('/super-admin/subscriptions', { params, signal: options?.signal });
     return res.data;
   },
 
-  async updateSubscription(id: string, payload: any): Promise<ApiResponse<any>> {
+  async getSubscriptionById(id: string): Promise<ApiResponse<SubscriptionInspectData>> {
+    const res = await api.get(`/super-admin/subscriptions/${id}`);
+    return res.data;
+  },
+
+  async updateSubscription(
+    id: string,
+    payload: Partial<Pick<SaasSubscriptionRecord, 'status' | 'billingCycle'>> & { planId?: string }
+  ): Promise<ApiResponse<SaasSubscriptionRecord>> {
     const res = await api.put(`/super-admin/subscriptions/${id}`, payload);
     return res.data;
   },
 
-  async extendSubscriptionTrial(id: string, days: number): Promise<ApiResponse<any>> {
+  async extendSubscriptionTrial(id: string, days: number): Promise<ApiResponse<SaasSubscriptionRecord>> {
     const res = await api.post(`/super-admin/subscriptions/${id}/extend-trial`, { days });
+    return res.data;
+  },
+
+  async initiateOrgPayment(
+    orgId: string,
+    payload: { planId: string; billingCycle: 'MONTHLY' | 'YEARLY'; intent?: string }
+  ): Promise<ApiResponse<InitiateGatewayPaymentData>> {
+    const res = await api.post(`/super-admin/organizations/${orgId}/subscription/initiate-payment`, payload);
+    return res.data;
+  },
+
+  async verifyOrgPayment(
+    orgId: string,
+    payload: {
+      razorpay_payment_id: string;
+      razorpay_order_id?: string;
+      razorpay_subscription_id?: string;
+      razorpay_signature: string;
+    }
+  ): Promise<ApiResponse<VerifiedPaymentResult>> {
+    const res = await api.post(`/super-admin/organizations/${orgId}/subscription/verify-payment`, payload);
+    return res.data;
+  },
+
+  async recordOrgPaymentFailure(
+    orgId: string,
+    payload: { orderId?: string; code?: string; reason?: string }
+  ): Promise<ApiResponse<{ recorded?: boolean }>> {
+    const res = await api.post(`/super-admin/organizations/${orgId}/subscription/payment-failed`, payload);
+    return res.data;
+  },
+
+  async startOrgTrial(
+    orgId: string,
+    payload: { planId: string; billingCycle: 'MONTHLY' | 'YEARLY'; trialDays?: number }
+  ): Promise<ApiResponse<VerifiedPaymentResult>> {
+    const res = await api.post(`/super-admin/organizations/${orgId}/subscription/trial`, payload);
+    return res.data;
+  },
+
+  async previewOrgVoucher(
+    orgId: string,
+    payload: { code: string; pin: string; planId: string; billingCycle: 'MONTHLY' | 'YEARLY' }
+  ): Promise<ApiResponse<ApplyVoucherResponse>> {
+    const res = await api.post(`/super-admin/organizations/${orgId}/subscription/voucher/preview`, payload);
+    return res.data;
+  },
+
+  async redeemOrgVoucher(
+    orgId: string,
+    payload: {
+      code: string;
+      pin: string;
+      planId: string;
+      billingCycle: 'MONTHLY' | 'YEARLY';
+      idempotencyKey?: string;
+    }
+  ): Promise<ApiResponse<VerifiedPaymentResult>> {
+    const res = await api.post(`/super-admin/organizations/${orgId}/subscription/voucher/redeem`, payload);
+    return res.data;
+  },
+
+  async reserveOrgVoucherPartial(
+    orgId: string,
+    payload: { code: string; pin: string; planId: string; billingCycle: 'MONTHLY' | 'YEARLY' }
+  ): Promise<ApiResponse<InitiateGatewayPaymentData & { checkoutSessionId: string }>> {
+    const res = await api.post(`/super-admin/organizations/${orgId}/subscription/voucher/reserve-partial`, payload);
+    return res.data;
+  },
+
+  async verifyOrgVoucherPartial(
+    orgId: string,
+    payload: {
+      checkoutSessionId: string;
+      razorpay_order_id: string;
+      razorpay_payment_id: string;
+      razorpay_signature: string;
+    }
+  ): Promise<ApiResponse<VerifiedPaymentResult>> {
+    const res = await api.post(`/super-admin/organizations/${orgId}/subscription/voucher/verify-partial`, payload);
     return res.data;
   },
 
@@ -173,7 +454,7 @@ export const superAdminService = {
     return res.data;
   },
 
-  async deleteFeature(id: string): Promise<ApiResponse<any>> {
+  async deleteFeature(id: string): Promise<ApiResponse<{ deleted?: boolean }>> {
     const res = await api.delete(`/super-admin/features/${id}`);
     return res.data;
   },
@@ -183,13 +464,24 @@ export const superAdminService = {
     return res.data;
   },
 
-  async toggleOrgFeature(payload: { organizationId: string; featureKey: string; enabled: boolean; configuration?: any }): Promise<ApiResponse<any>> {
+  async toggleOrgFeature(payload: {
+    organizationId: string;
+    featureKey: string;
+    enabled: boolean;
+    configuration?: Record<string, unknown>;
+  }): Promise<ApiResponse<OrgFeatureToggleState>> {
     const res = await api.post('/super-admin/features/toggle', payload);
     return res.data;
   },
 
   // 8. Compliance & Audit Logs
-  async getAuditLogs(params?: { organizationId?: string; action?: string; search?: string; page?: number; limit?: number }): Promise<ApiResponse<{ logs: AuditLogItem[]; pagination: any } | AuditLogItem[]>> {
+  async getAuditLogs(params?: {
+    organizationId?: string;
+    action?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<{ logs: AuditLogItem[]; pagination?: PaginationMeta } | AuditLogItem[]>> {
     const res = await api.get('/super-admin/audit-logs', { params });
     return res.data;
   },
@@ -200,13 +492,17 @@ export const superAdminService = {
     return res.data;
   },
 
-  async unlockSecurityUser(id: string): Promise<ApiResponse<any>> {
+  async unlockSecurityUser(id: string): Promise<ApiResponse<{ unlocked?: boolean }>> {
     const res = await api.post(`/super-admin/security/unlock/${id}`);
     return res.data;
   },
 
   // 10. Controlled Impersonation
-  async startImpersonation(payload: { targetUserId: string; organizationId: string; reason: string }): Promise<ApiResponse<{ token: string; organization: Organization; user: any }>> {
+  async startImpersonation(payload: {
+    targetUserId: string;
+    organizationId: string;
+    reason: string;
+  }): Promise<ApiResponse<{ token: string; organization: Organization; user: Record<string, unknown> }>> {
     const res = await api.post('/super-admin/impersonation/start', payload);
     return res.data;
   },
@@ -242,12 +538,17 @@ export const superAdminService = {
   },
 
   // 14. Account Invitations & Staff Provisioning
-  async resendInvitation(userId: string): Promise<ApiResponse<{ success: boolean; user?: any; alreadyActive?: boolean; message?: string }>> {
+  async resendInvitation(
+    userId: string
+  ): Promise<ApiResponse<{ success: boolean; user?: ProvisionedAccountSummary; alreadyActive?: boolean; message?: string }>> {
     const res = await api.post(`/super-admin/users/${userId}/resend-invitation`);
     return res.data;
   },
 
-  async provisionHostelWarden(hostelId: string, payload: { name: string; email?: string; phone?: string; username?: string }): Promise<ApiResponse<{ wardenAccount: any }>> {
+  async provisionHostelWarden(
+    hostelId: string,
+    payload: { name: string; email?: string; phone?: string; username?: string }
+  ): Promise<ApiResponse<{ wardenAccount: ProvisionedAccountSummary }>> {
     const res = await api.post(`/super-admin/hostels/${hostelId}/provision-warden`, payload);
     return res.data;
   },

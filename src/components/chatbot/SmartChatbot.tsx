@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Mic, MicOff, Bot, User, Sparkles, Database } from 'lucide-react';
+import { MessageCircle, X, Send, Mic, MicOff, Bot, User, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
+import { getErrorMessage } from '@/utils/errorHandling';
 import ReactMarkdown from 'react-markdown';
 
 interface ChatMessage {
@@ -15,6 +16,36 @@ interface ChatMessage {
   content: string;
   source?: 'database' | 'ai';
   timestamp: Date;
+}
+
+interface SpeechRecognitionResultAlternativeLike {
+  transcript: string;
+}
+
+interface SpeechRecognitionResultLike {
+  0: SpeechRecognitionResultAlternativeLike;
+}
+
+interface SpeechRecognitionEventLike {
+  results: ArrayLike<SpeechRecognitionResultLike>;
+}
+
+interface SpeechRecognitionInstance {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+interface WindowWithSpeech extends Window {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
 }
 
 interface SmartChatbotProps {
@@ -29,14 +60,16 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
   const [isListening, setIsListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const { user } = useAuth();
   const { selectedHostel } = useHostel();
 
   // Add welcome message
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      setMessages([{
+    if (!isOpen) return;
+    setMessages((prev) => {
+      if (prev.length > 0) return prev;
+      return [{
         id: 'welcome',
         role: 'assistant',
         content: isAdmin
@@ -44,9 +77,9 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
           : `👋 Hi there! I'm your **Q2 Campus Hub Assistant**.\n\nAsk me about:\n• Your fees, room, complaints\n• Leave request status\n• General hostel queries\n\nHow can I help?`,
         source: 'ai',
         timestamp: new Date(),
-      }]);
-    }
-  }, [isOpen]);
+      }];
+    });
+  }, [isOpen, isAdmin, selectedHostel]);
 
   // Auto-scroll
   useEffect(() => {
@@ -94,11 +127,11 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botMsg]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `❌ Error: ${err.message || 'Could not reach the assistant. Please try again.'}`,
+        content: `❌ Error: ${getErrorMessage(err, 'Could not reach the assistant. Please try again.')}`,
         timestamp: new Date(),
       }]);
     } finally {
@@ -108,7 +141,10 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
 
   // Voice input
   const toggleVoice = useCallback(() => {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    const speechWindow = window as WindowWithSpeech;
+    const SpeechRecognitionCtor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
       alert('Voice input is not supported in this browser.');
       return;
     }
@@ -119,13 +155,12 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
       return;
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognitionCtor();
     recognition.lang = 'en-IN';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       const transcript = event.results[0][0].transcript;
       setInput(prev => prev + transcript);
       setIsListening(false);
@@ -195,7 +230,7 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-3" ref={scrollRef as any}>
+            <ScrollArea className="flex-1 p-3" ref={scrollRef}>
               <div className="space-y-3">
                 {messages.map((msg) => (
                   <motion.div

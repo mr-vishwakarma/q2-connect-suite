@@ -8,6 +8,7 @@ const { sendStudentCredentials, sendAdminNewStudentRegisteredNotification, getTr
 const { addEmailJob } = require('../queues/queueManager');
 const studentService = require('../services/student.service');
 const { parsePagination, getPaginationMeta } = require('../utils/pagination');
+const { startSafeTransaction } = require('../utils/transaction');
 
 // @desc    Get all students (with optional hostel filter)
 // @route   GET /api/students
@@ -127,10 +128,6 @@ const getStudent = async (req, res) => {
   }
 };
 
-
-// @desc    Register a new student (creates User + Student records)
-// @route   POST /api/students
-const { startSafeTransaction } = require('../utils/transaction');
 
 // @desc    Register a new student (creates User + Student records)
 // @route   POST /api/students
@@ -551,8 +548,10 @@ const createStudent = async (req, res) => {
 // @route   PUT /api/students/:id
 // @access  Admin
 const updateStudent = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const sessionOpts = session ? { session } : {};
+  const withSession = (q) => (session ? q.session(session) : q);
 
   try {
     const orgId = req.organizationId || req.tenant?.organizationId;
@@ -564,10 +563,9 @@ const updateStudent = async (req, res) => {
       studentQuery.organizationId = orgId;
     }
 
-    const student = await Student.findOne(studentQuery).session(session);
+    const student = await withSession(Student.findOne(studentQuery));
     if (!student) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
 
@@ -606,7 +604,7 @@ const updateStudent = async (req, res) => {
               },
             },
           ],
-          { session }
+          sessionOpts
         );
       }
       // Atomic increment on new room with live capacity guard
@@ -633,13 +631,12 @@ const updateStudent = async (req, res) => {
             },
           },
         ],
-        { session, new: true }
+        session ? { session, new: true } : { new: true }
       );
 
       if (!updatedNewRoom) {
-        const existingNewRoom = await Room.findOne(newRoomQuery).session(session);
-        await session.abortTransaction();
-        session.endSession();
+        const existingNewRoom = await withSession(Room.findOne(newRoomQuery));
+        await tx.abort();
         if (!existingNewRoom) {
           return res.status(400).json({
             success: false,
@@ -671,16 +668,15 @@ const updateStudent = async (req, res) => {
     // Check username uniqueness if changing
     if (username !== undefined && username.trim().toLowerCase() !== student.username) {
       const cleanUsername = username.trim().toLowerCase();
-      const existingUser = await User.findOne({ username: cleanUsername, _id: { $ne: student.userId } }).session(session);
-      const existingStudent = await Student.findOne({ username: cleanUsername, _id: { $ne: student._id } }).session(session);
+      const existingUser = await withSession(User.findOne({ username: cleanUsername, _id: { $ne: student.userId } }));
+      const existingStudent = await withSession(Student.findOne({ username: cleanUsername, _id: { $ne: student._id } }));
       if (existingUser || existingStudent) {
-        await session.abortTransaction();
-        session.endSession();
+        await tx.abort();
         return res.status(400).json({ success: false, message: 'Username is already taken' });
       }
       updateFields.username = cleanUsername;
       if (student.userId) {
-        await User.findByIdAndUpdate(student.userId, { username: cleanUsername }, { session });
+        await User.findByIdAndUpdate(student.userId, { username: cleanUsername }, sessionOpts);
       }
     }
 
@@ -690,22 +686,20 @@ const updateStudent = async (req, res) => {
       if (name !== undefined) userUpdates.name = String(name).trim();
       if (email !== undefined && email) userUpdates.email = String(email).trim().toLowerCase();
       if (Object.keys(userUpdates).length > 0) {
-        await User.findByIdAndUpdate(student.userId, userUpdates, { session });
+        await User.findByIdAndUpdate(student.userId, userUpdates, sessionOpts);
       }
     }
 
     const updated = await Student.findByIdAndUpdate(
       student._id,
       { $set: updateFields },
-      { new: true, runValidators: true, session }
+      session ? { new: true, runValidators: true, session } : { new: true, runValidators: true }
     );
 
-    await session.commitTransaction();
-    session.endSession();
+    await tx.commit();
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    await tx.abort();
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -714,8 +708,10 @@ const updateStudent = async (req, res) => {
 // @route   DELETE /api/students/:id
 // @access  Admin
 const deleteStudent = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const sessionOpts = session ? { session } : {};
+  const withSession = (q) => (session ? q.session(session) : q);
 
   try {
     const orgId = req.organizationId || req.tenant?.organizationId;
@@ -728,17 +724,16 @@ const deleteStudent = async (req, res) => {
       studentQuery.organizationId = orgId;
     }
 
-    let student = await Student.findOne(studentQuery).session(session);
+    let student = await withSession(Student.findOne(studentQuery));
     if (!student) {
-      student = await Student.findOne({
+      student = await withSession(Student.findOne({
         userId: req.params.id,
         ...(!isSuperAdmin ? { organizationId: orgId || new mongoose.Types.ObjectId() } : (orgId ? { organizationId: orgId } : {})),
-      }).session(session);
+      }));
     }
 
     if (!student) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(404).json({ success: false, message: 'Student not found in your organization' });
     }
 
@@ -753,7 +748,7 @@ const deleteStudent = async (req, res) => {
             },
           },
         ],
-        { session }
+        sessionOpts
       );
     }
     // Non-destructive deactivation: preserve all financial/statutory audit records
@@ -761,25 +756,23 @@ const deleteStudent = async (req, res) => {
     student.status = 'FORMER_RESIDENT';
     student.roomNo = null;
     student.checkoutDate = new Date();
-    await student.save({ session });
+    await student.save(session ? { session } : undefined);
 
     if (student.userId) {
       await User.findByIdAndUpdate(
         student.userId,
         { isActive: false, status: 'DEACTIVATED', refreshTokens: [] },
-        { session }
+        sessionOpts
       );
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    await tx.commit();
     return res.status(200).json({
       success: true,
       message: 'Student account deactivated, room bed released, and financial history preserved successfully'
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    await tx.abort();
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -789,37 +782,37 @@ const deleteStudent = async (req, res) => {
 // @route   PUT /api/students/profile
 // @access  Student
 const updateOwnProfile = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const sessionOpts = session ? { session } : {};
+  const withSession = (q) => (session ? q.session(session) : q);
 
   try {
     const { name, phone, parentPhone, address, dob, profilePhoto, profilePhotoFileId } = req.body;
     
     // Find the student record associated with the logged-in user
-    const student = await Student.findOne({ userId: req.user._id }).session(session);
+    const student = await withSession(Student.findOne({ userId: req.user._id }));
     
     if (!student) {
-      await session.abortTransaction();
+      await tx.abort();
       return res.status(404).json({ success: false, message: 'Student profile not found' });
     }
 
     const updated = await Student.findByIdAndUpdate(
       student._id,
       { name, phone, parentPhone, address, dob, profilePhoto, profilePhotoFileId },
-      { new: true, runValidators: true, session }
+      session ? { new: true, runValidators: true, session } : { new: true, runValidators: true }
     );
 
     // Also update name on User record
     if (name) {
-      await User.findByIdAndUpdate(req.user._id, { name }, { session });
+      await User.findByIdAndUpdate(req.user._id, { name }, sessionOpts);
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    await tx.commit();
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    await tx.abort();
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -990,8 +983,10 @@ const rejectRegistration = async (req, res) => {
 // @route   POST /api/students/approve-and-register/:id
 // @access  Admin
 const approveAndRegisterStudent = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const sessionOpts = session ? { session, ordered: true } : { ordered: true };
+  const withSession = (q) => (session ? q.session(session) : q);
 
   try {
     const { id } = req.params;
@@ -1020,10 +1015,9 @@ const approveAndRegisterStudent = async (req, res) => {
       userQuery.activeOrganizationId = orgId;
     }
 
-    const user = await User.findOne(userQuery).session(session);
+    const user = await withSession(User.findOne(userQuery));
     if (!user) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(404).json({ success: false, message: 'Applicant user not found in your organization' });
     }
 
@@ -1038,7 +1032,7 @@ const approveAndRegisterStudent = async (req, res) => {
 
     const targetOrgId = orgId || req.tenant?.organizationId || req.user?.activeOrganizationId;
     const Hostel = require('../models/Hostel');
-    const hostelDoc = await Hostel.findOne({ organizationId: targetOrgId, code: finalHostel }).session(session);
+    const hostelDoc = await withSession(Hostel.findOne({ organizationId: targetOrgId, code: finalHostel }));
 
     // Update user properties
     user.name = finalName;
@@ -1068,12 +1062,12 @@ const approveAndRegisterStudent = async (req, res) => {
     }
 
     // Check if a Student profile already exists for this user
-    let student = await Student.findOne({ userId: user._id }).session(session);
+    let student = await withSession(Student.findOne({ userId: user._id }));
     // Generate studentCode if not provided
     let finalStudentCode = req.body.studentCode;
     if (!finalStudentCode) {
       const year = new Date(startDate || Date.now()).getFullYear();
-      const count = await Student.countDocuments({ organizationId: orgId }).session(session);
+      const count = await withSession(Student.countDocuments({ organizationId: orgId }));
       const cleanHostel = (finalHostel || 'Q2').toUpperCase().replace(/[^A-Z0-9]/g, '');
       finalStudentCode = `${cleanHostel}S${year}${String(count + 1).padStart(3, '0')}`;
     }
@@ -1099,7 +1093,7 @@ const approveAndRegisterStudent = async (req, res) => {
       student.validDate = validDate || null;
       if (!student.studentCode) student.studentCode = finalStudentCode;
       student.welcomeEmailStatus = 'pending';
-      await student.save({ session });
+      await student.save(session ? { session } : undefined);
     } else {
       const createdStudents = await Student.create([{
         userId: user._id,
@@ -1118,12 +1112,12 @@ const approveAndRegisterStudent = async (req, res) => {
         validDate: validDate || null,
         studentCode: finalStudentCode,
         welcomeEmailStatus: 'pending',
-      }], { session, ordered: true });
+      }], sessionOpts);
       student = createdStudents[0];
     }
 
     user.studentId = student._id;
-    await user.save({ session });
+    await user.save(session ? { session } : undefined);
 
     const feeReceiptNo = initialFeePaid && parseFloat(fees) > 0
       ? `RCPT-FEE-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
@@ -1150,7 +1144,7 @@ const approveAndRegisterStudent = async (req, res) => {
         notes: initialFeePaid
           ? 'Initial security deposit collected at student enrollment'
           : 'Required security deposit registered at student enrollment',
-      }], { session, ordered: true });
+      }], sessionOpts);
     }
 
     // Ensure Membership exists for student user
@@ -1165,7 +1159,7 @@ const approveAndRegisterStudent = async (req, res) => {
           status: 'ACTIVE',
           hostelAccess: [finalHostel],
         },
-        { upsert: true, session }
+        session ? { upsert: true, session } : { upsert: true }
       );
     }
 
@@ -1196,13 +1190,12 @@ const approveAndRegisterStudent = async (req, res) => {
             },
           },
         ],
-        { session, new: true }
+        session ? { session, new: true } : { new: true }
       );
 
       if (!updatedRoom) {
-        const existingRoom = await Room.findOne(roomQuery).session(session);
-        await session.abortTransaction();
-        session.endSession();
+        const existingRoom = await withSession(Room.findOne(roomQuery));
+        await tx.abort();
         if (!existingRoom) {
           return res.status(400).json({
             success: false,
@@ -1241,7 +1234,7 @@ const approveAndRegisterStudent = async (req, res) => {
           periodStart: initialCycle.periodStart,
           periodEnd: initialCycle.periodEnd,
           cycleNumber: initialCycle.cycleNumber,
-        }], { session, ordered: true });
+        }], sessionOpts);
 
         await FeePayment.create([{
           feeId: feeRecords[0]._id,
@@ -1261,7 +1254,7 @@ const approveAndRegisterStudent = async (req, res) => {
           adminName: req.user.name,
           month,
           notes: 'Initial registration fee collection',
-        }], { session, ordered: true });
+        }], sessionOpts);
       } else {
         await Fee.create([{
           studentId: student._id,
@@ -1276,7 +1269,7 @@ const approveAndRegisterStudent = async (req, res) => {
           periodStart: initialCycle.periodStart,
           periodEnd: initialCycle.periodEnd,
           cycleNumber: initialCycle.cycleNumber,
-        }], { session, ordered: true });
+        }], sessionOpts);
       }
     }
 
@@ -1305,10 +1298,9 @@ const approveAndRegisterStudent = async (req, res) => {
       });
     }
 
-    await Notification.create(notificationsToCreate, { session, ordered: true });
+    await Notification.create(notificationsToCreate, sessionOpts);
 
-    await session.commitTransaction();
-    session.endSession();
+    await tx.commit();
 
     // Construct structured receipts payload for immediate download / presentation
     const receipts = initialFeePaid ? {
@@ -1376,8 +1368,7 @@ const approveAndRegisterStudent = async (req, res) => {
       data: { user: user.toJSON(), student, receipts },
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    await tx.abort();
     console.error('approveAndRegisterStudent error:', error);
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'A student or user with this email or username already exists' });

@@ -25,6 +25,7 @@ const {
   verifyPaymentSignature,
   getPublicKey,
 } = require('../config/razorpay');
+const { startSafeTransaction } = require('../utils/transaction');
 
 // Helper: Resolve active tenant ID
 function resolveTenantId(req) {
@@ -130,6 +131,7 @@ const createPaymentOrder = async (req, res) => {
     // 7. Persist Payment Attempt Record in CREATED State
     const payment = await Payment.create({
       organizationId: fee.organizationId || organizationId,
+      billingDomain: 'STUDENT_LEGACY',
       hostelId: fee.hostelId || null,
       studentId: fee.studentId._id,
       feeId: fee._id,
@@ -178,15 +180,17 @@ const createPaymentOrder = async (req, res) => {
  * @access  Private
  */
 const verifyPayment = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const sessionOpts = session ? { session } : {};
+  const sessionOrderedOpts = session ? { session, ordered: true } : { ordered: true };
+  const withSession = (q) => (session ? q.session(session) : q);
 
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(400).json({
         success: false,
         message: 'razorpay_order_id, razorpay_payment_id, and razorpay_signature are required',
@@ -201,8 +205,7 @@ const verifyPayment = async (req, res) => {
     });
 
     if (!isValidSignature) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(400).json({
         success: false,
         message: 'Invalid payment signature. Authentication failed.',
@@ -210,10 +213,9 @@ const verifyPayment = async (req, res) => {
     }
 
     // 2. Fetch Payment Record
-    const payment = await Payment.findOne({ orderId: razorpay_order_id }).session(session);
+    const payment = await withSession(Payment.findOne({ orderId: razorpay_order_id }));
     if (!payment) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(404).json({ success: false, message: 'Payment record for order not found' });
     }
 
@@ -224,15 +226,13 @@ const verifyPayment = async (req, res) => {
       organizationId &&
       payment.organizationId.toString() !== organizationId.toString()
     ) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(403).json({ success: false, message: 'Tenant boundary violation: you do not own this payment' });
     }
 
     // 4. Idempotency Check: if already CAPTURED, return idempotent response
     if (payment.status === 'CAPTURED') {
-      await session.commitTransaction();
-      session.endSession();
+      await tx.commit();
       return res.status(200).json({
         success: true,
         message: 'Payment was already verified and captured successfully (idempotent)',
@@ -241,10 +241,9 @@ const verifyPayment = async (req, res) => {
     }
 
     // 5. Load Associated Fee
-    const fee = await Fee.findById(payment.feeId).session(session);
+    const fee = await withSession(Fee.findById(payment.feeId));
     if (!fee) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(404).json({ success: false, message: 'Associated fee record not found' });
     }
 
@@ -257,7 +256,7 @@ const verifyPayment = async (req, res) => {
     payment.signature = razorpay_signature;
     payment.capturedAt = new Date();
     payment.receiptNo = invoiceNumber;
-    await payment.save({ session });
+    await payment.save(sessionOpts);
 
     // 8. Create Immutable Invoice Record
     const invoice = await Invoice.create(
@@ -276,11 +275,11 @@ const verifyPayment = async (req, res) => {
           notes: `Razorpay Online Payment (${razorpay_payment_id})`,
         },
       ],
-      { session }
+      sessionOrderedOpts
     );
 
     payment.invoiceId = invoice[0]._id;
-    await payment.save({ session });
+    await payment.save(sessionOpts);
 
     // 8b. Create Immutable Financial Ledger Entry (CREDIT from ONLINE_PAYMENT)
     await LedgerEntry.create(
@@ -302,7 +301,7 @@ const verifyPayment = async (req, res) => {
           metadata: { orderId: razorpay_order_id, receiptNo: invoiceNumber },
         },
       ],
-      { session }
+      sessionOrderedOpts
     );
 
     // 8c. Record PaymentAttempt transition to CAPTURED
@@ -317,7 +316,7 @@ const verifyPayment = async (req, res) => {
           metadata: { invoiceNumber },
         },
       ],
-      { session }
+      sessionOrderedOpts
     );
 
     // 8d. Financial Audit Trail
@@ -341,7 +340,7 @@ const verifyPayment = async (req, res) => {
             },
           },
         ],
-        { session }
+        sessionOrderedOpts
       );
     }
 
@@ -358,20 +357,19 @@ const verifyPayment = async (req, res) => {
     fee.paidDate = new Date();
     fee.paymentMode = 'upi'; // Online collection standard
     fee.receiptNo = invoiceNumber;
-    await fee.save({ session });
+    await fee.save(sessionOpts);
 
     // 10. Student validDate extension if fully paid (best effort)
     if (fee.status === 'paid') {
-      const student = await Student.findById(payment.studentId).session(session);
+      const student = await withSession(Student.findById(payment.studentId));
       if (student && student.validDate) {
         const nextValid = new Date(student.validDate);
         nextValid.setMonth(nextValid.getMonth() + 1);
-        await Student.findByIdAndUpdate(student._id, { validDate: nextValid }, { session });
+        await Student.findByIdAndUpdate(student._id, { validDate: nextValid }, sessionOpts);
       }
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    await tx.commit();
 
     // 11. Dispatch Asynchronous In-App Notification
     try {
@@ -404,8 +402,7 @@ const verifyPayment = async (req, res) => {
       },
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    await tx.abort();
     console.error('[Payment:Verify] Error verifying payment:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -519,8 +516,11 @@ const getPayments = async (req, res) => {
  * @access  Private (Admin only)
  */
 const refundPayment = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const sessionOpts = session ? { session } : {};
+  const sessionOrderedOpts = session ? { session, ordered: true } : { ordered: true };
+  const withSession = (q) => (session ? q.session(session) : q);
 
   try {
     const { id } = req.params;
@@ -532,16 +532,14 @@ const refundPayment = async (req, res) => {
       query.organizationId = organizationId;
     }
 
-    const payment = await Payment.findOne(query).session(session);
+    const payment = await withSession(Payment.findOne(query));
     if (!payment) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(404).json({ success: false, message: 'Payment record not found in your organization' });
     }
 
     if (payment.status !== 'CAPTURED' && payment.status !== 'AUTHORIZED') {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(400).json({
         success: false,
         message: `Only CAPTURED or AUTHORIZED payments can be refunded (current status: ${payment.status})`,
@@ -552,16 +550,14 @@ const refundPayment = async (req, res) => {
     const maxRefundablePaise = payment.amountPaise - currentRefundedPaise;
 
     if (maxRefundablePaise <= 0) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(400).json({ success: false, message: 'Payment has already been fully refunded' });
     }
 
     const requestedPaise = amountRupees ? Math.round(Number(amountRupees) * 100) : maxRefundablePaise;
 
     if (requestedPaise <= 0 || requestedPaise > maxRefundablePaise) {
-      await session.abortTransaction();
-      session.endSession();
+      await tx.abort();
       return res.status(400).json({
         success: false,
         message: `Invalid refund amount. Maximum refundable balance is ₹${(maxRefundablePaise / 100).toFixed(2)}`,
@@ -591,7 +587,7 @@ const refundPayment = async (req, res) => {
           processedAt: new Date(),
         },
       ],
-      { session }
+      sessionOrderedOpts
     );
 
     // 2. Update Payment State
@@ -603,10 +599,10 @@ const refundPayment = async (req, res) => {
     if (payment.refundedAmountPaise >= payment.amountPaise) {
       payment.status = 'REFUNDED';
     }
-    await payment.save({ session });
+    await payment.save(sessionOpts);
 
     // 3. Update Fee Balance and Status
-    const fee = await Fee.findById(payment.feeId).session(session);
+    const fee = await withSession(Fee.findById(payment.feeId));
     if (fee) {
       fee.paidAmount = Math.max(0, (fee.paidAmount || 0) - refundRupees);
       const totalDue = (fee.amount || 0) + (fee.lateFee || 0) - (fee.discount || 0);
@@ -617,12 +613,12 @@ const refundPayment = async (req, res) => {
       } else {
         fee.status = 'unpaid';
       }
-      await fee.save({ session });
+      await fee.save(sessionOpts);
     }
 
     // 4. Update Invoice Status if fully refunded
     if (payment.status === 'REFUNDED' && payment.invoiceId) {
-      await Invoice.findByIdAndUpdate(payment.invoiceId, { status: 'REFUNDED' }, { session });
+      await Invoice.findByIdAndUpdate(payment.invoiceId, { status: 'REFUNDED' }, sessionOpts);
     }
 
     // 5. Create Reversing Ledger Entry (DEBIT for refund)
@@ -645,7 +641,7 @@ const refundPayment = async (req, res) => {
           metadata: { refundId: providerRefundId, adminId: req.user._id },
         },
       ],
-      { session }
+      sessionOrderedOpts
     );
 
     // 6. Financial Audit Trail
@@ -668,11 +664,10 @@ const refundPayment = async (req, res) => {
           },
         },
       ],
-      { session }
+      sessionOrderedOpts
     );
 
-    await session.commitTransaction();
-    session.endSession();
+    await tx.commit();
 
     return res.status(200).json({
       success: true,
@@ -684,8 +679,7 @@ const refundPayment = async (req, res) => {
       },
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    await tx.abort();
     console.error('[Payment:Refund] Error processing refund:', error);
     return res.status(500).json({ success: false, message: error.message });
   }

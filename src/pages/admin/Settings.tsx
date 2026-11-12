@@ -22,6 +22,7 @@ import { AdminPolicyManagement } from '@/components/admin/policies/AdminPolicyMa
 import { FileText, Sliders } from 'lucide-react';
 import { api } from '@/lib/api';
 import { settingsService } from '@/services/api';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 export default function AdminSettings() {
   const { selectedHostel, selectedHostelId, currentBranch, isLoading: hostelLoading } = useHostel();
@@ -102,9 +103,9 @@ export default function AdminSettings() {
       });
       settingsService.clearCache();
       toast.success(`Operational policies for branch '${selectedHostel || branchDisplay}' saved successfully!`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save settings:', error);
-      toast.error(error.response?.data?.message || 'Failed to update settings');
+      toast.error(getErrorMessage(error, 'Failed to update settings'));
     } finally {
       setSaving(false);
     }

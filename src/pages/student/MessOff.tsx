@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { WidgetErrorBoundary } from '@/components/common/WidgetErrorBoundary';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 const MessStatusChart = lazy(() => import('./components/MessStatusChart'));
 
@@ -64,7 +65,7 @@ export default function MessOff() {
       }
       
       if (requestsRes?.data?.success) {
-        setRequests(requestsRes.data.data.map((r: any) => ({
+        setRequests((requestsRes.data.data as Array<{ _id: string; leavingDate: string; returnDate: string; reason: string | null; status: string; adminMessage: string | null; documentUrl: string | null; documentName: string | null; createdAt: string; approvedDate: string | null }>).map((r) => ({
           id: r._id,
           leavingDate: r.leavingDate,
           returnDate: r.returnDate,
@@ -77,9 +78,9 @@ export default function MessOff() {
           approvedDate: r.approvedDate
         })));
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast.error(e.response?.data?.message || 'Failed to fetch mess requests');
+      toast.error(getErrorMessage(e, 'Failed to fetch mess requests'));
     }
   }, []);
 
@@ -158,8 +159,8 @@ export default function MessOff() {
       setReason('');
       setDocumentFile(null);
       fetchAll();
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to submit request');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to submit request'));
     } finally {
       setIsSubmitting(false);
     }

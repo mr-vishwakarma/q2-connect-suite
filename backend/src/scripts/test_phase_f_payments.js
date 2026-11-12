@@ -720,8 +720,8 @@ async function runPhaseFTestSuite() {
         body: {
           studentId: studentA1._id.toString(),
           month: manualFeeMonth,
-          amount: 5000,
-          receivedAmount: 5000,
+          amount: 6000,
+          receivedAmount: 6000,
           paymentMode: 'cash',
           receiptNo: manualReceiptNo,
           idempotencyKey,

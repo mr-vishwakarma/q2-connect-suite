@@ -95,7 +95,7 @@ export default function FeeHistory() {
       }
 
       if (fRes.data?.success) {
-        setFees(fRes.data.data.map((f: any) => ({
+        setFees((fRes.data.data as Array<{ _id: string; month: string; amount: number; paidDate: string | null; paymentMode: Fee['payment_mode']; status: Fee['status']; lateFee: number; discount: number; paidAmount: number; dueDate: string | null; receiptNo: string | null }>).map((f) => ({
           id: f._id, month: f.month, amount: f.amount, paid_date: f.paidDate,
           payment_mode: f.paymentMode, status: f.status, late_fee: f.lateFee,
           discount: f.discount, paid_amount: f.paidAmount, due_date: f.dueDate,
@@ -104,7 +104,7 @@ export default function FeeHistory() {
       }
 
       if (pRes.data?.success) {
-        setPayments(pRes.data.data.map((p: any) => ({
+        setPayments((pRes.data.data as Array<{ _id: string; receiptNo: string; amount: number; lateFee: number; discount: number; securityDeposit: number; paymentMode: Payment['payment_mode']; paymentDate: string; month: string; adminName: string | null; notes: string | null; receiptUrl?: string | null }>).map((p) => ({
           id: p._id, receipt_no: p.receiptNo, amount: p.amount, late_fee: p.lateFee,
           discount: p.discount, security_deposit: p.securityDeposit, payment_mode: p.paymentMode,
           payment_date: p.paymentDate, month: p.month, admin_name: p.adminName, notes: p.notes,
@@ -116,7 +116,7 @@ export default function FeeHistory() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profile?.hostel]);
 
   useEffect(() => { if (user) fetchAll(); }, [user, fetchAll]);
 

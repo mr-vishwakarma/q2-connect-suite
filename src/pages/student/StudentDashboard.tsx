@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { toast } from 'react-toastify';
 import { MealRatingWidget } from '@/components/student/MealRatingWidget';
 import { dashboardService } from '@/services/api';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 interface StudentData {
   name: string;
@@ -37,7 +38,7 @@ interface StudentData {
 }
 
 export default function StudentDashboard() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
   const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [stats, setStats] = useState({
@@ -56,9 +57,9 @@ export default function StudentDashboard() {
         setStudentData(response.data.student);
         setStats(response.data.stats);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to fetch dashboard data:', error);
-      toast.error(error.message || 'Failed to load dashboard data');
+      toast.error(getErrorMessage(error, 'Failed to load dashboard data'));
     }
   }, []);
 
@@ -75,7 +76,7 @@ export default function StudentDashboard() {
     try {
       toast.info('Generating high-resolution ID card...');
       const html2canvasModule = await import('html2canvas');
-      const html2canvas = (html2canvasModule.default || html2canvasModule) as any;
+      const html2canvas = html2canvasModule.default;
       const canvas = await html2canvas(cardElem, {
         scale: 2.5,
         useCORS: true,
@@ -213,7 +214,7 @@ export default function StudentDashboard() {
                     hostel={studentData?.hostel || 'Q2'}
                     fees={studentData?.fees ?? 0}
                     startDate={studentData?.start_date}
-                    profilePhoto={studentData?.profile_photo || (user as any)?.profilePhoto}
+                    profilePhoto={studentData?.profile_photo || profile?.profilePhoto}
                     studentCode={studentData?.student_code}
                   />
                 </div>

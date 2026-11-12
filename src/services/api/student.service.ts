@@ -1,11 +1,22 @@
 import { api } from '@/lib/api';
-import { ApiResponse, Student, StudentAlert, StudentRegistrationPayload } from '@/types';
+import { ApiResponse, PaginationMeta, Student, StudentApiRecord, StudentRegistrationPayload } from '@/types';
+
+export interface StudentListResponseData {
+  students: StudentApiRecord[];
+  pagination?: PaginationMeta;
+  total?: number;
+  totalPages?: number;
+}
+
+export interface AlertsCountResponse extends ApiResponse<{ count: number }> {
+  count?: number;
+}
 
 export const studentService = {
   async getStudents(
     params?: { hostel?: string; search?: string; page?: number; limit?: number },
     options?: { signal?: AbortSignal }
-  ): Promise<ApiResponse<any>> {
+  ): Promise<ApiResponse<StudentApiRecord[] | StudentListResponseData>> {
     const res = await api.get('/students', { params, signal: options?.signal });
     return res.data;
   },
@@ -30,12 +41,12 @@ export const studentService = {
     return res.data;
   },
 
-  async getAlerts(params?: { hostel?: string }): Promise<ApiResponse<StudentAlert[]>> {
+  async getAlerts(params?: { hostel?: string }): Promise<ApiResponse<StudentApiRecord[]>> {
     const res = await api.get('/students/alerts', { params });
     return res.data;
   },
 
-  async getAlertsCount(params?: { hostel?: string }): Promise<ApiResponse<{ count: number }>> {
+  async getAlertsCount(params?: { hostel?: string }): Promise<AlertsCountResponse> {
     const res = await api.get('/students/alerts/count', { params });
     return res.data;
   },

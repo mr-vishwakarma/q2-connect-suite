@@ -16,6 +16,7 @@ const { QUEUES } = require('../queues/queueManager');
 const { getRedisStatus, createIsolatedRedisConnection } = require('../config/redis');
 const { runLateFeeCalculation } = require('../jobs/lateFee.job');
 const { runFeeReminderDispatcher } = require('../jobs/feeReminder.job');
+const { runSubscriptionLifecycleSweep } = require('../jobs/subscriptionLifecycle.job');
 
 let scheduledWorker = null;
 
@@ -33,6 +34,9 @@ async function processScheduledJob(job) {
 
     case 'FEE_REMINDER_DISPATCHER':
       return await runFeeReminderDispatcher(payload);
+
+    case 'SUBSCRIPTION_LIFECYCLE_SWEEP':
+      return await runSubscriptionLifecycleSweep(payload);
 
     default:
       throw new UnrecoverableError(`Unknown scheduled job type: ${jobType}`);

@@ -156,8 +156,19 @@ const paymentSchema = new mongoose.Schema(
     },
     idempotencyKey: {
       type: String,
-      sparse: true,
       trim: true,
+    },
+    intent: {
+      type: String,
+      enum: ['ACTIVATION', 'RENEWAL', 'UPGRADE', 'REACTIVATION', 'PARTIAL_VOUCHER', 'LEGACY'],
+      default: 'ACTIVATION',
+    },
+    billingCycle: {
+      type: String,
+      enum: ['MONTHLY', 'YEARLY'],
+    },
+    planSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
     },
   },
   { timestamps: true }
@@ -172,5 +183,6 @@ paymentSchema.index({ studentId: 1, status: 1, createdAt: -1 });
 paymentSchema.index({ feeId: 1, status: 1 });
 paymentSchema.index({ provider: 1, orderId: 1 });
 paymentSchema.index({ provider: 1, paymentId: 1 });
+paymentSchema.index({ idempotencyKey: 1 }, { sparse: true });
 
 module.exports = mongoose.model('Payment', paymentSchema);

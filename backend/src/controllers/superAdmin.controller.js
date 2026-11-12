@@ -10,9 +10,23 @@ const { securityCenterService } = require('../services/securityCenter.service');
 const { systemHealthService } = require('../services/systemHealth.service');
 const { reportExportService } = require('../services/reportExport.service');
 const { platformSettingsService } = require('../services/platformSettings.service');
+const billingController = require('./billing.controller');
+const voucherController = require('./voucher.controller');
 const AuditLog = require('../models/AuditLog');
 const Hostel = require('../models/Hostel');
 const { logAuditAction } = require('../middleware/audit.middleware');
+
+function bindOrgTenantContext(req) {
+  req.tenant = {
+    ...(req.tenant || {}),
+    isSuperAdmin: true,
+    organizationId: req.params.id,
+  };
+  req.body = req.body || {};
+  if (!req.body.organizationId) {
+    req.body.organizationId = req.params.id;
+  }
+}
 
 const superAdminController = {
   // --- Analytics ---
@@ -288,9 +302,18 @@ const superAdminController = {
     }
   },
 
+  async getSubscriptionById(req, res) {
+    try {
+      const detail = await subscriptionAdminService.getSubscriptionDetail(req.params.id);
+      return res.status(200).json({ success: true, data: detail });
+    } catch (error) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+  },
+
   async updateSubscription(req, res) {
     try {
-      const sub = await subscriptionAdminService.updateSubscription(req.params.id, req.body);
+      const sub = await subscriptionAdminService.updateSubscription(req.params.id, req.body, req.user);
       await logAuditAction({
         req,
         action: 'UPDATE_SUBSCRIPTION',
@@ -307,7 +330,7 @@ const superAdminController = {
   async extendSubscriptionTrial(req, res) {
     try {
       const days = parseInt(req.body.days, 10) || 14;
-      const sub = await subscriptionAdminService.extendTrial(req.params.id, days);
+      const sub = await subscriptionAdminService.extendTrial(req.params.id, days, req.user);
       await logAuditAction({
         req,
         action: 'EXTEND_SUBSCRIPTION_TRIAL',
@@ -319,6 +342,47 @@ const superAdminController = {
     } catch (error) {
       return res.status(400).json({ success: false, message: error.message });
     }
+  },
+
+  // --- Super Admin Tenant Onboarding Subscription Activation ---
+  async initiateOrgPayment(req, res) {
+    bindOrgTenantContext(req);
+    return billingController.createSubscription(req, res);
+  },
+
+  async verifyOrgPayment(req, res) {
+    bindOrgTenantContext(req);
+    return billingController.verifySubscription(req, res);
+  },
+
+  async recordOrgPaymentFailure(req, res) {
+    bindOrgTenantContext(req);
+    return billingController.recordPaymentFailed(req, res);
+  },
+
+  async startOrgTrial(req, res) {
+    bindOrgTenantContext(req);
+    return billingController.startTrial(req, res);
+  },
+
+  async previewOrgVoucher(req, res) {
+    bindOrgTenantContext(req);
+    return voucherController.applyVoucher(req, res);
+  },
+
+  async redeemOrgVoucher(req, res) {
+    bindOrgTenantContext(req);
+    return voucherController.redeemVoucherZeroPayable(req, res);
+  },
+
+  async reserveOrgVoucherPartial(req, res) {
+    bindOrgTenantContext(req);
+    return voucherController.reserveVoucherPartial(req, res);
+  },
+
+  async verifyOrgVoucherPartial(req, res) {
+    bindOrgTenantContext(req);
+    return voucherController.verifyVoucherPartial(req, res);
   },
 
   // --- Features ---

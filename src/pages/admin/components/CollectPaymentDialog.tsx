@@ -8,7 +8,7 @@
  * - Security deposit collection separation
  * - Duplicate submission prevention
  */
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, Receipt, AlertCircle, Clock, Info, ShieldCheck } from 'lucide-react';
 import { feeService } from '@/services/api/fee.service';
+import type { Student } from '@/types';
 
 interface PaymentFormState {
   pMonth: string;
@@ -49,7 +50,7 @@ interface CalculationDetails {
 interface CollectPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedStudent: any;
+  selectedStudent: Student | null;
   initialValues: PaymentFormState;
   monthOptions: string[];
   onSubmit: (form: PaymentFormState) => Promise<void>;
@@ -70,13 +71,16 @@ export function CollectPaymentDialog({
   const [calculating, setCalculating] = useState(false);
   const [calcDetails, setCalcDetails] = useState<CalculationDetails | null>(null);
 
+  const initialValuesRef = useRef(initialValues);
+  initialValuesRef.current = initialValues;
+
   // Synchronize initial values only when dialog opens or selectedStudent changes
   useEffect(() => {
     if (open) {
-      setForm(initialValues);
+      setForm(initialValuesRef.current);
       setCalcDetails(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [open, selectedStudent?.id]);
 
   // Dynamic late-fee & payable fee calculation when month changes

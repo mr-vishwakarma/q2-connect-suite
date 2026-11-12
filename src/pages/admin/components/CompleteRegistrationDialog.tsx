@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { toast } from 'react-toastify';
 import { getAvatarUrl } from '@/utils/imageUtils';
+import type { Room as ApiRoom } from '@/types';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 interface Applicant {
   id: string;
@@ -91,8 +93,8 @@ export function CompleteRegistrationDialog({
           setRoomsLoading(true);
           const res = await api.get('/rooms', { params: { hostel } });
           if (res.data?.success) {
-            const mapped = (res.data.data || []).map((r: any) => ({
-              id: r._id,
+            const mapped = ((res.data.data || []) as ApiRoom[]).map((r) => ({
+              id: r._id || r.id || '',
               room_number: r.roomNumber,
               capacity: r.capacity,
               occupied_count: r.occupiedCount,
@@ -148,9 +150,9 @@ export function CompleteRegistrationDialog({
         onOpenChange(false);
         onSuccess();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to register student:', err);
-      toast.error(err.response?.data?.message || 'Failed to complete registration');
+      toast.error(getErrorMessage(err, 'Failed to complete registration'));
     } finally {
       setIsSubmitting(false);
     }

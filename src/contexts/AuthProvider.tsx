@@ -1,6 +1,15 @@
-import { createContext, useContext, useEffect, useState, useMemo, useCallback, ReactNode } from 'react';
+import { useEffect, useState, useMemo, useCallback, ReactNode } from 'react';
 import { api, getSocket, disconnectSocket } from '@/lib/api';
 import { settingsService } from '@/services/api/settings.service';
+import { getErrorMessage } from '@/utils/errorHandling';
+import {
+  AuthActionError,
+  AuthContext,
+  GoogleSignInResult,
+  Profile,
+  SignUpInput,
+  User,
+} from './authContextInstance';
 
 const clearTenantCache = () => {
   try {
@@ -16,25 +25,55 @@ const clearTenantCache = () => {
   }
 };
 
-export interface User {
-  id: string;
+interface BackendUserRecord {
+  _id?: string;
+  id?: string;
   name: string;
   email: string;
   username?: string;
-  role: 'super_admin' | 'admin' | 'student' | 'warden' | string;
+  role: string;
+  profilePhoto?: string;
   isSuperAdmin?: boolean;
+  isPrimaryAdmin?: boolean;
+  is_primary?: boolean;
 }
 
-export interface Profile {
-  id: string;
-  user_id: string;
+interface BackendStudentRecord {
+  _id?: string;
+  id?: string;
   name: string;
-  email: string | null;
-  username: string | null;
+  email?: string | null;
+  username?: string | null;
   profilePhoto?: string;
+  roomNo?: string | null;
   room_no?: string | null;
   fees?: number | null;
   hostel?: string | null;
+}
+
+interface AuthSessionPayload {
+  accessToken: string;
+  refreshToken: string;
+  user: BackendUserRecord;
+  student?: BackendStudentRecord | null;
+  features?: Record<string, boolean>;
+}
+
+interface ApiErrorShape {
+  message?: string;
+  response?: {
+    data?: {
+      message?: string;
+      status?: string;
+      isLocked?: boolean;
+      lockMinutes?: number;
+      remainingAttempts?: number;
+      code?: string;
+      requiresMfa?: boolean;
+      mfaToken?: string;
+      destinationMasked?: string;
+    };
+  };
 }
 
 // Batch all auth fields into one object so login/logout triggers 1 re-render, not 6.
@@ -55,43 +94,6 @@ const LOGGED_OUT_STATE: AuthState = {
   profile: null,
   features: {},
 };
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  isAdmin: boolean;
-  isSuperAdmin: boolean;
-  isPrimaryAdmin: boolean;
-  profile: Profile | null;
-  features: Record<string, boolean>;
-  hasFeature: (featureKey: string) => boolean;
-  signIn: (
-    identifier: string,
-    password: string,
-    portalOrIsAdmin?: 'super_admin' | 'admin' | 'student' | boolean
-  ) => Promise<{ error: any; user?: any }>;
-  signInWithGoogle: (
-    credential: string,
-    portal?: 'super_admin' | 'admin' | 'student'
-  ) => Promise<{
-    error: any;
-    user?: any;
-    status?: 'active' | 'pending_approval' | 'approved' | 'new_resident' | 'rejected' | string;
-    requiresInitialDetails?: boolean;
-    canCompleteSetup?: boolean;
-    setupToken?: string;
-    googleProfile?: any;
-    message?: string;
-    pendingUser?: any;
-  }>;
-  requestGoogleRegistration: (payload: { credential: string; name?: string; phone?: string; hostel?: string }) => Promise<{ error: any; message?: string; status?: string }>;
-  completeGoogleSetup: (payload: { setupToken: string; username: string; password: string }) => Promise<{ error: any; user?: any }>;
-  signUp: (payload: { name: string; email: string; password: string; username?: string; phone?: string; hostel?: string } | any) => Promise<{ error: any; user?: any }>;
-  signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // SECURITY NOTE: `isAdmin` / `isPrimaryAdmin` below are UX-only hints used to show
 // or hide UI. They are never the source of truth for authorization. All access is
@@ -136,35 +138,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await api.get('/auth/me');
       if (response.data?.success) {
-        const { user: userData, student, features: userFeatures } = response.data;
-        
+        const { user: userData, student, features: userFeatures } = response.data as {
+          user: BackendUserRecord;
+          student?: BackendStudentRecord | null;
+          features?: Record<string, boolean>;
+        };
+
         const mappedUser: User = {
-          id: userData._id,
+          id: userData._id || userData.id || '',
           name: userData.name,
           email: userData.email,
           username: userData.username,
           role: userData.role,
           isSuperAdmin: userData.isSuperAdmin || userData.role === 'super_admin',
+          isAdmin: userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin,
         };
 
         const newProfile: Profile = student
           ? {
-              id: student._id || student.id,
-              user_id: userData._id || userData.id,
+              id: student._id || student.id || '',
+              user_id: userData._id || userData.id || '',
               name: student.name,
-              email: student.email,
-              username: student.username,
+              email: student.email ?? null,
+              username: student.username ?? null,
               profilePhoto: student.profilePhoto,
               room_no: student.roomNo || student.room_no || null,
               fees: student.fees ?? null,
               hostel: student.hostel || null,
             }
           : {
-              id: userData._id,
-              user_id: userData._id,
+              id: userData._id || userData.id || '',
+              user_id: userData._id || userData.id || '',
               name: userData.name,
               email: userData.email,
-              username: userData.username,
+              username: userData.username ?? null,
               profilePhoto: userData.profilePhoto,
             };
 
@@ -229,39 +236,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchProfile]);
 
-  const handleAuthSuccess = useCallback((data: any) => {
+  const handleAuthSuccess = useCallback((data: AuthSessionPayload): User => {
     const { accessToken, refreshToken, user: userData, student } = data;
     clearTenantCache();
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
 
     const mappedUser: User = {
-      id: userData._id || userData.id,
+      id: userData._id || userData.id || '',
       name: userData.name,
       email: userData.email,
       username: userData.username,
       role: userData.role,
       isSuperAdmin: userData.role === 'super_admin' || !!userData.isSuperAdmin,
+      isAdmin: userData.role === 'admin' || userData.role === 'super_admin' || !!userData.isSuperAdmin,
     };
 
     const newProfile: Profile = student
       ? {
-          id: student._id || student.id,
-          user_id: userData._id || userData.id,
+          id: student._id || student.id || '',
+          user_id: userData._id || userData.id || '',
           name: student.name,
-          email: student.email,
-          username: student.username,
+          email: student.email ?? null,
+          username: student.username ?? null,
           profilePhoto: student.profilePhoto,
           room_no: student.roomNo || student.room_no || null,
           fees: student.fees ?? null,
           hostel: student.hostel || null,
         }
       : {
-          id: userData._id || userData.id,
-          user_id: userData._id || userData.id,
+          id: userData._id || userData.id || '',
+          user_id: userData._id || userData.id || '',
           name: userData.name,
           email: userData.email,
-          username: userData.username,
+          username: userData.username ?? null,
           profilePhoto: userData.profilePhoto,
         };
 
@@ -293,11 +301,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return mappedUser;
   }, []);
 
-  const signIn = async (
+  const signIn = useCallback(async (
     identifier: string,
     password: string,
     portalOrIsAdmin: 'super_admin' | 'admin' | 'student' | boolean = 'student'
-  ) => {
+  ): Promise<{ error: AuthActionError | null; user?: User }> => {
     try {
       let endpoint = '/auth/login';
       let requestedPortal = 'STUDENT';
@@ -323,6 +331,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         portal: requestedPortal,
       });
 
+      if (response.data?.requiresMfa) {
+        const errorObj: AuthActionError = new Error(response.data.message || 'MFA verification required');
+        errorObj.code = 'MFA_REQUIRED';
+        errorObj.requiresMfa = true;
+        errorObj.mfaToken = response.data.mfaToken;
+        errorObj.destinationMasked = response.data.destinationMasked;
+        return { error: errorObj };
+      }
+
       if (response.data?.success) {
         const mappedUser = handleAuthSuccess(response.data);
         if (!response.data.features || Object.keys(response.data.features).length === 0) {
@@ -331,21 +348,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: null, user: mappedUser };
       }
       return { error: new Error('Login failed') };
-    } catch (err: any) {
-      const data = err.response?.data;
-      const errorObj: any = new Error(data?.message || err.message || 'Login failed');
+    } catch (err: unknown) {
+      const data = (err as ApiErrorShape).response?.data;
+      const errorObj: AuthActionError = new Error(getErrorMessage(err, 'Login failed'));
       errorObj.isLocked = data?.isLocked;
       errorObj.lockMinutes = data?.lockMinutes;
       errorObj.remainingAttempts = data?.remainingAttempts;
       errorObj.code = data?.code;
+      errorObj.requiresMfa = data?.requiresMfa;
+      errorObj.mfaToken = data?.mfaToken;
+      errorObj.destinationMasked = data?.destinationMasked;
       return { error: errorObj };
     }
-  };
+  }, [fetchProfile, handleAuthSuccess]);
 
-  const signInWithGoogle = async (
+  const signInWithGoogle = useCallback(async (
     credential: string,
     portal: 'super_admin' | 'admin' | 'student' = 'student'
-  ) => {
+  ): Promise<GoogleSignInResult> => {
     try {
       const response = await api.post('/auth/google', {
         credential,
@@ -397,36 +417,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       return { error: new Error(data?.message || 'Google authentication failed') };
-    } catch (err: any) {
-      const data = err.response?.data;
-      const errorObj: any = new Error(data?.message || err.message || 'Google authentication failed');
+    } catch (err: unknown) {
+      const data = (err as ApiErrorShape).response?.data;
+      const errorObj: AuthActionError = new Error(getErrorMessage(err, 'Google authentication failed'));
       return { error: errorObj, status: data?.status };
     }
-  };
+  }, [fetchProfile, handleAuthSuccess]);
 
-  const requestGoogleRegistration = async (payload: {
+  const requestGoogleRegistration = useCallback(async (payload: {
     credential: string;
     name?: string;
     phone?: string;
     hostel?: string;
-  }) => {
+  }): Promise<{ error: AuthActionError | null; message?: string; status?: string }> => {
     try {
       const response = await api.post('/auth/request-google-registration', payload);
       if (response.data?.success) {
         return { error: null, message: response.data.message, status: response.data.status };
       }
       return { error: new Error('Failed to submit registration request') };
-    } catch (err: any) {
-      const data = err.response?.data;
-      return { error: new Error(data?.message || err.message || 'Failed to submit registration request') };
+    } catch (err: unknown) {
+      return { error: new Error(getErrorMessage(err, 'Failed to submit registration request')) };
     }
-  };
+  }, []);
 
-  const completeGoogleSetup = async (payload: {
+  const completeGoogleSetup = useCallback(async (payload: {
     setupToken: string;
     username: string;
     password: string;
-  }) => {
+  }): Promise<{ error: AuthActionError | null; user?: User }> => {
     try {
       const response = await api.post('/auth/complete-google-setup', payload);
       if (response.data?.success) {
@@ -437,13 +456,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: null, user: mappedUser };
       }
       return { error: new Error('Profile setup failed') };
-    } catch (err: any) {
-      const data = err.response?.data;
-      return { error: new Error(data?.message || err.message || 'Profile setup failed') };
+    } catch (err: unknown) {
+      return { error: new Error(getErrorMessage(err, 'Profile setup failed')) };
     }
-  };
+  }, [fetchProfile, handleAuthSuccess]);
 
-  const signUp = async (payload: any) => {
+  const signUp = useCallback(async (payload: SignUpInput): Promise<{ error: AuthActionError | null; user?: User }> => {
     try {
       const endpoint = payload.role === 'admin' ? '/auth/register-admin' : '/auth/register';
       const response = await api.post(endpoint, payload);
@@ -453,11 +471,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: null, user: mappedUser };
       }
       return { error: new Error('Signup failed') };
-    } catch (err: any) {
-      const data = err.response?.data;
-      return { error: new Error(data?.message || err.message || 'Signup failed') };
+    } catch (err: unknown) {
+      return { error: new Error(getErrorMessage(err, 'Signup failed')) };
     }
-  };
+  }, [handleAuthSuccess]);
 
   const signOut = useCallback(async () => {
     try {
@@ -493,10 +510,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     completeGoogleSetup,
     signUp,
     signOut,
-    refreshProfile
+    refreshProfile,
   }), [
-    authState,
+    user,
     loading,
+    isAdmin,
+    isSuperAdmin,
+    isPrimaryAdmin,
+    profile,
+    features,
     hasFeature,
     signIn,
     signInWithGoogle,
@@ -504,7 +526,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     completeGoogleSetup,
     signUp,
     signOut,
-    refreshProfile
+    refreshProfile,
   ]);
 
   return (
@@ -512,12 +534,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }

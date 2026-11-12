@@ -280,6 +280,12 @@ async function runPhaseGTests() {
 
     console.log('\n--- TEST GROUP 5: Query Optimization & Index Synchronization (G8 & G45) ---');
 
+    await Promise.all([
+      Student.syncIndexes(),
+      Room.syncIndexes(),
+      Fee.syncIndexes(),
+    ]);
+
     // Test 5.1: Student collection has compound index { organizationId: 1, createdAt: -1 }
     {
       const studentIndexes = await Student.collection.indexes();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Building2,
@@ -19,13 +19,20 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { superAdminService } from '@/services/api/superAdmin.service';
-import { Organization, HostelBranch, FeatureDefinition } from '@/types';
+import {
+  superAdminService,
+  OrganizationDetailResponse,
+  OrgFeatureToggleState,
+  CreateHostelPayload,
+  PopulatedPlanRef,
+} from '@/services/api/superAdmin.service';
+import { HostelBranch, FeatureDefinition } from '@/types';
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 export default function OrganizationDetail() {
   const { id } = useParams<{ id: string }>();
-  const [org, setOrg] = useState<any>(null);
+  const [org, setOrg] = useState<OrganizationDetailResponse | null>(null);
   const [features, setFeatures] = useState<FeatureDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -39,17 +46,12 @@ export default function OrganizationDetail() {
     address: '',
   });
 
-  useEffect(() => {
-    if (id) {
-      loadData();
-    }
-  }, [id]);
-
-  const loadData = async (showSpinner = true) => {
+  const loadData = useCallback(async (showSpinner = true) => {
+    if (!id) return;
     try {
       if (showSpinner) setIsLoading(true);
       const [orgRes, featRes] = await Promise.all([
-        superAdminService.getOrganizationById(id!),
+        superAdminService.getOrganizationById(id),
         superAdminService.getFeatures(),
       ]);
 
@@ -64,19 +66,25 @@ export default function OrganizationDetail() {
     } finally {
       if (showSpinner) setIsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadData();
+    }
+  }, [id, loadData]);
 
   const handleToggleFeature = async (featureKey: string, currentEnabled: boolean) => {
     const newEnabled = !currentEnabled;
 
     // Instant optimistic update
-    setOrg((prev: any) => {
+    setOrg((prev) => {
       if (!prev) return prev;
       const existingFeatures = prev.features || [];
-      const idx = existingFeatures.findIndex((f: any) => f.featureKey === featureKey);
-      let updatedFeatures;
+      const idx = existingFeatures.findIndex((f: OrgFeatureToggleState) => f.featureKey === featureKey);
+      let updatedFeatures: OrgFeatureToggleState[];
       if (idx >= 0) {
-        updatedFeatures = existingFeatures.map((f: any) =>
+        updatedFeatures = existingFeatures.map((f: OrgFeatureToggleState) =>
           f.featureKey === featureKey ? { ...f, enabled: newEnabled } : f
         );
       } else {
@@ -96,7 +104,7 @@ export default function OrganizationDetail() {
       } else {
         loadData(false);
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to update feature');
       loadData(false);
     }
@@ -105,18 +113,19 @@ export default function OrganizationDetail() {
   const handleAddBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await superAdminService.createHostel({
+      const payload: CreateHostelPayload = {
         organizationId: id,
         ...branchForm,
-      } as any);
+      };
+      const res = await superAdminService.createHostel(payload);
       if (res.success) {
         toast.success(`Branch '${branchForm.name}' created!`);
         setIsAddBranchOpen(false);
         setBranchForm({ name: '', code: '', capacity: 100, genderType: 'GIRLS', address: '' });
         loadData();
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to add branch');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to add branch'));
     }
   };
 
@@ -128,7 +137,9 @@ export default function OrganizationDetail() {
     );
   }
 
-  const enabledFeatureKeys = new Set((org.features || []).filter((f: any) => f.enabled).map((f: any) => f.featureKey));
+  const enabledFeatureKeys = new Set(
+    (org.features || []).filter((f: OrgFeatureToggleState) => f.enabled).map((f: OrgFeatureToggleState) => f.featureKey)
+  );
 
   return (
     <div className="space-y-6">
@@ -148,14 +159,23 @@ export default function OrganizationDetail() {
 
       {/* Overview Cards & Quotas */}
       {(() => {
-        const isYearly = org.subscription?.billingCycle?.toLowerCase() === 'yearly' || org.subscription?.billingCycle?.toLowerCase() === 'annual';
-        const planObj = org.subscription?.planId as any;
-        const price = isYearly 
-          ? (planObj?.priceYearly ?? planObj?.price)
-          : (planObj?.priceMonthly ?? planObj?.price);
-        const displayPrice = price !== undefined && price !== null ? `₹${Number(price).toLocaleString('en-IN')}` : null;
-        const maxStudents = planObj?.limits?.maxStudents;
+        const sub = org.subscription;
+        const snap = sub?.pricingSnapshot;
+        const planObj: PopulatedPlanRef | null =
+          sub?.planId && typeof sub.planId === 'object' ? (sub.planId as PopulatedPlanRef) : null;
+        const billingCycle = snap?.billingCycle || sub?.billingCycle || 'MONTHLY';
+        const isYearly = String(billingCycle).toUpperCase() === 'YEARLY' || String(billingCycle).toUpperCase() === 'ANNUAL';
+        const price =
+          snap?.agreedPriceRupees ??
+          sub?.agreedPriceRupees ??
+          (isYearly ? (planObj?.priceYearly ?? planObj?.price) : (planObj?.priceMonthly ?? planObj?.price));
+        const displayPrice =
+          price !== undefined && price !== null ? `₹${Number(price).toLocaleString('en-IN')}` : null;
+        const maxStudents = snap?.limits?.maxStudents ?? planObj?.limits?.maxStudents;
+        const maxHostels = snap?.limits?.maxHostels ?? planObj?.limits?.maxHostels;
         const isUnlimitedStudents = !maxStudents || maxStudents <= 0;
+        const isUnlimitedHostels = !maxHostels || maxHostels <= 0;
+        const planName = snap?.planName || planObj?.name || null;
 
         return (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -163,16 +183,42 @@ export default function OrganizationDetail() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Subscription Plan</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold text-amber-400">{planObj?.name || 'Starter Plan'}</div>
-                <div className="flex items-center justify-between mt-1">
-                  <p className="text-xs text-muted-foreground">Billing: {org.subscription?.billingCycle || 'Monthly'}</p>
+              <CardContent className="space-y-1.5">
+                <div className="text-xl font-bold text-amber-400">
+                  {planName || 'Not Assigned'}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    Billing: {billingCycle}
+                  </span>
                   {displayPrice && (
                     <span className="text-xs font-semibold text-emerald-400 font-mono">
                       {displayPrice} / {isYearly ? 'yr' : 'mo'}
                     </span>
                   )}
                 </div>
+                {sub && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <Badge variant="outline" className="text-[10px]">
+                      {sub.status}
+                    </Badge>
+                    {sub.activationMethod && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {String(sub.activationMethod).replace('_', ' ')}
+                      </Badge>
+                    )}
+                    {sub.nearExpiry?.isNearExpiry && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        Near Expiry ({sub.nearExpiry.daysRemaining}d)
+                      </Badge>
+                    )}
+                  </div>
+                )}
+                {sub?.scheduledPlanChange?.status === 'SCHEDULED' && (
+                  <p className="text-[11px] text-amber-400">
+                    Scheduled change to {sub.scheduledPlanChange.targetPlanName}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -184,9 +230,15 @@ export default function OrganizationDetail() {
               <CardContent className="space-y-1">
                 <div className="flex justify-between items-baseline">
                   <span className="text-xl font-bold text-foreground">{org.studentCount || 0}</span>
-                  <span className="text-xs text-emerald-400 font-mono">Unlimited Capacity</span>
+                  <span className="text-xs text-emerald-400 font-mono">
+                    {isUnlimitedStudents ? 'Unlimited Capacity' : `Limit: ${maxStudents}`}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground">No subscription limits enforced</p>
+                <p className="text-xs text-muted-foreground">
+                  {isUnlimitedStudents
+                    ? 'Unlimited resident capacity under current plan'
+                    : `${Math.max(0, Number(maxStudents) - Number(org.studentCount || 0))} beds remaining`}
+                </p>
               </CardContent>
             </Card>
 
@@ -198,9 +250,13 @@ export default function OrganizationDetail() {
               <CardContent className="space-y-1">
                 <div className="flex justify-between items-baseline">
                   <span className="text-xl font-bold text-foreground">{org.hostels?.length || 0}</span>
-                  <span className="text-xs text-blue-400 font-mono">Active Properties</span>
+                  <span className="text-xs text-blue-400 font-mono">
+                    {isUnlimitedHostels ? 'Unlimited Branches' : `Limit: ${maxHostels}`}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground">Multi-branch management enabled</p>
+                <p className="text-xs text-muted-foreground">
+                  {isUnlimitedHostels ? 'Multi-branch management enabled' : `Up to ${maxHostels} branches in plan`}
+                </p>
               </CardContent>
             </Card>
 
@@ -208,11 +264,29 @@ export default function OrganizationDetail() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Tenant Status</CardTitle>
               </CardHeader>
-              <CardContent>
-                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-sm">
+              <CardContent className="space-y-1">
+                <Badge
+                  className={
+                    org.status === 'ACTIVE'
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-sm'
+                      : org.status === 'SUSPENDED' || org.status === 'PAYMENT_FAILED' || org.status === 'EXPIRED'
+                      ? 'bg-destructive/20 text-destructive border-destructive/30 text-sm'
+                      : 'bg-amber-500/20 text-amber-400 border-amber-500/30 text-sm'
+                  }
+                >
                   {org.status}
                 </Badge>
                 <p className="text-xs text-muted-foreground mt-1 truncate">{org.contactEmail}</p>
+                {sub?.status === 'TRIAL' && sub?.trialEndsAt && (
+                  <p className="text-[11px] text-amber-400 font-mono">
+                    Trial ends {new Date(sub.trialEndsAt).toLocaleDateString('en-IN')}
+                  </p>
+                )}
+                {sub?.status === 'ACTIVE' && sub?.currentPeriodEnd && (
+                  <p className="text-[11px] text-muted-foreground font-mono">
+                    Renews {new Date(sub.currentPeriodEnd).toLocaleDateString('en-IN')}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const LaundrySlot = require('../models/LaundrySlot');
 const Student = require('../models/Student');
 const Hostel = require('../models/Hostel');
@@ -166,7 +167,7 @@ exports.cancelBooking = async (req, res) => {
 
     const filter = { _id: id };
     if (!isSuperAdmin) {
-      filter.organizationId = orgId || new require('mongoose').Types.ObjectId();
+      filter.organizationId = orgId || new mongoose.Types.ObjectId();
     }
 
     const booking = await LaundrySlot.findOne(filter);

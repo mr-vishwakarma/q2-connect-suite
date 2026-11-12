@@ -19,13 +19,18 @@ export interface VoucherUserRef {
   email: string;
 }
 
+export type VoucherType = 'DISCOUNT' | 'ACTIVATION' | 'TRIAL';
+
 export interface Voucher {
   _id: string;
   reference: string;
   name: string;
   description?: string;
+  voucherType?: VoucherType;
   codeMasked: string;
   discountAmountRupees: number;
+  activationDurationDays?: number | null;
+  trialDaysGranted?: number | null;
   eligiblePlans: VoucherPlanRef[];
   eligibleBillingIntervals: ('MONTHLY' | 'YEARLY')[];
   validFrom: string;
@@ -49,7 +54,10 @@ export interface Voucher {
 export interface CreateVoucherPayload {
   name: string;
   description?: string;
+  voucherType?: VoucherType;
   discountAmountRupees: number;
+  activationDurationDays?: number | null;
+  trialDaysGranted?: number | null;
   eligiblePlans?: string[];
   eligibleBillingIntervals?: ('MONTHLY' | 'YEARLY')[];
   validFrom?: string;
@@ -80,7 +88,10 @@ export interface VoucherRedemptionItem {
     name: string;
     reference: string;
     codeMasked: string;
+    voucherType?: VoucherType;
     discountAmountRupees: number;
+    activationDurationDays?: number | null;
+    trialDaysGranted?: number | null;
   };
   organizationId: {
     _id: string;
@@ -122,15 +133,25 @@ export interface ApplyVoucherPayload {
 export interface ApplyVoucherResponse {
   voucherReference: string;
   voucherName: string;
+  voucherType?: VoucherType;
   codeMasked: string;
   originalAmount: number;
   discountAmount: number;
   finalPayable: number;
   isZeroPayable: boolean;
+  grantsTrial?: boolean;
+  trialDaysGranted?: number | null;
+  activationDurationDays?: number | null;
   billingCycle: 'MONTHLY' | 'YEARLY';
   planId: string;
   planName: string;
+  planDescription?: string;
+  includedFeatures?: string[];
+  limits?: Record<string, number>;
   discountDurationCycles: number;
+  estimatedPeriodStart?: string;
+  estimatedPeriodEnd?: string;
+  benefitSummary?: string;
 }
 
 export interface RedeemZeroPayablePayload {
@@ -143,12 +164,19 @@ export interface RedeemZeroPayablePayload {
 
 export interface RedeemZeroPayableResponse {
   subscriptionId: string;
-  invoiceNumber: string;
+  status?: string;
+  activationMethod?: string;
+  benefitType?: string;
+  trialDaysGranted?: number | null;
+  invoiceNumber: string | null;
+  planId?: string;
   planName: string;
   billingCycle: string;
+  agreedPriceRupees?: number;
   originalAmount: number;
   discountAmount: number;
   finalPayable: number;
+  currentPeriodStart?: string;
   currentPeriodEnd: string;
 }
 
@@ -168,6 +196,7 @@ export interface ReservePartialResponse {
   originalAmount: number;
   discountAmount: number;
   currency: string;
+  planId?: string;
   planName: string;
   billingCycle: string;
   voucherReference: string;
@@ -187,6 +216,7 @@ export const voucherService = {
     limit?: number;
     status?: string;
     scope?: string;
+    voucherType?: string;
     planId?: string;
     search?: string;
   } = {}) => {

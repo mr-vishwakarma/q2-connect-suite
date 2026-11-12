@@ -25,9 +25,10 @@ import {
   Printer,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { extractFloor } from './StudentFeeMatrix';
+import { extractFloor } from './feeMatrixUtils';
 import { cn } from '@/lib/utils';
 import { formatDateDMY } from '@/utils/dateUtils';
+import { getErrorMessage } from '@/utils/errorHandling';
 import {
   FeeReceiptData,
   SecurityDepositReceiptData,
@@ -37,20 +38,71 @@ import {
 } from '@/lib/receiptPdf';
 import { HostelFeeReceiptModal } from '@/components/receipts/HostelFeeReceiptModal';
 
-interface StudentProfileHistoryProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  selectedStudent: any;
-  allStudents?: any[];
-  selectedStudentDeposit: any;
-  selectedStudentFees: any[];
-  selectedStudentPayments: any[];
-  downloadHistoryForStudent: (student: any) => void;
-  openCollect: (student: any) => void;
-  onSelectAnotherStudent?: (student: any) => void;
+export interface StudentProfileSummary {
+  id: string;
+  name: string;
+  username?: string;
+  student_code?: string;
+  studentCode?: string;
+  room_no?: string | null;
+  floor?: string;
+  hostel?: string;
+  phone?: string;
+  fees?: number;
+  profile_photo?: string;
+  start_date?: string | null;
+  valid_date?: string | null;
 }
 
-export function StudentProfileHistory({
+export interface StudentDepositSummary {
+  amount?: number;
+  status?: string;
+  receipt_no?: string | null;
+  collected_date?: string | null;
+  payment_mode?: string;
+  notes?: string | null;
+}
+
+export interface StudentFeeSummary {
+  id: string;
+  month: string;
+  amount: number;
+  late_fee?: number;
+  discount?: number;
+  paid_amount?: number;
+  status: string;
+}
+
+export interface StudentPaymentSummary {
+  id: string;
+  receipt_no: string;
+  payment_date: string;
+  month: string;
+  amount: number;
+  late_fee?: number;
+  discount?: number;
+  security_deposit?: number;
+  deposit_receipt_no?: string | null;
+  payment_mode: string;
+  hostel?: string;
+  admin_name?: string | null;
+  notes?: string | null;
+}
+
+interface StudentProfileHistoryProps<TStudent extends StudentProfileSummary = StudentProfileSummary> {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedStudent: TStudent | null;
+  allStudents?: TStudent[];
+  selectedStudentDeposit: StudentDepositSummary | null;
+  selectedStudentFees: StudentFeeSummary[];
+  selectedStudentPayments: StudentPaymentSummary[];
+  downloadHistoryForStudent: (student: TStudent) => void;
+  openCollect: (student: TStudent) => void;
+  onSelectAnotherStudent?: (student: TStudent) => void;
+}
+
+export function StudentProfileHistory<TStudent extends StudentProfileSummary = StudentProfileSummary>({
   open,
   onOpenChange,
   selectedStudent,
@@ -61,128 +113,20 @@ export function StudentProfileHistory({
   downloadHistoryForStudent,
   openCollect,
   onSelectAnotherStudent,
-}: StudentProfileHistoryProps) {
+}: StudentProfileHistoryProps<TStudent>) {
   const [previewReceiptNo, setPreviewReceiptNo] = useState<string | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
 
-  if (!selectedStudent) return null;
-
-  const handleDownloadFeeReceipt = async (p: any) => {
-    try {
-      const data: FeeReceiptData = {
-        receipt_no: p.receipt_no,
-        payment_date: p.payment_date,
-        student_name: selectedStudent.name,
-        username: selectedStudent.username,
-        student_code: selectedStudent.student_code || selectedStudent.studentCode,
-        room_no: selectedStudent.room_no,
-        hostel: p.hostel || selectedStudent.hostel || 'Hostel Campus',
-        month: p.month,
-        monthly_fee: p.amount,
-        late_fee: p.late_fee || 0,
-        discount: p.discount || 0,
-        amount_paid: p.amount,
-        payment_mode: p.payment_mode,
-        admin_name: p.admin_name,
-        notes: p.notes,
-        deposit_collected_separately: p.security_deposit > 0 ? p.security_deposit : null,
-        deposit_receipt_no: p.deposit_receipt_no || null,
-      };
-      await downloadFeeReceipt(data);
-    } catch {
-      downloadHistoryForStudent(selectedStudent);
-    }
-  };
-
-  const handlePrintFeeReceipt = async (p: any) => {
-    try {
-      const data: FeeReceiptData = {
-        receipt_no: p.receipt_no,
-        payment_date: p.payment_date,
-        student_name: selectedStudent.name,
-        username: selectedStudent.username,
-        student_code: selectedStudent.student_code || selectedStudent.studentCode,
-        room_no: selectedStudent.room_no,
-        hostel: p.hostel || selectedStudent.hostel || 'Hostel Campus',
-        month: p.month,
-        monthly_fee: p.amount,
-        late_fee: p.late_fee || 0,
-        discount: p.discount || 0,
-        amount_paid: p.amount,
-        payment_mode: p.payment_mode,
-        admin_name: p.admin_name,
-        notes: p.notes,
-        deposit_collected_separately: p.security_deposit > 0 ? p.security_deposit : null,
-        deposit_receipt_no: p.deposit_receipt_no || null,
-      };
-      await printFeeReceipt(data);
-    } catch {
-      // Fallback
-    }
-  };
-
-  const handleDownloadDepositReceipt = async (p: any) => {
-    try {
-      const data: SecurityDepositReceiptData = {
-        receipt_no: p.deposit_receipt_no || `DEP-${p.receipt_no}`,
-        payment_date: p.payment_date,
-        student_name: selectedStudent.name,
-        username: selectedStudent.username,
-        student_code: selectedStudent.student_code || selectedStudent.studentCode,
-        room_no: selectedStudent.room_no,
-        hostel: selectedStudent.hostel || 'Q2',
-        deposit_amount: p.security_deposit,
-        payment_mode: p.payment_mode,
-        admin_name: p.admin_name,
-        notes: p.notes,
-      };
-      await downloadSecurityDepositReceipt(data);
-    } catch {
-      downloadHistoryForStudent(selectedStudent);
-    }
-  };
-
-  const handleDownloadStandaloneDepositReceipt = async () => {
-    if (!selectedStudentDeposit) return;
-    try {
-      const data: SecurityDepositReceiptData = {
-        receipt_no: selectedStudentDeposit.receipt_no || `DEP-${selectedStudent.username}`,
-        payment_date: selectedStudentDeposit.collected_date || new Date().toISOString(),
-        student_name: selectedStudent.name,
-        username: selectedStudent.username,
-        student_code: selectedStudent.student_code || selectedStudent.studentCode,
-        room_no: selectedStudent.room_no,
-        hostel: selectedStudent.hostel || 'Q2',
-        deposit_amount: selectedStudentDeposit.amount,
-        payment_mode: selectedStudentDeposit.payment_mode || 'offline',
-        admin_name: selectedStudentDeposit.notes,
-        notes: selectedStudentDeposit.notes,
-      };
-      await downloadSecurityDepositReceipt(data);
-    } catch {
-      downloadHistoryForStudent(selectedStudent);
-    }
-  };
-
-  // Floor calculation
-  const floorName = extractFloor(selectedStudent.room_no, selectedStudent.floor);
-
-  // Roommates calculation (other students in the same room)
+  // Roommates calculation (must remain unconditional per Rules of Hooks)
   const roommates = React.useMemo(() => {
-    if (!selectedStudent.room_no) return [];
+    if (!selectedStudent?.room_no) return [];
+    const targetRoom = selectedStudent.room_no.trim();
     return allStudents.filter(
-      (s) => s.id !== selectedStudent.id && s.room_no && s.room_no.trim() === selectedStudent.room_no.trim()
+      (s) => s.id !== selectedStudent.id && s.room_no && s.room_no.trim() === targetRoom
     );
   }, [allStudents, selectedStudent]);
 
-  // Room Type description based on occupancy
-  const totalOccupants = 1 + roommates.length;
-  let roomType = 'Single Sharing';
-  if (totalOccupants === 2) roomType = 'Double Sharing';
-  else if (totalOccupants === 3) roomType = 'Triple Sharing';
-  else if (totalOccupants >= 4) roomType = `${totalOccupants}-Bed Sharing`;
-
-  // Financial totals (Memoized)
+  // Financial totals (Memoized unconditionally)
   const totalPaidOverall = React.useMemo(() => {
     return selectedStudentPayments.reduce(
       (sum, p) => sum + Number(p.amount || 0) + Number(p.security_deposit || 0),
@@ -207,7 +151,7 @@ export function StudentProfileHistory({
     return selectedStudentFees.find((f) => f.month === currentMonthName);
   }, [selectedStudentFees, currentMonthName]);
 
-  const isExpired = selectedStudent.valid_date ? new Date(selectedStudent.valid_date) < new Date() : false;
+  const isExpired = selectedStudent?.valid_date ? new Date(selectedStudent.valid_date) < new Date() : false;
 
   const feeStatusBadge = React.useMemo(() => {
     if (isExpired || (currentFeeRecord && currentFeeRecord.status === 'unpaid') || (!currentFeeRecord && totalPendingBalance > 0)) {
@@ -229,6 +173,116 @@ export function StudentProfileHistory({
       </Badge>
     );
   }, [isExpired, currentFeeRecord, totalPendingBalance]);
+
+  if (!selectedStudent) return null;
+
+  const handleDownloadFeeReceipt = async (p: StudentPaymentSummary) => {
+    try {
+      const data: FeeReceiptData = {
+        receipt_no: p.receipt_no,
+        payment_date: p.payment_date,
+        student_name: selectedStudent.name,
+        username: selectedStudent.username || '',
+        student_code: selectedStudent.student_code || selectedStudent.studentCode,
+        room_no: selectedStudent.room_no || null,
+        hostel: p.hostel || selectedStudent.hostel || 'Hostel Campus',
+        month: p.month,
+        monthly_fee: p.amount,
+        late_fee: p.late_fee || 0,
+        discount: p.discount || 0,
+        amount_paid: p.amount,
+        payment_mode: p.payment_mode,
+        admin_name: p.admin_name,
+        notes: p.notes,
+        deposit_collected_separately: p.security_deposit && p.security_deposit > 0 ? p.security_deposit : null,
+        deposit_receipt_no: p.deposit_receipt_no || null,
+      };
+      await downloadFeeReceipt(data);
+    } catch {
+      downloadHistoryForStudent(selectedStudent);
+    }
+  };
+
+  const handlePrintFeeReceipt = async (p: StudentPaymentSummary) => {
+    try {
+      const data: FeeReceiptData = {
+        receipt_no: p.receipt_no,
+        payment_date: p.payment_date,
+        student_name: selectedStudent.name,
+        username: selectedStudent.username || '',
+        student_code: selectedStudent.student_code || selectedStudent.studentCode,
+        room_no: selectedStudent.room_no || null,
+        hostel: p.hostel || selectedStudent.hostel || 'Hostel Campus',
+        month: p.month,
+        monthly_fee: p.amount,
+        late_fee: p.late_fee || 0,
+        discount: p.discount || 0,
+        amount_paid: p.amount,
+        payment_mode: p.payment_mode,
+        admin_name: p.admin_name,
+        notes: p.notes,
+        deposit_collected_separately: p.security_deposit && p.security_deposit > 0 ? p.security_deposit : null,
+        deposit_receipt_no: p.deposit_receipt_no || null,
+      };
+      await printFeeReceipt(data);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const handleDownloadDepositReceipt = async (p: StudentPaymentSummary) => {
+    try {
+      const data: SecurityDepositReceiptData = {
+        receipt_no: p.deposit_receipt_no || `DEP-${p.receipt_no}`,
+        payment_date: p.payment_date,
+        student_name: selectedStudent.name,
+        username: selectedStudent.username || '',
+        student_code: selectedStudent.student_code || selectedStudent.studentCode,
+        room_no: selectedStudent.room_no || null,
+        hostel: selectedStudent.hostel || 'Q2',
+        deposit_amount: p.security_deposit || 0,
+        payment_mode: p.payment_mode,
+        admin_name: p.admin_name,
+        notes: p.notes,
+      };
+      await downloadSecurityDepositReceipt(data);
+    } catch {
+      downloadHistoryForStudent(selectedStudent);
+    }
+  };
+
+  const handleDownloadStandaloneDepositReceipt = async () => {
+    if (!selectedStudentDeposit) return;
+    try {
+      const data: SecurityDepositReceiptData = {
+        receipt_no: selectedStudentDeposit.receipt_no || `DEP-${selectedStudent.username}`,
+        payment_date: selectedStudentDeposit.collected_date || new Date().toISOString(),
+        student_name: selectedStudent.name,
+        username: selectedStudent.username || '',
+        student_code: selectedStudent.student_code || selectedStudent.studentCode,
+        room_no: selectedStudent.room_no || null,
+        hostel: selectedStudent.hostel || 'Q2',
+        deposit_amount: selectedStudentDeposit.amount || 0,
+        payment_mode: selectedStudentDeposit.payment_mode || 'offline',
+        admin_name: selectedStudentDeposit.notes,
+        notes: selectedStudentDeposit.notes,
+      };
+      await downloadSecurityDepositReceipt(data);
+    } catch (err: unknown) {
+      void getErrorMessage(err);
+      downloadHistoryForStudent(selectedStudent);
+    }
+  };
+
+  // Floor calculation
+  const floorName = extractFloor(selectedStudent.room_no, selectedStudent.floor);
+
+  // Room Type description based on occupancy
+  const totalOccupants = 1 + roommates.length;
+  let roomType = 'Single Sharing';
+  if (totalOccupants === 2) roomType = 'Double Sharing';
+  else if (totalOccupants === 3) roomType = 'Triple Sharing';
+  else if (totalOccupants >= 4) roomType = `${totalOccupants}-Bed Sharing`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

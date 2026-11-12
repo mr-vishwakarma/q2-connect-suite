@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { PlatformSettings as PlatformSettingsType } from '@/types';
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 export default function PlatformSettings() {
   const [settings, setSettings] = useState<PlatformSettingsType | null>(null);
@@ -53,8 +54,8 @@ export default function PlatformSettings() {
         setSettings(res.data);
         toast.success('Platform settings updated successfully!');
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to update settings');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to update settings'));
     } finally {
       setIsSaving(false);
     }

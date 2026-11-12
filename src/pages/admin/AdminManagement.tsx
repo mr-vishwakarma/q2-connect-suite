@@ -39,7 +39,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { formatDateDMY } from '@/utils/dateUtils';
+import { formatDateDMY } from '@/utils/dateUtils'; import { getErrorMessage } from '@/utils/errorHandling';
 
 interface AdminUser {
   id: string;
@@ -125,9 +125,9 @@ export default function AdminManagement() {
           setIsPrimaryAdmin(response.data.isCallerPrimaryAdmin);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching admins:', error);
-      toast.error(error.response?.data?.message || 'Failed to load administrator directory');
+      toast.error(getErrorMessage(error, 'Failed to load administrator directory'));
     } finally {
       setIsLoading(false);
     }
@@ -170,9 +170,9 @@ export default function AdminManagement() {
         setCreateStep('OTP');
         setCreateCooldown(res.data.cooldownSeconds || 60);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error requesting create OTP:', err);
-      toast.error(err.response?.data?.message || 'Failed to request verification code');
+      toast.error(getErrorMessage(err, 'Failed to request verification code'));
     } finally {
       setIsSubmittingCreate(false);
     }
@@ -196,9 +196,9 @@ export default function AdminManagement() {
         setIsCreateOpen(false);
         fetchAdmins();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error verifying create OTP:', err);
-      toast.error(err.response?.data?.message || 'Failed to verify code');
+      toast.error(getErrorMessage(err, 'Failed to verify code'));
     } finally {
       setIsSubmittingCreate(false);
     }
@@ -230,9 +230,9 @@ export default function AdminManagement() {
         setDeleteStep('OTP');
         setDeleteCooldown(res.data.cooldownSeconds || 60);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error requesting delete OTP:', err);
-      toast.error(err.response?.data?.message || 'Failed to request verification code');
+      toast.error(getErrorMessage(err, 'Failed to request verification code'));
     } finally {
       setIsSubmittingDelete(false);
     }
@@ -257,9 +257,9 @@ export default function AdminManagement() {
         setIsDeleteOpen(false);
         fetchAdmins();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error verifying delete OTP:', err);
-      toast.error(err.response?.data?.message || 'Failed to deactivate admin');
+      toast.error(getErrorMessage(err, 'Failed to deactivate admin'));
     } finally {
       setIsSubmittingDelete(false);
     }
@@ -273,9 +273,9 @@ export default function AdminManagement() {
       if (res.data?.success) {
         toast.success(`Activation invite resent to ${email}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error resending invite:', err);
-      toast.error(err.response?.data?.message || 'Failed to resend invitation');
+      toast.error(getErrorMessage(err, 'Failed to resend invitation'));
     } finally {
       setResendingId(null);
     }

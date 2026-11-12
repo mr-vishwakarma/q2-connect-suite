@@ -13,7 +13,15 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 interface FormData {
   fullName: string;
@@ -48,6 +56,7 @@ export default function ConnectWithUs() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedEnquiryId, setSubmittedEnquiryId] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [legalModal, setLegalModal] = useState<'terms' | 'privacy' | null>(null);
 
   useEffect(() => {
     document.title = "Connect With Us — Hostel IQ";
@@ -80,7 +89,7 @@ export default function ConnectWithUs() {
       newErrors.workEmail = 'Please provide a valid work email address';
     }
 
-    const cleanedPhone = formData.contactNumber.replace(/[\s\-\(\)\.]/g, '');
+    const cleanedPhone = formData.contactNumber.replace(/[\s().-]/g, '');
     if (!formData.contactNumber.trim()) {
       newErrors.contactNumber = 'Contact number is required';
     } else if (!/^\+?[0-9]{7,15}$/.test(cleanedPhone)) {
@@ -151,12 +160,12 @@ export default function ConnectWithUs() {
         setServerError(msg);
         toast.error(msg, { toastId: 'connect-error' });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsSubmitting(false);
-      const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        'Unable to submit enquiry. Please verify your connection and try again.';
+      const msg = getErrorMessage(
+        err,
+        'Unable to submit enquiry. Please verify your connection and try again.'
+      );
       setServerError(msg);
       toast.error(msg, { toastId: 'connect-error' });
     }
@@ -625,13 +634,21 @@ export default function ConnectWithUs() {
                 {/* Helper text & Privacy Notice */}
                 <div className="text-[11px] text-zinc-400 leading-relaxed pt-1">
                   Our team will review your enquiry and contact you using the details provided. By submitting, you agree to our{' '}
-                  <Link to="/terms" target="_blank" className="text-rose-400 hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setLegalModal('terms')}
+                    className="text-rose-400 hover:underline focus:outline-none focus:underline cursor-pointer"
+                  >
                     Terms of Service
-                  </Link>{' '}
+                  </button>{' '}
                   and{' '}
-                  <Link to="/privacy" target="_blank" className="text-rose-400 hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => setLegalModal('privacy')}
+                    className="text-rose-400 hover:underline focus:outline-none focus:underline cursor-pointer"
+                  >
                     Privacy Policy
-                  </Link>
+                  </button>
                   .
                 </div>
 
@@ -665,6 +682,51 @@ export default function ConnectWithUs() {
       <footer className="relative z-20 w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 text-center text-xs text-zinc-500">
         Hostel IQ &copy; {new Date().getFullYear()} &mdash; Enterprise Hostel Management Cloud Platform
       </footer>
+
+      <Dialog
+        open={legalModal !== null}
+        onOpenChange={(open) => {
+          if (!open) setLegalModal(null);
+        }}
+      >
+        <DialogContent className="bg-[#12131d] border border-white/[0.12] text-zinc-100 max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-white text-lg">
+              {legalModal === 'terms' ? 'Hostel IQ Terms of Service' : 'Hostel IQ Privacy Policy'}
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 text-xs">
+              {legalModal === 'terms'
+                ? 'Enterprise onboarding and platform evaluation terms'
+                : 'How we protect and handle your enquiry information'}
+            </DialogDescription>
+          </DialogHeader>
+          {legalModal === 'terms' ? (
+            <div className="space-y-3 text-xs text-zinc-300 leading-relaxed">
+              <p>
+                Submitting this form initiates a consultative onboarding and platform evaluation conversation with the Hosteliq team. No financial obligation or paid subscription is created until an authorized administrator completes tenant provisioning and plan activation.
+              </p>
+              <p>
+                You confirm that the property and contact information provided is accurate and that you are authorized to enquire on behalf of your hostel or accommodation organization.
+              </p>
+              <p>
+                Tenant workspaces, resident data isolation, and billing entitlements are governed by your selected Hosteliq service plan upon account activation.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 text-xs text-zinc-300 leading-relaxed">
+              <p>
+                We collect your name, work email, contact number, and hostel details solely to respond to your onboarding enquiry, schedule demos, and assist with setting up your Hosteliq workspace.
+              </p>
+              <p>
+                Enquiry submissions are stored securely within Hosteliq infrastructure and are never sold or shared with third-party data brokers.
+              </p>
+              <p>
+                To update or request deletion of your enquiry details at any time, contact our support team at support@mrvishwakarma.in.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

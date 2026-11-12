@@ -19,6 +19,7 @@ import { superAdminService } from '@/services/api/superAdmin.service';
 import { Organization, SaasUserListItem } from '@/types';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 export default function ImpersonationCenter() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -47,7 +48,7 @@ export default function ImpersonationCenter() {
     try {
       const res = await superAdminService.getOrganizations();
       if (res.success && res.data) {
-        const orgList = Array.isArray(res.data) ? res.data : (res.data as any).organizations || [];
+        const orgList = Array.isArray(res.data) ? res.data : res.data.organizations || [];
         setOrganizations(orgList);
       }
     } catch (error) {
@@ -113,8 +114,8 @@ export default function ImpersonationCenter() {
         // Navigate into tenant manager dashboard
         navigate('/admin/dashboard');
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to initialize impersonation session');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to initialize impersonation session'));
     } finally {
       setIsLoading(false);
     }

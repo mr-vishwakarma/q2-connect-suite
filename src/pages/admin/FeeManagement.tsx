@@ -47,6 +47,7 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getAvatarUrl } from '@/utils/imageUtils';
 import { formatDateDMY } from '@/utils/dateUtils';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 const generateMonthOptions = () => {
   const options = [];
@@ -130,8 +131,8 @@ export default function FeeManagement() {
       } else {
         toast.error(res.message || 'Failed to send fee statement email');
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to send fee statement email');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to send fee statement email'));
     } finally {
       setEmailingStudentId(null);
     }
@@ -297,7 +298,7 @@ export default function FeeManagement() {
       const studentCollectedDeposit = deposits
         .filter((d) => d.student_id === s.id && (d.status === 'collected' || d.status === 'active' || d.status === 'held'))
         .reduce((sum, d) => sum + (d.paid_amount !== undefined ? d.paid_amount : (d.amount || 0)), 0);
-      const requiredDeposit = (s as any).security_deposit || 0;
+      const requiredDeposit = s.security_deposit || 0;
       const depositDue = Math.max(0, requiredDeposit - studentCollectedDeposit);
 
       const paidAmount = isPaid ? 0 : currentFee?.paid_amount || 0;
@@ -429,7 +430,7 @@ export default function FeeManagement() {
   const upcomingCount = useMemo(() => records.filter((r) => r.status === 'upcoming').length, [records]);
 
   // Open Collect Payment dialog with authoritative dynamic calculation
-  const openCollect = async (s: Student, monthToSelect?: string) => {
+  const openCollect = useCallback(async (s: Student, monthToSelect?: string) => {
     setSelectedStudent(s);
     const targetMonth = monthToSelect || selectedMonth;
     const monthly = s.fees || 0;
@@ -488,7 +489,7 @@ export default function FeeManagement() {
       pNotes: '',
     });
     setShowPaymentDialog(true);
-  };
+  }, [selectedMonth, fees, gracePeriodSetting, lateFeeSetting]);
 
   // Deep-link integration from alerts & dashboard cards
   const alertStudentId = searchParams.get('studentId');
@@ -513,7 +514,7 @@ export default function FeeManagement() {
         toast.error('Student record referenced in alert could not be found in current branch.');
       }
     }
-  }, [alertStudentId, alertAction, alertMonth, students, fees, loading]);
+  }, [alertStudentId, alertAction, alertMonth, students, fees, loading, openCollect, searchParams, selectedMonth, setSearchParams]);
 
   const openProfile = (s: Student) => {
     setSelectedStudent(s);

@@ -19,6 +19,7 @@ export interface ReceiptStudent {
   yearSemester: string;
   roomNo: string;
   floor?: string;
+  hostel?: string;
 }
 
 export interface ReceiptBilling {

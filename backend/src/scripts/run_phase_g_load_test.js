@@ -17,9 +17,10 @@
  * Generates: PHASE_G_LOAD_TEST_REPORT.md
  */
 
-require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config();
 const dns = require('dns');
 try {
   dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);

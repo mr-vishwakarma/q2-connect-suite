@@ -13,16 +13,55 @@ export interface NormalizedApiError {
   isAuthError: boolean;
 }
 
+interface HttpErrorResponseData {
+  message?: string;
+  code?: string;
+  error?: {
+    message?: string;
+    code?: string;
+  };
+}
+
+interface HttpErrorLike {
+  code?: string;
+  message?: string;
+  response?: {
+    status?: number;
+    data?: HttpErrorResponseData;
+  };
+}
+
+function asHttpError(error: unknown): HttpErrorLike {
+  if (typeof error === 'object' && error !== null) {
+    return error as HttpErrorLike;
+  }
+  return {};
+}
+
+export function getErrorMessage(error: unknown, fallback = 'An unexpected error occurred'): string {
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+  const err = asHttpError(error);
+  return (
+    err.response?.data?.message ||
+    err.response?.data?.error?.message ||
+    err.message ||
+    fallback
+  );
+}
+
 /**
  * Normalizes any Axios, Network, or unknown error into a structured object.
  */
-export function normalizeApiError(error: any): NormalizedApiError {
-  const isTimeout = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout');
-  const isNetwork = error?.code === 'ERR_NETWORK' || (typeof navigator !== 'undefined' && !navigator.onLine);
-  const status = error?.response?.status || null;
-  const backendMessage = error?.response?.data?.message;
+export function normalizeApiError(error: unknown): NormalizedApiError {
+  const err = asHttpError(error);
+  const isTimeout = err.code === 'ECONNABORTED' || Boolean(err.message?.includes('timeout'));
+  const isNetwork = err.code === 'ERR_NETWORK' || (typeof navigator !== 'undefined' && !navigator.onLine);
+  const status = err.response?.status ?? null;
+  const backendMessage = err.response?.data?.message || err.response?.data?.error?.message;
 
-  let message = backendMessage || error?.message || 'An unexpected error occurred';
+  let message = backendMessage || err.message || 'An unexpected error occurred';
 
   if (isNetwork) {
     message = 'Network unavailable. Check your internet connection.';
@@ -46,7 +85,7 @@ export function normalizeApiError(error: any): NormalizedApiError {
 
   return {
     status,
-    code: error?.code || null,
+    code: err.code || null,
     message,
     isOffline: isNetwork,
     isTimeout,
@@ -58,7 +97,7 @@ export function normalizeApiError(error: any): NormalizedApiError {
  * Displays a deduplicated toast for API errors.
  * Silently throttles identical notifications within a 2.5s window.
  */
-export function notifyApiError(error: any, fallbackMessage?: string) {
+export function notifyApiError(error: unknown, fallbackMessage?: string) {
   const normalized = normalizeApiError(error);
   const displayMsg = fallbackMessage || normalized.message;
   const dedupKey = `${normalized.status || normalized.code || 'unknown'}:${displayMsg}`;

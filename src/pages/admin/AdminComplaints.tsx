@@ -16,7 +16,7 @@ import {
   PaginationItem,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination";
+} from '@/components/ui/pagination';
 
 interface Complaint {
   id: string;
@@ -26,6 +26,16 @@ interface Complaint {
   createdAt: string;
   userId: { name?: string; username?: string } | string;
   studentId: { name?: string; roomNo?: string } | string | null;
+}
+
+interface ComplaintApiRecord {
+  _id: string;
+  title: string;
+  description: string;
+  status?: string;
+  createdAt: string;
+  userId: Complaint['userId'];
+  studentId: Complaint['studentId'];
 }
 
 export default function AdminComplaints() {
@@ -44,23 +54,17 @@ export default function AdminComplaints() {
     }
   }, [user, isAdmin, loading, navigate]);
 
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchComplaints();
-    }
-  }, [user, isAdmin, selectedHostel, currentPage]);
-
-  const fetchComplaints = async () => {
+  const fetchComplaints = useCallback(async () => {
     try {
       const response = await api.get('/complaints', {
-        params: { 
+        params: {
           hostel: selectedHostel,
           page: currentPage,
-          limit: 20
-        }
+          limit: 20,
+        },
       });
       if (response.data?.success) {
-        const mapped = response.data.data.map((c: any) => ({
+        const mapped = (response.data.data || []).map((c: ComplaintApiRecord) => ({
           id: c._id,
           title: c.title,
           description: c.description,
@@ -79,7 +83,13 @@ export default function AdminComplaints() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedHostel, currentPage]);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchComplaints();
+    }
+  }, [user, isAdmin, fetchComplaints]);
 
   const updateStatus = async (id: string, status: string) => {
     try {
@@ -113,7 +123,9 @@ export default function AdminComplaints() {
 
   if (loading || isLoading) {
     return (
-      <div className="py-8"><InlineSkeletonList rows={5} /></div>
+      <div className="py-8">
+        <InlineSkeletonList rows={5} />
+      </div>
     );
   }
 
@@ -206,18 +218,20 @@ export default function AdminComplaints() {
           <Pagination>
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                <PaginationPrevious
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
               <PaginationItem>
-                <span className="text-sm px-4">Page {currentPage} of {totalPages}</span>
+                <span className="text-sm px-4">
+                  Page {currentPage} of {totalPages}
+                </span>
               </PaginationItem>
               <PaginationItem>
-                <PaginationNext 
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                <PaginationNext
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
             </PaginationContent>

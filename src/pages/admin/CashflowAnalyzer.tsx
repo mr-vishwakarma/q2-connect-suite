@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   TrendingUp,
@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useHostel } from '@/contexts/HostelContext';
 import { expenseService } from '@/services/api/expense.service';
 import { feeService } from '@/services/api/fee.service';
-import { Expense } from '@/types';
+import { Expense, Fee, Payment } from '@/types';
 import { format } from 'date-fns';
 
 export default function CashflowAnalyzer() {
@@ -31,11 +31,7 @@ export default function CashflowAnalyzer() {
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchCashflowData();
-  }, [selectedHostel, selectedMonth]);
-
-  const fetchCashflowData = async () => {
+  const fetchCashflowData = useCallback(async () => {
     try {
       setIsLoading(true);
       const [expRes, feeDashRes] = await Promise.all([
@@ -51,8 +47,8 @@ export default function CashflowAnalyzer() {
 
       if (feeDashRes.success && feeDashRes.data) {
         const selectedYearMonth = selectedMonth; // e.g. "2026-09"
-        const allPayments = feeDashRes.data.payments || [];
-        const monthFilteredPayments = allPayments.filter((p: any) => {
+        const allPayments: Array<Payment & { paymentDate?: string }> = feeDashRes.data.payments || [];
+        const monthFilteredPayments = allPayments.filter((p) => {
           if (!p.paymentDate) return true;
           try {
             return format(new Date(p.paymentDate), 'yyyy-MM') === selectedYearMonth;
@@ -63,10 +59,10 @@ export default function CashflowAnalyzer() {
 
         // Use filtered payments if any match, or all payments if monthly filter isn't recorded
         const activePayments = monthFilteredPayments.length > 0 ? monthFilteredPayments : allPayments;
-        const totalPaid = activePayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        const totalPaid = activePayments.reduce((sum: number, p) => sum + (p.amount || 0), 0);
         const totalFeeDues = (feeDashRes.data.fees || [])
-          .filter((f: any) => f.status !== 'paid')
-          .reduce((sum: number, f: any) => sum + (f.amount || 0), 0);
+          .filter((f: Fee) => f.status !== 'paid')
+          .reduce((sum: number, f: Fee) => sum + (f.amount || 0), 0);
 
         setTotalCollectedRent(totalPaid);
         setPendingRent(totalFeeDues);
@@ -82,7 +78,11 @@ export default function CashflowAnalyzer() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedHostel, selectedMonth]);
+
+  useEffect(() => {
+    fetchCashflowData();
+  }, [fetchCashflowData]);
 
   const totalExpense = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const netOperatingProfit = totalCollectedRent - totalExpense;

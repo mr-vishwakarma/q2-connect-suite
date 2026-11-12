@@ -43,6 +43,7 @@ import {
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { FeatureDefinition } from '@/types';
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 type CategoryFilter = 'all' | 'core' | 'operations' | 'finance' | 'advanced';
 
@@ -83,9 +84,9 @@ export default function FeatureCatalog() {
       } else {
         setFeatures([]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch feature catalog:', err);
-      setError(err?.response?.data?.message || err?.message || 'Failed to load feature catalog');
+      setError(getErrorMessage(err, 'Failed to load feature catalog'));
     } finally {
       setIsLoading(false);
     }
@@ -99,8 +100,8 @@ export default function FeatureCatalog() {
         setFeatures(res.data);
         toast.success(`Standard feature catalog initialized with ${res.data.length} modules`);
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to initialize default features');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to initialize default features'));
     } finally {
       setIsSeeding(false);
     }
@@ -171,8 +172,8 @@ export default function FeatureCatalog() {
           fetchFeatures();
         }
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to save feature');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to save feature'));
     } finally {
       setIsSubmitting(false);
     }
@@ -188,12 +189,12 @@ export default function FeatureCatalog() {
       );
       await superAdminService.toggleFeature(id, nextVal);
       toast.success(`${feat.name} default status is now ${nextVal ? 'Enabled' : 'Disabled'}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback
       setFeatures((prev) =>
         prev.map((f) => (f.key === feat.key ? { ...f, defaultEnabled: !nextVal } : f))
       );
-      toast.error(err?.response?.data?.message || 'Failed to toggle feature status');
+      toast.error(getErrorMessage(err, 'Failed to toggle feature status'));
     }
   };
 
@@ -206,8 +207,8 @@ export default function FeatureCatalog() {
       toast.success(`Feature '${deletingFeature.name}' removed from catalog`);
       setDeletingFeature(null);
       fetchFeatures();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to delete feature');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to delete feature'));
     } finally {
       setIsSubmitting(false);
     }
@@ -550,7 +551,7 @@ export default function FeatureCatalog() {
               <select
                 id="featCategory"
                 value={formData.category}
-                onChange={(e: any) => setFormData({ ...formData, category: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value as FeatureDefinition['category'] })}
                 className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="core">Core (Essential hostel management)</option>

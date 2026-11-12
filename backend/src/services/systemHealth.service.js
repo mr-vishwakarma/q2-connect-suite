@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const os = require('os');
 const { getRedisStatus } = require('../config/redis');
 const { getQueueMetrics } = require('../queues/queueManager');
+const { getMailConfigStatus } = require('../utils/email');
 
 const systemHealthService = {
   async getSystemHealth() {
@@ -43,6 +44,7 @@ const systemHealthService = {
     const uptimeSeconds = process.uptime();
 
     // 5. External Services Configuration Check
+    const mailConfig = getMailConfigStatus();
     const services = {
       razorpay: {
         configured: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
@@ -57,8 +59,9 @@ const systemHealthService = {
         status: process.env.GOOGLE_CLIENT_ID ? 'CONFIGURED' : 'OPTIONAL',
       },
       emailService: {
-        configured: Boolean(process.env.SMTP_HOST || process.env.EMAIL_USER),
-        status: (process.env.SMTP_HOST || process.env.EMAIL_USER) ? 'CONFIGURED' : 'MOCK_FALLBACK',
+        configured: mailConfig.configured,
+        status: mailConfig.configured ? 'CONFIGURED' : 'MOCK_FALLBACK',
+        primaryProvider: mailConfig.primaryProvider,
       },
       jwtAuth: {
         configured: Boolean(process.env.JWT_SECRET),

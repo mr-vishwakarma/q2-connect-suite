@@ -179,14 +179,17 @@ async function runPhaseDTestSuite() {
     // =============================================================
     console.log('\n--- TEST GROUP 4: Distributed Repeatable Scheduler & Duplicate Cron Elimination ---');
 
-    assert(SCHEDULED_TASKS.length === 2, 'Distributed scheduler defines exactly 2 repeatable jobs (Late Fee & Fee Reminders)');
+    assert(SCHEDULED_TASKS.length === 3, 'Distributed scheduler defines 3 repeatable jobs (Late Fee, Fee Reminders & Subscription Lifecycle Sweep)');
     const lateFeeTask = SCHEDULED_TASKS.find((t) => t.name === 'LATE_FEE_CALCULATION');
     const feeReminderTask = SCHEDULED_TASKS.find((t) => t.name === 'FEE_REMINDER_DISPATCHER');
+    const lifecycleTask = SCHEDULED_TASKS.find((t) => t.name === 'SUBSCRIPTION_LIFECYCLE_SWEEP');
 
     assert(lateFeeTask && lateFeeTask.pattern === '0 0 * * *', 'Late fee calculation is scheduled for daily midnight (0 0 * * *)');
     assert(lateFeeTask && lateFeeTask.jobId === 'repeatable:late-fee-daily', 'Late fee calculation has deterministic repeatable jobId');
     assert(feeReminderTask && feeReminderTask.pattern === '0 10 * * *', 'Fee reminder dispatcher is scheduled for daily 10:00 AM (0 10 * * *)');
     assert(feeReminderTask && feeReminderTask.jobId === 'repeatable:fee-reminders-daily', 'Fee reminder dispatcher has deterministic repeatable jobId');
+    assert(lifecycleTask && lifecycleTask.pattern === '15 0 * * *', 'Subscription lifecycle sweep is scheduled daily at 00:15 AM (15 0 * * *)');
+    assert(lifecycleTask && lifecycleTask.jobId === 'repeatable:subscription-lifecycle-daily', 'Subscription lifecycle sweep has deterministic repeatable jobId');
 
     // Test idempotent registration: running initDistributedScheduler twice does not error or register duplicate jobs
     const schedResult1 = await initDistributedScheduler();

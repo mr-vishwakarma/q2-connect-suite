@@ -28,7 +28,17 @@ const {
   createOrder,
   verifyPaymentSignature,
   getPublicKey,
+  isConfigured,
 } = require('../config/razorpay');
+const {
+  getPublishedPlanOrFail,
+  validatePlanAndCycle,
+  getPlanPriceForCycle,
+  buildPricingSnapshot,
+  syncOrganizationFeatures,
+  buildHistoryEntry,
+  runInTransaction,
+} = require('../services/subscriptionLifecycle.service');
 const { calculateSubscriptionPeriod } = require('../utils/subscriptionPeriod');
 const {
   generateVoucherCode,
@@ -48,7 +58,13 @@ const {
 // Helper: Resolve Organization ID from tenant context
 function resolveOrgId(req) {
   if (req.tenant?.isSuperAdmin) {
-    return req.body.organizationId || req.query.organizationId || req.tenant.organizationId || null;
+    return (
+      req.params?.id ||
+      req.body.organizationId ||
+      req.query.organizationId ||
+      req.tenant.organizationId ||
+      null
+    );
   }
   return req.tenant?.organizationId || req.user?.activeOrganizationId || null;
 }
@@ -125,34 +141,138 @@ async function logVoucherAudit({
   }
 }
 
-// Helper: Authoritatively calculate price & discount
+// Helper: Authoritatively calculate price, discount & voucher benefit
 async function calculateDiscountForPlan({ voucher, planId, billingCycle, organizationId }) {
-  const plan = await Plan.findById(planId);
-  if (!plan || !plan.isActive) {
-    return { error: 'Selected SaaS plan is inactive or does not exist' };
+  let plan;
+  let normCycle;
+  try {
+    plan = await getPublishedPlanOrFail({ planId }, { requirePublished: true });
+    normCycle = validatePlanAndCycle({ plan, billingCycle });
+  } catch (err) {
+    return { error: err.message || 'Selected SaaS plan is inactive or does not exist' };
   }
 
-  const isYearly = String(billingCycle || '').toUpperCase() === 'YEARLY';
-  const originalAmount = isYearly ? plan.priceYearly : plan.priceMonthly;
+  const isYearly = normCycle === 'YEARLY';
+  const originalAmount = getPlanPriceForCycle(plan, normCycle);
+  const voucherType = voucher.voucherType || 'DISCOUNT';
 
-  if (voucher.minSubscriptionAmountRupees && originalAmount < voucher.minSubscriptionAmountRupees) {
+  if (
+    voucherType === 'DISCOUNT' &&
+    voucher.minSubscriptionAmountRupees &&
+    originalAmount < voucher.minSubscriptionAmountRupees
+  ) {
     return {
       error: `Subscription amount (₹${originalAmount}) does not meet minimum voucher requirement (₹${voucher.minSubscriptionAmountRupees})`,
     };
   }
 
-  // Fixed discount: minimum of voucher discount and original amount
-  const discountAmount = Math.min(voucher.discountAmountRupees, originalAmount);
+  const now = new Date();
+  const existingSub = organizationId ? await Subscription.findOne({ organizationId }).lean() : null;
+
+  if (voucherType === 'TRIAL') {
+    const hasExplicitEligiblePlans = Array.isArray(voucher.eligiblePlans) && voucher.eligiblePlans.length > 0;
+    if (plan.trialEligible === false && !hasExplicitEligiblePlans) {
+      return {
+        error: `Selected plan '${plan.name}' does not permit free trial activation`,
+      };
+    }
+
+    if (
+      existingSub &&
+      ((existingSub.status === 'ACTIVE' && existingSub.paidCount > 0) ||
+        existingSub.status === 'TRIAL' ||
+        (existingSub.trialUsed && existingSub.status !== 'PENDING_PAYMENT'))
+    ) {
+      return {
+        error: 'This organization is not eligible for a voucher trial because an active subscription or previous trial already exists',
+      };
+    }
+
+    const trialDaysGranted =
+      Number(voucher.trialDaysGranted) > 0
+        ? Number(voucher.trialDaysGranted)
+        : Number(plan.trialDays) > 0
+        ? Number(plan.trialDays)
+        : 14;
+    const trialEnd = new Date(now.getTime() + trialDaysGranted * 24 * 60 * 60 * 1000);
+
+    return {
+      plan,
+      normCycle,
+      isYearly,
+      voucherType,
+      originalAmount,
+      discountAmount: 0,
+      finalPayable: 0,
+      isZeroPayable: true,
+      grantsTrial: true,
+      trialDaysGranted,
+      activationDurationDays: null,
+      estimatedPeriodStart: now,
+      estimatedPeriodEnd: trialEnd,
+      benefitSummary: `${trialDaysGranted}-day free trial on ${plan.name} (${normCycle})`,
+    };
+  }
+
+  if (voucherType === 'ACTIVATION') {
+    const activationDays =
+      Number(voucher.activationDurationDays) > 0 ? Number(voucher.activationDurationDays) : null;
+    const periodPreview = calculateSubscriptionPeriod({
+      activationDate: now,
+      billingCycle: normCycle,
+      existingSubscription: existingSub,
+      durationCycles: voucher.discountDurationCycles || 1,
+      activationDurationDays: activationDays,
+    });
+
+    return {
+      plan,
+      normCycle,
+      isYearly,
+      voucherType,
+      originalAmount,
+      discountAmount: originalAmount,
+      finalPayable: 0,
+      isZeroPayable: true,
+      grantsTrial: false,
+      trialDaysGranted: null,
+      activationDurationDays: activationDays,
+      estimatedPeriodStart: periodPreview.periodStart,
+      estimatedPeriodEnd: periodPreview.periodEnd,
+      benefitSummary: activationDays
+        ? `Direct ${activationDays}-day activation of ${plan.name} (${normCycle})`
+        : `Direct ${voucher.discountDurationCycles || 1} ${isYearly ? 'year' : 'month'} activation of ${plan.name}`,
+    };
+  }
+
+  // Standard fixed DISCOUNT voucher
+  const discountAmount = Math.min(Number(voucher.discountAmountRupees || 0), originalAmount);
   const finalPayable = Math.max(0, originalAmount - discountAmount);
   const isZeroPayable = finalPayable === 0;
+  const periodPreview = calculateSubscriptionPeriod({
+    activationDate: now,
+    billingCycle: normCycle,
+    existingSubscription: existingSub,
+    durationCycles: isZeroPayable ? voucher.discountDurationCycles || 1 : 1,
+  });
 
   return {
     plan,
+    normCycle,
     isYearly,
+    voucherType: 'DISCOUNT',
     originalAmount,
     discountAmount,
     finalPayable,
     isZeroPayable,
+    grantsTrial: false,
+    trialDaysGranted: null,
+    activationDurationDays: null,
+    estimatedPeriodStart: periodPreview.periodStart,
+    estimatedPeriodEnd: periodPreview.periodEnd,
+    benefitSummary: isZeroPayable
+      ? `100% discount (₹${discountAmount} off) — Full activation on ${plan.name}`
+      : `₹${discountAmount.toLocaleString('en-IN')} discount applied — ₹${finalPayable.toLocaleString('en-IN')} payable`,
   };
 }
 
@@ -308,7 +428,10 @@ const createVoucher = async (req, res) => {
     const {
       name,
       description,
-      discountAmountRupees,
+      voucherType = 'DISCOUNT',
+      discountAmountRupees = 0,
+      activationDurationDays = null,
+      trialDaysGranted = null,
       eligiblePlans,
       eligibleBillingIntervals,
       validFrom,
@@ -328,12 +451,42 @@ const createVoucher = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Voucher name is required' });
     }
 
-    const discount = Number(discountAmountRupees);
-    if (isNaN(discount) || discount <= 0) {
+    const normType = String(voucherType || 'DISCOUNT').toUpperCase().trim();
+    if (!['DISCOUNT', 'ACTIVATION', 'TRIAL'].includes(normType)) {
       return res.status(400).json({
         success: false,
-        message: 'Discount amount must be a positive number greater than 0',
+        message: 'voucherType must be one of DISCOUNT, ACTIVATION, or TRIAL',
       });
+    }
+
+    const discount = Number(discountAmountRupees || 0);
+    if (normType === 'DISCOUNT' && (isNaN(discount) || discount <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount amount must be a positive number greater than 0 for DISCOUNT vouchers',
+      });
+    }
+
+    let parsedActivationDays = null;
+    if (normType === 'ACTIVATION' && activationDurationDays !== null && activationDurationDays !== undefined && activationDurationDays !== '') {
+      parsedActivationDays = parseInt(activationDurationDays, 10);
+      if (isNaN(parsedActivationDays) || parsedActivationDays < 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'activationDurationDays must be at least 1 day when specified',
+        });
+      }
+    }
+
+    let parsedTrialDays = null;
+    if (normType === 'TRIAL') {
+      parsedTrialDays = parseInt(trialDaysGranted ?? 14, 10);
+      if (isNaN(parsedTrialDays) || parsedTrialDays < 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'trialDaysGranted must be at least 1 day for TRIAL vouchers',
+        });
+      }
     }
 
     if (!expiresAt) {
@@ -408,11 +561,14 @@ const createVoucher = async (req, res) => {
       reference,
       name: name.trim(),
       description: description ? description.trim() : undefined,
+      voucherType: normType,
       codeDigest,
       codeMasked,
       pinVerifier,
       pinSalt,
-      discountAmountRupees: discount,
+      discountAmountRupees: normType === 'DISCOUNT' ? discount : Math.max(0, discount),
+      activationDurationDays: parsedActivationDays,
+      trialDaysGranted: parsedTrialDays,
       eligiblePlans: Array.isArray(eligiblePlans) ? eligiblePlans : [],
       eligibleBillingIntervals: Array.isArray(eligibleBillingIntervals)
         ? eligibleBillingIntervals
@@ -440,13 +596,16 @@ const createVoucher = async (req, res) => {
       newValue: {
         reference: voucher.reference,
         name: voucher.name,
+        voucherType: voucher.voucherType,
         codeMasked: voucher.codeMasked,
         discountAmountRupees: voucher.discountAmountRupees,
+        activationDurationDays: voucher.activationDurationDays,
+        trialDaysGranted: voucher.trialDaysGranted,
         globalRedemptionLimit: voucher.globalRedemptionLimit,
         maxRedemptionsPerOrg: voucher.maxRedemptionsPerOrg,
         expiresAt: voucher.expiresAt,
       },
-      description: `Created voucher campaign "${voucher.name}" [${voucher.reference}] with ₹${voucher.discountAmountRupees} discount`,
+      description: `Created ${voucher.voucherType} voucher "${voucher.name}" [${voucher.reference}]`,
       req,
     });
 
@@ -460,8 +619,11 @@ const createVoucher = async (req, res) => {
           reference: voucher.reference,
           name: voucher.name,
           description: voucher.description,
+          voucherType: voucher.voucherType,
           codeMasked: voucher.codeMasked,
           discountAmountRupees: voucher.discountAmountRupees,
+          activationDurationDays: voucher.activationDurationDays,
+          trialDaysGranted: voucher.trialDaysGranted,
           eligiblePlans: voucher.eligiblePlans,
           eligibleBillingIntervals: voucher.eligibleBillingIntervals,
           validFrom: voucher.validFrom,
@@ -502,7 +664,7 @@ const getVouchers = async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
 
-    const { status, scope, planId, search } = req.query;
+    const { status, scope, voucherType, planId, search } = req.query;
     const filter = {};
 
     if (status) {
@@ -510,6 +672,9 @@ const getVouchers = async (req, res) => {
     }
     if (scope) {
       filter.scope = scope.toUpperCase();
+    }
+    if (voucherType) {
+      filter.voucherType = voucherType.toUpperCase();
     }
     if (planId && mongoose.Types.ObjectId.isValid(planId)) {
       filter.eligiblePlans = planId;
@@ -525,7 +690,7 @@ const getVouchers = async (req, res) => {
     const [vouchers, total] = await Promise.all([
       Voucher.find(filter)
         .select('-pinVerifier -pinSalt -codeDigest')
-        .populate('eligiblePlans', 'name code priceMonthly priceYearly')
+        .populate('eligiblePlans', 'name code priceMonthly priceYearly allowedBillingCycles trialEligible trialDays')
         .populate('restrictedToOrgIds', 'name')
         .populate('createdBy', 'name email')
         .sort({ createdAt: -1 })
@@ -693,7 +858,7 @@ const getRedemptionsReport = async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
 
-    const { voucherId, organizationId, status, fromDate, toDate } = req.query;
+    const { voucherId, organizationId, status, benefitType, fromDate, toDate } = req.query;
     const filter = {};
 
     if (voucherId && mongoose.Types.ObjectId.isValid(voucherId)) {
@@ -705,6 +870,9 @@ const getRedemptionsReport = async (req, res) => {
     if (status) {
       filter.status = status.toUpperCase();
     }
+    if (benefitType) {
+      filter.benefitType = benefitType.toUpperCase();
+    }
     if (fromDate || toDate) {
       filter.redeemedAt = {};
       if (fromDate) filter.redeemedAt.$gte = new Date(fromDate);
@@ -713,7 +881,7 @@ const getRedemptionsReport = async (req, res) => {
 
     const [redemptions, total] = await Promise.all([
       VoucherRedemption.find(filter)
-        .populate('voucherId', 'name reference codeMasked discountAmountRupees')
+        .populate('voucherId', 'name reference codeMasked discountAmountRupees voucherType')
         .populate('organizationId', 'name email')
         .populate('planId', 'name code')
         .populate('invoiceId', 'invoiceNumber totalRupees status')
@@ -834,15 +1002,25 @@ const applyVoucher = async (req, res) => {
       data: {
         voucherReference: voucher.reference,
         voucherName: voucher.name,
+        voucherType: calculation.voucherType,
         codeMasked: voucher.codeMasked,
         originalAmount: calculation.originalAmount,
         discountAmount: calculation.discountAmount,
         finalPayable: calculation.finalPayable,
         isZeroPayable: calculation.isZeroPayable,
-        billingCycle: calculation.isYearly ? 'YEARLY' : 'MONTHLY',
+        grantsTrial: calculation.grantsTrial,
+        trialDaysGranted: calculation.trialDaysGranted,
+        activationDurationDays: calculation.activationDurationDays,
+        billingCycle: calculation.normCycle,
         planId: calculation.plan._id,
         planName: calculation.plan.name,
+        planDescription: calculation.plan.description || '',
+        includedFeatures: calculation.plan.includedFeatures || [],
+        limits: calculation.plan.limits || {},
         discountDurationCycles: voucher.discountDurationCycles,
+        estimatedPeriodStart: calculation.estimatedPeriodStart,
+        estimatedPeriodEnd: calculation.estimatedPeriodEnd,
+        benefitSummary: calculation.benefitSummary,
       },
     });
   } catch (err) {
@@ -855,7 +1033,7 @@ const applyVoucher = async (req, res) => {
 };
 
 /**
- * @desc    Atomic Zero-Payable Voucher Redemption & Instant SaaS Subscription Activation (₹0 Final Payable)
+ * @desc    Atomic Zero-Payable Voucher Redemption & Instant SaaS Activation / Trial Grant (₹0 Final Payable)
  * @route   POST /api/billing/vouchers/redeem-zero-payable
  * @access  Private (Organization Admin / Super Admin — Students blocked)
  */
@@ -890,7 +1068,7 @@ const redeemVoucherZeroPayable = async (req, res) => {
       status: 'COMPLETED',
     })
       .populate('invoiceId')
-      .populate('subscriptionId');
+      .populate({ path: 'subscriptionId', populate: { path: 'planId', select: 'name code' } });
 
     if (existingRedemption) {
       return res.status(200).json({
@@ -899,10 +1077,15 @@ const redeemVoucherZeroPayable = async (req, res) => {
         message: 'Voucher already successfully redeemed for this checkout',
         data: {
           subscriptionId: existingRedemption.subscriptionId?._id,
-          invoiceNumber: existingRedemption.invoiceId?.invoiceNumber,
+          status: existingRedemption.subscriptionId?.status,
+          benefitType: existingRedemption.benefitType,
+          trialDaysGranted: existingRedemption.trialDaysGranted,
+          invoiceNumber: existingRedemption.invoiceId?.invoiceNumber || null,
+          planName: existingRedemption.subscriptionId?.planId?.name,
           originalAmount: existingRedemption.originalAmountRupees,
           discountAmount: existingRedemption.discountAmountRupees,
           finalPayable: existingRedemption.finalPayableRupees,
+          currentPeriodEnd: existingRedemption.subscriptionId?.currentPeriodEnd,
         },
       });
     }
@@ -989,142 +1172,346 @@ const redeemVoucherZeroPayable = async (req, res) => {
       await Voucher.findByIdAndUpdate(updatedVoucher._id, { status: 'EXHAUSTED' });
     }
 
-    // 5. Activate SaaS Subscription
     const isYearly = calculation.isYearly;
-    const durationCycles = updatedVoucher.discountDurationCycles || 1;
-    const existingSubscription = await Subscription.findOne({ organizationId });
-    const period = calculateSubscriptionPeriod({
-      activationDate: now,
-      billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
-      existingSubscription,
-      durationCycles,
-    });
-    const periodEnd = period.periodEnd;
+    const normCycle = calculation.normCycle;
 
-    const subscription = await Subscription.findOneAndUpdate(
-      { organizationId },
-      {
+    // 5. Execute Subscription Activation or Trial Grant cleanly inside transaction when supported
+    const txResult = await runInTransaction(async (session) => {
+      const findOpts = session ? { session } : {};
+      const existingSubscription = await Subscription.findOne({ organizationId }, null, findOpts);
+      const prevStatus = existingSubscription?.status || null;
+      const prevPlanId = existingSubscription?.planId || null;
+
+      if (calculation.voucherType === 'TRIAL') {
+        const trialDaysGranted = calculation.trialDaysGranted;
+        const trialStartsAt = now;
+        const trialEndsAt = new Date(now.getTime() + trialDaysGranted * 24 * 60 * 60 * 1000);
+
+        const snapshot = buildPricingSnapshot({
+          plan: calculation.plan,
+          billingCycle: normCycle,
+          agreedPriceRupees: calculation.originalAmount,
+          finalPayableRupees: calculation.originalAmount,
+          source: 'VOUCHER_TRIAL',
+        });
+
+        const historyEntry = buildHistoryEntry({
+          eventType: 'TRIAL_STARTED',
+          fromStatus: prevStatus,
+          toStatus: 'TRIAL',
+          fromPlanId: prevPlanId,
+          toPlanId: calculation.plan._id,
+          toPlanName: calculation.plan.name,
+          billingCycle: normCycle,
+          amountRupees: 0,
+          activationMethod: 'VOUCHER',
+          voucherReference: updatedVoucher.reference,
+          actor: req.user,
+          notes: `${trialDaysGranted}-day trial activated via voucher [${updatedVoucher.reference}]`,
+        });
+
+        const subscription = await Subscription.findOneAndUpdate(
+          { organizationId },
+          {
+            $set: {
+              planId: calculation.plan._id,
+              status: 'TRIAL',
+              activationMethod: 'VOUCHER',
+              renewalMode: 'MANUAL',
+              autoRenew: false,
+              billingCycle: normCycle,
+              agreedPriceRupees: calculation.originalAmount,
+              amount: 0,
+              amountPaise: 0,
+              currency: (calculation.plan.currency || 'INR').toUpperCase(),
+              pricingSnapshot: snapshot,
+              lastVoucherId: updatedVoucher._id,
+              lastVoucherReference: updatedVoucher.reference,
+              startedAt: existingSubscription?.startedAt || now,
+              trialStartsAt,
+              trialEndsAt,
+              trialUsed: true,
+              currentPeriodStart: trialStartsAt,
+              currentPeriodEnd: trialEndsAt,
+            },
+            $push: { history: historyEntry },
+          },
+          { upsert: true, new: true, ...findOpts }
+        );
+
+        await Organization.findByIdAndUpdate(
+          organizationId,
+          { subscriptionId: subscription._id, status: 'TRIAL' },
+          findOpts
+        );
+
+        await syncOrganizationFeatures(
+          organizationId,
+          calculation.plan.includedFeatures || [],
+          { enabled: true, session }
+        );
+
+        const redemptions = await VoucherRedemption.create(
+          [
+            {
+              voucherId: updatedVoucher._id,
+              organizationId,
+              subscriptionId: subscription._id,
+              planId: calculation.plan._id,
+              billingCycle: normCycle,
+              benefitType: 'TRIAL',
+              originalAmountRupees: calculation.originalAmount,
+              discountAmountRupees: 0,
+              finalPayableRupees: 0,
+              isZeroPayable: true,
+              status: 'COMPLETED',
+              idempotencyKey: safeIdempotencyKey,
+              redeemedBy: req.user._id,
+              redeemedAt: now,
+              trialDaysGranted,
+            },
+          ],
+          findOpts
+        );
+
+        return {
+          subscription,
+          invoiceNumber: null,
+          periodEnd: trialEndsAt,
+          redemption: redemptions[0],
+          trialDaysGranted,
+        };
+      }
+
+      // ACTIVATION or 100% DISCOUNT voucher -> ACTIVE paid/waived subscription
+      const durationCycles = updatedVoucher.discountDurationCycles || 1;
+      const period = calculateSubscriptionPeriod({
+        activationDate: now,
+        billingCycle: normCycle,
+        existingSubscription,
+        durationCycles,
+        activationDurationDays: calculation.activationDurationDays,
+      });
+
+      const snapshot = buildPricingSnapshot({
+        plan: calculation.plan,
+        billingCycle: normCycle,
+        agreedPriceRupees: calculation.originalAmount,
+        finalPayableRupees: 0,
+        source:
+          calculation.voucherType === 'ACTIVATION' ? 'VOUCHER_ACTIVATION' : 'VOUCHER_ZERO_PAYABLE',
+      });
+
+      const invoiceNumber = await InvoiceSequence.getNextInvoiceNumber(
+        organizationId,
+        'Q2-INV',
+        now.getFullYear(),
+        session
+      );
+
+      const historyEntry = buildHistoryEntry({
+        eventType:
+          calculation.voucherType === 'ACTIVATION' ? 'SUBSCRIPTION_ACTIVATED' : 'VOUCHER_APPLIED',
+        fromStatus: prevStatus,
+        toStatus: 'ACTIVE',
+        fromPlanId: prevPlanId,
+        toPlanId: calculation.plan._id,
+        toPlanName: calculation.plan.name,
+        billingCycle: normCycle,
+        amountRupees: 0,
+        activationMethod: 'VOUCHER',
+        invoiceNumber,
+        voucherReference: updatedVoucher.reference,
+        actor: req.user,
+        notes: `${calculation.voucherType} voucher [${updatedVoucher.reference}] redeemed for ${calculation.plan.name}`,
+      });
+
+      const subscriptionUpdate = {
         planId: calculation.plan._id,
         status: 'ACTIVE',
+        activationMethod: 'VOUCHER',
         renewalMode: 'MANUAL',
         autoRenew: false,
-        billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
+        billingCycle: normCycle,
+        agreedPriceRupees: calculation.originalAmount,
         amount: 0,
         amountPaise: 0,
-        currency: 'INR',
+        currency: (calculation.plan.currency || 'INR').toUpperCase(),
+        pricingSnapshot: snapshot,
+        lastVoucherId: updatedVoucher._id,
+        lastVoucherReference: updatedVoucher.reference,
         startedAt: existingSubscription?.startedAt || now,
+        activatedAt: existingSubscription?.activatedAt || now,
         currentPeriodStart: period.periodStart,
         currentPeriodEnd: period.periodEnd,
         totalCount: isYearly ? 5 : 12,
         paidCount: (existingSubscription?.paidCount || 0) + 1,
-      },
-      { upsert: true, new: true }
-    );
+      };
+      if (existingSubscription?.scheduledPlanChange?.status === 'SCHEDULED') {
+        subscriptionUpdate['scheduledPlanChange.status'] = 'CANCELLED';
+      }
 
-    await Organization.findByIdAndUpdate(organizationId, {
-      subscriptionId: subscription._id,
-      status: 'ACTIVE',
+      const subscription = await Subscription.findOneAndUpdate(
+        { organizationId },
+        {
+          $set: subscriptionUpdate,
+          $push: { history: historyEntry },
+        },
+        { upsert: true, new: true, ...findOpts }
+      );
+
+      await Organization.findByIdAndUpdate(
+        organizationId,
+        { subscriptionId: subscription._id, status: 'ACTIVE' },
+        findOpts
+      );
+
+      await syncOrganizationFeatures(
+        organizationId,
+        calculation.plan.includedFeatures || [],
+        { enabled: true, session }
+      );
+
+      const createdPayments = await Payment.create(
+        [
+          {
+            organizationId,
+            billingDomain: 'SAAS',
+            subscriptionId: subscription._id,
+            planId: calculation.plan._id,
+            amountPaise: 0,
+            amountRupees: 0,
+            discountRupees: calculation.discountAmount,
+            currency: (calculation.plan.currency || 'INR').toUpperCase(),
+            provider: 'VOUCHER',
+            paymentMethod:
+              calculation.voucherType === 'ACTIVATION'
+                ? 'voucher_activation'
+                : 'voucher_zero_balance',
+            orderId: `order_vch_${updatedVoucher.reference}_${Date.now()}`,
+            status: 'CAPTURED',
+            intent: existingSubscription?.status === 'ACTIVE' ? 'RENEWAL' : 'ACTIVATION',
+            billingCycle: normCycle,
+            planSnapshot: snapshot,
+            capturedAt: now,
+            idempotencyKey: safeIdempotencyKey,
+            notes: `Voucher ${updatedVoucher.reference} (${calculation.voucherType}) activation`,
+          },
+        ],
+        findOpts
+      );
+      const payment = createdPayments[0];
+
+      const createdInvoices = await Invoice.create(
+        [
+          {
+            organizationId,
+            paymentId: payment._id,
+            subscriptionId: subscription._id,
+            invoiceNumber,
+            invoiceType: 'SAAS_INVOICE',
+            subtotalRupees: calculation.originalAmount,
+            taxRupees: 0,
+            discountRupees: calculation.discountAmount,
+            originalAmountRupees: calculation.originalAmount,
+            totalRupees: 0,
+            currency: (calculation.plan.currency || 'INR').toUpperCase(),
+            status: 'PAID',
+            issuedAt: now,
+            paidAt: now,
+            notes:
+              calculation.voucherType === 'ACTIVATION'
+                ? `Activated via entitlement voucher [${updatedVoucher.reference}]`
+                : `Settled via 100% voucher discount [${updatedVoucher.reference}]`,
+          },
+        ],
+        findOpts
+      );
+      const invoice = createdInvoices[0];
+
+      payment.invoiceId = invoice._id;
+      await payment.save(findOpts);
+
+      await LedgerEntry.create(
+        [
+          {
+            organizationId,
+            subscriptionId: subscription._id,
+            paymentId: payment._id,
+            invoiceId: invoice._id,
+            amountPaise: 0,
+            amountRupees: 0,
+            currency: (calculation.plan.currency || 'INR').toUpperCase(),
+            type: 'CREDIT',
+            source: 'SAAS_VOUCHER',
+            externalReference: updatedVoucher.reference,
+            description: `Zero-balance voucher settlement - ${calculation.plan.name} (${normCycle})`,
+          },
+        ],
+        findOpts
+      );
+
+      const createdRedemptions = await VoucherRedemption.create(
+        [
+          {
+            voucherId: updatedVoucher._id,
+            organizationId,
+            subscriptionId: subscription._id,
+            paymentId: payment._id,
+            invoiceId: invoice._id,
+            planId: calculation.plan._id,
+            billingCycle: normCycle,
+            benefitType: calculation.voucherType === 'ACTIVATION' ? 'ACTIVATION' : 'DISCOUNT',
+            originalAmountRupees: calculation.originalAmount,
+            discountAmountRupees: calculation.discountAmount,
+            finalPayableRupees: 0,
+            isZeroPayable: true,
+            status: 'COMPLETED',
+            idempotencyKey: safeIdempotencyKey,
+            redeemedBy: req.user._id,
+            redeemedAt: now,
+            discountCyclesGranted: durationCycles,
+            activationDurationDays: calculation.activationDurationDays || undefined,
+          },
+        ],
+        findOpts
+      );
+      const redemption = createdRedemptions[0];
+
+      payment.voucherRedemptionId = redemption._id;
+      await payment.save(findOpts);
+      invoice.voucherRedemptionId = redemption._id;
+      await invoice.save(findOpts);
+
+      return {
+        subscription,
+        invoiceNumber,
+        periodEnd: period.periodEnd,
+        redemption,
+        trialDaysGranted: null,
+      };
     });
-
-    // 6. Record Zero-Balance Payment
-    const payment = await Payment.create({
-      organizationId,
-      billingDomain: 'SAAS',
-      subscriptionId: subscription._id,
-      planId: calculation.plan._id,
-      amountPaise: 0,
-      amountRupees: 0,
-      discountRupees: calculation.discountAmount,
-      currency: 'INR',
-      provider: 'VOUCHER',
-      paymentMethod: 'voucher_zero_balance',
-      orderId: `order_vch_${updatedVoucher.reference}_${Date.now()}`,
-      status: 'CAPTURED',
-      capturedAt: now,
-      idempotencyKey: safeIdempotencyKey,
-      notes: `Voucher ${updatedVoucher.reference} full discount activation`,
-    });
-
-    // 7. Generate Sequential SaaS Invoice
-    const invoiceNumber = await InvoiceSequence.getNextInvoiceNumber(organizationId);
-
-    const invoice = await Invoice.create({
-      organizationId,
-      paymentId: payment._id,
-      subscriptionId: subscription._id,
-      invoiceNumber,
-      invoiceType: 'SAAS_INVOICE',
-      subtotalRupees: calculation.originalAmount,
-      taxRupees: 0,
-      discountRupees: calculation.discountAmount,
-      originalAmountRupees: calculation.originalAmount,
-      totalRupees: 0,
-      currency: 'INR',
-      status: 'PAID',
-      issuedAt: now,
-      paidAt: now,
-      notes: `Settled via 100% voucher discount [${updatedVoucher.reference}]`,
-    });
-
-    payment.invoiceId = invoice._id;
-    await payment.save();
-
-    // 8. Immutable Financial Ledger Entry
-    await LedgerEntry.create({
-      organizationId,
-      subscriptionId: subscription._id,
-      paymentId: payment._id,
-      invoiceId: invoice._id,
-      amountPaise: 0,
-      amountRupees: 0,
-      currency: 'INR',
-      type: 'CREDIT',
-      source: 'SAAS_VOUCHER',
-      externalReference: updatedVoucher.reference,
-      description: `Zero-balance voucher settlement - ${calculation.plan.name} (${isYearly ? 'YEARLY' : 'MONTHLY'})`,
-    });
-
-    // 9. Persist VoucherRedemption Record
-    const redemption = await VoucherRedemption.create({
-      voucherId: updatedVoucher._id,
-      organizationId,
-      subscriptionId: subscription._id,
-      paymentId: payment._id,
-      invoiceId: invoice._id,
-      planId: calculation.plan._id,
-      billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
-      originalAmountRupees: calculation.originalAmount,
-      discountAmountRupees: calculation.discountAmount,
-      finalPayableRupees: 0,
-      isZeroPayable: true,
-      status: 'COMPLETED',
-      idempotencyKey: safeIdempotencyKey,
-      redeemedBy: req.user._id,
-      redeemedAt: now,
-      discountCyclesGranted: durationCycles,
-    });
-
-    // Link back to payment and invoice
-    payment.voucherRedemptionId = redemption._id;
-    await payment.save();
-    invoice.voucherRedemptionId = redemption._id;
-    await invoice.save();
 
     // 10. Audit Log
     await logVoucherAudit({
       actor: req.user,
-      action: 'VOUCHER_REDEEMED_ZERO_PAYABLE',
+      action:
+        calculation.voucherType === 'TRIAL'
+          ? 'VOUCHER_REDEEMED_TRIAL'
+          : 'VOUCHER_REDEEMED_ZERO_PAYABLE',
       entityId: updatedVoucher._id,
       organizationId,
       newValue: {
         voucherReference: updatedVoucher.reference,
-        invoiceNumber,
+        voucherType: calculation.voucherType,
+        invoiceNumber: txResult.invoiceNumber,
         originalAmountRupees: calculation.originalAmount,
         discountAmountRupees: calculation.discountAmount,
         finalPayableRupees: 0,
-        subscriptionPeriodEnd: periodEnd,
+        trialDaysGranted: txResult.trialDaysGranted,
+        subscriptionPeriodEnd: txResult.periodEnd,
       },
-      description: `Voucher ${updatedVoucher.reference} redeemed for zero-payable activation of ${calculation.plan.name}`,
+      description: `Voucher ${updatedVoucher.reference} (${calculation.voucherType}) redeemed for ${calculation.plan.name}`,
       req,
     });
 
@@ -1133,9 +1520,9 @@ const redeemVoucherZeroPayable = async (req, res) => {
     await notifySuperAdmins(
       {
         organizationId,
-        orgName: orgDoc?.name || 'Q2 Organization',
+        orgName: orgDoc?.name || 'Hosteliq Organization',
         planName: calculation.plan.name,
-        billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
+        billingCycle: normCycle,
         voucherName: updatedVoucher.name,
         voucherReference: updatedVoucher.reference,
         originalAmount: calculation.originalAmount,
@@ -1147,16 +1534,26 @@ const redeemVoucherZeroPayable = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Subscription successfully activated using voucher!',
+      message:
+        calculation.voucherType === 'TRIAL'
+          ? `Trial (${txResult.trialDaysGranted} days) successfully activated using voucher!`
+          : 'Subscription successfully activated using voucher!',
       data: {
-        subscriptionId: subscription._id,
-        invoiceNumber,
+        subscriptionId: txResult.subscription._id,
+        status: txResult.subscription.status,
+        activationMethod: txResult.subscription.activationMethod,
+        benefitType: calculation.voucherType,
+        trialDaysGranted: txResult.trialDaysGranted,
+        invoiceNumber: txResult.invoiceNumber,
+        planId: calculation.plan._id,
         planName: calculation.plan.name,
-        billingCycle: isYearly ? 'YEARLY' : 'MONTHLY',
+        billingCycle: normCycle,
+        agreedPriceRupees: calculation.originalAmount,
         originalAmount: calculation.originalAmount,
         discountAmount: calculation.discountAmount,
         finalPayable: 0,
-        currentPeriodEnd: periodEnd,
+        currentPeriodStart: txResult.subscription.currentPeriodStart,
+        currentPeriodEnd: txResult.periodEnd,
       },
     });
   } catch (err) {
@@ -1227,23 +1624,37 @@ const reserveVoucherPartial = async (req, res) => {
       return res.status(400).json({ success: false, message: calculation.error });
     }
 
-    if (calculation.finalPayable <= 0) {
+    if (
+      calculation.voucherType === 'ACTIVATION' ||
+      calculation.voucherType === 'TRIAL' ||
+      calculation.finalPayable <= 0
+    ) {
       return res.status(400).json({
         success: false,
         message: 'This voucher yields a ₹0 payable amount. Use zero-payable redemption directly.',
       });
     }
 
+    const isTestEnv = process.env.NODE_ENV === 'test' || process.env.ALLOW_TEST_PAYMENTS === 'true';
+    if (!isConfigured() && !isTestEnv) {
+      return res.status(503).json({
+        success: false,
+        code: 'PAYMENT_GATEWAY_NOT_CONFIGURED',
+        message: 'Online payment gateway is not configured yet for partial voucher checkout.',
+      });
+    }
+
     // Create short-lived reservation (15-minute TTL)
     const checkoutSessionId = `chk_sess_${organizationId}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const normCycle = calculation.normCycle;
 
-    const reservation = await VoucherReservation.create({
+    await VoucherReservation.create({
       voucherId: voucher._id,
       organizationId,
       checkoutSessionId,
       planId: calculation.plan._id,
-      billingCycle: calculation.isYearly ? 'YEARLY' : 'MONTHLY',
+      billingCycle: normCycle,
       originalAmountRupees: calculation.originalAmount,
       discountAmountRupees: calculation.discountAmount,
       finalPayableRupees: calculation.finalPayable,
@@ -1266,6 +1677,69 @@ const reserveVoucherPartial = async (req, res) => {
       },
     });
 
+    // Preserve active/trial state by recording checkout metadata only inside pendingCheckout
+    const now = new Date();
+    const existingSub = await Subscription.findOne({ organizationId });
+    const intent =
+      existingSub?.status === 'ACTIVE'
+        ? String(existingSub.planId) === String(calculation.plan._id)
+          ? 'RENEWAL'
+          : 'UPGRADE'
+        : existingSub?.status === 'EXPIRED'
+        ? 'REACTIVATION'
+        : 'PARTIAL_VOUCHER';
+
+    const pendingCheckout = {
+      orderId: order.id,
+      intent: 'PARTIAL_VOUCHER',
+      targetPlanId: calculation.plan._id,
+      targetPlanCode: calculation.plan.code,
+      targetPlanName: calculation.plan.name,
+      targetBillingCycle: normCycle,
+      originalAmountRupees: calculation.originalAmount,
+      prorationCreditRupees: 0,
+      discountAmountRupees: calculation.discountAmount,
+      finalPayableRupees: calculation.finalPayable,
+      voucherId: voucher._id,
+      voucherReference: voucher.reference,
+      checkoutSessionId,
+      status: 'CREATED',
+      createdAt: now,
+      updatedAt: now,
+      expiresAt,
+    };
+
+    if (existingSub) {
+      existingSub.orderId = order.id;
+      existingSub.pendingCheckout = pendingCheckout;
+      await existingSub.save();
+
+      await Payment.findOneAndUpdate(
+        { orderId: order.id },
+        {
+          $setOnInsert: {
+            organizationId,
+            billingDomain: 'SAAS',
+            subscriptionId: existingSub._id,
+            planId: calculation.plan._id,
+            orderId: order.id,
+            amountPaise,
+            amountRupees: calculation.finalPayable,
+            discountRupees: calculation.discountAmount,
+            currency: 'INR',
+            provider: 'RAZORPAY',
+            status: 'CREATED',
+            paymentMethod: 'subscription_discounted_online',
+            intent,
+            billingCycle: normCycle,
+            planSnapshot: pendingCheckout,
+            notes: `Voucher ${voucher.reference} partial discount checkout initiated`,
+          },
+        },
+        { upsert: true }
+      );
+    }
+
     return res.status(200).json({
       success: true,
       data: {
@@ -1277,8 +1751,9 @@ const reserveVoucherPartial = async (req, res) => {
         originalAmount: calculation.originalAmount,
         discountAmount: calculation.discountAmount,
         currency: 'INR',
+        planId: calculation.plan._id,
         planName: calculation.plan.name,
-        billingCycle: calculation.isYearly ? 'YEARLY' : 'MONTHLY',
+        billingCycle: normCycle,
         voucherReference: voucher.reference,
       },
     });
@@ -1328,12 +1803,19 @@ const verifyVoucherPartial = async (req, res) => {
       });
     }
 
-    // 1b. Idempotency guard: If payment already captured, return early
+    // 1b. Idempotency guard: If payment already captured, return idempotently (ensuring voucher redemption recorded if webhook beat us)
     const existingPayment = await Payment.findOne({
       paymentId: razorpay_payment_id,
       status: 'CAPTURED',
     });
     if (existingPayment) {
+      if (
+        !req.tenant?.isSuperAdmin &&
+        organizationId &&
+        String(existingPayment.organizationId) !== String(organizationId)
+      ) {
+        return res.status(403).json({ success: false, message: 'Cross-tenant payment access denied' });
+      }
       const existingInvoice = await Invoice.findOne({ paymentId: existingPayment._id });
       return res.status(200).json({
         success: true,
@@ -1347,12 +1829,15 @@ const verifyVoucherPartial = async (req, res) => {
       });
     }
 
-    // 2. Fetch reservation
-    const reservation = await VoucherReservation.findOne({
-      checkoutSessionId,
-      organizationId,
-      status: 'HELD',
-    }).populate('voucherId planId');
+    // 2. Fetch reservation (enforcing tenant isolation unless Super Admin)
+    const resQuery = { checkoutSessionId, status: 'HELD' };
+    if (organizationId) {
+      resQuery.organizationId = organizationId;
+    } else if (!req.tenant?.isSuperAdmin) {
+      return res.status(400).json({ success: false, message: 'Organization tenant context is required' });
+    }
+
+    const reservation = await VoucherReservation.findOne(resQuery).populate('voucherId planId');
 
     if (!reservation) {
       return res.status(404).json({
@@ -1360,6 +1845,8 @@ const verifyVoucherPartial = async (req, res) => {
         message: 'Active voucher reservation not found or expired',
       });
     }
+
+    const targetOrgId = reservation.organizationId;
 
     // 3. Atomically finalize voucher consumption
     const now = new Date();
@@ -1381,138 +1868,246 @@ const verifyVoucherPartial = async (req, res) => {
       });
     }
 
+    if (updatedVoucher.currentRedemptionCount >= updatedVoucher.globalRedemptionLimit) {
+      await Voucher.findByIdAndUpdate(updatedVoucher._id, { status: 'EXHAUSTED' });
+    }
+
     reservation.status = 'COMMITTED';
     await reservation.save();
 
-    // 4. Activate SaaS Subscription
+    // 4. Transactional SaaS Subscription Activation & Financial Recording
     const isYearly = reservation.billingCycle === 'YEARLY';
-    const existingSubscription = await Subscription.findOne({ organizationId });
-    const period = calculateSubscriptionPeriod({
-      activationDate: now,
-      billingCycle: reservation.billingCycle,
-      existingSubscription,
-      durationCycles: 1,
-    });
-    const periodEnd = period.periodEnd;
+    const txResult = await runInTransaction(async (session) => {
+      const findOpts = session ? { session } : {};
+      const existingSubscription = await Subscription.findOne({ organizationId: targetOrgId }, null, findOpts);
+      const prevStatus = existingSubscription?.status || null;
+      const prevPlanId = existingSubscription?.planId || null;
 
-    const subscription = await Subscription.findOneAndUpdate(
-      { organizationId },
-      {
+      const period = calculateSubscriptionPeriod({
+        activationDate: now,
+        billingCycle: reservation.billingCycle,
+        existingSubscription,
+        durationCycles: 1,
+      });
+
+      const snapshot = buildPricingSnapshot({
+        plan: reservation.planId,
+        billingCycle: reservation.billingCycle,
+        agreedPriceRupees: reservation.originalAmountRupees,
+        finalPayableRupees: reservation.finalPayableRupees,
+        source: 'VOUCHER_PARTIAL',
+      });
+
+      const invoiceNumber = await InvoiceSequence.getNextInvoiceNumber(
+        targetOrgId,
+        'Q2-INV',
+        now.getFullYear(),
+        session
+      );
+
+      const historyEntry = buildHistoryEntry({
+        eventType: 'VOUCHER_APPLIED',
+        fromStatus: prevStatus,
+        toStatus: 'ACTIVE',
+        fromPlanId: prevPlanId,
+        toPlanId: reservation.planId._id,
+        toPlanName: reservation.planId.name,
+        billingCycle: reservation.billingCycle,
+        amountRupees: reservation.finalPayableRupees,
+        activationMethod: 'VOUCHER',
+        paymentId: razorpay_payment_id,
+        invoiceNumber,
+        voucherReference: updatedVoucher.reference,
+        actor: req.user,
+        notes: `Partial discount voucher [${updatedVoucher.reference}] verified with online payment ₹${reservation.finalPayableRupees}`,
+      });
+
+      const subSet = {
         planId: reservation.planId._id,
         orderId: razorpay_order_id,
         status: 'ACTIVE',
+        activationMethod: 'VOUCHER',
         renewalMode: 'MANUAL',
         autoRenew: false,
         billingCycle: reservation.billingCycle,
+        agreedPriceRupees: reservation.originalAmountRupees,
         amount: reservation.finalPayableRupees,
         amountPaise: Math.round(reservation.finalPayableRupees * 100),
         currency: 'INR',
+        pricingSnapshot: snapshot,
+        lastVoucherId: updatedVoucher._id,
+        lastVoucherReference: updatedVoucher.reference,
         startedAt: existingSubscription?.startedAt || now,
+        activatedAt: existingSubscription?.activatedAt || now,
         currentPeriodStart: period.periodStart,
         currentPeriodEnd: period.periodEnd,
         totalCount: isYearly ? 5 : 12,
         paidCount: (existingSubscription?.paidCount || 0) + 1,
-      },
-      { upsert: true, new: true }
-    );
+      };
+      if (existingSubscription?.pendingCheckout) {
+        subSet['pendingCheckout.status'] = 'COMPLETED';
+        subSet['pendingCheckout.updatedAt'] = now;
+      }
+      if (existingSubscription?.scheduledPlanChange?.status === 'SCHEDULED') {
+        subSet['scheduledPlanChange.status'] = 'CANCELLED';
+      }
 
-    await Organization.findByIdAndUpdate(organizationId, {
-      subscriptionId: subscription._id,
-      status: 'ACTIVE',
+      const subscription = await Subscription.findOneAndUpdate(
+        { organizationId: targetOrgId },
+        {
+          $set: subSet,
+          $push: { history: historyEntry },
+        },
+        { upsert: true, new: true, ...findOpts }
+      );
+
+      await Organization.findByIdAndUpdate(
+        targetOrgId,
+        { subscriptionId: subscription._id, status: 'ACTIVE' },
+        findOpts
+      );
+
+      await syncOrganizationFeatures(
+        targetOrgId,
+        reservation.planId.includedFeatures || [],
+        { enabled: true, session }
+      );
+
+      let payment = await Payment.findOne(
+        { orderId: razorpay_order_id, organizationId: targetOrgId },
+        null,
+        findOpts
+      );
+      if (payment) {
+        payment.subscriptionId = subscription._id;
+        payment.planId = reservation.planId._id;
+        payment.paymentId = razorpay_payment_id;
+        payment.signature = razorpay_signature;
+        payment.amountPaise = Math.round(reservation.finalPayableRupees * 100);
+        payment.amountRupees = reservation.finalPayableRupees;
+        payment.discountRupees = reservation.discountAmountRupees;
+        payment.status = 'CAPTURED';
+        payment.paymentMethod = 'subscription_discounted_online';
+        payment.planSnapshot = snapshot;
+        payment.capturedAt = now;
+        await payment.save(findOpts);
+      } else {
+        const createdPayments = await Payment.create(
+          [
+            {
+              organizationId: targetOrgId,
+              billingDomain: 'SAAS',
+              subscriptionId: subscription._id,
+              planId: reservation.planId._id,
+              orderId: razorpay_order_id,
+              paymentId: razorpay_payment_id,
+              signature: razorpay_signature,
+              amountPaise: Math.round(reservation.finalPayableRupees * 100),
+              amountRupees: reservation.finalPayableRupees,
+              discountRupees: reservation.discountAmountRupees,
+              currency: 'INR',
+              provider: 'RAZORPAY',
+              status: 'CAPTURED',
+              paymentMethod: 'subscription_discounted_online',
+              billingCycle: reservation.billingCycle,
+              planSnapshot: snapshot,
+              capturedAt: now,
+              notes: `Voucher ${updatedVoucher.reference} partial discount checkout`,
+            },
+          ],
+          findOpts
+        );
+        payment = createdPayments[0];
+      }
+
+      const createdInvoices = await Invoice.create(
+        [
+          {
+            organizationId: targetOrgId,
+            paymentId: payment._id,
+            subscriptionId: subscription._id,
+            invoiceNumber,
+            invoiceType: 'SAAS_INVOICE',
+            subtotalRupees: reservation.originalAmountRupees,
+            taxRupees: 0,
+            discountRupees: reservation.discountAmountRupees,
+            originalAmountRupees: reservation.originalAmountRupees,
+            totalRupees: reservation.finalPayableRupees,
+            currency: 'INR',
+            status: 'PAID',
+            issuedAt: now,
+            paidAt: now,
+            notes: `Applied voucher [${updatedVoucher.reference}] discount of ₹${reservation.discountAmountRupees}`,
+          },
+        ],
+        findOpts
+      );
+      const invoice = createdInvoices[0];
+
+      payment.invoiceId = invoice._id;
+      await payment.save(findOpts);
+
+      await LedgerEntry.create(
+        [
+          {
+            organizationId: targetOrgId,
+            subscriptionId: subscription._id,
+            paymentId: payment._id,
+            invoiceId: invoice._id,
+            amountPaise: payment.amountPaise,
+            amountRupees: payment.amountRupees,
+            currency: 'INR',
+            type: 'CREDIT',
+            source: 'SAAS_SUBSCRIPTION',
+            externalReference: razorpay_payment_id,
+            description: `Discounted SaaS Subscription - ${reservation.planId.name} (${reservation.billingCycle})`,
+          },
+        ],
+        findOpts
+      );
+
+      const createdRedemptions = await VoucherRedemption.create(
+        [
+          {
+            voucherId: updatedVoucher._id,
+            organizationId: targetOrgId,
+            subscriptionId: subscription._id,
+            paymentId: payment._id,
+            invoiceId: invoice._id,
+            planId: reservation.planId._id,
+            billingCycle: reservation.billingCycle,
+            benefitType: 'DISCOUNT',
+            originalAmountRupees: reservation.originalAmountRupees,
+            discountAmountRupees: reservation.discountAmountRupees,
+            finalPayableRupees: reservation.finalPayableRupees,
+            isZeroPayable: false,
+            status: 'COMPLETED',
+            idempotencyKey: checkoutSessionId,
+            redeemedBy: req.user._id,
+            redeemedAt: now,
+          },
+        ],
+        findOpts
+      );
+      const redemption = createdRedemptions[0];
+
+      payment.voucherRedemptionId = redemption._id;
+      await payment.save(findOpts);
+      invoice.voucherRedemptionId = redemption._id;
+      await invoice.save(findOpts);
+
+      return { subscription, payment, invoice, invoiceNumber, periodEnd: period.periodEnd };
     });
-
-    // 5. Create Payment record for SaaS transaction
-    const payment = await Payment.create({
-      organizationId,
-      billingDomain: 'SAAS',
-      subscriptionId: subscription._id,
-      planId: reservation.planId._id,
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      signature: razorpay_signature,
-      amountPaise: Math.round(reservation.finalPayableRupees * 100),
-      amountRupees: reservation.finalPayableRupees,
-      discountRupees: reservation.discountAmountRupees,
-      currency: 'INR',
-      provider: 'RAZORPAY',
-      status: 'CAPTURED',
-      paymentMethod: 'subscription_discounted_online',
-      capturedAt: now,
-      notes: `Voucher ${updatedVoucher.reference} partial discount checkout`,
-    });
-
-    // 6. Generate sequential SaaS invoice
-    const invoiceNumber = await InvoiceSequence.getNextInvoiceNumber(organizationId);
-
-    const invoice = await Invoice.create({
-      organizationId,
-      paymentId: payment._id,
-      subscriptionId: subscription._id,
-      invoiceNumber,
-      invoiceType: 'SAAS_INVOICE',
-      subtotalRupees: reservation.originalAmountRupees,
-      taxRupees: 0,
-      discountRupees: reservation.discountAmountRupees,
-      originalAmountRupees: reservation.originalAmountRupees,
-      totalRupees: reservation.finalPayableRupees,
-      currency: 'INR',
-      status: 'PAID',
-      issuedAt: now,
-      paidAt: now,
-      notes: `Applied voucher [${updatedVoucher.reference}] discount of ₹${reservation.discountAmountRupees}`,
-    });
-
-    payment.invoiceId = invoice._id;
-    await payment.save();
-
-    // 7. Ledger entry
-    await LedgerEntry.create({
-      organizationId,
-      subscriptionId: subscription._id,
-      paymentId: payment._id,
-      invoiceId: invoice._id,
-      amountPaise: payment.amountPaise,
-      amountRupees: payment.amountRupees,
-      currency: 'INR',
-      type: 'CREDIT',
-      source: 'SAAS_SUBSCRIPTION',
-      externalReference: razorpay_payment_id,
-      description: `Discounted SaaS Subscription - ${reservation.planId.name} (${reservation.billingCycle})`,
-    });
-
-    // 8. Record redemption
-    const redemption = await VoucherRedemption.create({
-      voucherId: updatedVoucher._id,
-      organizationId,
-      subscriptionId: subscription._id,
-      paymentId: payment._id,
-      invoiceId: invoice._id,
-      planId: reservation.planId._id,
-      billingCycle: reservation.billingCycle,
-      originalAmountRupees: reservation.originalAmountRupees,
-      discountAmountRupees: reservation.discountAmountRupees,
-      finalPayableRupees: reservation.finalPayableRupees,
-      isZeroPayable: false,
-      status: 'COMPLETED',
-      idempotencyKey: checkoutSessionId,
-      redeemedBy: req.user._id,
-      redeemedAt: now,
-    });
-
-    payment.voucherRedemptionId = redemption._id;
-    await payment.save();
-    invoice.voucherRedemptionId = redemption._id;
-    await invoice.save();
 
     // 9. Audit Log & Notifications
     await logVoucherAudit({
       actor: req.user,
       action: 'VOUCHER_REDEEMED_PARTIAL',
       entityId: updatedVoucher._id,
-      organizationId,
+      organizationId: targetOrgId,
       newValue: {
         voucherReference: updatedVoucher.reference,
-        invoiceNumber,
+        invoiceNumber: txResult.invoiceNumber,
         originalAmountRupees: reservation.originalAmountRupees,
         discountAmountRupees: reservation.discountAmountRupees,
         finalPayableRupees: reservation.finalPayableRupees,
@@ -1521,11 +2116,11 @@ const verifyVoucherPartial = async (req, res) => {
       req,
     });
 
-    const orgDoc = await Organization.findById(organizationId).select('name');
+    const orgDoc = await Organization.findById(targetOrgId).select('name');
     await notifySuperAdmins(
       {
-        organizationId,
-        orgName: orgDoc?.name || 'Q2 Organization',
+        organizationId: targetOrgId,
+        orgName: orgDoc?.name || 'Hosteliq Organization',
         planName: reservation.planId.name,
         billingCycle: reservation.billingCycle,
         voucherName: updatedVoucher.name,
@@ -1541,13 +2136,18 @@ const verifyVoucherPartial = async (req, res) => {
       success: true,
       message: 'Discounted subscription successfully activated!',
       data: {
-        subscriptionId: subscription._id,
-        invoiceNumber,
+        subscriptionId: txResult.subscription._id,
+        status: txResult.subscription.status,
+        activationMethod: txResult.subscription.activationMethod,
+        invoiceNumber: txResult.invoiceNumber,
+        planId: reservation.planId._id,
         planName: reservation.planId.name,
+        billingCycle: reservation.billingCycle,
+        agreedPriceRupees: reservation.originalAmountRupees,
         originalAmount: reservation.originalAmountRupees,
         discountAmount: reservation.discountAmountRupees,
         finalPayable: reservation.finalPayableRupees,
-        currentPeriodEnd: periodEnd,
+        currentPeriodEnd: txResult.periodEnd,
       },
     });
   } catch (err) {

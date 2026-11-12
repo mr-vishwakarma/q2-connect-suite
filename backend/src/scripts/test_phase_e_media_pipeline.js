@@ -16,6 +16,8 @@
  * 12. Non-Fatal Degraded Mode when ImageKit is unconfigured or in mock mode
  */
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 require('dotenv').config();
 process.env.NODE_ENV = 'test';
 process.env.MOCK_EMAIL = 'true';
@@ -29,7 +31,6 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const os = require('os');
-const path = require('path');
 
 const Organization = require('../models/Organization');
 const Hostel = require('../models/Hostel');

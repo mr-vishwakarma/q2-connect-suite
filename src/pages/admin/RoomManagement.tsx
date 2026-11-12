@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { InlineSkeletonList } from '@/components/ui/dashboard-skeleton';
 import { useHostel } from '@/contexts/HostelContext';
 import { roomService, studentService } from '@/services/api';
+import type { Room as ApiRoom, StudentApiRecord } from '@/types';
+import { getErrorMessage } from '@/utils/errorHandling';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -69,8 +71,8 @@ export default function RoomManagement() {
     try {
       const response = await roomService.getRooms({ hostel: selectedHostel });
       if (response.success && response.data) {
-        const mapped = (response.data as any[]).map((r: any) => ({
-          id: r._id || r.id,
+        const mapped = response.data.map((r: ApiRoom) => ({
+          id: r._id || r.id || '',
           room_number: r.roomNumber,
           capacity: r.capacity,
           occupied_count: r.occupiedCount,
@@ -89,11 +91,11 @@ export default function RoomManagement() {
       const response = await studentService.getStudents({ hostel: selectedHostel, limit: 100 });
       if (response.success && response.data) {
         const studentList = Array.isArray(response.data) ? response.data : response.data.students || [];
-        const mapped = studentList.map((s: any) => ({
-          id: s._id || s.id,
+        const mapped = (studentList as Array<StudentApiRecord & { room_no?: string | null }>).map((s) => ({
+          id: s._id || s.id || '',
           name: s.name,
           username: s.username,
-          room_no: s.roomNo || s.room_no,
+          room_no: s.roomNo ?? s.room_no ?? null,
         }));
         setStudents(mapped);
       }
@@ -132,8 +134,8 @@ export default function RoomManagement() {
       setShowAddDialog(false);
       setNewRoom({ room_number: '', capacity: 4 });
       fetchRooms();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to add room');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to add room'));
     }
   };
 

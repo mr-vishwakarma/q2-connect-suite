@@ -76,7 +76,7 @@ export function ReceiptsSuccessModal({
     try {
       await downloadFeeReceipt(feeReceipt);
       toast.success('Fee receipt downloaded');
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to download fee receipt');
     } finally {
       setDownloadingFee(false);
@@ -89,7 +89,7 @@ export function ReceiptsSuccessModal({
     try {
       await downloadSecurityDepositReceipt(depositReceipt);
       toast.success('Security deposit receipt downloaded');
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to download security deposit receipt');
     } finally {
       setDownloadingDeposit(false);
@@ -102,7 +102,7 @@ export function ReceiptsSuccessModal({
     try {
       await downloadBothReceipts(feeReceipt, depositReceipt);
       toast.success('Both receipts downloaded successfully');
-    } catch (err: any) {
+    } catch {
       toast.error('Failed to download both receipts');
     } finally {
       setDownloadingBoth(false);

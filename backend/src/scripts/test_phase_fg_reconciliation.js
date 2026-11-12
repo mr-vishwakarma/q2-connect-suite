@@ -49,7 +49,7 @@ const {
 } = require('../controllers/billing.controller');
 
 const { handleRazorpayWebhook } = require('../controllers/webhook.controller');
-const { generateSubscriptionSignature, generateWebhookSignature, getPublicKey } = require('../config/razorpay');
+const { generateSubscriptionSignature, generatePaymentSignature, generateWebhookSignature, getPublicKey } = require('../config/razorpay');
 
 async function runReconciliationSuite() {
   console.log('============================================================');
@@ -87,6 +87,7 @@ async function runReconciliationSuite() {
       orgA = await Organization.create({
         name: 'Q2 Hostels Prime',
         slug: 'q2-hostels',
+        contactEmail: 'admin@q2hostels.com',
         status: 'ACTIVE',
       });
     }
@@ -96,6 +97,7 @@ async function runReconciliationSuite() {
       orgB = await Organization.create({
         name: 'Hansraj Group',
         slug: 'hansraj-hostel',
+        contactEmail: 'admin@hansraj.test',
         status: 'ACTIVE',
       });
     }
@@ -265,16 +267,19 @@ async function runReconciliationSuite() {
       await createSubscription(req, res);
       assert(getStatus() === 201, 'Organization Admin creating subscription returns 201 Created');
       const data = getData()?.data;
-      assert(Boolean(data?.subscriptionId), 'Razorpay subscriptionId returned');
+      assert(Boolean(data?.orderId || data?.subscriptionId), 'Razorpay orderId / checkout reference returned');
       assert(data?.amountRupees === growthPlan.priceMonthly, 'Authoritative plan price enforced (₹4,999)');
       assert(data?.amountPaise === growthPlan.priceMonthly * 100, 'Amount in paise correctly set (499900)');
       assert(Boolean(data?.keyId), 'Public keyId returned for client checkout');
-      createdSubscriptionId = data?.subscriptionId;
+      createdSubscriptionId = data?.orderId || data?.subscriptionId;
 
       // Verify local database state
       const localSub = await Subscription.findOne({ organizationId: orgA._id });
       assert(localSub?.status === 'CREATED', 'Local Subscription status is CREATED');
-      assert(localSub?.razorpaySubscriptionId === createdSubscriptionId, 'Local Subscription stores razorpaySubscriptionId');
+      assert(
+        localSub?.orderId === createdSubscriptionId || localSub?.razorpaySubscriptionId === createdSubscriptionId,
+        'Local Subscription stores checkout orderId reference'
+      );
       assert(localSub?.amount === growthPlan.priceMonthly, 'Local Subscription stores authoritative amount');
     }
 
@@ -284,7 +289,7 @@ async function runReconciliationSuite() {
     console.log('\n--- TEST GROUP 4: Subscription Verification & Signature Validation ---');
 
     const testPaymentId = `pay_sub_${Date.now()}`;
-    const validSignature = generateSubscriptionSignature(createdSubscriptionId, testPaymentId);
+    const validSignature = generatePaymentSignature(createdSubscriptionId, testPaymentId);
 
     // 4.1 Forged Signature Check
     {
@@ -292,17 +297,17 @@ async function runReconciliationSuite() {
         user: adminUserA,
         body: {
           razorpay_payment_id: testPaymentId,
-          razorpay_subscription_id: createdSubscriptionId,
+          razorpay_order_id: createdSubscriptionId,
           razorpay_signature: 'forged_fake_signature_hex_1234567890',
         },
       });
 
       await verifySubscription(req, res);
-      assert(getStatus() === 400, 'Forged subscription signature is rejected with 400 Bad Request');
-      assert(getData()?.error?.code === 'SUBSCRIPTION_VERIFICATION_FAILED', 'Error code is SUBSCRIPTION_VERIFICATION_FAILED');
+      assert(getStatus() === 400, 'Forged payment signature is rejected with 400 Bad Request');
+      assert(getData()?.error?.code === 'PAYMENT_VERIFICATION_FAILED', 'Error code is PAYMENT_VERIFICATION_FAILED');
 
-      const subCheck = await Subscription.findOne({ razorpaySubscriptionId: createdSubscriptionId });
-      assert(subCheck.status === 'CREATED', 'Subscription status remains CREATED upon signature failure');
+      const subCheck = await Subscription.findOne({ orderId: createdSubscriptionId });
+      assert(subCheck?.status === 'CREATED', 'Subscription status remains CREATED upon signature failure');
     }
 
     // 4.2 Valid Signature Verification
@@ -312,13 +317,13 @@ async function runReconciliationSuite() {
         user: adminUserA,
         body: {
           razorpay_payment_id: testPaymentId,
-          razorpay_subscription_id: createdSubscriptionId,
+          razorpay_order_id: createdSubscriptionId,
           razorpay_signature: validSignature,
         },
       });
 
       await verifySubscription(req, res);
-      assert(getStatus() === 200, 'Valid subscription signature verified with 200 OK');
+      assert(getStatus() === 200, 'Valid payment signature verified with 200 OK');
       const data = getData()?.data;
       assert(data?.status === 'ACTIVE', 'Subscription transitioned to ACTIVE');
       assert(Boolean(data?.invoiceNumber), `Sequential invoice issued: ${data?.invoiceNumber}`);
@@ -327,8 +332,8 @@ async function runReconciliationSuite() {
 
       // Verify Organization Subscription reference updated
       const updatedOrg = await Organization.findById(orgA._id);
-      const activeSub = await Subscription.findOne({ razorpaySubscriptionId: createdSubscriptionId });
-      assert(updatedOrg?.subscriptionId?.toString() === activeSub._id.toString(), 'Organization active subscription reference updated');
+      const activeSub = await Subscription.findOne({ orderId: createdSubscriptionId });
+      assert(updatedOrg?.subscriptionId?.toString() === activeSub?._id.toString(), 'Organization active subscription reference updated');
       assert(updatedOrg?.status === 'ACTIVE', 'Organization status updated to ACTIVE');
 
       // Verify SaaS Payment record created
@@ -351,7 +356,7 @@ async function runReconciliationSuite() {
         user: adminUserA,
         body: {
           razorpay_payment_id: testPaymentId,
-          razorpay_subscription_id: createdSubscriptionId,
+          razorpay_order_id: createdSubscriptionId,
           razorpay_signature: validSignature,
         },
       });
@@ -367,15 +372,15 @@ async function runReconciliationSuite() {
     console.log('\n--- TEST GROUP 5: Cross-Tenant SaaS Billing Isolation ---');
 
     {
-      // Org B Admin attempting to verify Org A's subscription
+      // Org B Admin attempting to verify Org A's subscription order
       const foreignPaymentId = `pay_foreign_${Date.now()}`;
-      const foreignSignature = generateSubscriptionSignature(createdSubscriptionId, foreignPaymentId);
+      const foreignSignature = generatePaymentSignature(createdSubscriptionId, foreignPaymentId);
 
       const { req, res, getStatus } = mockReqRes({
         user: adminUserB,
         body: {
           razorpay_payment_id: foreignPaymentId,
-          razorpay_subscription_id: createdSubscriptionId,
+          razorpay_order_id: createdSubscriptionId,
           razorpay_signature: foreignSignature,
         },
       });
@@ -399,6 +404,12 @@ async function runReconciliationSuite() {
     // =============================================================
     console.log('\n--- TEST GROUP 6: Subscription Webhook Lifecycle & Monotonic State ---');
 
+    const legacyWebhookSubId = `sub_legacy_${Date.now()}`;
+    await Subscription.findOneAndUpdate(
+      { organizationId: orgA._id },
+      { $set: { razorpaySubscriptionId: legacyWebhookSubId } }
+    );
+
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || 'dummy_webhook_secret_123456';
 
     // 6.1 subscription.charged Webhook
@@ -408,7 +419,7 @@ async function runReconciliationSuite() {
       payload: {
         subscription: {
           entity: {
-            id: createdSubscriptionId,
+            id: legacyWebhookSubId,
             status: 'active',
             charge_at: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
           },
@@ -453,10 +464,10 @@ async function runReconciliationSuite() {
 
     // 6.2 Duplicate Webhook Delivery Idempotency
     {
-      const { req, res, getStatus, getData } = mockReqRes({
+      const { req, res, getStatus } = mockReqRes({
         headers: {
           'x-razorpay-signature': signatureCharged,
-          'x-razorpay-event-id': `ev_sub_charge_${Date.now()}`, // Will be suppressed or caught by idempotency
+          'x-razorpay-event-id': `ev_sub_charge_dup_${Date.now()}`,
         },
         body: chargedPayload,
         rawBody: rawBodyCharged,
@@ -465,7 +476,8 @@ async function runReconciliationSuite() {
       // Repeat with same payload
       await handleRazorpayWebhook(req, res);
       assert(getStatus() === 200, 'Duplicate subscription webhook accepted with 200 OK');
-      const invoiceCount = await Invoice.countDocuments({ 'subscriptionId': (await Subscription.findOne({ razorpaySubscriptionId: createdSubscriptionId }))._id });
+      const localSubDoc = await Subscription.findOne({ razorpaySubscriptionId: legacyWebhookSubId });
+      const invoiceCount = await Invoice.countDocuments({ subscriptionId: localSubDoc._id });
       assert(invoiceCount === 2, `Exact invoice count maintained (${invoiceCount} invoices, zero duplicate side-effects)`);
     }
 
@@ -475,7 +487,7 @@ async function runReconciliationSuite() {
       payload: {
         subscription: {
           entity: {
-            id: createdSubscriptionId,
+            id: legacyWebhookSubId,
             status: 'cancelled',
           },
         },
@@ -497,9 +509,9 @@ async function runReconciliationSuite() {
       await handleRazorpayWebhook(req, res);
       assert(getStatus() === 200, 'subscription.cancelled webhook processed with 200 OK');
 
-      const localSub = await Subscription.findOne({ razorpaySubscriptionId: createdSubscriptionId });
-      assert(localSub.status === 'CANCELLED', 'Subscription transitioned to CANCELLED');
-      assert(Boolean(localSub.cancelledAt), 'Subscription recorded cancelledAt timestamp');
+      const localSub = await Subscription.findOne({ razorpaySubscriptionId: legacyWebhookSubId });
+      assert(localSub?.status === 'CANCELLED', 'Subscription transitioned to CANCELLED');
+      assert(Boolean(localSub?.cancelledAt), 'Subscription recorded cancelledAt timestamp');
     }
 
     // =============================================================
@@ -539,10 +551,12 @@ async function runReconciliationSuite() {
     // TEARDOWN
     // =============================================================
     console.log('\n[Teardown] Cleaning temporary test records...');
-    await Subscription.findOneAndDelete({ razorpaySubscriptionId: createdSubscriptionId });
-    await Payment.deleteMany({ razorpaySubscriptionId: createdSubscriptionId });
+    await Subscription.deleteMany({ organizationId: orgA._id });
+    await Payment.deleteMany({
+      $or: [{ orderId: createdSubscriptionId }, { razorpaySubscriptionId: legacyWebhookSubId }],
+    });
     await Invoice.deleteMany({ invoiceNumber: generatedInvoiceNumber });
-    await LedgerEntry.deleteMany({ description: new RegExp(createdSubscriptionId) });
+    await LedgerEntry.deleteMany({ externalReference: { $in: [testPaymentId, recurringPaymentId] } });
     await WebhookEvent.deleteMany({ provider: 'RAZORPAY', eventType: { $regex: /^subscription\./ } });
     console.log('✅ Temporary test records cleaned up.');
 

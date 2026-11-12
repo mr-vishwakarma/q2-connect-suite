@@ -32,11 +32,18 @@ invoiceSequenceSchema.index({ organizationId: 1, year: 1, prefix: 1 }, { unique:
  * e.g. Q2-INV-2026-000001
  * Concurrency-safe: uses MongoDB findOneAndUpdate with $inc
  */
-invoiceSequenceSchema.statics.getNextInvoiceNumber = async function (organizationId, prefix = 'Q2-INV', year = new Date().getFullYear()) {
+invoiceSequenceSchema.statics.getNextInvoiceNumber = async function (
+  organizationId,
+  prefix = 'Q2-INV',
+  year = new Date().getFullYear(),
+  session = null
+) {
+  const opts = { new: true, upsert: true, setDefaultsOnInsert: true };
+  if (session) opts.session = session;
   const record = await this.findOneAndUpdate(
     { organizationId, year, prefix },
     { $inc: { seq: 1 } },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    opts
   );
 
   const paddedSeq = String(record.seq).padStart(6, '0');

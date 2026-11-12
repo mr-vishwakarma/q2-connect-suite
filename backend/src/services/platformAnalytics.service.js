@@ -26,14 +26,22 @@ const platformAnalyticsService = {
       Hostel.countDocuments({ isDeleted: false }),
       Student.countDocuments({ isActive: true }),
       Room.countDocuments(),
-      Subscription.find({ status: 'ACTIVE' }).populate('planId', 'priceMonthly').lean(),
+      Subscription.find({ status: 'ACTIVE' })
+        .populate('planId', 'priceMonthly priceYearly')
+        .lean(),
       AuditLog.find().sort({ createdAt: -1, _id: -1 }).limit(10).lean()
     ]);
 
-    // Calculate Platform MRR from active subscriptions
+    // Calculate Platform MRR from active paid subscriptions using agreed pricing snapshots first
     const monthlyRecurringRevenue = subscriptions.reduce((acc, sub) => {
-      const price = sub.planId ? sub.planId.priceMonthly : 0;
-      return acc + price;
+      const agreed =
+        sub.pricingSnapshot?.agreedPriceRupees ??
+        sub.agreedPriceRupees ??
+        sub.amount ??
+        (sub.planId ? sub.planId.priceMonthly : 0);
+      const monthlyEquivalent =
+        sub.billingCycle === 'YEARLY' ? Math.round(Number(agreed || 0) / 12) : Number(agreed || 0);
+      return acc + monthlyEquivalent;
     }, 0);
 
     const annualRecurringRevenue = monthlyRecurringRevenue * 12;
@@ -112,9 +120,14 @@ const platformAnalyticsService = {
     subscriptions.forEach((sub) => {
       if (sub.status === 'ACTIVE') {
         activeSubCount++;
-        if (sub.planId && sub.planId.priceMonthly) {
-          mrr += sub.planId.priceMonthly;
-        }
+        const agreed =
+          sub.pricingSnapshot?.agreedPriceRupees ??
+          sub.agreedPriceRupees ??
+          sub.amount ??
+          (sub.planId ? sub.planId.priceMonthly : 0);
+        const monthlyEquivalent =
+          sub.billingCycle === 'YEARLY' ? Math.round(Number(agreed || 0) / 12) : Number(agreed || 0);
+        mrr += monthlyEquivalent;
       } else if (sub.status === 'TRIAL') {
         trialSubCount++;
       } else if (sub.status === 'PAST_DUE') {

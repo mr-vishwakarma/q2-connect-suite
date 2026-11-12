@@ -65,7 +65,7 @@ export const HostelFeeReceiptModal: React.FC<HostelFeeReceiptModalProps> = ({
     try {
       await downloadFeeReceipt(receipt);
       toast.success('Fee receipt downloaded successfully');
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error('Failed to download fee receipt');
       console.error(err);
     } finally {

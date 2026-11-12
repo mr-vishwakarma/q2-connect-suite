@@ -12,6 +12,7 @@ export interface Student {
   floor?: string | null;
   hostel?: HostelType | null;
   fees: number | null;
+  security_deposit?: number | null;
   start_date: string | null;
   valid_date: string | null;
   address?: string | null;
@@ -20,6 +21,32 @@ export interface Student {
   student_code?: string | null;
   studentCode?: string | null;
   isActive?: boolean;
+}
+
+export interface StudentApiRecord {
+  _id: string;
+  id?: string;
+  userId?: string | { _id: string; name?: string; email?: string; username?: string } | null;
+  name: string;
+  username: string;
+  email?: string | null;
+  phone?: string | null;
+  parentPhone?: string | null;
+  roomNo?: string | null;
+  floor?: string | null;
+  hostel?: HostelType | null;
+  fees?: number | null;
+  securityDeposit?: number | null;
+  startDate?: string | null;
+  validDate?: string | null;
+  address?: string | null;
+  dob?: string | null;
+  profilePhoto?: string | null;
+  studentCode?: string | null;
+  isActive?: boolean;
+  registrationStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface StudentRegistrationPayload {

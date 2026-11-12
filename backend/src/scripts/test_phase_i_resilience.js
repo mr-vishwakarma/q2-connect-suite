@@ -208,7 +208,7 @@ async function runResilienceSuite() {
     // TEST GROUP 3: DISTRIBUTED SCHEDULER SINGLETON INVARIANT
     // -------------------------------------------------------------
     console.log('\n--- TEST GROUP 3: Distributed Scheduler Singleton Invariant ---');
-    assert(SCHEDULED_TASKS.length === 2, 'Distributed scheduler defines exactly 2 repeatable jobs');
+    assert(SCHEDULED_TASKS.length === 3, 'Distributed scheduler defines 3 repeatable jobs (Late Fee, Fee Reminders & Subscription Lifecycle Sweep)');
     // Invoking scheduler initialization from both simulated instances
     const schedResultA = await initDistributedScheduler();
     const schedResultB = await initDistributedScheduler();
@@ -413,6 +413,7 @@ async function runResilienceSuite() {
     // TEST GROUP 6: CONCURRENT MANUAL PAYMENTS ACROSS INSTANCES
     // -------------------------------------------------------------
     console.log('\n--- TEST GROUP 6: Concurrent Manual Payments Across Instances ---');
+    await Promise.all([FeePayment.syncIndexes(), Room.syncIndexes()]);
     const testHostel = await Hostel.findOneAndUpdate(
       { code: 'RESIL_H1', organizationId: testOrgA._id },
       { name: 'Resil Hostel 1', code: 'RESIL_H1', organizationId: testOrgA._id, status: 'ACTIVE' },
@@ -493,8 +494,17 @@ async function runResilienceSuite() {
       ),
     ]);
 
-    const successfulPayments = [payRes1, payRes2].filter((r) => r.status === 201 || (r.status === 200 && r.body?.idempotent) || r.status === 409);
-    assert(successfulPayments.length === 2, 'Both concurrent payment requests handled cleanly without unhandled rejections', `Statuses: ${payRes1.status}, ${payRes2.status}`);
+    const validStatuses = [payRes1, payRes2].every(
+      (r) => r.status === 200 || r.status === 201 || r.status === 409
+    );
+    const freshCreations = [payRes1, payRes2].filter(
+      (r) => (r.status === 200 || r.status === 201) && !r.body?.idempotent
+    );
+    assert(
+      validStatuses && freshCreations.length === 1,
+      'Both concurrent payment requests handled cleanly with zero unhandled rejections and exactly one creation',
+      `Statuses: ${payRes1.status} (idempotent=${Boolean(payRes1.body?.idempotent)}), ${payRes2.status} (idempotent=${Boolean(payRes2.body?.idempotent)})`
+    );
 
     const feePaymentsInDb = await FeePayment.find({ idempotencyKey: sharedIdempotencyKey });
     assert(feePaymentsInDb.length === 1, 'Exactly one FeePayment record persisted in database (idempotency enforced across instances)');

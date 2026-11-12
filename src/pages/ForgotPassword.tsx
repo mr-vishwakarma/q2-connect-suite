@@ -31,18 +31,28 @@ export default function ForgotPassword() {
         setErrorMsg(msg);
         toast.error(msg);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errObj = error as {
+        code?: string;
+        message?: string;
+        response?: {
+          data?: { message?: string; error?: { message?: string } } | string;
+        };
+      };
+      const rawData = errObj.response?.data;
       const serverMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error?.message ||
-        (typeof error.response?.data === 'string' && error.response.data.length < 200 ? error.response.data : null);
+        typeof rawData === 'string'
+          ? rawData.length < 200
+            ? rawData
+            : null
+          : rawData?.message || rawData?.error?.message || null;
 
       if (serverMessage) {
         setErrorMsg(serverMessage);
         toast.error(serverMessage);
-      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      } else if (errObj.code === 'ECONNABORTED' || errObj.message?.includes('timeout')) {
         setIsSubmitted(true);
-      } else if (error.code === 'ERR_NETWORK') {
+      } else if (errObj.code === 'ERR_NETWORK') {
         const msg = 'Network error: Unable to reach the server. Please check your internet connection.';
         setErrorMsg(msg);
         toast.error(msg);

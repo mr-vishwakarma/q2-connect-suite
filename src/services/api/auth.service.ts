@@ -1,8 +1,47 @@
 import { api } from '@/lib/api';
-import { ApiResponse, AuthResponse, User } from '@/types';
+import { ApiResponse, AuthResponse, StudentApiRecord, User } from '@/types';
+
+export interface AuthLoginCredentials {
+  email?: string;
+  username?: string;
+  password: string;
+  isAdminLogin?: boolean;
+  portal?: string;
+}
+
+export interface GoogleProfilePreview {
+  email: string;
+  name: string;
+  picture?: string;
+  suggestedUsername?: string;
+}
+
+export interface GoogleLoginResponseData {
+  success?: boolean;
+  status?: 'active' | 'pending_approval' | 'approved' | 'new_resident' | 'rejected' | string;
+  message?: string;
+  user?: User & { _id?: string; isSuperAdmin?: boolean; isPrimaryAdmin?: boolean };
+  student?: StudentApiRecord | null;
+  accessToken?: string;
+  refreshToken?: string;
+  features?: Record<string, boolean>;
+  canCompleteSetup?: boolean;
+  setupToken?: string;
+  googleProfile?: GoogleProfilePreview;
+}
+
+export interface AdminRegistrationPayload {
+  name: string;
+  email: string;
+  password: string;
+  username?: string;
+  phone?: string;
+  hostel?: string;
+  adminSecret?: string;
+}
 
 export const authService = {
-  async login(credentials: { email?: string; username?: string; password: string; isAdminLogin?: boolean; portal?: string }): Promise<ApiResponse<AuthResponse>> {
+  async login(credentials: AuthLoginCredentials): Promise<ApiResponse<AuthResponse>> {
     const res = await api.post('/auth/login', credentials);
     return res.data;
   },
@@ -22,7 +61,7 @@ export const authService = {
     return res.data;
   },
 
-  async googleLogin(credential: string): Promise<ApiResponse<any>> {
+  async googleLogin(credential: string): Promise<ApiResponse<GoogleLoginResponseData> & GoogleLoginResponseData> {
     const res = await api.post('/auth/google', { credential });
     return res.data;
   },
@@ -43,12 +82,12 @@ export const authService = {
     return res.data;
   },
 
-  async registerAdmin(payload: any): Promise<ApiResponse<any>> {
+  async registerAdmin(payload: AdminRegistrationPayload): Promise<ApiResponse<AuthResponse>> {
     const res = await api.post('/auth/register-admin', payload);
     return res.data;
   },
 
-  async getMe(): Promise<ApiResponse<{ user: User; student?: any }>> {
+  async getMe(): Promise<ApiResponse<{ user: User; student?: StudentApiRecord | null }>> {
     const res = await api.get('/auth/me');
     return res.data;
   },

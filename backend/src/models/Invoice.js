@@ -89,6 +89,9 @@ const invoiceSchema = new mongoose.Schema(
       default: Date.now,
       index: true,
     },
+    paidAt: {
+      type: Date,
+    },
     pdfUrl: {
       type: String,
       trim: true,

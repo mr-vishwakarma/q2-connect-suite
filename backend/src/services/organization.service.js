@@ -9,6 +9,17 @@ const Room = require('../models/Room');
 const User = require('../models/User');
 const Settings = require('../models/Settings');
 const { DEFAULT_FEATURES } = require('../constants/saas.constants');
+const {
+  getPublishedPlanOrFail,
+  validatePlanAndCycle,
+  getPlanPriceForCycle,
+  buildPricingSnapshot,
+  syncOrganizationFeatures,
+  buildHistoryEntry,
+  evaluateNearExpiry,
+  getNearExpiryThresholdDays,
+} = require('./subscriptionLifecycle.service');
+const { calculateSubscriptionPeriod } = require('../utils/subscriptionPeriod');
 
 const organizationService = {
   async getAllOrganizations(query = {}) {
@@ -29,7 +40,13 @@ const organizationService = {
 
     const [organizations, total] = await Promise.all([
       Organization.find(filter)
-        .populate('subscriptionId')
+        .populate({
+          path: 'subscriptionId',
+          populate: {
+            path: 'planId',
+            select: 'name code priceMonthly priceYearly limits trialEligible trialDays',
+          },
+        })
         .sort({ createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
@@ -73,12 +90,32 @@ const organizationService = {
 
     const orgsWithMetrics = organizations.map((org) => {
       const orgIdStr = String(org._id);
+      const sub = org.subscriptionId;
+      const plan = sub?.planId;
+      const snap = sub?.pricingSnapshot;
       return {
         ...org,
         id: org._id,
         hostelCount: hostelMap.get(orgIdStr) || 0,
         studentCount: studentMap.get(orgIdStr) || 0,
         roomCount: roomMap.get(orgIdStr) || 0,
+        subscriptionSummary: sub
+          ? {
+              status: sub.status,
+              activationMethod: sub.activationMethod || 'PENDING',
+              billingCycle: snap?.billingCycle || sub.billingCycle,
+              planId: plan?._id || snap?.planId,
+              planName: snap?.planName || plan?.name || null,
+              planCode: snap?.planCode || plan?.code || null,
+              agreedPriceRupees:
+                snap?.agreedPriceRupees ??
+                sub.agreedPriceRupees ??
+                sub.amount ??
+                null,
+              currentPeriodEnd: sub.currentPeriodEnd,
+              trialEndsAt: sub.trialEndsAt,
+            }
+          : null,
       };
     });
 
@@ -94,16 +131,29 @@ const organizationService = {
   },
 
   async getOrganizationById(id) {
-    const org = await Organization.findById(id).populate('subscriptionId');
+    const org = await Organization.findById(id).populate({
+      path: 'subscriptionId',
+      populate: { path: 'planId' },
+    });
     if (!org) throw new Error('Organization not found');
 
-    const hostels = await Hostel.find({ organizationId: id, isDeleted: false });
-    const memberships = await Membership.find({ organizationId: id }).populate('userId', 'name email username');
-    const features = await OrganizationFeature.find({ organizationId: id });
-    const subscription = await Subscription.findOne({ organizationId: id }).populate('planId');
+    const [hostels, memberships, features, subscription, studentCount, roomCount, thresholdDays] =
+      await Promise.all([
+        Hostel.find({ organizationId: id, isDeleted: false }),
+        Membership.find({ organizationId: id }).populate('userId', 'name email username'),
+        OrganizationFeature.find({ organizationId: id }),
+        Subscription.findOne({ organizationId: id }).populate('planId'),
+        Student.countDocuments({ organizationId: id, isActive: true }),
+        Room.countDocuments({ organizationId: id }),
+        getNearExpiryThresholdDays(),
+      ]);
 
-    const studentCount = await Student.countDocuments({ organizationId: id, isActive: true });
-    const roomCount = await Room.countDocuments({ organizationId: id });
+    const subObj = subscription
+      ? {
+          ...subscription.toObject(),
+          nearExpiry: evaluateNearExpiry(subscription, thresholdDays),
+        }
+      : null;
 
     return {
       ...org.toObject(),
@@ -111,7 +161,7 @@ const organizationService = {
       hostels,
       memberships,
       features,
-      subscription,
+      subscription: subObj,
       studentCount,
       roomCount,
     };
@@ -123,6 +173,40 @@ const organizationService = {
     }
     if (!data.contactEmail || !data.contactEmail.trim()) {
       throw new Error('Official contact email is required');
+    }
+
+    // Validate Plan & Billing Frequency strictly BEFORE creating any tenant/user records
+    const selectedPlan = await getPublishedPlanOrFail(
+      { planId: data.planId, planCode: data.planCode },
+      { requirePublished: true }
+    );
+    const billingCycle = validatePlanAndCycle({
+      plan: selectedPlan,
+      billingCycle: data.billingCycle || 'MONTHLY',
+    });
+
+    const requestedMode = String(data.activationMode || '').toUpperCase().trim();
+    const isTrialRequested =
+      requestedMode === 'FREE_TRIAL' ||
+      (!requestedMode && data.trialDays !== undefined && Number(data.trialDays) > 0);
+
+    let trialDays = 0;
+    if (isTrialRequested) {
+      if (selectedPlan.trialEligible === false) {
+        const err = new Error(
+          `Free trial is not permitted for plan '${selectedPlan.name}'. Please activate via Online Payment or Voucher.`
+        );
+        err.statusCode = 400;
+        err.code = 'TRIAL_NOT_ELIGIBLE';
+        throw err;
+      }
+      trialDays =
+        data.trialDays !== undefined && Number(data.trialDays) > 0
+          ? Number(data.trialDays)
+          : Number(selectedPlan.trialDays || 14);
+      if (trialDays <= 0) {
+        trialDays = 14;
+      }
     }
 
     const slug = (data.slug || data.name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')).trim();
@@ -175,6 +259,7 @@ const organizationService = {
     }
 
     // 1. Create Organization with KYC & Aadhaar
+    const initialOrgStatus = isTrialRequested ? 'TRIAL' : 'PENDING_PAYMENT';
     const org = await Organization.create({
       name: data.name.trim(),
       legalName: data.legalName ? data.legalName.trim() : data.name.trim(),
@@ -192,55 +277,87 @@ const organizationService = {
       pan: data.pan || '',
       orgType: data.orgType || 'Multi-Branch Chain',
       primaryColor: data.primaryColor || '#f59e0b',
-      status: data.trialDays ? 'TRIAL' : 'ACTIVE',
+      status: initialOrgStatus,
     });
 
-    // 2. Resolve Plan & Assign Subscription
-    const planQuery = data.planId ? { _id: data.planId } : (data.planCode ? { code: data.planCode.toUpperCase() } : { code: 'STARTER' });
-    const selectedPlan = await Plan.findOne(planQuery) || await Plan.findOne();
-    let subscription = null;
+    // 2. Create Authoritative Subscription with Exact Selected Plan & Immutable Pricing Snapshot
+    const now = new Date();
+    const catalogPrice = getPlanPriceForCycle(selectedPlan, billingCycle);
+    const snapshot = buildPricingSnapshot({
+      plan: selectedPlan,
+      billingCycle,
+      agreedPriceRupees: catalogPrice,
+      finalPayableRupees: catalogPrice,
+      source: isTrialRequested ? 'ONBOARDING_FREE_TRIAL' : 'ONBOARDING',
+    });
 
-    if (selectedPlan) {
-      const now = new Date();
-      const trialDays = Number(data.trialDays) || 14;
-      const billingCycle = data.billingCycle || 'MONTHLY';
-      
-      let periodEnd = new Date(now);
-      if (billingCycle === 'ANNUAL') {
-        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-      } else if (billingCycle === 'QUARTERLY') {
-        periodEnd.setMonth(periodEnd.getMonth() + 3);
-      } else {
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
-      }
+    let periodStart = now;
+    let periodEnd;
+    let trialStartsAt = undefined;
+    let trialEndsAt = undefined;
 
-      if (data.trialDays) {
-        periodEnd = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
-      }
-
-      subscription = await Subscription.create({
-        organizationId: org._id,
-        planId: selectedPlan._id,
-        status: data.trialDays ? 'TRIAL' : 'ACTIVE',
+    if (isTrialRequested) {
+      trialStartsAt = now;
+      trialEndsAt = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+      periodEnd = trialEndsAt;
+    } else {
+      const calc = calculateSubscriptionPeriod({
+        activationDate: now,
         billingCycle,
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
+        durationCycles: 1,
       });
-
-      org.subscriptionId = subscription._id;
-      await org.save();
+      periodStart = calc.periodStart;
+      periodEnd = calc.periodEnd;
     }
 
-    // 3. Initialize Feature Catalog
-    const featuresToEnable = selectedPlan?.includedFeatures?.length > 0 ? selectedPlan.includedFeatures : DEFAULT_FEATURES;
-    const orgFeatureDocs = featuresToEnable.map((key) => ({
+    const subStatus = isTrialRequested ? 'TRIAL' : 'PENDING_PAYMENT';
+    const activationMethod = isTrialRequested ? 'FREE_TRIAL' : 'PENDING';
+
+    const subscription = await Subscription.create({
       organizationId: org._id,
-      featureKey: key,
-      enabled: true,
-    }));
-    if (orgFeatureDocs.length > 0) {
-      await OrganizationFeature.insertMany(orgFeatureDocs);
-    }
+      planId: selectedPlan._id,
+      status: subStatus,
+      activationMethod,
+      billingCycle,
+      renewalMode: 'MANUAL',
+      autoRenew: false,
+      agreedPriceRupees: catalogPrice,
+      amount: isTrialRequested ? 0 : catalogPrice,
+      amountPaise: isTrialRequested ? 0 : Math.round(catalogPrice * 100),
+      currency: (selectedPlan.currency || 'INR').toUpperCase(),
+      pricingSnapshot: snapshot,
+      startedAt: isTrialRequested ? now : undefined,
+      trialStartsAt,
+      trialEndsAt,
+      trialUsed: isTrialRequested,
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
+      history: [
+        buildHistoryEntry({
+          eventType: isTrialRequested ? 'TRIAL_STARTED' : 'ONBOARDING_SUBSCRIPTION_CREATED',
+          toStatus: subStatus,
+          toPlanId: selectedPlan._id,
+          toPlanName: selectedPlan.name,
+          billingCycle,
+          amountRupees: isTrialRequested ? 0 : catalogPrice,
+          activationMethod,
+          actor: creatorUserId ? { _id: creatorUserId } : null,
+          notes: isTrialRequested
+            ? `Onboarded with ${trialDays}-day free trial on ${selectedPlan.name} (${billingCycle})`
+            : `Onboarded with ${selectedPlan.name} (${billingCycle}); awaiting payment or voucher activation`,
+        }),
+      ],
+    });
+
+    org.subscriptionId = subscription._id;
+    await org.save();
+
+    // 3. Initialize Feature Catalog synced strictly to selected plan
+    const featuresToEnable =
+      selectedPlan.includedFeatures?.length > 0 ? selectedPlan.includedFeatures : DEFAULT_FEATURES;
+    await syncOrganizationFeatures(org._id, featuresToEnable, {
+      enabled: isTrialRequested,
+    });
 
     // 4. Create First Property / Branch Hostel with Amenities & Policy
     const mainHostel = await Hostel.create({

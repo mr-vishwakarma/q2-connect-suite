@@ -66,4 +66,6 @@ checkoutRouter.post('/verify-partial', voucherRedeemLimiter, verifyVoucherPartia
 module.exports = {
   superAdminVoucherRoutes: superAdminRouter,
   checkoutVoucherRoutes: checkoutRouter,
+  voucherValidateLimiter,
+  voucherRedeemLimiter,
 };

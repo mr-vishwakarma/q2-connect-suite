@@ -110,8 +110,10 @@ async function runTestSuite() {
   await test('sendViaResend validates missing API key when not in test mode', async () => {
     const prevNodeEnv = process.env.NODE_ENV;
     const prevKey = process.env.RESEND_API_KEY;
+    const prevMockEmail = process.env.MOCK_EMAIL;
     process.env.NODE_ENV = 'production';
     delete process.env.RESEND_API_KEY;
+    delete process.env.MOCK_EMAIL;
     try {
       let threw = false;
       try {
@@ -128,6 +130,7 @@ async function runTestSuite() {
     } finally {
       process.env.NODE_ENV = prevNodeEnv;
       if (prevKey) process.env.RESEND_API_KEY = prevKey;
+      if (prevMockEmail !== undefined) process.env.MOCK_EMAIL = prevMockEmail;
     }
   });
 

@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bell, Check, AlertTriangle, Info, CheckCircle } from 'lucide-react';
+import { Bell, AlertTriangle, Info, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Notification {
@@ -19,6 +19,15 @@ interface Notification {
   type: string;
   is_read: boolean;
   created_at: string;
+}
+
+interface BackendNotification {
+  _id: string;
+  title: string;
+  message: string;
+  type?: string;
+  isRead: boolean;
+  createdAt: string;
 }
 
 export function NotificationBell() {
@@ -32,7 +41,8 @@ export function NotificationBell() {
     try {
       const response = await api.get('/notifications');
       if (response.data?.success) {
-        const mapped = response.data.data.map((n: any) => ({
+        const items: BackendNotification[] = Array.isArray(response.data.data) ? response.data.data : [];
+        const mapped = items.map((n) => ({
           id: n._id,
           title: n.title,
           message: n.message,
@@ -57,8 +67,8 @@ export function NotificationBell() {
     if (!user) return;
 
     const socket = getSocket();
-    
-    const handleNewNotification = (notification: any) => {
+
+    const handleNewNotification = (notification: BackendNotification) => {
       const newNotif: Notification = {
         id: notification._id,
         title: notification.title,
@@ -127,7 +137,7 @@ export function NotificationBell() {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <Badge 
+            <Badge
               className="absolute -top-1 -right-1 min-w-5 h-5 flex items-center justify-center p-0 text-xs"
               variant="destructive"
             >

@@ -15,14 +15,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { superAdminService } from '@/services/api/superAdmin.service';
+import { superAdminService, HostelDirectoryItem } from '@/services/api/superAdmin.service';
 import { HostelMetricsData } from '@/types';
 import { toast } from 'react-toastify';
 
 import { useDebounce } from '@/hooks/useDebounce';
 
 export default function HostelList() {
-  const [hostels, setHostels] = useState<any[]>([]);
+  const [hostels, setHostels] = useState<HostelDirectoryItem[]>([]);
   const [metrics, setMetrics] = useState<HostelMetricsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,7 +46,7 @@ export default function HostelList() {
   const fetchHostels = useCallback(async (page = 1, signal?: AbortSignal) => {
     try {
       setIsLoading(true);
-      const params: any = { page, limit: 20 };
+      const params: { organizationId?: string; status?: string; genderType?: string; search?: string; page?: number; limit?: number } = { page, limit: 20 };
       if (statusFilter !== 'ALL') params.status = statusFilter;
       if (genderFilter !== 'ALL') params.genderType = genderFilter;
       if (debouncedSearch) params.search = debouncedSearch;
@@ -63,8 +63,13 @@ export default function HostelList() {
           }
         }
       }
-    } catch (error: any) {
-      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') return;
+    } catch (error: unknown) {
+      const isCanceled =
+        typeof error === 'object' &&
+        error !== null &&
+        ((error as { name?: string }).name === 'CanceledError' ||
+          (error as { code?: string }).code === 'ERR_CANCELED');
+      if (isCanceled) return;
       console.error('Failed to load hostels:', error);
       toast.error('Failed to load hostels');
     } finally {
@@ -95,7 +100,9 @@ export default function HostelList() {
       return (
         (h.name && h.name.toLowerCase().includes(term)) ||
         (h.code && h.code.toLowerCase().includes(term)) ||
-        (h.organizationId?.name && h.organizationId.name.toLowerCase().includes(term)) ||
+        (typeof h.organizationId === 'object' &&
+          h.organizationId !== null &&
+          h.organizationId.name?.toLowerCase().includes(term)) ||
         (h.address && h.address.toLowerCase().includes(term))
       );
     });
@@ -276,7 +283,9 @@ export default function HostelList() {
                         <div className="flex items-center gap-2">
                           <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
                           <span className="font-medium text-foreground">
-                            {hostel.organizationId?.name || 'Independent / Unlinked'}
+                            {typeof hostel.organizationId === 'object' && hostel.organizationId !== null
+                              ? hostel.organizationId.name || 'Independent / Unlinked'
+                              : 'Independent / Unlinked'}
                           </span>
                         </div>
                       </td>

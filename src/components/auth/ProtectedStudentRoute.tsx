@@ -44,8 +44,9 @@ export function ProtectedStudentRoute({ children }: ProtectedStudentRouteProps) 
           }
           setCheckingPolicies(false);
         }
-      } catch (err: any) {
-        if (err.response?.data?.code === 'POLICY_ACCEPTANCE_REQUIRED') {
+      } catch (err: unknown) {
+        const apiErr = err as { response?: { data?: { code?: string } } };
+        if (apiErr.response?.data?.code === 'POLICY_ACCEPTANCE_REQUIRED') {
           if (isMounted) {
             navigate("/student/accept-policies", { replace: true });
           }

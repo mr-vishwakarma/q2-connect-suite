@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 const mealTypes = ['Breakfast', 'Lunch', 'Snacks', 'Dinner'];
 
@@ -35,8 +36,8 @@ export function MealRatingWidget() {
         setRating(0);
         setFeedback('');
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to submit rating');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to submit rating'));
     } finally {
       setSubmitting(false);
     }

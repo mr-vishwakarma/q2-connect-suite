@@ -1,19 +1,14 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { motion } from 'framer-motion';
 import {
   UserCheck,
   UserX,
-  Calendar,
   Search,
   Download,
   CheckCircle,
   XCircle,
   Clock,
-  Building2,
-  Users,
-  Percent,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -27,6 +22,7 @@ import {
 } from '@/components/ui/table';
 import { useHostel } from '@/contexts/HostelContext';
 import { studentService } from '@/services/api';
+import { StudentApiRecord } from '@/types';
 import { api } from '@/lib/api';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
@@ -40,10 +36,16 @@ interface AttendanceRecord {
   status: 'present' | 'absent' | 'mess_off';
 }
 
+function getStudentUserId(s: StudentApiRecord): string {
+  if (typeof s.userId === 'string') return s.userId || s._id;
+  if (s.userId && typeof s.userId === 'object') return s.userId._id || s._id;
+  return s._id;
+}
+
 export default function AttendanceManagement() {
   const { selectedHostel } = useHostel();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<StudentApiRecord[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'present' | 'absent' | 'mess_off'>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'present' | 'absent' | 'mess_off'>('all');
@@ -97,7 +99,7 @@ export default function AttendanceManagement() {
       if (res.data?.success) {
         toast.success(`Marked ${status}`);
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to update attendance');
       loadAttendanceData();
     }
@@ -105,7 +107,7 @@ export default function AttendanceManagement() {
 
   const handleMarkAllPresent = async () => {
     const promises = students.map((s) => {
-      const uId = s.userId || s._id;
+      const uId = getStudentUserId(s);
       return api.post('/attendance', {
         userId: uId,
         studentId: s._id,
@@ -119,7 +121,7 @@ export default function AttendanceManagement() {
       await Promise.all(promises);
       toast.success('All residents marked Present for today!');
       loadAttendanceData();
-    } catch (error) {
+    } catch {
       toast.error('Failed to mark all present');
     }
   };
@@ -128,7 +130,7 @@ export default function AttendanceManagement() {
     const csvContent = [
       ['Student Name', 'Room No', 'Hostel Branch', 'Date', 'Status'].join(','),
       ...students.map((s) => {
-        const uId = s.userId || s._id;
+        const uId = getStudentUserId(s);
         const status = attendanceRecords[uId] || 'unmarked';
         return [
           s.name,
@@ -157,7 +159,7 @@ export default function AttendanceManagement() {
     let messOff = 0;
     for (let i = 0; i < students.length; i++) {
       const s = students[i];
-      const status = attendanceRecords[s.userId || s._id];
+      const status = attendanceRecords[getStudentUserId(s)];
       if (status === 'present') present++;
       else if (status === 'absent') absent++;
       else if (status === 'mess_off') messOff++;
@@ -176,10 +178,11 @@ export default function AttendanceManagement() {
   const filteredStudents = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return students.filter((s) => {
-      const uId = s.userId || s._id;
+      const uId = getStudentUserId(s);
       const currentStatus = attendanceRecords[uId] || 'unmarked';
-      const matchesSearch = !query || 
-        (s.name && s.name.toLowerCase().includes(query)) || 
+      const matchesSearch =
+        !query ||
+        (s.name && s.name.toLowerCase().includes(query)) ||
         (s.roomNo && s.roomNo.includes(query));
       if (!matchesSearch) return false;
 
@@ -225,7 +228,9 @@ export default function AttendanceManagement() {
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Present Today</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black text-emerald-400">{presentCount} <span className="text-xs text-muted-foreground font-normal">/ {totalCount}</span></div>
+            <div className="text-2xl font-black text-emerald-400">
+              {presentCount} <span className="text-xs text-muted-foreground font-normal">/ {totalCount}</span>
+            </div>
             <p className="text-[11px] text-emerald-400 mt-1 font-semibold">{attendanceRate}% Rate</p>
           </CardContent>
         </Card>
@@ -327,12 +332,24 @@ export default function AttendanceManagement() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, idx) => (
                   <TableRow key={idx} className="border-border animate-pulse">
-                    <TableCell><div className="h-4 w-32 bg-secondary/60 rounded" /></TableCell>
-                    <TableCell><div className="h-4 w-12 bg-secondary/60 rounded" /></TableCell>
-                    <TableCell><div className="h-4 w-24 bg-secondary/60 rounded" /></TableCell>
-                    <TableCell><div className="h-4 w-16 bg-secondary/60 rounded" /></TableCell>
-                    <TableCell><div className="h-4 w-20 bg-secondary/60 rounded" /></TableCell>
-                    <TableCell className="text-right"><div className="h-8 w-24 bg-secondary/60 rounded ml-auto" /></TableCell>
+                    <TableCell>
+                      <div className="h-4 w-32 bg-secondary/60 rounded" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-12 bg-secondary/60 rounded" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-24 bg-secondary/60 rounded" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-16 bg-secondary/60 rounded" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 w-20 bg-secondary/60 rounded" />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="h-8 w-24 bg-secondary/60 rounded ml-auto" />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : filteredStudents.length === 0 ? (
@@ -343,7 +360,7 @@ export default function AttendanceManagement() {
                 </TableRow>
               ) : (
                 filteredStudents.map((student) => {
-                  const uId = student.userId || student._id;
+                  const uId = getStudentUserId(student);
                   const currentStatus = attendanceRecords[uId] || 'unmarked';
 
                   return (

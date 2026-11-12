@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthLayout } from '@/components/auth/AuthLayout';
-import { WorkspaceSelector } from '@/components/auth/WorkspaceSelector';
+import { WorkspaceSelector, Workspace } from '@/components/auth/WorkspaceSelector';
 import { GoogleStep2Modal } from '@/components/auth/GoogleStep2Modal';
 import { GoogleInitialDetailsModal } from '@/components/auth/GoogleInitialDetailsModal';
+import { GoogleProfilePreview } from '@/services/api/auth.service';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
+import { getErrorMessage } from '@/utils/errorHandling';
 import { toast } from 'react-toastify';
 import {
   Eye,
@@ -89,16 +91,16 @@ export default function Login() {
   // Google Step 2 Completion State (After Admin Approval)
   const [showGoogleStep2, setShowGoogleStep2] = useState(false);
   const [googleSetupToken, setGoogleSetupToken] = useState('');
-  const [googleProfileData, setGoogleProfileData] = useState<any>(null);
+  const [googleProfileData, setGoogleProfileData] = useState<GoogleProfilePreview | null>(null);
 
   // Google Initial Details (Step 1) State (Pending Admin Approval)
   const [showInitialModal, setShowInitialModal] = useState(false);
-  const [initialGoogleProfile, setInitialGoogleProfile] = useState<any>(null);
+  const [initialGoogleProfile, setInitialGoogleProfile] = useState<GoogleProfilePreview | null>(null);
   const [initialCredential, setInitialCredential] = useState('');
 
   // Workspace selection state
-  const [workspaces, setWorkspaces] = useState<any[]>([]);
-  const [showWorkspaceSelect, setShowWorkspaceSelect] = useState(false);
+  const [workspaces] = useState<Workspace[]>([]);
+  const [showWorkspaceSelect] = useState(false);
 
   const { signIn, signInWithGoogle, requestGoogleRegistration, user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -144,7 +146,7 @@ export default function Login() {
     if (setupTokenParam) {
       const emailParam = searchParams.get('email') || '';
       setGoogleSetupToken(setupTokenParam);
-      setGoogleProfileData({ email: emailParam });
+      setGoogleProfileData({ email: emailParam, name: '' });
       setShowGoogleStep2(true);
       return;
     }
@@ -251,9 +253,9 @@ export default function Login() {
       } else {
         navigate('/student/dashboard', { replace: true });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      const msg = err?.response?.data?.message || err?.message || 'Authentication failed. Please verify credentials.';
+      const msg = getErrorMessage(err, 'Authentication failed. Please verify credentials.');
       setErrorBanner(msg);
       toast.error(msg, { toastId: 'auth-login-error' });
     }
@@ -288,9 +290,9 @@ export default function Login() {
       } else {
         toast.error(response.data?.message || 'Verification failed', { toastId: 'auth-login-error' });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      toast.error(err.response?.data?.message || err.message || 'Invalid or expired verification code', { toastId: 'auth-login-error' });
+      toast.error(getErrorMessage(err, 'Invalid or expired verification code'), { toastId: 'auth-login-error' });
     }
   };
 
@@ -302,12 +304,12 @@ export default function Login() {
       });
       setResendCooldown(60);
       toast.success('A new verification code has been dispatched.', { toastId: 'auth-mfa-info' });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to resend code', { toastId: 'auth-login-error' });
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to resend code'), { toastId: 'auth-login-error' });
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
     if (!credentialResponse?.credential) {
       toast.error('Google Sign In did not return a credential.', { toastId: 'auth-login-error' });
       return;
@@ -328,7 +330,7 @@ export default function Login() {
       }
 
       if (result.status === 'new_resident' && result.requiresInitialDetails) {
-        setInitialGoogleProfile(result.googleProfile);
+        setInitialGoogleProfile(result.googleProfile || null);
         setInitialCredential(credentialResponse.credential);
         setShowInitialModal(true);
         toast.info('Google account verified! Please enter your phone number & preferred hostel branch.', { toastId: 'auth-google-info' });
@@ -342,7 +344,7 @@ export default function Login() {
 
       if (result.status === 'approved' && result.canCompleteSetup) {
         setGoogleSetupToken(result.setupToken || '');
-        setGoogleProfileData(result.googleProfile);
+        setGoogleProfileData(result.googleProfile || null);
         setShowGoogleStep2(true);
         toast.success('Congratulations! Your application has been approved. Please choose your password.', { toastId: 'auth-google-info' });
         return;
@@ -360,9 +362,9 @@ export default function Login() {
       } else {
         navigate('/student/dashboard', { replace: true });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      const msg = err?.message || 'Google authentication failed';
+      const msg = getErrorMessage(err, 'Google authentication failed');
       setErrorBanner(msg);
       toast.error(msg, { toastId: 'auth-login-error' });
     }
@@ -387,9 +389,9 @@ export default function Login() {
       }
 
       toast.success('Registration request submitted! Awaiting hostel administrator approval.', { toastId: 'auth-google-info' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      toast.error(err?.message || 'Submission failed', { toastId: 'auth-login-error' });
+      toast.error(getErrorMessage(err, 'Submission failed'), { toastId: 'auth-login-error' });
     }
   };
 

@@ -52,6 +52,17 @@ interface Student {
   user_id: string;
 }
 
+interface NotificationApiRecord {
+  _id: string;
+  userId?: { _id?: string } | null;
+  hostel?: string;
+  title: string;
+  message: string;
+  type: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export default function Notifications() {
   const { selectedHostel } = useHostel();
   const { user, isAdmin } = useAuth();
@@ -81,9 +92,9 @@ export default function Notifications() {
       });
       if (response.data?.success) {
         const rawData = response.data.data || [];
-        const formatted = rawData.map((n: any) => ({
+        const formatted = (rawData as NotificationApiRecord[]).map((n) => ({
           id: n._id,
-          user_id: n.userId?._id,
+          user_id: n.userId?._id || '',
           hostel: n.hostel,
           title: n.title,
           message: n.message,

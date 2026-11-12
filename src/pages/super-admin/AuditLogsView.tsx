@@ -26,10 +26,10 @@ export default function AuditLogsView() {
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [actionFilter, setActionFilter] = useState('ALL');
 
-  const fetchLogs = useCallback(async (targetPage = page) => {
+  const fetchLogs = useCallback(async (targetPage: number) => {
     try {
       setIsLoading(true);
-      const params: any = { page: targetPage, limit: 25 };
+      const params: { organizationId?: string; action?: string; search?: string; page?: number; limit?: number } = { page: targetPage, limit: 25 };
       if (actionFilter !== 'ALL') params.action = actionFilter;
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
 

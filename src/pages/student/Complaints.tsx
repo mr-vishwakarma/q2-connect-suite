@@ -13,6 +13,7 @@ import { toast } from 'react-toastify';
 import { Send, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 interface Complaint {
   id: string;
@@ -52,7 +53,7 @@ export default function Complaints() {
       }
       
       if (complaintsRes?.data?.success) {
-        setComplaints(complaintsRes.data.data.map((c: any) => ({
+        setComplaints((complaintsRes.data.data as Array<{ _id: string; title: string; description: string; status: string; createdAt: string }>).map((c) => ({
           id: c._id,
           title: c.title,
           description: c.description,
@@ -60,9 +61,9 @@ export default function Complaints() {
           createdAt: c.createdAt,
         })));
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast.error(e.response?.data?.message || 'Failed to fetch complaints');
+      toast.error(getErrorMessage(e, 'Failed to fetch complaints'));
     }
   }, []);
 

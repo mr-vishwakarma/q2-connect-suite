@@ -65,6 +65,8 @@ function calculateSubscriptionPeriod({
   billingCycle = 'MONTHLY',
   existingSubscription = null,
   durationCycles = 1,
+  activationDurationDays = null,
+  allowTrialExtension = false,
 }) {
   const isYearly = String(billingCycle || '').toUpperCase() === 'YEARLY';
   const now = new Date(activationDate);
@@ -72,10 +74,15 @@ function calculateSubscriptionPeriod({
   let anchorDate = now;
   let isExtension = false;
 
-  // Early renewal extension: if active and future expiry, extend from currentPeriodEnd
-  if (
+  // Early renewal extension: extend from currentPeriodEnd ONLY when existing subscription is ACTIVE paid
+  // (never extend a TRIAL unless explicitly requested so Trial -> Paid starts a fresh paid cycle)
+  const canExtendStatus =
     existingSubscription &&
-    (existingSubscription.status === 'ACTIVE' || existingSubscription.status === 'TRIAL') &&
+    (existingSubscription.status === 'ACTIVE' ||
+      (allowTrialExtension && existingSubscription.status === 'TRIAL'));
+
+  if (
+    canExtendStatus &&
     existingSubscription.currentPeriodEnd &&
     new Date(existingSubscription.currentPeriodEnd) > now
   ) {
@@ -83,9 +90,14 @@ function calculateSubscriptionPeriod({
     isExtension = true;
   }
 
-  const periodEnd = isYearly
-    ? addCalendarYears(anchorDate, durationCycles)
-    : addCalendarMonths(anchorDate, durationCycles);
+  let periodEnd;
+  if (activationDurationDays && Number(activationDurationDays) > 0) {
+    periodEnd = new Date(anchorDate.getTime() + Number(activationDurationDays) * 24 * 60 * 60 * 1000);
+  } else {
+    periodEnd = isYearly
+      ? addCalendarYears(anchorDate, durationCycles)
+      : addCalendarMonths(anchorDate, durationCycles);
+  }
 
   const periodStart = isExtension
     ? (existingSubscription.currentPeriodStart || now)

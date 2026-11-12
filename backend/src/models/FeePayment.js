@@ -23,11 +23,18 @@ const feePaymentSchema = new mongoose.Schema(
     transactionId: { type: String, trim: true },
     bankName: { type: String, trim: true },
     receiptSnapshot: { type: mongoose.Schema.Types.Mixed },
-    idempotencyKey: { type: String, sparse: true, index: true },
+    idempotencyKey: { type: String, trim: true },
   },
   { timestamps: true }
 );
 
+feePaymentSchema.index(
+  { organizationId: 1, idempotencyKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { idempotencyKey: { $type: 'string' } },
+  }
+);
 feePaymentSchema.index({ organizationId: 1, receiptNo: 1 });
 feePaymentSchema.index({ organizationId: 1, paymentDate: -1 });
 feePaymentSchema.index({ organizationId: 1, studentId: 1 });

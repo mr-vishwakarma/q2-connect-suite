@@ -3,7 +3,8 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, User as AuthUser } from '@/hooks/useAuth';
+import { getErrorMessage } from '@/utils/errorHandling';
 import { toast } from 'react-toastify';
 import { Eye, EyeOff, User, Lock, CheckCircle2, Sparkles, ArrowRight } from 'lucide-react';
 import { getAvatarUrl } from '@/utils/imageUtils';
@@ -13,11 +14,11 @@ interface GoogleStep2ModalProps {
   setupToken: string;
   googleProfile: {
     email: string;
-    name: string;
+    name?: string;
     picture?: string;
     suggestedUsername?: string;
   };
-  onSuccess: (user: any) => void;
+  onSuccess: (user?: AuthUser) => void;
   onCancel: () => void;
 }
 
@@ -83,9 +84,9 @@ export function GoogleStep2Modal({
         toast.success(`Welcome to Hosteliq, ${user?.name || 'Resident'}! Setup complete.`);
         onSuccess(user);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsLoading(false);
-      toast.error(err?.message || 'Profile setup failed');
+      toast.error(getErrorMessage(err, 'Profile setup failed'));
     }
   };
 
@@ -100,7 +101,7 @@ export function GoogleStep2Modal({
             {googleProfile.picture ? (
               <img
                 src={getAvatarUrl(googleProfile.picture, 96)}
-                alt={googleProfile.name}
+                alt={googleProfile.name || 'Resident'}
                 width={48}
                 height={48}
                 decoding="async"

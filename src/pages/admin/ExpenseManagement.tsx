@@ -14,7 +14,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { expenseService } from '@/services/api/expense.service';
+import { expenseService, type CreateExpensePayload } from '@/services/api/expense.service';
+import { getErrorMessage } from '@/utils/errorHandling';
 import { useHostel } from '@/contexts/HostelContext';
 import { Expense } from '@/types';
 import { toast } from 'react-toastify';
@@ -46,9 +47,9 @@ export default function ExpenseManagement() {
       });
       if (res.success && res.data) {
         setExpenses(res.data);
-        if ((res as any).totalPages !== undefined) {
-          setTotalPages((res as any).totalPages || 1);
-          setTotalExpenses((res as any).total || res.data.length);
+        if (res.totalPages !== undefined) {
+          setTotalPages(res.totalPages || 1);
+          setTotalExpenses(res.total || res.data.length);
         }
       }
     } catch (error) {
@@ -74,7 +75,7 @@ export default function ExpenseManagement() {
         ...form,
         amount: Number(form.amount),
         hostelId: selectedHostel,
-      } as any);
+      } satisfies CreateExpensePayload);
 
       if (res.success) {
         toast.success('Expense recorded successfully!');
@@ -82,8 +83,8 @@ export default function ExpenseManagement() {
         setForm({ category: 'ELECTRICITY', amount: '', vendor: '', description: '', paymentMode: 'UPI' });
         fetchExpenses();
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to record expense');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to record expense'));
     }
   };
 

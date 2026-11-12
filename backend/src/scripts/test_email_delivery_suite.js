@@ -27,6 +27,7 @@ const { addEmailJob } = require('../queues/queueManager');
 
 let testOrg = null;
 let testHostel = null;
+let forgotTestUser = null;
 let primaryAdminUser = null;
 let testStudentUser = null;
 let testStudentDoc = null;
@@ -89,9 +90,18 @@ async function runTestSuite() {
   // --- SECTION 2: FORGOT PASSWORD RECOVERY WORKFLOW ---
   console.log('\n🔑 SECTION 2: FORGOT PASSWORD SECURITY & TOKEN RECOVERY');
 
-  const designatedTestEmail = 'shyamvishwakarma610@gmail.com';
+  const designatedTestEmail = `recovery.test.${Date.now()}@q2connect.com`;
 
-  await runTest('Target test account shyamvishwakarma610@gmail.com exists in database', async () => {
+  await runTest('Provision isolated test account for password recovery checks', async () => {
+    forgotTestUser = await User.create({
+      name: 'Recovery Flow Test User',
+      username: `recovery_test_${Date.now()}`,
+      email: designatedTestEmail,
+      password: crypto.randomBytes(20).toString('hex') + 'A1!',
+      role: 'student',
+      status: 'ACTIVE',
+      isActive: true,
+    });
     const target = await User.findOne({ email: designatedTestEmail });
     assert(target !== null, 'Target user must exist');
     assert.strictEqual(target.email, designatedTestEmail, 'Email must match target');
@@ -99,6 +109,7 @@ async function runTestSuite() {
 
   await runTest('Forgot Password generates cryptographically secure sha256 token and 30-min expiry', async () => {
     const target = await User.findOne({ email: designatedTestEmail });
+    assert(target !== null, 'Target user must be found before generating reset token');
     const rawResetToken = crypto.randomBytes(32).toString('hex');
     const hashedResetToken = crypto.createHash('sha256').update(rawResetToken).digest('hex');
     const expiry = Date.now() + 30 * 60 * 1000;
@@ -325,6 +336,7 @@ async function runTestSuite() {
   // --- SECTION 5: CLEANUP TEST ARTIFACTS ---
   console.log('\n🧹 SECTION 5: CLEANUP TEST RECORDS');
   await runTest('Clean up temporary test records from MongoDB Atlas', async () => {
+    if (forgotTestUser) await User.deleteOne({ _id: forgotTestUser._id });
     if (secondaryAdminUser) await User.deleteOne({ _id: secondaryAdminUser._id });
     if (testStudentUser) await User.deleteOne({ _id: testStudentUser._id });
     if (testStudentDoc) await Student.deleteOne({ _id: testStudentDoc._id });

@@ -90,9 +90,21 @@ const voucherRedemptionSchema = new mongoose.Schema(
       default: Date.now,
       index: true,
     },
+    benefitType: {
+      type: String,
+      enum: ['DISCOUNT', 'ACTIVATION', 'TRIAL'],
+      default: 'DISCOUNT',
+      index: true,
+    },
     discountCyclesGranted: {
       type: Number,
       default: 1,
+    },
+    activationDurationDays: {
+      type: Number,
+    },
+    trialDaysGranted: {
+      type: Number,
     },
   },
   { timestamps: true }

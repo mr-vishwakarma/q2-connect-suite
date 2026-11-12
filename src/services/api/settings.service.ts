@@ -1,11 +1,27 @@
 import { api } from '@/lib/api';
 import { ApiResponse } from '@/types';
 
-const settingsCache = new Map<string, { data: ApiResponse<any>; timestamp: number }>();
+export interface HostelSettingsData {
+  hostel?: string;
+  lateFeePerDay?: number;
+  gracePeriodDays?: number;
+  securityDeposit?: number;
+  curfewTime?: string;
+  weeklyLaundrySlots?: number;
+  laundrySlotsPerWeek?: number;
+  monthlyRentDueDay?: number;
+  hasMess?: boolean;
+  messOffNoticeHours?: number;
+  messRebatePerDay?: number;
+  parentConsentRequired?: boolean;
+  [key: string]: unknown;
+}
+
+const settingsCache = new Map<string, { data: ApiResponse<HostelSettingsData | null>; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache for non-sensitive hostel config
 
 export const settingsService = {
-  async getHostelSettings(hostel: string, forceRefresh = false): Promise<ApiResponse<any>> {
+  async getHostelSettings(hostel: string, forceRefresh = false): Promise<ApiResponse<HostelSettingsData | null>> {
     const cached = settingsCache.get(hostel);
     if (!forceRefresh && cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
       return cached.data;
@@ -18,7 +34,7 @@ export const settingsService = {
     return res.data;
   },
 
-  async updateHostelSettings(hostel: string, payload: any): Promise<ApiResponse<any>> {
+  async updateHostelSettings(hostel: string, payload: Partial<HostelSettingsData>): Promise<ApiResponse<HostelSettingsData>> {
     const res = await api.put(`/settings/${hostel}`, payload);
     // Invalidate stale cache upon modification
     settingsCache.delete(hostel);

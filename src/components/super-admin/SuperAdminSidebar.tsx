@@ -19,6 +19,7 @@ import {
   Activity,
   FileDown,
   Ticket,
+  LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,7 +29,7 @@ interface NavSection {
   title?: string;
   links: Array<{
     to: string;
-    icon: any;
+    icon: LucideIcon;
     label: string;
   }>;
 }

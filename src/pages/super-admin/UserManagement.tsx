@@ -30,11 +30,14 @@ import {
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { SaasUserListItem } from '@/types';
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/utils/errorHandling';
+
+type SaasUserRow = SaasUserListItem & { status?: string };
 
 import { useDebounce } from '@/hooks/useDebounce';
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<SaasUserListItem[]>([]);
+  const [users, setUsers] = useState<SaasUserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 300);
@@ -65,7 +68,7 @@ export default function UserManagement() {
   const fetchUsers = useCallback(async (page = 1, signal?: AbortSignal) => {
     try {
       setIsLoading(true);
-      const params: any = { page, limit: 20 };
+      const params: Parameters<typeof superAdminService.getUsers>[0] = { page, limit: 20 };
       if (roleFilter !== 'ALL') params.role = roleFilter;
       if (statusFilter !== 'ALL') {
         if (statusFilter === 'LOCKED') {
@@ -83,8 +86,13 @@ export default function UserManagement() {
           setPagination(res.data.pagination);
         }
       }
-    } catch (error: any) {
-      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') return;
+    } catch (error: unknown) {
+      const isCanceled =
+        typeof error === 'object' &&
+        error !== null &&
+        ((error as { name?: string }).name === 'CanceledError' ||
+          (error as { code?: string }).code === 'ERR_CANCELED');
+      if (isCanceled) return;
       console.error('Failed to load users:', error);
       toast.error('Failed to load user directory');
     } finally {
@@ -123,8 +131,8 @@ export default function UserManagement() {
             fetchUsers(currentPage);
             setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
           }
-        } catch (error: any) {
-          toast.error(error?.response?.data?.message || 'Failed to update user status');
+        } catch (error: unknown) {
+          toast.error(getErrorMessage(error, 'Failed to update user status'));
         } finally {
           setIsConfirmActionLoading(false);
         }
@@ -139,8 +147,8 @@ export default function UserManagement() {
         toast.success(`Account unlocked for "${user.name}"`);
         fetchUsers(currentPage);
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to unlock account');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to unlock account'));
     }
   };
 
@@ -160,8 +168,8 @@ export default function UserManagement() {
             fetchUsers(currentPage);
             setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
           }
-        } catch (error: any) {
-          toast.error(error?.response?.data?.message || 'Failed to revoke sessions');
+        } catch (error: unknown) {
+          toast.error(getErrorMessage(error, 'Failed to revoke sessions'));
         } finally {
           setIsConfirmActionLoading(false);
         }
@@ -184,8 +192,8 @@ export default function UserManagement() {
         setIsRoleModalOpen(false);
         fetchUsers(currentPage);
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to update role');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to update role'));
     }
   };
 
@@ -323,16 +331,16 @@ export default function UserManagement() {
                         <Badge
                           variant="outline"
                           className={
-                            (user as any).status === 'ACTIVE' || (!(user as any).status && user.isActive)
+                            user.status === 'ACTIVE' || (!user.status && user.isActive)
                               ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10 w-fit'
-                              : (user as any).status === 'INVITED'
+                              : user.status === 'INVITED'
                               ? 'border-blue-500/30 text-blue-400 bg-blue-500/10 w-fit'
-                              : (user as any).status === 'SUSPENDED'
+                              : user.status === 'SUSPENDED'
                               ? 'border-amber-500/30 text-amber-400 bg-amber-500/10 w-fit'
                               : 'border-red-500/30 text-red-400 bg-red-500/10 w-fit'
                           }
                         >
-                          {(user as any).status || (user.isActive ? 'ACTIVE' : 'DEACTIVATED')}
+                          {user.status || (user.isActive ? 'ACTIVE' : 'DEACTIVATED')}
                         </Badge>
                         {user.isLocked && (
                           <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-500/10 w-fit">

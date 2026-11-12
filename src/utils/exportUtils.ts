@@ -5,14 +5,18 @@
  * @param data Array of arrays containing row data
  * @param filename File name (without extension)
  */
+import type { RowInput } from 'jspdf-autotable';
+
 export const exportToPDF = async (
   title: string,
   headers: string[],
-  data: any[][],
+  data: RowInput[],
   filename: string = 'export'
 ) => {
-  const { default: jsPDF } = await import('jspdf');
-  await import('jspdf-autotable');
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
 
   const doc = new jsPDF();
   
@@ -22,7 +26,7 @@ export const exportToPDF = async (
   doc.setFontSize(11);
   doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: 36,
     head: [headers],
     body: data,
@@ -42,7 +46,7 @@ export const exportToPDF = async (
  */
 export const exportToExcel = async (
   headers: string[],
-  data: any[],
+  data: Record<string, unknown>[],
   filename: string = 'export'
 ) => {
   const XLSX = await import('xlsx');

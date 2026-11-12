@@ -101,10 +101,15 @@ api.interceptors.request.use(
 );
 
 // Interceptor to handle expired tokens and refresh
-let isRefreshing = false;
-let failedRequestsQueue: any[] = [];
+interface QueuedRequest {
+  resolve: (token: string | null) => void;
+  reject: (error: unknown) => void;
+}
 
-const processQueue = (error: any, token: string | null = null) => {
+let isRefreshing = false;
+let failedRequestsQueue: QueuedRequest[] = [];
+
+const processQueue = (error: unknown, token: string | null = null) => {
   failedRequestsQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
@@ -196,7 +201,8 @@ export const getSocket = (): Socket => {
   const token = localStorage.getItem('accessToken');
 
   if (socket) {
-    if (token && socket.auth && (socket.auth as any).token !== token) {
+    const authPayload = socket.auth as { token?: string } | undefined;
+    if (token && authPayload?.token !== token) {
       socket.auth = { token };
     }
     return socket;

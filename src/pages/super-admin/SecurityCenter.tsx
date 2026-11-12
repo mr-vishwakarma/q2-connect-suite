@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { SecurityOverview } from '@/types';
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 export default function SecurityCenter() {
   const [data, setData] = useState<SecurityOverview | null>(null);
@@ -48,8 +49,8 @@ export default function SecurityCenter() {
         toast.success(`Account unlocked for "${userName}"`);
         fetchSecurityOverview();
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to unlock user');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to unlock user'));
     }
   };
 

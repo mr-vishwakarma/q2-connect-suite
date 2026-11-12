@@ -9,16 +9,20 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import React from 'react';
 
+export interface EditStudentFormState {
+  name: string;
+  room_no: string;
+  fees: string;
+  username: string;
+  startDate?: Date;
+  endDate?: Date;
+}
+
 interface EditStudentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editForm: {
-    name: string;
-    room_no: string;
-    fees: string;
-    username: string;
-  };
-  setEditForm: (form: any) => void;
+  editForm: EditStudentFormState;
+  setEditForm: React.Dispatch<React.SetStateAction<EditStudentFormState>>;
   editStartDate: Date | undefined;
   setEditStartDate: (date: Date | undefined) => void;
   editEndDate: Date | undefined;

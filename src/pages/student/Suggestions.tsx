@@ -13,6 +13,7 @@ import { toast } from 'react-toastify';
 import { Send, Lightbulb } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 interface Suggestion {
   id: string;
@@ -52,7 +53,7 @@ export default function Suggestions() {
       }
       
       if (suggestionsRes?.data?.success) {
-        setSuggestions(suggestionsRes.data.data.map((s: any) => ({
+        setSuggestions((suggestionsRes.data.data as Array<{ _id: string; title: string; description: string; status: string; createdAt: string }>).map((s) => ({
           id: s._id,
           title: s.title,
           description: s.description,
@@ -60,9 +61,9 @@ export default function Suggestions() {
           createdAt: s.createdAt,
         })));
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      toast.error(e.response?.data?.message || 'Failed to fetch suggestions');
+      toast.error(getErrorMessage(e, 'Failed to fetch suggestions'));
     }
   }, []);
 

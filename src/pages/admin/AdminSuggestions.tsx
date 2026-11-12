@@ -16,7 +16,7 @@ import {
   PaginationItem,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination";
+} from '@/components/ui/pagination';
 
 interface Suggestion {
   id: string;
@@ -25,6 +25,15 @@ interface Suggestion {
   status: string;
   created_at: string;
   user_id: string;
+}
+
+interface SuggestionApiRecord {
+  _id: string;
+  title: string;
+  description: string;
+  status: string;
+  createdAt: string;
+  userId: string;
 }
 
 export default function AdminSuggestions() {
@@ -43,30 +52,24 @@ export default function AdminSuggestions() {
     }
   }, [user, isAdmin, loading, navigate]);
 
-  useEffect(() => {
-    if (user && isAdmin) {
-      fetchSuggestions();
-    }
-  }, [user, isAdmin, selectedHostel, currentPage]);
-
-  const fetchSuggestions = async () => {
+  const fetchSuggestions = useCallback(async () => {
     try {
-      setIsLoading(prev => prev);
-      const { data } = await api.get('/suggestions', { 
-        params: { 
+      setIsLoading((prev) => prev);
+      const { data } = await api.get('/suggestions', {
+        params: {
           hostel: selectedHostel,
           page: currentPage,
-          limit: 20
-        } 
+          limit: 20,
+        },
       });
-      
-      const mappedSuggestions = (data?.data || []).map((s: any) => ({
+
+      const mappedSuggestions = (data?.data || []).map((s: SuggestionApiRecord) => ({
         id: s._id,
         title: s.title,
         description: s.description,
         status: s.status,
         created_at: s.createdAt,
-        user_id: s.userId
+        user_id: s.userId,
       }));
 
       setSuggestions(mappedSuggestions);
@@ -78,7 +81,13 @@ export default function AdminSuggestions() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedHostel, currentPage]);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchSuggestions();
+    }
+  }, [user, isAdmin, fetchSuggestions]);
 
   const updateStatus = async (id: string, status: string) => {
     try {
@@ -108,7 +117,9 @@ export default function AdminSuggestions() {
 
   if (loading || isLoading) {
     return (
-      <div className="py-8"><InlineSkeletonList rows={5} /></div>
+      <div className="py-8">
+        <InlineSkeletonList rows={5} />
+      </div>
     );
   }
 
@@ -210,18 +221,20 @@ export default function AdminSuggestions() {
           <Pagination>
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                <PaginationPrevious
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
               <PaginationItem>
-                <span className="text-sm px-4">Page {currentPage} of {totalPages}</span>
+                <span className="text-sm px-4">
+                  Page {currentPage} of {totalPages}
+                </span>
               </PaginationItem>
               <PaginationItem>
-                <PaginationNext 
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                <PaginationNext
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
             </PaginationContent>

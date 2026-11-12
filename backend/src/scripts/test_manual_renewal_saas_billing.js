@@ -5,7 +5,13 @@
  * Verifies all 22 Acceptance Criteria end-to-end against MongoDB.
  */
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 require('dotenv').config();
+process.env.VOUCHER_LOOKUP_SECRET =
+  process.env.VOUCHER_LOOKUP_SECRET || 'test_voucher_lookup_secret_64hex_deterministic_key_123456';
+process.env.VOUCHER_PIN_SECRET =
+  process.env.VOUCHER_PIN_SECRET || 'test_voucher_pin_secret_64hex_deterministic_key_123456';
 const mongoose = require('mongoose');
 const Plan = require('../models/Plan');
 const Subscription = require('../models/Subscription');
@@ -98,7 +104,7 @@ async function runTestSuite() {
   console.log('🚀 RUNNING Q2 SAAS BILLING: MANUAL RENEWAL & VOUCHER TEST SUITE');
   console.log('======================================================================\n');
 
-  const mongoUri = process.env.TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017/q2connect_test';
+  const mongoUri = process.env.TEST_MONGODB_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/q2connect_test';
   await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
   console.log(`Connected to MongoDB at ${mongoUri} for test execution.\n`);
 
@@ -682,6 +688,8 @@ async function runTestSuite() {
     // ==================================================================
     console.log('\n[Scenario 22] Missing gateway credentials handling');
     delete process.env.ALLOW_TEST_PAYMENTS;
+    const origNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
     const origKeyId = process.env.RAZORPAY_KEY_ID;
     delete process.env.RAZORPAY_KEY_ID;
 
@@ -728,6 +736,10 @@ async function runTestSuite() {
     });
     await createVoucher(vCreateReqUnconf, vCreateResUnconf);
     const unconfVoucherCredentials = vCreateResUnconf.getData()?.data?.credentials;
+    assert(
+      vCreateResUnconf.getStatusCode() === 201 && Boolean(unconfVoucherCredentials?.code && unconfVoucherCredentials?.pin),
+      'Dedicated voucher created cleanly for unconfigured gateway zero-payable test'
+    );
 
     // Zero-payable voucher still works without gateway credentials!
     const { req: vZeroUnconfReq, res: vZeroUnconfRes } = mockReqRes({
@@ -746,6 +758,11 @@ async function runTestSuite() {
 
     // Restore test env
     process.env.ALLOW_TEST_PAYMENTS = 'true';
+    if (origNodeEnv !== undefined) {
+      process.env.NODE_ENV = origNodeEnv;
+    } else {
+      delete process.env.NODE_ENV;
+    }
     if (origKeyId) process.env.RAZORPAY_KEY_ID = origKeyId;
 
     console.log('\n======================================================================');

@@ -1,4 +1,5 @@
 import { UserRole, HostelType } from './common.types';
+import type { Student } from './student.types';
 
 export interface User {
   id: string;
@@ -24,7 +25,7 @@ export interface Profile {
 
 export interface AuthResponse {
   user: User;
-  student?: any;
+  student?: Student | null;
   accessToken: string;
   refreshToken: string;
 }

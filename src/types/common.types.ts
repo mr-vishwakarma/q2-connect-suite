@@ -1,11 +1,11 @@
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
   data?: T;
   error?: string;
 }
 
-export interface PaginatedResponse<T = any> {
+export interface PaginatedResponse<T = unknown> {
   success: boolean;
   data: {
     items?: T[];
@@ -13,7 +13,7 @@ export interface PaginatedResponse<T = any> {
     page: number;
     totalPages: number;
     limit: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

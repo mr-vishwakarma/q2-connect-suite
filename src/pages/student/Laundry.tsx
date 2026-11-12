@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'react-toastify';
 import { api } from '@/lib/api';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 interface Booking {
   _id: string;
@@ -75,7 +76,7 @@ export default function Laundry() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [data, setData] = useState<LaundryData | null>(null);
-  const [myBookings, setMyBookings] = useState<any[]>([]);
+  const [myBookings, setMyBookings] = useState<Array<{ _id: string; date: string; timeSlot: string; machineNumber?: number; status: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [bookingInProgress, setBookingInProgress] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -89,8 +90,8 @@ export default function Laundry() {
       if (response.data?.success) {
         setData(response.data.data);
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to load laundry slots');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to load laundry slots'));
     } finally {
       setLoading(false);
     }
@@ -134,8 +135,8 @@ export default function Laundry() {
         fetchSlots(selectedDate);
         fetchMyBookings();
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to book slot');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to book slot'));
     } finally {
       setBookingInProgress(false);
     }
@@ -150,8 +151,8 @@ export default function Laundry() {
         fetchSlots(selectedDate);
         fetchMyBookings();
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to cancel booking');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to cancel booking'));
     }
   };
 

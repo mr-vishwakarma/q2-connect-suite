@@ -52,11 +52,36 @@ const voucherSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    // Fixed discount in INR
+    // Voucher category within unified Coupons & Vouchers catalogue
+    voucherType: {
+      type: String,
+      enum: ['DISCOUNT', 'ACTIVATION', 'TRIAL'],
+      default: 'DISCOUNT',
+      index: true,
+    },
+    // Fixed discount in INR (required >= 1 for DISCOUNT vouchers; optional/0 for ACTIVATION or TRIAL vouchers)
     discountAmountRupees: {
       type: Number,
-      required: true,
-      min: [1, 'Discount amount must be at least 1 INR'],
+      default: 0,
+      validate: {
+        validator: function (val) {
+          if (this.voucherType === 'DISCOUNT' || !this.voucherType) {
+            return typeof val === 'number' && val >= 1;
+          }
+          return typeof val === 'number' && val >= 0;
+        },
+        message: 'Discount amount must be at least 1 INR for discount vouchers',
+      },
+    },
+    // Explicit validity duration override (in days) for ACTIVATION vouchers
+    activationDurationDays: {
+      type: Number,
+      min: [1, 'Activation duration must be at least 1 day'],
+    },
+    // Explicit trial period (in days) granted by TRIAL vouchers
+    trialDaysGranted: {
+      type: Number,
+      min: [1, 'Trial days granted must be at least 1 day'],
     },
     // Eligible SaaS Plans (empty array means all active plans are eligible)
     eligiblePlans: [

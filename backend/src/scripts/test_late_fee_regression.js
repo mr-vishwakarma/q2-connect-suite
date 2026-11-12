@@ -1,5 +1,8 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 require('dotenv').config();
 const assert = require('assert');
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const {
   calculateLateFeeBreakdown,
@@ -8,6 +11,10 @@ const {
   calculateBillingPeriod,
 } = require('../utils/billingCycle');
 const feeService = require('../services/fee.service');
+const Organization = require('../models/Organization');
+const Hostel = require('../models/Hostel');
+const Settings = require('../models/Settings');
+const User = require('../models/User');
 const Student = require('../models/Student');
 const { getSenderAddress } = require('../utils/email');
 
@@ -140,36 +147,130 @@ async function runLateFeeRegressionTests() {
   // --- SECTION 3: SENDER IDENTITY GUARANTEE ---
   console.log('\n📧 SECTION 3: GLOBAL SENDER IDENTITY ENFORCEMENT');
 
-  test('getSenderAddress strictly sends from authenticated mayurvish2003@gmail.com', () => {
+  test('getSenderAddress strictly enforces verified domain or configured SMTP identity without dead q2connect.com', () => {
     const sender = getSenderAddress();
-    assert(sender.includes('mayurvish2003@gmail.com'), `Sender must include mayurvish2003@gmail.com. Received: ${sender}`);
-    assert(!sender.includes('noreply@q2connect.com'), 'Must never send from unroutable noreply@q2connect.com');
+    assert(!sender.includes('q2connect.com'), `Must never send from unroutable q2connect.com. Received: ${sender}`);
+
+    const configuredFrom = (process.env.EMAIL_FROM || '').trim();
+    const expectedCurrent =
+      !process.env.RESEND_API_KEY && configuredFrom && configuredFrom.includes('@') && !configuredFrom.includes('@q2connect.com')
+        ? configuredFrom
+        : 'Hosteliq <noreply@mrvishwakarma.in>';
+    assert(
+      sender === expectedCurrent || sender.includes('@mrvishwakarma.in'),
+      `Sender must match verified domain or configured SMTP sender. Received: ${sender}`
+    );
+
+    // Explicitly verify Resend and clean default modes always enforce @mrvishwakarma.in
+    const origResend = process.env.RESEND_API_KEY;
+    const origFrom = process.env.EMAIL_FROM;
+    try {
+      process.env.RESEND_API_KEY = 're_test_dummy_key';
+      assert(getSenderAddress().includes('@mrvishwakarma.in'), 'Resend transport must strictly resolve @mrvishwakarma.in');
+      delete process.env.RESEND_API_KEY;
+      delete process.env.EMAIL_FROM;
+      assert.strictEqual(getSenderAddress(), 'Hosteliq <noreply@mrvishwakarma.in>', 'Default sender without EMAIL_FROM must be Hosteliq <noreply@mrvishwakarma.in>');
+    } finally {
+      if (origResend !== undefined) process.env.RESEND_API_KEY = origResend;
+      else delete process.env.RESEND_API_KEY;
+      if (origFrom !== undefined) process.env.EMAIL_FROM = origFrom;
+      else delete process.env.EMAIL_FROM;
+    }
   });
 
-  // --- SECTION 4: INTEGRATED FEE SERVICE WITH ATLAS ---
-  console.log('\n🏦 SECTION 4: AUTHORITATIVE FEE SERVICE ATLAS INTEGRATION');
+  // --- SECTION 4: INTEGRATED FEE SERVICE WITH MONGODB ---
+  console.log('\n🏦 SECTION 4: AUTHORITATIVE FEE SERVICE INTEGRATION');
 
   await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 30000 });
 
-  await testAsync('feeService.calculatePayableFee correctly derives late fee for student Karan', async () => {
-    const karan = await Student.findOne({ name: 'Karan' }).lean();
-    assert(karan, 'Student Karan must exist in Atlas');
+  let testOrg = null;
+  let testHostel = null;
+  let testSettings = null;
+  let testUser = null;
+  let testStudent = null;
 
-    const res = await feeService.calculatePayableFee({
-      studentId: karan._id,
-      feeMonth: 'October 2026',
-      asOfDate: new Date('2026-10-17'),
+  try {
+    await testAsync('feeService.calculatePayableFee correctly derives late fee for seeded test student', async () => {
+      const suffix = Date.now().toString(36);
+      testOrg = await Organization.create({
+        name: `LateFee Org ${suffix}`,
+        slug: `latefee-org-${suffix}`,
+        contactEmail: `latefee.${suffix}@mrvishwakarma.in`,
+        status: 'ACTIVE',
+      });
+
+      const hostelCode = `LF_${suffix.toUpperCase()}`;
+      testHostel = await Hostel.create({
+        organizationId: testOrg._id,
+        name: `LateFee Hostel ${suffix}`,
+        code: hostelCode,
+        status: 'ACTIVE',
+        settings: {
+          gracePeriodDays: 5,
+          lateFeePerDay: 20,
+          securityDeposit: 0,
+        },
+      });
+
+      testSettings = await Settings.create({
+        organizationId: testOrg._id,
+        hostelId: testHostel._id,
+        hostel: hostelCode,
+        gracePeriodDays: 5,
+        lateFeePerDay: 20,
+        securityDeposit: 0,
+      });
+
+      testUser = await User.create({
+        name: 'Karan',
+        username: `karan_${suffix}`,
+        email: `karan.${suffix}@mrvishwakarma.in`,
+        password: crypto.randomBytes(16).toString('hex') + 'A1!',
+        role: 'student',
+        activeOrganizationId: testOrg._id,
+        activeHostelId: testHostel._id,
+        hostels: [hostelCode],
+        status: 'ACTIVE',
+        isActive: true,
+      });
+
+      testStudent = await Student.create({
+        userId: testUser._id,
+        organizationId: testOrg._id,
+        hostelId: testHostel._id,
+        name: 'Karan',
+        username: testUser.username,
+        email: testUser.email,
+        hostel: hostelCode,
+        roomNo: 'LF-101',
+        fees: 8000,
+        securityDeposit: 0,
+        startDate: new Date('2026-10-05T00:00:00.000Z'),
+        isActive: true,
+      });
+
+      const res = await feeService.calculatePayableFee({
+        studentId: testStudent._id,
+        organizationId: testOrg._id,
+        feeMonth: 'October 2026',
+        asOfDate: new Date('2026-10-17'),
+      });
+
+      assert.strictEqual(res.baseFee, 8000);
+      assert.strictEqual(res.applicableLateFee, 140, 'Karan October late fee must be exactly ₹140');
+      assert.strictEqual(res.overdueDays, 12);
+      assert.strictEqual(res.chargeableDays, 7);
+      assert.strictEqual(res.isOverdue, true);
+      assert.strictEqual(res.totalPayable, 8140);
     });
-
-    assert.strictEqual(res.baseFee, 8000);
-    assert.strictEqual(res.applicableLateFee, 140, 'Karan October late fee must be exactly ₹140');
-    assert.strictEqual(res.overdueDays, 12);
-    assert.strictEqual(res.chargeableDays, 7);
-    assert.strictEqual(res.isOverdue, true);
-    assert.strictEqual(res.totalPayable, 8140);
-  });
-
-  await mongoose.disconnect();
+  } finally {
+    if (testStudent) await Student.deleteOne({ _id: testStudent._id }).catch(() => {});
+    if (testUser) await User.deleteOne({ _id: testUser._id }).catch(() => {});
+    if (testSettings) await Settings.deleteOne({ _id: testSettings._id }).catch(() => {});
+    if (testHostel) await Hostel.deleteOne({ _id: testHostel._id }).catch(() => {});
+    if (testOrg) await Organization.deleteOne({ _id: testOrg._id }).catch(() => {});
+    await mongoose.disconnect();
+  }
 
   console.log('\n================================================================');
   console.log(`📊 REGRESSION SUITE: ${passed}/${total} TESTS PASSED`);

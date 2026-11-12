@@ -61,13 +61,16 @@ export default function ResetPassword() {
         setIsSuccess(true);
         toast.success('Your password has been reset. You can continue to log in.');
       }
-    } catch (error: any) {
-      if (error.response?.data?.expired) {
-        const msg = error.response.data.message || 'This reset link has expired. A fresh reset link has been sent to your email.';
+    } catch (error: unknown) {
+      const errObj = error as {
+        response?: { data?: { expired?: boolean; message?: string } };
+      };
+      if (errObj.response?.data?.expired) {
+        const msg = errObj.response.data.message || 'This reset link has expired. A fresh reset link has been sent to your email.';
         setExpiredNotice(msg);
         toast.info(msg, { autoClose: 10000 });
       } else {
-        const msg = error.response?.data?.message || 'Failed to reset password. If your link expired, please request a new one.';
+        const msg = errObj.response?.data?.message || 'Failed to reset password. If your link expired, please request a new one.';
         setErrorMsg(msg);
         toast.error(msg);
       }

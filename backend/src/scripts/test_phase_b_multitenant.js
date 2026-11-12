@@ -112,12 +112,75 @@ async function runTenantTestSuite() {
     // SETUP FIXTURES
     // -------------------------------------------------------------
     console.log('[Setup] Resolving Organizations & Seeding Deterministic Fixtures...');
-    orgA = await Organization.findOne({ slug: 'q2-hostels' });
-    orgB = await Organization.findOne({ slug: 'hansraj-hostel' });
+    orgA = await Organization.findOneAndUpdate(
+      { slug: 'q2-hostels' },
+      {
+        $setOnInsert: {
+          name: 'Q2 Hostel Management Pvt Ltd',
+          slug: 'q2-hostels',
+          contactEmail: 'admin@q2hostels.com',
+          status: 'ACTIVE',
+        },
+      },
+      { upsert: true, new: true }
+    );
+    orgB = await Organization.findOneAndUpdate(
+      { slug: 'hansraj-hostel' },
+      {
+        $setOnInsert: {
+          name: 'Hansraj Hostel Group',
+          slug: 'hansraj-hostel',
+          contactEmail: 'admin@hansraj.test',
+          status: 'ACTIVE',
+        },
+      },
+      { upsert: true, new: true }
+    );
 
-    if (!orgA || !orgB) {
-      throw new Error('Required test organizations (q2-hostels, hansraj-hostel) not found in database.');
-    }
+    await Hostel.findOneAndUpdate(
+      { organizationId: orgA._id, code: 'Q2' },
+      {
+        $setOnInsert: {
+          organizationId: orgA._id,
+          name: 'Q2 Branch Q2',
+          code: 'Q2',
+          capacity: 150,
+          status: 'ACTIVE',
+        },
+      },
+      { upsert: true, new: true }
+    );
+    await Hostel.findOneAndUpdate(
+      { organizationId: orgA._id, code: 'MAIN' },
+      {
+        $setOnInsert: {
+          organizationId: orgA._id,
+          name: 'Q2 Branch Main',
+          code: 'MAIN',
+          capacity: 150,
+          status: 'ACTIVE',
+        },
+      },
+      { upsert: true, new: true }
+    );
+    await Hostel.findOneAndUpdate(
+      { organizationId: orgB._id, code: 'MAIN' },
+      {
+        $setOnInsert: {
+          organizationId: orgB._id,
+          name: 'Hansraj Main Branch',
+          code: 'MAIN',
+          capacity: 150,
+          status: 'ACTIVE',
+        },
+      },
+      { upsert: true, new: true }
+    );
+    await OrganizationFeature.findOneAndUpdate(
+      { organizationId: orgA._id, featureKey: 'expense_management' },
+      { organizationId: orgA._id, featureKey: 'expense_management', enabled: true },
+      { upsert: true }
+    );
 
     // Ensure Org B has expense_management feature enabled
     await OrganizationFeature.findOneAndUpdate(
@@ -364,11 +427,38 @@ async function runTenantTestSuite() {
     console.log('[Auth] Generating Signed JWT Tokens for Test Personas...');
     const jwt = require('jsonwebtoken');
 
-    const orgAAdminUser = await User.findOne({ username: 'Abhi1006' });
-    const saUser = await User.findOne({ username: 'superadmin' });
+    let orgAAdminUser = await User.findOne({ username: 'Abhi1006' }) || await User.findOne({ role: 'admin', activeOrganizationId: orgA._id });
+    if (!orgAAdminUser) {
+      orgAAdminUser = await User.create({
+        name: 'Abhishek Admin',
+        email: 'admin_a@q2hostels.test',
+        username: 'Abhi1006',
+        password: testPassword,
+        role: 'admin',
+        activeOrganizationId: orgA._id,
+        hostels: ['all', 'Q2'],
+        isActive: true,
+        registrationStatus: 'active',
+      });
+    }
+    await Membership.findOneAndUpdate(
+      { userId: orgAAdminUser._id, organizationId: orgA._id },
+      { userId: orgAAdminUser._id, organizationId: orgA._id, role: 'ORGANIZATION_OWNER', status: 'ACTIVE', hostelAccess: ['all'], permissions: ['*'] },
+      { upsert: true }
+    );
 
-    if (!orgAAdminUser || !saUser) {
-      throw new Error('Baseline users Abhi1006 or superadmin missing from database');
+    let saUser = await User.findOne({ username: 'superadmin' }) || await User.findOne({ role: 'super_admin' });
+    if (!saUser) {
+      saUser = await User.create({
+        name: 'Super Administrator',
+        email: 'superadmin@q2connect.com',
+        username: 'superadmin',
+        password: 'SuperAdmin@123',
+        role: 'super_admin',
+        isSuperAdmin: true,
+        isActive: true,
+        registrationStatus: 'active',
+      });
     }
 
     const orgAAdminToken = jwt.sign({ id: orgAAdminUser._id }, process.env.JWT_SECRET, { expiresIn: '1h' });

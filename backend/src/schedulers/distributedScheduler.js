@@ -27,10 +27,16 @@ const SCHEDULED_TASKS = [
     pattern: '0 10 * * *', // Daily at 10:00 AM
     jobId: 'repeatable:fee-reminders-daily',
   },
+  {
+    name: 'SUBSCRIPTION_LIFECYCLE_SWEEP',
+    pattern: '15 0 * * *', // Daily at 00:15 AM
+    jobId: 'repeatable:subscription-lifecycle-daily',
+  },
 ];
 
 /**
- * Initializes distributed repeatable jobs in BullMQ.
+ * Initializes distributed repeatable jobs in BullMQ (compatible with BullMQ v6 Job Schedulers
+ * as well as legacy getRepeatableJobs/add mocks).
  */
 async function initDistributedScheduler() {
   const status = getRedisStatus();
@@ -46,26 +52,42 @@ async function initDistributedScheduler() {
   }
 
   try {
-    // 1. Audit existing repeatable jobs in Redis to avoid stale duplicates
-    const existingRepeatable = await scheduledQueue.getRepeatableJobs();
-    const existingJobKeys = new Set(existingRepeatable.map((j) => j.key));
+    const payload = { scheduledBy: 'distributed-scheduler', registeredAt: new Date().toISOString() };
 
-    // 2. Register each required task with deterministic repeat options
-    for (const task of SCHEDULED_TASKS) {
-      // Add or update repeatable job
-      await scheduledQueue.add(
-        task.name,
-        { scheduledBy: 'distributed-scheduler', registeredAt: new Date().toISOString() },
-        {
-          repeat: {
-            pattern: task.pattern,
-          },
+    if (typeof scheduledQueue.upsertJobScheduler === 'function') {
+      // BullMQ v6 Job Scheduler API
+      if (typeof scheduledQueue.getJobSchedulers === 'function') {
+        await scheduledQueue.getJobSchedulers();
+      }
+      for (const task of SCHEDULED_TASKS) {
+        await scheduledQueue.upsertJobScheduler(
+          task.jobId,
+          { pattern: task.pattern },
+          {
+            name: task.name,
+            data: payload,
+            opts: {
+              removeOnComplete: { count: 50 },
+              removeOnFail: { count: 100 },
+            },
+          }
+        );
+        console.log(`[DistributedScheduler] Upserted distributed job scheduler: ${task.name} (${task.pattern}) [ID: ${task.jobId}]`);
+      }
+    } else if (typeof scheduledQueue.getRepeatableJobs === 'function') {
+      // Legacy BullMQ <= v5 compatibility fallback
+      await scheduledQueue.getRepeatableJobs();
+      for (const task of SCHEDULED_TASKS) {
+        await scheduledQueue.add(task.name, payload, {
+          repeat: { pattern: task.pattern },
           jobId: task.jobId,
           removeOnComplete: { count: 50 },
           removeOnFail: { count: 100 },
-        }
-      );
-      console.log(`[DistributedScheduler] Registered distributed repeatable job: ${task.name} (${task.pattern}) [ID: ${task.jobId}]`);
+        });
+        console.log(`[DistributedScheduler] Registered distributed repeatable job: ${task.name} (${task.pattern}) [ID: ${task.jobId}]`);
+      }
+    } else {
+      throw new Error('BullMQ queue lacks upsertJobScheduler / getRepeatableJobs API');
     }
 
     return { initialized: true, registeredCount: SCHEDULED_TASKS.length };

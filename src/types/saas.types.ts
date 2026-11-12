@@ -1,4 +1,12 @@
-export type OrganizationStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELLED';
+export type OrganizationStatus =
+  | 'PENDING_PAYMENT'
+  | 'TRIAL'
+  | 'ACTIVE'
+  | 'PAYMENT_FAILED'
+  | 'EXPIRED'
+  | 'PAST_DUE'
+  | 'SUSPENDED'
+  | 'CANCELLED';
 
 export type HostelGenderType = 'GIRLS' | 'BOYS' | 'COED';
 
@@ -90,7 +98,8 @@ export interface OnboardTenantPayload {
   // Stage 4: Subscription & Policies
   planCode?: string;
   planId?: string;
-  billingCycle?: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  billingCycle?: 'MONTHLY' | 'YEARLY';
+  activationMode?: 'PENDING_PAYMENT' | 'FREE_TRIAL';
   trialDays?: number;
 
   monthlyRentDueDay?: number;
@@ -197,10 +206,94 @@ export interface SubscriptionPlan {
   description?: string;
   priceMonthly: number;
   priceYearly: number;
+  currency?: string;
+  allowedBillingCycles?: ('MONTHLY' | 'YEARLY')[];
+  trialEligible?: boolean;
+  trialDays?: number;
+  sortOrder?: number;
+  version?: number;
+  status?: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
   limits: PlanLimits;
   includedFeatures: FeatureKey[];
   isActive: boolean;
   isPopular?: boolean;
+  badgeText?: string;
+}
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PricingSnapshot {
+  planId?: string;
+  planCode?: string;
+  planName?: string;
+  planDescription?: string;
+  planVersion?: number;
+  billingCycle?: 'MONTHLY' | 'YEARLY';
+  agreedPriceRupees?: number;
+  finalPayableRupees?: number;
+  monthlyPriceAtPurchase?: number;
+  yearlyPriceAtPurchase?: number;
+  currency?: string;
+  trialEligible?: boolean;
+  trialDays?: number;
+  limits?: PlanLimits;
+  includedFeatures?: string[];
+  capturedAt?: string;
+  source?: string;
+}
+
+export interface ScheduledPlanChange {
+  targetPlanId?: string;
+  targetPlanCode?: string;
+  targetPlanName?: string;
+  targetBillingCycle?: 'MONTHLY' | 'YEARLY';
+  targetPriceRupees?: number;
+  changeType?: 'DOWNGRADE' | 'PLAN_SWITCH';
+  effectiveDate?: string;
+  scheduledAt?: string;
+  capacityWarnings?: string[];
+  acknowledgedCapacityWarning?: boolean;
+  status?: 'NONE' | 'SCHEDULED' | 'APPLIED' | 'CANCELLED';
+}
+
+export interface SubscriptionHistoryItem {
+  _id?: string;
+  eventType: string;
+  fromStatus?: string;
+  toStatus?: string;
+  fromPlanId?: string;
+  fromPlanName?: string;
+  toPlanId?: string;
+  toPlanName?: string;
+  billingCycle?: 'MONTHLY' | 'YEARLY';
+  amountRupees?: number;
+  activationMethod?: string;
+  paymentId?: string;
+  invoiceNumber?: string;
+  voucherReference?: string;
+  actorName?: string;
+  actorEmail?: string;
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface SubscriptionAvailableActions {
+  isTrial?: boolean;
+  isPaidActive?: boolean;
+  isPendingPayment?: boolean;
+  isExpired?: boolean;
+  canActivatePlan?: boolean;
+  canApplyVoucher?: boolean;
+  canRenew?: boolean;
+  canReactivate?: boolean;
+  canUpgrade?: boolean;
+  canDowngrade?: boolean;
+  canStartTrial?: boolean;
 }
 
 export interface TenantSubscription {
@@ -209,11 +302,31 @@ export interface TenantSubscription {
   organizationId: string;
   planId: string;
   plan?: SubscriptionPlan;
-  status: 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
+  status:
+    | 'CREATED'
+    | 'PENDING_PAYMENT'
+    | 'PAYMENT_FAILED'
+    | 'TRIAL'
+    | 'ACTIVE'
+    | 'PAST_DUE'
+    | 'EXPIRED'
+    | 'CANCELLED'
+    | 'SUSPENDED';
+  activationMethod?: 'PENDING' | 'ONLINE_PAYMENT' | 'VOUCHER' | 'FREE_TRIAL' | 'MANUAL_OVERRIDE';
   billingCycle: 'MONTHLY' | 'YEARLY';
+  agreedPriceRupees?: number;
+  pricingSnapshot?: PricingSnapshot;
+  scheduledPlanChange?: ScheduledPlanChange;
   currentPeriodStart: string;
   currentPeriodEnd: string;
+  startedAt?: string;
+  activatedAt?: string;
+  trialStartsAt?: string;
   trialEndsAt?: string;
+  trialUsed?: boolean;
+  lastVoucherReference?: string;
+  availableActions?: SubscriptionAvailableActions;
+  history?: SubscriptionHistoryItem[];
   usage: {
     studentCount: number;
     roomCount: number;
@@ -236,7 +349,7 @@ export interface OrganizationFeature {
   organizationId: string;
   featureKey: FeatureKey;
   enabled: boolean;
-  configuration?: Record<string, any>;
+  configuration?: Record<string, unknown>;
   limits?: Record<string, number>;
 }
 
@@ -251,8 +364,8 @@ export interface AuditLogItem {
   action: string;
   entityType: string;
   entityId?: string;
-  oldValue?: any;
-  newValue?: any;
+  oldValue?: unknown;
+  newValue?: unknown;
   ipAddress?: string;
   userAgent?: string;
   timestamp: string;
@@ -451,7 +564,7 @@ export interface SystemHealthData {
     configured?: boolean;
     status?: string;
     classification?: string;
-    metrics?: any;
+    metrics?: Record<string, unknown>;
   }>;
   nodeVersion?: string;
 }

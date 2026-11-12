@@ -43,8 +43,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { superAdminService } from '@/services/api/superAdmin.service';
+import { billingService } from '@/services/api/billing.service';
 import { SubscriptionPlan, FeatureDefinition } from '@/types';
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 const STANDARD_FEATURE_OPTIONS: { key: string; label: string }[] = [
   { key: 'student_management', label: 'Student Management' },
@@ -69,7 +71,7 @@ export default function PlanManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'archived'>('all');
   const [isSeeding, setIsSeeding] = useState(false);
 
   // Dialog state
@@ -85,6 +87,11 @@ export default function PlanManagement() {
     description: '',
     priceMonthly: 0,
     priceYearly: 0,
+    allowedBillingCycles: ['MONTHLY', 'YEARLY'] as ('MONTHLY' | 'YEARLY')[],
+    trialEligible: true,
+    trialDays: 14,
+    sortOrder: 1,
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'ARCHIVED',
     isPopular: false,
     isActive: true,
     maxStudents: 100,
@@ -110,9 +117,9 @@ export default function PlanManagement() {
       } else {
         setPlans([]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch plans:', err);
-      setError(err?.response?.data?.message || err?.message || 'Failed to load subscription plans');
+      setError(getErrorMessage(err, 'Failed to load subscription plans'));
     } finally {
       setIsLoading(false);
     }
@@ -141,11 +148,12 @@ export default function PlanManagement() {
       setIsSeeding(true);
       const res = await superAdminService.seedDefaultPlans();
       if (res.success && res.data) {
+        billingService.invalidatePlansCache();
         setPlans(res.data);
         toast.success(`Standard pricing tiers initialized (${res.data.length} plans)`);
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to initialize default plans');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to initialize default plans'));
     } finally {
       setIsSeeding(false);
     }
@@ -158,6 +166,11 @@ export default function PlanManagement() {
       description: '',
       priceMonthly: 2999,
       priceYearly: 29990,
+      allowedBillingCycles: ['MONTHLY', 'YEARLY'],
+      trialEligible: true,
+      trialDays: 14,
+      sortOrder: plans.length + 1,
+      status: 'ACTIVE',
       isPopular: false,
       isActive: true,
       maxStudents: 100,
@@ -180,20 +193,43 @@ export default function PlanManagement() {
 
   const handleOpenEdit = (plan: SubscriptionPlan) => {
     setEditingPlan(plan);
+    const derivedStatus: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' =
+      plan.status || (plan.isActive === false ? 'INACTIVE' : 'ACTIVE');
     setFormData({
       name: plan.name || '',
       code: plan.code || '',
       description: plan.description || '',
       priceMonthly: plan.priceMonthly || 0,
       priceYearly: plan.priceYearly || 0,
+      allowedBillingCycles:
+        plan.allowedBillingCycles && plan.allowedBillingCycles.length > 0
+          ? plan.allowedBillingCycles
+          : ['MONTHLY', 'YEARLY'],
+      trialEligible: plan.trialEligible ?? true,
+      trialDays: plan.trialDays ?? 14,
+      sortOrder: plan.sortOrder ?? 1,
+      status: derivedStatus,
       isPopular: plan.isPopular || false,
-      isActive: plan.isActive ?? true,
+      isActive: derivedStatus === 'ACTIVE',
       maxStudents: plan.limits?.maxStudents ?? 0,
       maxRooms: plan.limits?.maxRooms ?? 50,
       maxHostels: plan.limits?.maxHostels ?? 1,
       maxStaff: plan.limits?.maxStaff ?? 5,
       storageGb: plan.limits?.storageGb ?? 5,
       includedFeatures: plan.includedFeatures || [],
+    });
+  };
+
+  const handleToggleCycleCheck = (cycle: 'MONTHLY' | 'YEARLY') => {
+    setFormData((prev) => {
+      const exists = prev.allowedBillingCycles.includes(cycle);
+      const next = exists
+        ? prev.allowedBillingCycles.filter((c) => c !== cycle)
+        : [...prev.allowedBillingCycles, cycle];
+      return {
+        ...prev,
+        allowedBillingCycles: next.length > 0 ? next : [cycle],
+      };
     });
   };
 
@@ -211,15 +247,25 @@ export default function PlanManagement() {
 
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.allowedBillingCycles || formData.allowedBillingCycles.length === 0) {
+      toast.error('Select at least one billing cycle (Monthly or Yearly)');
+      return;
+    }
+
     try {
       setIsSaving(true);
-      const payload: any = {
+      const payload: Partial<SubscriptionPlan> = {
         name: formData.name.trim(),
         description: formData.description.trim(),
         priceMonthly: Number(formData.priceMonthly),
         priceYearly: Number(formData.priceYearly),
+        allowedBillingCycles: formData.allowedBillingCycles,
+        trialEligible: Boolean(formData.trialEligible),
+        trialDays: formData.trialEligible ? Math.max(0, Number(formData.trialDays) || 14) : 0,
+        sortOrder: Number(formData.sortOrder) || 1,
+        status: formData.status,
         isPopular: formData.isPopular,
-        isActive: formData.isActive,
+        isActive: formData.status === 'ACTIVE',
         limits: {
           maxStudents: Number(formData.maxStudents),
           maxRooms: Number(formData.maxRooms),
@@ -227,28 +273,32 @@ export default function PlanManagement() {
           maxStaff: Number(formData.maxStaff),
           storageGb: Number(formData.storageGb),
         },
-        includedFeatures: formData.includedFeatures,
+        includedFeatures: formData.includedFeatures as SubscriptionPlan['includedFeatures'],
       };
 
       if (editingPlan) {
-        const planId = (editingPlan as any)._id || editingPlan.id;
+        const planId = editingPlan._id || editingPlan.id;
         const res = await superAdminService.updatePlan(planId, payload);
         if (res.success) {
+          billingService.invalidatePlansCache();
           toast.success(`Plan '${formData.name}' updated successfully`);
           setEditingPlan(null);
           fetchPlans();
         }
       } else {
-        payload.code = (formData.code || formData.name).toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+        payload.code = (formData.code || formData.name)
+          .toUpperCase()
+          .replace(/[^A-Z0-9]+/g, '_') as SubscriptionPlan['code'];
         const res = await superAdminService.createPlan(payload);
         if (res.success) {
+          billingService.invalidatePlansCache();
           toast.success(`Plan '${formData.name}' created successfully`);
           setIsCreateOpen(false);
           fetchPlans();
         }
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to save subscription plan');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to save subscription plan'));
     } finally {
       setIsSaving(false);
     }
@@ -256,15 +306,16 @@ export default function PlanManagement() {
 
   const handleDeletePlan = async () => {
     if (!deletingPlan) return;
-    const planId = (deletingPlan as any)._id || deletingPlan.id;
+    const planId = deletingPlan._id || deletingPlan.id;
     try {
       setIsSaving(true);
       await superAdminService.deletePlan(planId);
-      toast.success(`Plan '${deletingPlan.name}' deleted successfully`);
+      billingService.invalidatePlansCache();
+      toast.success(`Plan '${deletingPlan.name}' removed or archived from catalog`);
       setDeletingPlan(null);
       fetchPlans();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to delete plan');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to delete plan'));
     } finally {
       setIsSaving(false);
     }
@@ -279,10 +330,12 @@ export default function PlanManagement() {
         (plan.code && plan.code.toLowerCase().includes(q)) ||
         (plan.description && plan.description.toLowerCase().includes(q));
 
+      const effectiveStatus = plan.status || (plan.isActive === false ? 'INACTIVE' : 'ACTIVE');
       const matchesStatus =
         statusFilter === 'all' ||
-        (statusFilter === 'active' && plan.isActive !== false) ||
-        (statusFilter === 'inactive' && plan.isActive === false);
+        (statusFilter === 'active' && effectiveStatus === 'ACTIVE' && plan.isActive !== false) ||
+        (statusFilter === 'inactive' && (effectiveStatus === 'INACTIVE' || plan.isActive === false)) ||
+        (statusFilter === 'archived' && effectiveStatus === 'ARCHIVED');
 
       return matchesSearch && matchesStatus;
     });
@@ -357,7 +410,7 @@ export default function PlanManagement() {
         </div>
 
         <div className="flex items-center gap-1.5 self-end sm:self-auto">
-          {(['all', 'active', 'inactive'] as const).map((st) => (
+          {(['all', 'active', 'inactive', 'archived'] as const).map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
@@ -460,7 +513,7 @@ export default function PlanManagement() {
         /* Plan Cards Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPlans.map((plan) => {
-            const planId = (plan as any)._id || plan.id;
+            const planId = plan._id || plan.id;
             const maxStudents = plan.limits?.maxStudents;
             const maxRooms = plan.limits?.maxRooms;
             const maxHostels = plan.limits?.maxHostels;
@@ -477,13 +530,25 @@ export default function PlanManagement() {
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <CardTitle className="text-lg font-bold text-foreground">{plan.name}</CardTitle>
                       {plan.code && (
                         <Badge variant="outline" className="text-[10px] font-mono uppercase bg-secondary/40 text-muted-foreground border-border">
                           {plan.code}
                         </Badge>
                       )}
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] uppercase ${
+                          (plan.status || (plan.isActive ? 'ACTIVE' : 'INACTIVE')) === 'ACTIVE'
+                            ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                            : (plan.status === 'ARCHIVED')
+                            ? 'border-zinc-500/30 text-zinc-400 bg-zinc-500/10'
+                            : 'border-amber-500/30 text-amber-400 bg-amber-500/10'
+                        }`}
+                      >
+                        {plan.status || (plan.isActive ? 'ACTIVE' : 'INACTIVE')}
+                      </Badge>
                     </div>
                     {plan.isPopular && (
                       <Badge className="bg-amber-500 text-black font-bold text-[10px] shrink-0">
@@ -494,6 +559,26 @@ export default function PlanManagement() {
                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2 min-h-[32px]">
                     {plan.description || 'General subscription tier.'}
                   </p>
+
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    {(plan.allowedBillingCycles?.length ? plan.allowedBillingCycles : ['MONTHLY', 'YEARLY']).map((cy) => (
+                      <Badge key={cy} variant="outline" className="text-[10px] font-mono py-0 px-1.5">
+                        {cy}
+                      </Badge>
+                    ))}
+                    {plan.trialEligible !== false ? (
+                      <Badge className="bg-blue-500/15 text-blue-400 border-blue-500/30 text-[10px] py-0 px-1.5">
+                        {plan.trialDays || 14}d Free Trial
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground py-0 px-1.5">
+                        Paid Only
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground py-0 px-1.5 font-mono">
+                      v{plan.version || 1}
+                    </Badge>
+                  </div>
 
                   <div className="pt-3 flex items-baseline justify-between border-t border-border/40 mt-2">
                     <div>
@@ -616,7 +701,7 @@ export default function PlanManagement() {
                   id="planName"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Starter Plan"
+                  placeholder="e.g. Growth Plan"
                   required
                   className="h-9 text-xs"
                 />
@@ -628,7 +713,7 @@ export default function PlanManagement() {
                   id="planCode"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  placeholder="e.g. STARTER"
+                  placeholder="e.g. GROWTH_PRO"
                   disabled={!!editingPlan}
                   required
                   className="h-9 text-xs font-mono uppercase"
@@ -776,6 +861,82 @@ export default function PlanManagement() {
               </div>
             </div>
 
+            {/* Billing Frequencies, Trial Policy & Publishing Status */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/50">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold block">Allowed Billing Frequencies</Label>
+                <div className="flex items-center gap-3 p-2 rounded-lg border border-border/60 bg-secondary/20">
+                  {(['MONTHLY', 'YEARLY'] as const).map((cy) => {
+                    const checked = formData.allowedBillingCycles.includes(cy);
+                    return (
+                      <label key={cy} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => handleToggleCycleCheck(cy)}
+                          className="w-3.5 h-3.5 rounded border-border text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className="font-mono font-medium">{cy}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="planStatus" className="text-xs font-semibold block">Publishing Status</Label>
+                <select
+                  id="planStatus"
+                  value={formData.status}
+                  onChange={(e) => {
+                    const st = e.target.value as 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+                    setFormData({ ...formData, status: st, isActive: st === 'ACTIVE' });
+                  }}
+                  className="w-full h-9 px-3 rounded-md bg-background border border-input text-xs text-foreground"
+                >
+                  <option value="ACTIVE">Published (Active for Onboarding & Billing)</option>
+                  <option value="INACTIVE">Unpublished (Inactive / Hidden)</option>
+                  <option value="ARCHIVED">Archived (Grandfathered Existing Tenants Only)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-secondary/20 border border-border/50">
+              <div className="flex items-center gap-2 sm:col-span-1">
+                <input
+                  id="trialEligible"
+                  type="checkbox"
+                  checked={formData.trialEligible}
+                  onChange={(e) => setFormData({ ...formData, trialEligible: e.target.checked })}
+                  className="w-4 h-4 rounded border-border text-amber-500 focus:ring-amber-500"
+                />
+                <Label htmlFor="trialEligible" className="text-xs cursor-pointer">
+                  Free Trial Eligible
+                </Label>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] text-muted-foreground block">Trial Duration (Days)</span>
+                <Input
+                  type="number"
+                  min="0"
+                  disabled={!formData.trialEligible}
+                  value={formData.trialEligible ? formData.trialDays : 0}
+                  onChange={(e) => setFormData({ ...formData, trialDays: Number(e.target.value) })}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[11px] text-muted-foreground block">Catalog Sort Order</span>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.sortOrder}
+                  onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) })}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+
             {/* Toggles */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
               <div className="flex items-center gap-2">
@@ -788,19 +949,6 @@ export default function PlanManagement() {
                 />
                 <Label htmlFor="isPopular" className="text-xs cursor-pointer">
                   Highlight as "Most Popular"
-                </Label>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  id="isActive"
-                  type="checkbox"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4 rounded border-border text-amber-500 focus:ring-amber-500"
-                />
-                <Label htmlFor="isActive" className="text-xs cursor-pointer">
-                  Active for Onboarding
                 </Label>
               </div>
             </div>

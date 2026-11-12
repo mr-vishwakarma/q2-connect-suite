@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   voucherService,
   Voucher,
+  VoucherType,
   CreateVoucherPayload,
   CreateVoucherResponse,
   VoucherRedemptionItem,
@@ -63,6 +64,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { toast } from 'react-toastify';
 import { api } from '@/lib/api';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 export default function CouponsVouchers() {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -74,6 +76,7 @@ export default function CouponsVouchers() {
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [voucherTypeFilter, setVoucherTypeFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
 
@@ -88,9 +91,12 @@ export default function CouponsVouchers() {
   const [formData, setFormData] = useState<CreateVoucherPayload>({
     name: '',
     description: '',
+    voucherType: 'DISCOUNT',
     discountAmountRupees: 2000,
+    activationDurationDays: null,
+    trialDaysGranted: 14,
     eligiblePlans: [],
-    eligibleBillingIntervals: ['MONTHLY'],
+    eligibleBillingIntervals: ['MONTHLY', 'YEARLY'],
     validFrom: new Date().toISOString().slice(0, 16),
     expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 16),
     globalRedemptionLimit: 1,
@@ -114,20 +120,27 @@ export default function CouponsVouchers() {
   const fetchVouchers = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = { page, limit: 20 };
+      const params: {
+        page: number;
+        limit: number;
+        status?: string;
+        voucherType?: string;
+        search?: string;
+      } = { page, limit: 20 };
       if (statusFilter !== 'ALL') params.status = statusFilter;
+      if (voucherTypeFilter !== 'ALL') params.voucherType = voucherTypeFilter;
       if (searchQuery.trim()) params.search = searchQuery.trim();
 
       const response = await voucherService.getVouchers(params);
       setVouchers(response.data || []);
       setTotalCount(response.pagination?.total || 0);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching vouchers:', err);
-      toast.error(err.message || 'Failed to load vouchers');
+      toast.error(getErrorMessage(err, 'Failed to load vouchers'));
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, searchQuery]);
+  }, [page, statusFilter, voucherTypeFilter, searchQuery]);
 
   // Fetch Redemptions Report
   const fetchRedemptions = useCallback(async () => {
@@ -136,7 +149,7 @@ export default function CouponsVouchers() {
       const response = await voucherService.getRedemptionsReport({ limit: 50 });
       setRedemptions(response.data || []);
       setRedemptionsTotal(response.pagination?.total || 0);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching redemptions report:', err);
       toast.error('Failed to load redemptions report');
     } finally {
@@ -148,12 +161,19 @@ export default function CouponsVouchers() {
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const [plansData, orgsRes] = await Promise.all([
-          billingService.getPlans(),
+        const [plansRes, orgsRes] = await Promise.all([
+          api.get('/super-admin/plans').catch(() => ({ data: { data: [] } })),
           api.get('/super-admin/organizations?limit=100').catch(() => ({ data: { data: [] } })),
         ]);
-        setPlans(plansData);
-        setOrganizations(orgsRes.data?.data || []);
+        const plansList = Array.isArray(plansRes.data?.data) ? plansRes.data.data : await billingService.getPlans().catch(() => []);
+        const rawOrgs = orgsRes.data?.data;
+        const orgsList = Array.isArray(rawOrgs)
+          ? rawOrgs
+          : Array.isArray(rawOrgs?.organizations)
+          ? rawOrgs.organizations
+          : [];
+        setPlans(plansList);
+        setOrganizations(orgsList);
       } catch (err) {
         console.warn('Metadata fetch notice:', err);
       }
@@ -178,8 +198,13 @@ export default function CouponsVouchers() {
       toast.error('Please enter a voucher name');
       return;
     }
-    if (Number(formData.discountAmountRupees) <= 0) {
+    const vType = formData.voucherType || 'DISCOUNT';
+    if (vType === 'DISCOUNT' && Number(formData.discountAmountRupees) <= 0) {
       toast.error('Discount amount must be greater than ₹0');
+      return;
+    }
+    if (vType === 'TRIAL' && (!formData.trialDaysGranted || Number(formData.trialDaysGranted) < 1)) {
+      toast.error('Trial days granted must be at least 1 day');
       return;
     }
     if (new Date(formData.expiresAt) <= new Date(formData.validFrom || Date.now())) {
@@ -187,16 +212,27 @@ export default function CouponsVouchers() {
       return;
     }
 
+    const payload: CreateVoucherPayload = {
+      ...formData,
+      voucherType: vType,
+      discountAmountRupees: vType === 'DISCOUNT' ? Number(formData.discountAmountRupees) : 0,
+      activationDurationDays:
+        vType === 'ACTIVATION' && formData.activationDurationDays
+          ? Number(formData.activationDurationDays)
+          : null,
+      trialDaysGranted: vType === 'TRIAL' ? Number(formData.trialDaysGranted || 14) : null,
+    };
+
     try {
       setIsSubmittingCreate(true);
-      const result = await voucherService.createVoucher(formData);
+      const result = await voucherService.createVoucher(payload);
       setIsCreateOpen(false);
       setCredentialsModal(result);
       toast.success('Voucher created successfully! Secure credentials now.');
       fetchVouchers();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Create voucher error:', err);
-      toast.error(err.response?.data?.message || err.message || 'Failed to create voucher');
+      toast.error(getErrorMessage(err, 'Failed to create voucher'));
     } finally {
       setIsSubmittingCreate(false);
     }
@@ -218,9 +254,9 @@ export default function CouponsVouchers() {
       if (selectedVoucherDetails?._id === voucherId) {
         setSelectedVoucherDetails((prev) => (prev ? { ...prev, status: targetStatus } : null));
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Status change error:', err);
-      toast.error(err.response?.data?.message || err.message || 'Failed to update voucher status');
+      toast.error(getErrorMessage(err, 'Failed to update voucher status'));
     }
   };
 
@@ -230,7 +266,7 @@ export default function CouponsVouchers() {
       setIsDetailsLoading(true);
       const details = await voucherService.getVoucherById(id);
       setSelectedVoucherDetails(details);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Fetch details error:', err);
       toast.error('Failed to load voucher details');
     } finally {
@@ -247,13 +283,24 @@ export default function CouponsVouchers() {
   // Download Credentials as Safe File
   const downloadCredentials = () => {
     if (!credentialsModal) return;
+    const vType = credentialsModal.voucher.voucherType || 'DISCOUNT';
+    const benefitText =
+      vType === 'ACTIVATION'
+        ? credentialsModal.voucher.activationDurationDays
+          ? `Direct Activation (${credentialsModal.voucher.activationDurationDays} days)`
+          : `Direct Plan Activation`
+        : vType === 'TRIAL'
+        ? `${credentialsModal.voucher.trialDaysGranted || 14}-Day Trial Grant`
+        : `₹${credentialsModal.voucher.discountAmountRupees.toLocaleString('en-IN')} Discount`;
+
     const content = `================================================
 HOSTELIQ — SECURE VOUCHER CREDENTIALS
 ================================================
 Voucher Name: ${credentialsModal.voucher.name}
 Reference ID: ${credentialsModal.voucher.reference}
-Discount Amount: ₹${credentialsModal.voucher.discountAmountRupees.toLocaleString('en-IN')}
-Expiry Date: ${new Date(credentialsModal.voucher.expiresAt).toLocaleString('en-IN')}
+Voucher Type: ${vType}
+Benefit:      ${benefitText}
+Expiry Date:  ${new Date(credentialsModal.voucher.expiresAt).toLocaleString('en-IN')}
 
 VOUCHER CODE: ${credentialsModal.credentials.code}
 SECRET PIN:   ${credentialsModal.credentials.pin}
@@ -292,6 +339,41 @@ Distribute directly to the authorized organization administrator.
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const getVoucherTypeBadge = (voucherType?: VoucherType | string) => {
+    const type = voucherType || 'DISCOUNT';
+    return (
+      <Badge
+        variant="outline"
+        className={`text-[10px] font-mono ${
+          type === 'ACTIVATION'
+            ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+            : type === 'TRIAL'
+            ? 'border-blue-500/40 text-blue-400 bg-blue-500/10'
+            : 'border-amber-500/40 text-amber-400 bg-amber-500/10'
+        }`}
+      >
+        {type}
+      </Badge>
+    );
+  };
+
+  const formatVoucherBenefit = (voucher: {
+    voucherType?: VoucherType | string;
+    discountAmountRupees?: number;
+    activationDurationDays?: number | null;
+    trialDaysGranted?: number | null;
+  }) => {
+    if (voucher.voucherType === 'ACTIVATION') {
+      return voucher.activationDurationDays
+        ? `${voucher.activationDurationDays}d Direct Activation`
+        : 'Full Plan Activation';
+    }
+    if (voucher.voucherType === 'TRIAL') {
+      return `${voucher.trialDaysGranted || 14}-Day Trial Grant`;
+    }
+    return `₹${(voucher.discountAmountRupees || 0).toLocaleString('en-IN')} Off`;
   };
 
   // Metrics computation
@@ -437,6 +519,18 @@ Distribute directly to the authorized organization administrator.
               </div>
 
               <select
+                aria-label="Filter vouchers by type"
+                value={voucherTypeFilter}
+                onChange={(e) => setVoucherTypeFilter(e.target.value)}
+                className="h-9 px-3 text-xs rounded-lg border border-input bg-card text-foreground"
+              >
+                <option value="ALL">All Types</option>
+                <option value="DISCOUNT">Discount Coupon</option>
+                <option value="ACTIVATION">Plan Activation</option>
+                <option value="TRIAL">Trial Grant</option>
+              </select>
+
+              <select
                 aria-label="Filter vouchers by status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -483,7 +577,7 @@ Distribute directly to the authorized organization administrator.
                       <TableRow className="border-border hover:bg-transparent">
                         <TableHead className="font-semibold text-foreground">Voucher & Ref</TableHead>
                         <TableHead className="font-semibold text-foreground">Masked Code</TableHead>
-                        <TableHead className="font-semibold text-foreground">Discount</TableHead>
+                        <TableHead className="font-semibold text-foreground">Type & Benefit</TableHead>
                         <TableHead className="font-semibold text-foreground">Plans & Intervals</TableHead>
                         <TableHead className="font-semibold text-foreground">Validity Period</TableHead>
                         <TableHead className="font-semibold text-foreground">Redemptions</TableHead>
@@ -513,10 +607,29 @@ Distribute directly to the authorized organization administrator.
                             </TableCell>
 
                             <TableCell>
-                              <span className="font-bold text-foreground text-sm flex items-center">
-                                <IndianRupee className="w-3.5 h-3.5 mr-0.5 inline" />
-                                {v.discountAmountRupees.toLocaleString('en-IN')}
-                              </span>
+                              <div className="space-y-1">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] font-mono ${
+                                    v.voucherType === 'ACTIVATION'
+                                      ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+                                      : v.voucherType === 'TRIAL'
+                                      ? 'border-blue-500/40 text-blue-400 bg-blue-500/10'
+                                      : 'border-amber-500/40 text-amber-400 bg-amber-500/10'
+                                  }`}
+                                >
+                                  {v.voucherType || 'DISCOUNT'}
+                                </Badge>
+                                <div className="font-bold text-foreground text-xs">
+                                  {v.voucherType === 'ACTIVATION'
+                                    ? v.activationDurationDays
+                                      ? `${v.activationDurationDays}d Direct Activation`
+                                      : 'Full Plan Activation'
+                                    : v.voucherType === 'TRIAL'
+                                    ? `${v.trialDaysGranted || 14}-Day Trial Grant`
+                                    : `₹${(v.discountAmountRupees || 0).toLocaleString('en-IN')} Off`}
+                                </div>
+                              </div>
                             </TableCell>
 
                             <TableCell>
@@ -682,9 +795,12 @@ Distribute directly to the authorized organization administrator.
                           <TableCell>
                             <div>
                               <p className="font-semibold text-foreground text-xs">{r.voucherId?.name}</p>
-                              <span className="font-mono text-[10px] text-muted-foreground">
-                                {r.voucherId?.reference}
-                              </span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="font-mono text-[10px] text-muted-foreground">
+                                  {r.voucherId?.reference}
+                                </span>
+                                {getVoucherTypeBadge(r.voucherId?.voucherType)}
+                              </div>
                             </div>
                           </TableCell>
 
@@ -696,19 +812,23 @@ Distribute directly to the authorized organization administrator.
 
                           <TableCell>
                             <span className="text-xs text-foreground font-medium">
-                              {r.planId?.name} ({r.billingCycle})
+                              {r.planId?.name || 'Assigned Plan'} ({r.billingCycle})
                             </span>
                           </TableCell>
 
                           <TableCell>
                             <span className="text-xs text-muted-foreground">
-                              ₹{r.originalAmountRupees?.toLocaleString('en-IN')}
+                              ₹{(r.originalAmountRupees ?? 0).toLocaleString('en-IN')}
                             </span>
                           </TableCell>
 
                           <TableCell>
                             <span className="text-xs font-semibold text-emerald-400">
-                              -₹{r.discountAmountRupees?.toLocaleString('en-IN')}
+                              {r.voucherId?.voucherType === 'TRIAL'
+                                ? `${r.voucherId?.trialDaysGranted || 14}d Trial`
+                                : r.voucherId?.voucherType === 'ACTIVATION'
+                                ? '100% Activation'
+                                : `-₹${(r.discountAmountRupees ?? 0).toLocaleString('en-IN')}`}
                             </span>
                           </TableCell>
 
@@ -716,10 +836,10 @@ Distribute directly to the authorized organization administrator.
                             <span className="text-xs font-bold text-foreground">
                               {r.finalPayableRupees === 0 ? (
                                 <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">
-                                  ₹0 (Free)
+                                  ₹0 ({r.voucherId?.voucherType === 'TRIAL' ? 'Trial' : 'Activated'})
                                 </Badge>
                               ) : (
-                                `₹${r.finalPayableRupees?.toLocaleString('en-IN')}`
+                                `₹${(r.finalPayableRupees ?? 0).toLocaleString('en-IN')}`
                               )}
                             </span>
                           </TableCell>
@@ -761,17 +881,51 @@ Distribute directly to the authorized organization administrator.
             </div>
             <DialogTitle className="text-xl font-bold text-foreground">Create Subscription Voucher</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Configure a promotional coupon granting a fixed INR discount on SaaS subscriptions.
+              Configure a secure voucher granting a fixed INR discount, direct plan activation, or free trial extension.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreateSubmit} className="space-y-4 pt-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs font-semibold">Voucher Type *</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'DISCOUNT', label: 'INR Discount', desc: 'Deduct ₹ off plan price' },
+                    { value: 'ACTIVATION', label: 'Direct Activation', desc: '100% covered activation' },
+                    { value: 'TRIAL', label: 'Trial Grant', desc: 'Activate N-day free trial' },
+                  ].map((opt) => {
+                    const active = (formData.voucherType || 'DISCOUNT') === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, voucherType: opt.value as VoucherType })}
+                        className={`text-left p-2.5 rounded-xl border text-xs transition-colors ${
+                          active
+                            ? 'border-primary bg-primary/10 text-foreground'
+                            : 'border-border bg-muted/20 text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <div className="font-semibold">{opt.label}</div>
+                        <div className="text-[10px] opacity-80 mt-0.5">{opt.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label className="text-xs font-semibold">Voucher / Campaign Name *</Label>
                 <Input
                   required
-                  placeholder="e.g. Hosteliq Launch Special ₹2,000"
+                  placeholder={
+                    formData.voucherType === 'ACTIVATION'
+                      ? 'e.g. Partner 1-Year Complimentary Activation'
+                      : formData.voucherType === 'TRIAL'
+                      ? 'e.g. Extended 30-Day Launch Trial'
+                      : 'e.g. Hosteliq Launch Special ₹2,000'
+                  }
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="h-9 text-xs"
@@ -789,30 +943,75 @@ Distribute directly to the authorized organization administrator.
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Fixed Discount Amount (₹) *</Label>
-                <Input
-                  type="number"
-                  required
-                  min="1"
-                  step="1"
-                  value={formData.discountAmountRupees}
-                  onChange={(e) => setFormData({ ...formData, discountAmountRupees: Number(e.target.value) })}
-                  className="h-9 text-xs font-mono font-bold"
-                />
-              </div>
+              {(formData.voucherType || 'DISCOUNT') === 'DISCOUNT' && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Fixed Discount Amount (₹) *</Label>
+                    <Input
+                      type="number"
+                      required
+                      min="1"
+                      step="1"
+                      value={formData.discountAmountRupees}
+                      onChange={(e) => setFormData({ ...formData, discountAmountRupees: Number(e.target.value) })}
+                      className="h-9 text-xs font-mono font-bold"
+                    />
+                  </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Discount Duration (Billing Cycles)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={formData.discountDurationCycles}
-                  onChange={(e) => setFormData({ ...formData, discountDurationCycles: Number(e.target.value) })}
-                  className="h-9 text-xs font-mono"
-                />
-              </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Discount Duration (Billing Cycles)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={formData.discountDurationCycles}
+                      onChange={(e) => setFormData({ ...formData, discountDurationCycles: Number(e.target.value) })}
+                      className="h-9 text-xs font-mono"
+                    />
+                  </div>
+                </>
+              )}
+
+              {formData.voucherType === 'ACTIVATION' && (
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold">
+                    Custom Activation Duration (Days — leave blank to use selected billing cycle)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Optional (e.g. 30 for 30 days, or blank for full monthly/yearly cycle)"
+                    value={formData.activationDurationDays ?? ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        activationDurationDays: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    className="h-9 text-xs font-mono"
+                  />
+                </div>
+              )}
+
+              {formData.voucherType === 'TRIAL' && (
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold">Trial Days Granted *</Label>
+                  <Input
+                    type="number"
+                    required
+                    min="1"
+                    max="365"
+                    step="1"
+                    value={formData.trialDaysGranted ?? 14}
+                    onChange={(e) => setFormData({ ...formData, trialDaysGranted: Number(e.target.value) })}
+                    className="h-9 text-xs font-mono font-bold"
+                  />
+                  <span className="text-[10px] text-muted-foreground">
+                    Activates tenant subscription in TRIAL status without creating a paid invoice
+                  </span>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Valid From *</Label>
@@ -877,7 +1076,8 @@ Distribute directly to the authorized organization administrator.
                     const val = e.target.value;
                     setFormData({
                       ...formData,
-                      eligibleBillingIntervals: val === 'BOTH' ? ['MONTHLY', 'YEARLY'] : [val as any],
+                      eligibleBillingIntervals:
+                        val === 'BOTH' ? ['MONTHLY', 'YEARLY'] : [val as 'MONTHLY' | 'YEARLY'],
                     });
                   }}
                   className="w-full h-9 px-3 text-xs rounded-lg border border-input bg-card text-foreground"
@@ -893,7 +1093,12 @@ Distribute directly to the authorized organization administrator.
                 <select
                   aria-label="Organization Targeting Scope"
                   value={formData.scope}
-                  onChange={(e) => setFormData({ ...formData, scope: e.target.value as any })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      scope: e.target.value as CreateVoucherPayload['scope'],
+                    })
+                  }
                   className="w-full h-9 px-3 text-xs rounded-lg border border-input bg-card text-foreground"
                 >
                   <option value="GLOBAL">Global (Any Eligible Organization)</option>
@@ -1053,9 +1258,13 @@ Distribute directly to the authorized organization administrator.
                   <span className="font-mono text-foreground">{credentialsModal.voucher.reference}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Discount Value:</span>
+                  <span>Voucher Type:</span>
+                  <span>{getVoucherTypeBadge(credentialsModal.voucher.voucherType)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Benefit:</span>
                   <span className="font-bold text-foreground">
-                    ₹{credentialsModal.voucher.discountAmountRupees.toLocaleString('en-IN')}
+                    {formatVoucherBenefit(credentialsModal.voucher)}
                   </span>
                 </div>
               </div>
@@ -1104,10 +1313,13 @@ Distribute directly to the authorized organization administrator.
                 <p className="font-mono font-bold text-foreground mt-0.5">{selectedVoucherDetails.codeMasked}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Discount Amount</span>
-                <p className="font-bold text-foreground mt-0.5">
-                  ₹{selectedVoucherDetails.discountAmountRupees.toLocaleString('en-IN')}
-                </p>
+                <span className="text-muted-foreground">Type &amp; Benefit</span>
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                  {getVoucherTypeBadge(selectedVoucherDetails.voucherType)}
+                  <span className="font-bold text-foreground">
+                    {formatVoucherBenefit(selectedVoucherDetails)}
+                  </span>
+                </div>
               </div>
               <div>
                 <span className="text-muted-foreground">Redemptions</span>
@@ -1155,9 +1367,13 @@ Distribute directly to the authorized organization administrator.
                       {selectedVoucherDetails.redemptions.map((r) => (
                         <TableRow key={r._id} className="border-border text-xs">
                           <TableCell className="font-medium text-foreground">{r.organizationId?.name}</TableCell>
-                          <TableCell>{r.planId?.name} ({r.billingCycle})</TableCell>
+                          <TableCell>{r.planId?.name || 'Assigned Plan'} ({r.billingCycle})</TableCell>
                           <TableCell className="font-bold">
-                            {r.finalPayableRupees === 0 ? '₹0 (Free)' : `₹${r.finalPayableRupees}`}
+                            {r.finalPayableRupees === 0
+                              ? selectedVoucherDetails.voucherType === 'TRIAL'
+                                ? '₹0 (Trial)'
+                                : '₹0 (Activated)'
+                              : `₹${(r.finalPayableRupees ?? 0).toLocaleString('en-IN')}`}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {format(parseISO(r.redeemedAt), 'dd MMM yyyy')}

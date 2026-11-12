@@ -14,13 +14,23 @@ const WebhookEvent = require('../models/WebhookEvent');
 const Subscription = require('../models/Subscription');
 const Organization = require('../models/Organization');
 const Payment = require('../models/Payment');
+const Fee = require('../models/Fee');
+const Student = require('../models/Student');
 const Invoice = require('../models/Invoice');
 const InvoiceSequence = require('../models/InvoiceSequence');
 const LedgerEntry = require('../models/LedgerEntry');
 const PaymentAttempt = require('../models/PaymentAttempt');
 const Refund = require('../models/Refund');
 const AuditLog = require('../models/AuditLog');
+const Voucher = require('../models/Voucher');
+const VoucherReservation = require('../models/VoucherReservation');
+const VoucherRedemption = require('../models/VoucherRedemption');
 const { verifyWebhookSignature } = require('../config/razorpay');
+const { startSafeTransaction } = require('../utils/transaction');
+const {
+  finalizeOnlinePaymentActivation,
+  recordOnlinePaymentFailure,
+} = require('../services/subscriptionLifecycle.service');
 
 /**
  * @desc    Handle Razorpay Webhook Events
@@ -288,42 +298,250 @@ async function processSubscriptionEvent(event, subscriptionEntity, paymentEntity
 }
 
 /**
- * Handles payment captured event for legacy or direct orders.
+ * Handles payment captured event for SaaS orders or legacy orders idempotently.
  */
 async function processPaymentCapturedEvent(orderId, paymentId, paymentEntity) {
   const payment = await Payment.findOne({ orderId });
+  if (payment && payment.status === 'CAPTURED') return;
+
+  // Check if this order corresponds to a SaaS subscription checkout
+  const isStudentFeePayment = Boolean(payment?.feeId && !payment?.subscriptionId);
+  const subscription = !isStudentFeePayment
+    ? (payment?.subscriptionId ? await Subscription.findById(payment.subscriptionId) : null) ||
+      (await Subscription.findOne({
+        $or: [{ 'pendingCheckout.orderId': orderId }, { orderId }],
+      }))
+    : null;
+
+  if (subscription && (!payment || payment.billingDomain === 'SAAS')) {
+    if (!paymentId) return;
+
+    const finalized = await finalizeOnlinePaymentActivation({
+      subscription,
+      orderId,
+      paymentId,
+      paymentMethod: paymentEntity?.method || 'webhook_captured',
+    });
+
+    // If a partial-discount voucher reservation was held on this order's checkoutSessionId, commit it idempotently
+    const pendingVoucherId = subscription.pendingCheckout?.voucherId;
+    if (pendingVoucherId) {
+      const heldReservation = await VoucherReservation.findOne({
+        organizationId: subscription.organizationId,
+        voucherId: pendingVoucherId,
+        status: 'HELD',
+      }).populate('voucherId planId');
+
+      if (heldReservation) {
+        const updatedVoucher = await Voucher.findOneAndUpdate(
+          {
+            _id: heldReservation.voucherId._id || heldReservation.voucherId,
+            currentRedemptionCount: { $lt: heldReservation.voucherId.globalRedemptionLimit || 1000000 },
+          },
+          { $inc: { currentRedemptionCount: 1 } },
+          { new: true }
+        );
+        heldReservation.status = 'COMMITTED';
+        await heldReservation.save();
+
+        if (updatedVoucher && updatedVoucher.currentRedemptionCount >= updatedVoucher.globalRedemptionLimit) {
+          await Voucher.findByIdAndUpdate(updatedVoucher._id, { status: 'EXHAUSTED' });
+        }
+
+        const existingRedemption = await VoucherRedemption.findOne({
+          idempotencyKey: heldReservation.checkoutSessionId,
+          status: 'COMPLETED',
+        });
+
+        if (!existingRedemption && finalized?.subscription) {
+          const redemption = await VoucherRedemption.create({
+            voucherId: updatedVoucher?._id || heldReservation.voucherId._id,
+            organizationId: subscription.organizationId,
+            subscriptionId: finalized.subscription._id,
+            paymentId: finalized.payment?._id,
+            invoiceId: finalized.invoice?._id,
+            planId: heldReservation.planId?._id || finalized.subscription.planId?._id || finalized.subscription.planId,
+            billingCycle: heldReservation.billingCycle,
+            benefitType: 'DISCOUNT',
+            originalAmountRupees: heldReservation.originalAmountRupees,
+            discountAmountRupees: heldReservation.discountAmountRupees,
+            finalPayableRupees: heldReservation.finalPayableRupees,
+            isZeroPayable: false,
+            status: 'COMPLETED',
+            idempotencyKey: heldReservation.checkoutSessionId,
+            redeemedBy: heldReservation.heldBy,
+            redeemedAt: new Date(),
+          });
+
+          await Subscription.findByIdAndUpdate(finalized.subscription._id, {
+            activationMethod: 'VOUCHER',
+            lastVoucherId: updatedVoucher?._id || heldReservation.voucherId._id,
+            lastVoucherReference: updatedVoucher?.reference || subscription.pendingCheckout?.voucherReference,
+          });
+
+          if (finalized.payment) {
+            finalized.payment.voucherRedemptionId = redemption._id;
+            finalized.payment.discountRupees = heldReservation.discountAmountRupees;
+            finalized.payment.paymentMethod = 'subscription_discounted_online';
+            await finalized.payment.save();
+          }
+
+          if (finalized.invoice) {
+            finalized.invoice.voucherRedemptionId = redemption._id;
+            finalized.invoice.subtotalRupees = heldReservation.originalAmountRupees;
+            finalized.invoice.originalAmountRupees = heldReservation.originalAmountRupees;
+            finalized.invoice.discountRupees = heldReservation.discountAmountRupees;
+            finalized.invoice.totalRupees = heldReservation.finalPayableRupees;
+            await finalized.invoice.save();
+          }
+        }
+      }
+    }
+    return;
+  }
+
   if (!payment) return;
 
-  if (payment.status === 'CAPTURED') return;
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const sessionOpts = session ? { session } : {};
+  const sessionOrderedOpts = session ? { session, ordered: true } : { ordered: true };
+  const withSession = (q) => (session ? q.session(session) : q);
 
-  payment.status = 'CAPTURED';
-  payment.paymentId = paymentId || payment.paymentId;
-  payment.capturedAt = new Date();
-  if (paymentEntity?.method) {
-    payment.paymentMethod = paymentEntity.method;
-  }
-  await payment.save();
+  try {
+    const txPayment = await withSession(Payment.findOne({ orderId }));
+    if (!txPayment || txPayment.status === 'CAPTURED') {
+      await tx.commit();
+      return;
+    }
 
-  if (payment.invoiceId) {
-    await Invoice.findByIdAndUpdate(payment.invoiceId, { status: 'ISSUED', paidAt: new Date() });
+    txPayment.status = 'CAPTURED';
+    txPayment.paymentId = paymentId || txPayment.paymentId;
+    txPayment.capturedAt = new Date();
+    if (paymentEntity?.method) {
+      txPayment.paymentMethod = paymentEntity.method;
+    }
+
+    if (txPayment.feeId) {
+      const fee = await withSession(Fee.findById(txPayment.feeId));
+      if (fee) {
+        let invoiceNumber = txPayment.receiptNo;
+        if (!txPayment.invoiceId) {
+          invoiceNumber = await InvoiceSequence.getNextInvoiceNumber(txPayment.organizationId);
+          txPayment.receiptNo = invoiceNumber;
+
+          const createdInvoices = await Invoice.create(
+            [
+              {
+                organizationId: txPayment.organizationId,
+                hostelId: txPayment.hostelId || null,
+                studentId: txPayment.studentId,
+                paymentId: txPayment._id,
+                feeId: fee._id,
+                invoiceNumber,
+                subtotalRupees: txPayment.amountRupees,
+                totalRupees: txPayment.amountRupees,
+                status: 'PAID',
+                issuedAt: new Date(),
+                paidAt: new Date(),
+                notes: `Razorpay Webhook Captured (${paymentId || orderId})`,
+              },
+            ],
+            sessionOrderedOpts
+          );
+          txPayment.invoiceId = createdInvoices[0]._id;
+
+          await LedgerEntry.create(
+            [
+              {
+                organizationId: txPayment.organizationId,
+                hostelId: txPayment.hostelId || null,
+                studentId: txPayment.studentId,
+                feeId: fee._id,
+                paymentId: txPayment._id,
+                invoiceId: createdInvoices[0]._id,
+                amountPaise: txPayment.amountPaise,
+                amountRupees: txPayment.amountRupees,
+                currency: txPayment.currency || 'INR',
+                type: 'CREDIT',
+                source: 'ONLINE_PAYMENT',
+                externalReference: paymentId || txPayment.orderId,
+                description: `Razorpay Webhook Online Payment for ${fee.month}`,
+                metadata: { orderId, receiptNo: invoiceNumber },
+              },
+            ],
+            sessionOrderedOpts
+          );
+
+          await PaymentAttempt.create(
+            [
+              {
+                organizationId: txPayment.organizationId,
+                paymentId: txPayment._id,
+                providerOrderId: orderId,
+                providerPaymentId: paymentId,
+                status: 'CAPTURED',
+                metadata: { invoiceNumber, source: 'webhook' },
+              },
+            ],
+            sessionOrderedOpts
+          );
+        } else {
+          await Invoice.findByIdAndUpdate(
+            txPayment.invoiceId,
+            { status: 'PAID', paidAt: new Date() },
+            sessionOpts
+          );
+        }
+
+        fee.paidAmount = (fee.paidAmount || 0) + txPayment.amountRupees;
+        const totalDue = (fee.amount || 0) + (fee.lateFee || 0) - (fee.discount || 0);
+        if (fee.paidAmount >= totalDue) {
+          fee.status = 'paid';
+        } else if (fee.paidAmount > 0) {
+          fee.status = 'partial';
+        }
+        fee.paidDate = new Date();
+        fee.paymentMode = paymentEntity?.method === 'upi' ? 'upi' : 'online';
+        if (invoiceNumber) {
+          fee.receiptNo = invoiceNumber;
+        }
+        await fee.save(sessionOpts);
+
+        if (fee.status === 'paid' && txPayment.studentId) {
+          const student = await withSession(Student.findById(txPayment.studentId));
+          if (student && student.validDate) {
+            const nextValid = new Date(student.validDate);
+            nextValid.setMonth(nextValid.getMonth() + 1);
+            await Student.findByIdAndUpdate(student._id, { validDate: nextValid }, sessionOpts);
+          }
+        }
+      }
+    } else if (txPayment.invoiceId) {
+      await Invoice.findByIdAndUpdate(
+        txPayment.invoiceId,
+        { status: 'ISSUED', paidAt: new Date() },
+        sessionOpts
+      );
+    }
+
+    await txPayment.save(sessionOpts);
+    await tx.commit();
+  } catch (err) {
+    await tx.abort();
+    throw err;
   }
 }
 
 /**
- * Handles payment failure event without corrupting state.
+ * Handles payment failure event without corrupting active subscription state.
  */
 async function processPaymentFailedEvent(orderId, paymentEntity) {
-  const payment = await Payment.findOne({ orderId });
-  if (!payment) return;
-
-  // Never downgrade a CAPTURED payment to FAILED if out-of-order webhook arrived
-  if (payment.status === 'CAPTURED') return;
-
-  payment.status = 'FAILED';
-  payment.failedAt = new Date();
-  payment.failureCode = paymentEntity?.error_code || 'PAYMENT_FAILED';
-  payment.failureReason = paymentEntity?.error_description || 'Payment failed at provider';
-  await payment.save();
+  await recordOnlinePaymentFailure({
+    orderId,
+    code: paymentEntity?.error_code || 'PAYMENT_FAILED',
+    reason: paymentEntity?.error_description || 'Payment failed at provider',
+  });
 }
 
 /**

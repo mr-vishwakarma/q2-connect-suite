@@ -15,6 +15,7 @@ import { uploadMedia } from '@/utils/uploadService';
 import { getAvatarUrl } from '@/utils/imageUtils';
 import { formatDateDMY } from '@/utils/dateUtils';
 import { StudentPolicyLibrary } from '@/components/student/StudentPolicyLibrary';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 export default function Profile() {
   const { profile: authProfile, refreshProfile, signOut } = useAuth();
@@ -87,8 +88,8 @@ export default function Profile() {
       await api.put('/students/profile', formData);
       await refreshProfile();
       toast.success('Profile updated successfully!');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to update profile');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to update profile'));
     } finally {
       setSaving(false);
     }
@@ -115,8 +116,8 @@ export default function Profile() {
       await api.put('/students/profile', { ...formData, profilePhoto: url, profilePhotoFileId: fileId });
       await refreshProfile();
       toast.success('Profile photo updated!');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || error.message || 'Failed to upload photo');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to upload photo'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

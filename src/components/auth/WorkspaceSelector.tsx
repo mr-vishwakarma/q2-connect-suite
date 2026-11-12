@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { Building2, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-interface Workspace {
+export interface Workspace {
   id: string;
   name: string;
   code: string;

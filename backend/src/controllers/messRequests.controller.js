@@ -3,6 +3,7 @@ const MessRequest = require('../models/MessRequest');
 const Student = require('../models/Student');
 const Notification = require('../models/Notification');
 const { sendMessRequestUpdate } = require('../utils/email');
+const { startSafeTransaction } = require('../utils/transaction');
 
 const getMessRequests = async (req, res) => {
   try {
@@ -92,8 +93,9 @@ const createMessRequest = async (req, res) => {
 };
 
 const updateMessRequest = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const tx = await startSafeTransaction();
+  const session = tx.session;
+  const sessionOpts = session ? { session, ordered: true } : { ordered: true };
   
   try {
     const { status, adminMessage } = req.body;
@@ -123,11 +125,11 @@ const updateMessRequest = async (req, res) => {
     const messReq = await MessRequest.findOneAndUpdate(
       filter,
       { $set: updateData },
-      { new: true, session }
+      session ? { new: true, session } : { new: true }
     ).populate('userId', 'name email');
 
     if (!messReq) {
-      await session.abortTransaction();
+      await tx.abort();
       return res.status(404).json({ success: false, message: 'Request not found' });
     }
 
@@ -140,10 +142,9 @@ const updateMessRequest = async (req, res) => {
       title: `Mess Off Request ${status === 'approved' ? 'Approved' : (status === 'returned' ? 'Returned' : 'Rejected')}`,
       message: adminMessage || `Your mess off request has been marked as ${status}.`,
       type: status === 'approved' ? 'success' : (status === 'returned' ? 'info' : 'error'),
-    }], { session, ordered: true });
+    }], sessionOpts);
 
-    await session.commitTransaction();
-    session.endSession();
+    await tx.commit();
 
     // Parent WhatsApp Notification (Only for APPROVED status)
     let parentNotificationWarning = null;
@@ -205,10 +206,7 @@ const updateMessRequest = async (req, res) => {
       parentNotificationWarning,
     });
   } catch (error) {
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
-    session.endSession();
+    await tx.abort();
     console.error('Error updating mess request:', error);
     return res.status(500).json({ success: false, message: error.message });
   }

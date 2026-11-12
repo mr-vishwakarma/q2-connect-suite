@@ -455,7 +455,11 @@ const collectPayment = async (req, res) => {
       receiptUrl, idempotencyKey: bodyIdempotencyKey, transactionId, bankName
     } = req.body;
 
-    idempotencyKey = req.headers['idempotency-key'] || bodyIdempotencyKey;
+    const rawIdempotencyKey = req.headers['idempotency-key'] || bodyIdempotencyKey;
+    idempotencyKey =
+      typeof rawIdempotencyKey === 'string' && rawIdempotencyKey.trim()
+        ? rawIdempotencyKey.trim()
+        : undefined;
 
     if (!studentId || !month || receivedAmount === undefined || receivedAmount === null || !paymentMode) {
       await tx.abort();
@@ -626,6 +630,15 @@ const collectPayment = async (req, res) => {
       }));
 
       if (existingReceipt) {
+        if (idempotencyKey && existingReceipt.idempotencyKey === idempotencyKey) {
+          await tx.abort();
+          return res.status(200).json({
+            success: true,
+            data: existingReceipt,
+            idempotent: true,
+            message: 'Payment already recorded successfully (idempotent response)'
+          });
+        }
         await tx.abort();
         return res.status(409).json({
           success: false,
@@ -706,7 +719,7 @@ const collectPayment = async (req, res) => {
       notes: notes || null,
       transactionId: transactionId || null,
       bankName: bankName || null,
-      idempotencyKey: idempotencyKey || null,
+      ...(idempotencyKey ? { idempotencyKey } : {}),
     }], sessionOpts);
     const payment = payments[0];
 
@@ -864,19 +877,21 @@ const collectPayment = async (req, res) => {
     await tx.abort();
     if (error.code === 11000 || error.code === 112 || (error.hasErrorLabel && error.hasErrorLabel('TransientTransactionError')) || (error.message && error.message.includes('Write conflict'))) {
       if (idempotencyKey) {
-        // Wait briefly for concurrent winning transaction to commit
-        await new Promise((r) => setTimeout(r, 150));
-        const existingPayment = await FeePayment.findOne({
-          idempotencyKey,
-          ...(orgId ? { organizationId: orgId } : {})
-        });
-        if (existingPayment) {
-          return res.status(200).json({
-            success: true,
-            data: existingPayment,
-            idempotent: true,
-            message: 'Payment already recorded successfully (idempotent response)'
+        // Poll briefly for concurrent winning write or transaction commit
+        for (let attempt = 0; attempt < 6; attempt++) {
+          await new Promise((r) => setTimeout(r, 80));
+          const existingPayment = await FeePayment.findOne({
+            idempotencyKey,
+            ...(orgId ? { organizationId: orgId } : {})
           });
+          if (existingPayment) {
+            return res.status(200).json({
+              success: true,
+              data: existingPayment,
+              idempotent: true,
+              message: 'Payment already recorded successfully (idempotent response)'
+            });
+          }
         }
       }
       return res.status(409).json({ success: false, message: 'Concurrent write conflict or duplicate receipt detected' });

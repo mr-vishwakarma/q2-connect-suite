@@ -22,7 +22,17 @@ const organizationSchema = new mongoose.Schema(
     primaryColor: { type: String, trim: true, default: '#f59e0b' },
     status: {
       type: String,
-      enum: ['TRIAL', 'ACTIVE', 'PAST_DUE', 'SUSPENDED', 'CANCELLED', 'ARCHIVED'],
+      enum: [
+        'PENDING_PAYMENT',
+        'TRIAL',
+        'ACTIVE',
+        'PAST_DUE',
+        'EXPIRED',
+        'PAYMENT_FAILED',
+        'SUSPENDED',
+        'CANCELLED',
+        'ARCHIVED',
+      ],
       default: 'TRIAL',
     },
     kycVerificationStatus: {

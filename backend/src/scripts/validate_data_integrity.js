@@ -18,9 +18,10 @@
  * Generates: DATA_INTEGRITY_REPORT.md
  */
 
-require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config();
 const dns = require('dns');
 try {
   dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
@@ -141,7 +142,15 @@ async function runDataIntegrityCheck() {
       $or: [{ amount: { $lt: 0 } }, { paidAmount: { $lt: 0 } }, { lateFee: { $lt: 0 } }, { discount: { $lt: 0 } }],
     });
     const negativePayments = await Payment.countDocuments({
-      $or: [{ amountPaise: { $lte: 0 } }, { amountRupees: { $lte: 0 } }, { refundedAmountPaise: { $lt: 0 } }],
+      $or: [
+        { amountPaise: { $lt: 0 } },
+        { amountRupees: { $lt: 0 } },
+        { refundedAmountPaise: { $lt: 0 } },
+        {
+          provider: { $ne: 'VOUCHER' },
+          $or: [{ amountPaise: { $lte: 0 } }, { amountRupees: { $lte: 0 } }],
+        },
+      ],
     });
     recordCheck('G20.6', 'Zero Negative Fee Balances or Payment Amounts', negativeFees === 0 && negativePayments === 0, negativeFees + negativePayments);
   }
@@ -180,8 +189,9 @@ async function runDataIntegrityCheck() {
 
   // Check 10: Invalid Subscription States
   {
+    const validSubStatuses = Subscription.schema.path('status').enumValues;
     const invalidSubs = await Subscription.countDocuments({
-      status: { $nin: ['TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELLED', 'EXPIRED'] },
+      status: { $nin: validSubStatuses },
     });
     recordCheck('G20.10', 'Zero Invalid Subscription States', invalidSubs === 0, invalidSubs);
   }

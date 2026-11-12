@@ -35,7 +35,7 @@ interface AlertStudent {
   feeStatus: 'paid' | 'unpaid';
 }
 
-import { studentService } from '@/services/api';
+import { studentService } from '@/services/api'; import type { StudentApiRecord } from '@/types';
 
 function formatValidDate(student: { valid_date?: string | null; start_date?: string | null }, dateFormat: string = 'dd-MM-yy'): string {
   if (student.valid_date) {
@@ -88,9 +88,9 @@ export default function AdminAlerts() {
         return;
       }
       
-      const mappedStudents = students.map((s: any) => ({
-        id: s._id || s.id,
-        user_id: s.userId?._id || s.userId || '',
+      const mappedStudents = students.map((s: StudentApiRecord) => ({
+        id: s._id || s.id || '',
+        user_id: typeof s.userId === 'string' ? s.userId : s.userId?._id || '',
         name: s.name || 'Resident',
         phone: s.phone || null,
         room_no: s.roomNo || null,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'react-toastify';
 import { api } from '@/lib/api';
 import { useHostel } from '@/contexts/HostelContext';
+import { getErrorMessage } from '@/utils/errorHandling';
 import {
   Table,
   TableBody,
@@ -66,7 +67,7 @@ export default function LaundryManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [blockingSlot, setBlockingSlot] = useState<string | null>(null);
 
-  const fetchBookings = async (selectedDate: Date) => {
+  const fetchBookings = useCallback(async (selectedDate: Date) => {
     try {
       setLoading(true);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -80,16 +81,16 @@ export default function LaundryManagement() {
         setBookings(response.data.data.bookings || []);
         setOperatingHours(response.data.data.operatingHours || []);
       }
-    } catch (error: any) {
+    } catch {
       toast.error('Failed to fetch laundry bookings');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedHostel]);
 
   useEffect(() => {
     fetchBookings(date);
-  }, [date, selectedHostel]);
+  }, [date, fetchBookings]);
 
   const handleCancelBooking = async (id: string, studentName?: string) => {
     if (!window.confirm(`Are you sure you want to cancel the wash booking for ${studentName || 'this student'}?`)) return;
@@ -99,8 +100,8 @@ export default function LaundryManagement() {
         toast.success('Booking cancelled successfully');
         fetchBookings(date);
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to cancel booking');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Failed to cancel booking'));
     }
   };
 
@@ -118,8 +119,8 @@ export default function LaundryManagement() {
         toast.success(res.data.message || 'Maintenance slot updated');
         fetchBookings(date);
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to toggle maintenance');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to toggle maintenance'));
     } finally {
       setBlockingSlot(null);
     }

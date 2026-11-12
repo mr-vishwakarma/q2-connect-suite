@@ -41,6 +41,7 @@ import {
   PolicyReadiness,
 } from '@/services/api/policy.service';
 import { PolicyDocumentViewer } from '@/components/policies/PolicyDocumentViewer';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 interface AdminPolicyManagementProps {
   selectedHostel: string;
@@ -102,7 +103,7 @@ export function AdminPolicyManagement({
       setLoading(true);
       const res = await policyService.getSettings(targetHostelParam || undefined);
       setData(res);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load policy settings:', err);
       toast.error('Failed to load hostel policy configuration', { toastId: 'policy-load-error' });
     } finally {
@@ -181,9 +182,9 @@ export function AdminPolicyManagement({
       if (res?.version) {
         openReviewModal(res.version);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Upload error:', err);
-      toast.error(err.response?.data?.message || 'Failed to upload and parse PDF document.');
+      toast.error(getErrorMessage(err, 'Failed to upload and parse PDF document.'));
     } finally {
       setUploading(false);
     }
@@ -216,9 +217,9 @@ export function AdminPolicyManagement({
       setReviewVersion(updated);
       toast.success('Draft changes saved successfully.');
       await fetchSettings();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Save draft error:', err);
-      toast.error(err.response?.data?.message || 'Failed to update draft content.');
+      toast.error(getErrorMessage(err, 'Failed to update draft content.'));
     } finally {
       setSavingDraft(false);
     }
@@ -244,9 +245,9 @@ export function AdminPolicyManagement({
       toast.success('Policy document published and activated successfully!');
       setReviewModalOpen(false);
       await fetchSettings();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Publish error:', err);
-      toast.error(err.response?.data?.message || 'Failed to publish policy document.');
+      toast.error(getErrorMessage(err, 'Failed to publish policy document.'));
     } finally {
       setPublishing(false);
     }
@@ -259,7 +260,7 @@ export function AdminPolicyManagement({
       setHistoryModalOpen(true);
       const versions = await policyService.getDocumentHistory(documentId);
       setHistoryVersions(versions);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('History error:', err);
       toast.error('Failed to load version history');
     } finally {
@@ -287,9 +288,9 @@ export function AdminPolicyManagement({
         setSplitResult(split);
         toast.success('Combined document extracted into 3 categories! Review below.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Combined error:', err);
-      toast.error(err.response?.data?.message || 'Failed to process combined document.');
+      toast.error(getErrorMessage(err, 'Failed to process combined document.'));
     } finally {
       setProcessingCombined(false);
     }

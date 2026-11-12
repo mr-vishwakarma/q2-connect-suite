@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { superAdminService } from '@/services/api/superAdmin.service';
 import { SystemHealthData } from '@/types';
 import { toast } from 'react-toastify';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 // Safe Error Boundary for System Health
 interface ErrorBoundaryProps {
@@ -90,9 +91,9 @@ function SystemHealthContent() {
       } else {
         setFetchError(res.message || 'Failed to retrieve telemetry data');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load system health:', error);
-      const msg = error.response?.data?.message || error.message || 'Failed to check platform system health';
+      const msg = getErrorMessage(error, 'Failed to check platform system health');
       setFetchError(msg);
       toast.error(msg);
     } finally {
@@ -134,18 +135,19 @@ function SystemHealthContent() {
     );
   }
 
-  const envDisplay =
-    typeof health?.environment === 'object'
-      ? (health?.environment as any)?.env
-      : (health?.environment || 'development');
+  const envObj =
+    typeof health?.environment === 'object' && health.environment !== null ? health.environment : null;
 
-  const nodeVersionDisplay =
-    typeof health?.environment === 'object'
-      ? (health?.environment as any)?.nodeVersion
-      : (health?.nodeVersion || 'v20.x');
+  const envDisplay = envObj
+    ? envObj.env || 'development'
+    : typeof health?.environment === 'string'
+      ? health.environment
+      : 'development';
+
+  const nodeVersionDisplay = envObj ? envObj.nodeVersion : health?.nodeVersion || 'v20.x';
 
   const uptimeDisplay =
-    (health as any)?.uptime?.formatted ||
+    health?.uptime?.formatted ||
     (health?.uptimeSeconds ? formatUptime(health.uptimeSeconds) : '--');
 
   const isHealthy = health?.status === 'HEALTHY' || health?.status === 'OPERATIONAL';
@@ -277,7 +279,7 @@ function SystemHealthContent() {
                     Redis & BullMQ
                   </span>
                   <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
-                    {(health as any)?.dependencies?.degraded?.redis === 'OPERATIONAL' ? 'READY' : (health as any)?.services?.redis?.status || 'OPERATIONAL'}
+                    {health?.dependencies?.degraded?.redis === 'OPERATIONAL' ? 'READY' : health?.services?.redis?.status || 'OPERATIONAL'}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -285,7 +287,7 @@ function SystemHealthContent() {
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-muted-foreground">Background Queue:</span>
                   <span className="font-mono font-bold text-blue-400">
-                    {(health as any)?.services?.queueSystem?.status || 'OPERATIONAL'}
+                    {health?.services?.queueSystem?.status || 'OPERATIONAL'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-xs">
@@ -372,11 +374,11 @@ function SystemHealthContent() {
                     State {health?.database?.readyState ?? 1} (1 = Connected, 2 = Connecting, 0 = Disconnected)
                   </span>
                 </div>
-                {(health?.database as any)?.collectionsCount !== undefined && (
+                {health?.database?.collectionsCount !== undefined && (
                   <div className="flex flex-col sm:flex-row justify-between gap-1 pt-2 border-t border-border/40">
                     <span className="text-muted-foreground">Total Database Collections:</span>
                     <span className="font-mono font-bold text-foreground">
-                      {(health?.database as any).collectionsCount} collections
+                      {health.database.collectionsCount} collections
                     </span>
                   </div>
                 )}
@@ -402,7 +404,7 @@ function SystemHealthContent() {
                 <div className="p-3 bg-secondary/40 rounded-lg border border-border/50">
                   <div className="text-xs text-muted-foreground">Redis Client State</div>
                   <div className="text-base font-bold text-blue-400 mt-1">
-                    {(health as any)?.services?.redis?.status || 'READY'}
+                    {health?.services?.redis?.status || 'READY'}
                   </div>
                 </div>
                 <div className="p-3 bg-secondary/40 rounded-lg border border-border/50">
@@ -468,7 +470,7 @@ function SystemHealthContent() {
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-sm text-foreground">ImageKit Object Storage</span>
                       <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-                        {(health as any)?.services?.imageKit?.status || 'CONFIGURED'}
+                        {health?.services?.imageKit?.status || 'CONFIGURED'}
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -484,7 +486,7 @@ function SystemHealthContent() {
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-sm text-foreground">SMTP & Nodemailer</span>
                       <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-                        {(health as any)?.services?.emailService?.status || 'CONFIGURED'}
+                        {health?.services?.emailService?.status || 'CONFIGURED'}
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -500,7 +502,7 @@ function SystemHealthContent() {
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-sm text-foreground">Google OAuth 2.0 SSO</span>
                       <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-                        {(health as any)?.services?.googleOAuth?.status || 'CONFIGURED'}
+                        {health?.services?.googleOAuth?.status || 'CONFIGURED'}
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">

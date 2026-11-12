@@ -40,8 +40,34 @@ import { superAdminService } from '@/services/api/superAdmin.service';
 import { Organization } from '@/types';
 import { toast } from 'react-toastify';
 
+interface PopulatedOrgSubscription {
+  status?: string;
+  billingCycle?: string;
+  agreedPriceRupees?: number;
+  activationMethod?: string;
+  pricingSnapshot?: {
+    planName?: string;
+    agreedPriceRupees?: number;
+  };
+  planId?: {
+    name?: string;
+  } | string;
+}
+
+interface OrganizationListItem extends Omit<Organization, 'subscriptionId'> {
+  roomCount?: number;
+  subscriptionSummary?: {
+    planName?: string;
+    billingCycle?: string;
+    agreedPriceRupees?: number;
+    status?: string;
+    activationMethod?: string;
+  };
+  subscriptionId?: string | PopulatedOrgSubscription;
+}
+
 export default function OrganizationList() {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizations, setOrganizations] = useState<OrganizationListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -52,7 +78,7 @@ export default function OrganizationList() {
   const [totalCount, setTotalCount] = useState(0);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [suspendTargetOrg, setSuspendTargetOrg] = useState<Organization | null>(null);
+  const [suspendTargetOrg, setSuspendTargetOrg] = useState<OrganizationListItem | null>(null);
   const [isSuspendingAction, setIsSuspendingAction] = useState(false);
 
   // Debounce search input by 300ms
@@ -87,9 +113,9 @@ export default function OrganizationList() {
           setOrganizations(res.data);
           setTotalCount(res.data.length);
           setTotalPages(Math.ceil(res.data.length / limit) || 1);
-        } else if (res.data && (res.data as any).organizations) {
-          const orgData = (res.data as any).organizations;
-          const pagination = (res.data as any).pagination;
+        } else if ('organizations' in res.data && res.data.organizations) {
+          const orgData = res.data.organizations;
+          const pagination = res.data.pagination;
           setOrganizations(orgData);
           if (pagination) {
             setTotalCount(pagination.total || 0);
@@ -114,7 +140,7 @@ export default function OrganizationList() {
     const isSuspending = suspendTargetOrg.status !== 'SUSPENDED';
     try {
       setIsSuspendingAction(true);
-      const orgId = (suspendTargetOrg as any)._id || suspendTargetOrg.id;
+      const orgId = suspendTargetOrg._id || suspendTargetOrg.id;
       const res = await superAdminService.suspendOrganization(orgId, isSuspending);
       if (res.success) {
         toast.success(`Organization '${suspendTargetOrg.name}' ${isSuspending ? 'suspended' : 'activated'} successfully`);
@@ -163,6 +189,9 @@ export default function OrganizationList() {
               <SelectItem value="ALL">All Statuses</SelectItem>
               <SelectItem value="ACTIVE">Active</SelectItem>
               <SelectItem value="TRIAL">Trial</SelectItem>
+              <SelectItem value="PENDING_PAYMENT">Pending Payment</SelectItem>
+              <SelectItem value="PAYMENT_FAILED">Payment Failed</SelectItem>
+              <SelectItem value="EXPIRED">Expired</SelectItem>
               <SelectItem value="SUSPENDED">Suspended</SelectItem>
             </SelectContent>
           </Select>
@@ -204,7 +233,7 @@ export default function OrganizationList() {
                   </tr>
                 ) : (
                   organizations.map((org) => {
-                    const orgId = (org as any)._id || org.id;
+                    const orgId = org._id || org.id;
                     const isSuspended = org.status === 'SUSPENDED';
 
                     return (
@@ -236,30 +265,71 @@ export default function OrganizationList() {
                         <td className="p-4">
                           <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
                             <GitFork className="w-3.5 h-3.5 text-primary" />
-                            <span>{(org as any).hostelCount ?? 0} Branches</span>
+                            <span>{org.hostelCount ?? 0} Branches</span>
                           </div>
                         </td>
 
                         <td className="p-4">
                           <div className="flex items-center gap-1.5 text-xs text-foreground font-medium">
                             <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                            <span>{(org as any).studentCount ?? 0} Students &bull; {(org as any).roomCount ?? 0} Rooms</span>
+                            <span>{org.studentCount ?? 0} Students &bull; {org.roomCount ?? 0} Rooms</span>
                           </div>
                         </td>
 
                         <td className="p-4">
-                          <div className="space-y-1">
-                            <Badge variant="outline" className="border-border text-xs uppercase font-mono">
-                              {(org as any).subscriptionId?.planId?.name || (org as any).plan || 'Enterprise Plan'}
-                            </Badge>
-                          </div>
+                          {(() => {
+                            const summary = org.subscriptionSummary;
+                            const subObj =
+                              typeof org.subscriptionId === 'object' && org.subscriptionId !== null
+                                ? org.subscriptionId
+                                : null;
+                            const subPlanObj =
+                              subObj?.planId && typeof subObj.planId === 'object' ? subObj.planId : null;
+                            const planName =
+                              summary?.planName ||
+                              subObj?.pricingSnapshot?.planName ||
+                              subPlanObj?.name ||
+                              null;
+                            const cycle = summary?.billingCycle || subObj?.billingCycle || 'MONTHLY';
+                            const isYearly = String(cycle).toUpperCase() === 'YEARLY';
+                            const agreedPrice =
+                              summary?.agreedPriceRupees ??
+                              subObj?.pricingSnapshot?.agreedPriceRupees ??
+                              subObj?.agreedPriceRupees ??
+                              null;
+                            const subStatus = summary?.status || subObj?.status;
+                            const activationMethod = summary?.activationMethod || subObj?.activationMethod;
+
+                            return (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <Badge variant="outline" className="border-border text-xs font-semibold">
+                                    {planName || 'Not Assigned'}
+                                  </Badge>
+                                  {subStatus && (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      {subStatus}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {agreedPrice !== null && agreedPrice !== undefined && (
+                                  <div className="text-[11px] font-mono text-muted-foreground">
+                                    ₹{Number(agreedPrice).toLocaleString('en-IN')} / {isYearly ? 'yr' : 'mo'}
+                                    {activationMethod && activationMethod !== 'PENDING'
+                                      ? ` • ${activationMethod.replace('_', ' ')}`
+                                      : ''}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         <td className="p-4">
                           <Badge
                             variant="outline"
                             className={
-                              isSuspended
+                              isSuspended || org.status === 'PAYMENT_FAILED' || org.status === 'EXPIRED'
                                 ? 'border-destructive/40 text-destructive bg-destructive/10'
                                 : org.status === 'ACTIVE'
                                 ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'

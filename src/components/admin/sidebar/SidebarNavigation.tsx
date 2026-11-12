@@ -1,48 +1,9 @@
 import { useCallback, useEffect, useState, useMemo, memo } from 'react';
-import {
-  LayoutDashboard,
-  UserPlus,
-  UserCheck,
-  MessageSquare,
-  Lightbulb,
-  Users,
-  Shield,
-  AlertTriangle,
-  Building2,
-  Bell,
-  CalendarCheck,
-  DollarSign,
-  BarChart,
-  Shirt,
-  Settings,
-  Receipt,
-  CreditCard,
-} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { studentService } from '@/services/api';
 import { SidebarNavItem } from './SidebarNavItem';
-
-export const ADMIN_NAV_LINKS = [
-  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/admin/analytics', icon: BarChart, label: 'Analytics', featureKey: 'advanced_analytics' },
-  { to: '/admin/register-student', icon: UserPlus, label: 'Register Student', featureKey: 'student_management' },
-  { to: '/admin/students', icon: Users, label: 'All Students', featureKey: 'student_management' },
-  { to: '/admin/fees', icon: DollarSign, label: 'Fee Management', featureKey: 'fee_management' },
-  { to: '/admin/billing', icon: CreditCard, label: 'SaaS Billing' },
-  { to: '/admin/rooms', icon: Building2, label: 'Room Management', featureKey: 'room_management' },
-  { to: '/admin/attendance', icon: UserCheck, label: 'Attendance & Passes', featureKey: 'attendance' },
-  { to: '/admin/expenses', icon: Receipt, label: 'Expense Tracker', featureKey: 'expense_management' },
-  { to: '/admin/cashflow', icon: DollarSign, label: 'Cashflow & P&L', featureKey: 'expense_management' },
-  { to: '/admin/leave-requests', icon: CalendarCheck, label: 'Leave Requests', featureKey: 'mess_management' },
-  { to: '/admin/laundry', icon: Shirt, label: 'Laundry Management', featureKey: 'laundry' },
-  { to: '/admin/complaints', icon: MessageSquare, label: 'Complaints', featureKey: 'complaints' },
-  { to: '/admin/suggestions', icon: Lightbulb, label: 'Suggestions', featureKey: 'complaints' },
-  { to: '/admin/notifications', icon: Bell, label: 'Notifications', featureKey: 'notifications' },
-  { to: '/admin/alerts', icon: AlertTriangle, label: 'Alert', featureKey: 'fee_management' },
-  { to: '/admin/admin-management', icon: Shield, label: 'Admin Management' },
-  { to: '/admin/settings', icon: Settings, label: 'Settings' },
-] as const;
+import { ADMIN_NAV_LINKS } from './adminNavLinks';
 
 export interface SidebarNavigationProps {
   isCollapsed?: boolean;
@@ -58,7 +19,7 @@ function SidebarNavigationInner({ isCollapsed = false, onNavigate }: SidebarNavi
     try {
       const response = await studentService.getAlertsCount({ hostel: selectedHostel });
       if (response.success) {
-        const count = response.data?.count ?? (response as any).count ?? 0;
+        const count = response.data?.count ?? response.count ?? 0;
         setAlertCount(count);
       }
     } catch (error) {

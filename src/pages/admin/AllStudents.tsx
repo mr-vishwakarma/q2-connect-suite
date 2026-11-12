@@ -9,6 +9,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { api } from '@/lib/api';
+import type { StudentApiRecord } from '@/types';
+import { getErrorMessage } from '@/utils/errorHandling';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -166,12 +168,12 @@ export default function AllStudents() {
         signal,
       });
       if (response.data?.success) {
-        const rawList = Array.isArray(response.data.data) ? response.data.data : [];
+        const rawList: StudentApiRecord[] = Array.isArray(response.data.data) ? response.data.data : [];
         const mapped = rawList
-          .filter((s: any) => s && !deletedIdsRef.current.has(s._id))
-          .map((s: any) => ({
+          .filter((s) => s && !deletedIdsRef.current.has(s._id))
+          .map((s) => ({
             id: s._id,
-            user_id: typeof s.userId === 'object' ? (s.userId?._id || '') : (s.userId || ''),
+            user_id: typeof s.userId === 'string' ? s.userId : s.userId?._id || '',
             name: s.name || '',
             phone: s.phone || '',
             room_no: s.roomNo || '',
@@ -179,7 +181,7 @@ export default function AllStudents() {
             start_date: s.startDate || '',
             valid_date: s.validDate || '',
             username: s.username || '',
-            email: s.email || (typeof s.userId === 'object' ? s.userId?.email : '') || '',
+            email: s.email || (typeof s.userId === 'object' && s.userId !== null ? s.userId.email : '') || '',
             created_at: s.createdAt || '',
           }));
         setStudents(mapped);
@@ -188,12 +190,12 @@ export default function AllStudents() {
       } else {
         setFetchError(response.data?.message || 'Failed to fetch students');
       }
-    } catch (error: any) {
-      if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+    } catch (error: unknown) {
+      const errObj = typeof error === 'object' && error !== null ? (error as { name?: string; code?: string }) : {}; if (errObj.name === 'CanceledError' || errObj.code === 'ERR_CANCELED') {
         return;
       }
       console.error('Error fetching students:', error);
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to fetch students';
+      const errorMsg = getErrorMessage(error, 'Failed to fetch students');
       setFetchError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -244,8 +246,8 @@ export default function AllStudents() {
         toast.success(`Registration approved for ${applicantName}! The resident can now sign in with Google to set their credentials.`);
         setPendingRegistrations((prev) => prev.filter((item) => item.id !== applicantId));
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to approve registration');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to approve registration'));
     } finally {
       setActionLoadingId(null);
     }
@@ -262,8 +264,8 @@ export default function AllStudents() {
         toast.info(`Declined registration for ${applicantName}.`);
         setPendingRegistrations((prev) => prev.filter((item) => item.id !== applicantId));
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to decline registration');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to decline registration'));
     } finally {
       setActionLoadingId(null);
     }
@@ -278,8 +280,8 @@ export default function AllStudents() {
       if (res.data?.success) {
         toast.success(`Activation invite queued successfully for ${studentEmail}`);
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to resend invite');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to resend invite'));
     } finally {
       setResendingId(null);
     }
@@ -318,9 +320,9 @@ export default function AllStudents() {
       setIsDialogOpen(false);
       setEditingStudent(null);
       fetchStudents();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating student:', error);
-      toast.error(error.response?.data?.message || 'Failed to update student');
+      toast.error(getErrorMessage(error, 'Failed to update student'));
     } finally {
       setIsSubmitting(false);
     }

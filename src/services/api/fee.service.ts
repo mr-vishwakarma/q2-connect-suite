@@ -11,6 +11,19 @@ export interface FeeDashboardData {
   page: number;
 }
 
+export interface CollectFeeResponseData {
+  payment?: Payment;
+  feeReceipt?: Record<string, unknown> | null;
+  depositReceipt?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}
+
+export interface SendFeeReminderResponseData {
+  sent?: boolean;
+  emailSent?: boolean;
+  message?: string;
+}
+
 export const feeService = {
   async getFeeDashboard(params?: { hostel?: string; page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }): Promise<ApiResponse<FeeDashboardData>> {
     const res = await api.get('/fees/dashboard', { params });
@@ -44,22 +57,22 @@ export const feeService = {
     return res.data;
   },
 
-  async collectFee(payload: CollectPaymentPayload): Promise<ApiResponse<any>> {
+  async collectFee(payload: CollectPaymentPayload): Promise<ApiResponse<CollectFeeResponseData>> {
     const res = await api.post('/fees/collect', payload);
     return res.data;
   },
 
   async getStudentFees(studentId: string): Promise<ApiResponse<Fee[]>> {
-    const res = await api.get(`/fees/student/${studentId}`);
+    const res = await api.get('/fees', { params: { studentId } });
     return res.data;
   },
 
   async getStudentPayments(studentId: string): Promise<ApiResponse<Payment[]>> {
-    const res = await api.get(`/fees/payments/${studentId}`);
+    const res = await api.get('/fees/payments', { params: { studentId } });
     return res.data;
   },
 
-  async sendFeeReminder(studentId: string, month?: string): Promise<ApiResponse<any>> {
+  async sendFeeReminder(studentId: string, month?: string): Promise<ApiResponse<SendFeeReminderResponseData>> {
     const res = await api.post(`/fees/send-reminder/${studentId}`, { month });
     return res.data;
   },

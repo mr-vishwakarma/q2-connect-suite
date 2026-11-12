@@ -5,7 +5,7 @@ const platformSettingSchema = new mongoose.Schema(
     key: { type: String, required: true, unique: true, trim: true },
     category: {
       type: String,
-      enum: ['general', 'security', 'notifications', 'billing', 'features', 'maintenance'],
+      enum: ['general', 'security', 'notifications', 'billing', 'features', 'maintenance', 'trial', 'limits'],
       default: 'general',
       required: true,
     },

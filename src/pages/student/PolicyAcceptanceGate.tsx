@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useHostel } from '@/contexts/HostelContext';
 import { policyService, PolicyVersionItem, PolicyReadiness } from '@/services/api/policy.service';
 import { PolicyDocumentViewer } from '@/components/policies/PolicyDocumentViewer';
+import { getErrorMessage } from '@/utils/errorHandling';
 
 export default function PolicyAcceptanceGate() {
   const { user, profile, signOut, refreshProfile } = useAuth();
@@ -68,11 +69,13 @@ export default function PolicyAcceptanceGate() {
         });
         setAcceptedCheckboxMap(initialMap);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load applicable policies:', err);
       setErrorMsg(
-        err.response?.data?.message ||
+        getErrorMessage(
+          err,
           'Failed to retrieve mandatory hostel policies. Please check your connection and retry.'
+        )
       );
     } finally {
       setLoading(false);
@@ -121,11 +124,12 @@ export default function PolicyAcceptanceGate() {
       } else {
         toast.error('Failed to record policy acceptances. Please retry.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Accept policies error:', err);
-      const message =
-        err.response?.data?.message ||
-        'An error occurred while saving your acceptance records. Please retry.';
+      const message = getErrorMessage(
+        err,
+        'An error occurred while saving your acceptance records. Please retry.'
+      );
       setErrorMsg(message);
       toast.error(message);
     } finally {

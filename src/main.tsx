@@ -4,7 +4,7 @@ import "./index.css";
 
 // Suppress THREE.Clock deprecation warning emitted by @react-three/fiber internal loop
 const originalWarn = console.warn;
-console.warn = (...args: any[]) => {
+console.warn = (...args: unknown[]) => {
   if (typeof args[0] === 'string' && args[0].includes('THREE.Clock')) {
     return;
   }
