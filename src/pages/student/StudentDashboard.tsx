@@ -214,8 +214,8 @@ export default function StudentDashboard() {
                     hostel={studentData?.hostel || 'Q2'}
                     fees={studentData?.fees ?? 0}
                     startDate={studentData?.start_date}
-                    profilePhoto={studentData?.profile_photo || profile?.profilePhoto}
-                    studentCode={studentData?.student_code}
+                    profilePhoto={studentData?.profile_photo || profile?.profilePhoto || undefined}
+                    studentCode={studentData?.student_code ?? undefined}
                   />
                 </div>
 

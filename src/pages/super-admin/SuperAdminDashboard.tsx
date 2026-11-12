@@ -19,16 +19,19 @@ import { Link } from 'react-router-dom';
 export default function SuperAdminDashboard() {
   const [stats, setStats] = useState<SuperAdminDashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchStats = useCallback(async () => {
     try {
       setIsLoading(true);
+      setLoadError(false);
       const res = await superAdminService.getDashboardStats();
       if (res.success && res.data) {
         setStats(res.data);
       }
     } catch (error) {
       console.error('Failed to load dashboard stats:', error);
+      setLoadError(true);
     } finally {
       setIsLoading(false);
     }
@@ -103,6 +106,11 @@ export default function SuperAdminDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {loadError && (
+            <Button variant="outline" size="sm" onClick={fetchStats}>
+              Retry Metrics
+            </Button>
+          )}
           <Button asChild>
             <Link to="/super-admin/organizations">
               <Building2 className="w-4 h-4 mr-2" />
@@ -219,15 +227,17 @@ export default function SuperAdminDashboard() {
           <CardContent>
             <div className="space-y-3">
               {stats?.recentActivity && stats.recentActivity.length > 0 ? (
-                stats.recentActivity.slice(0, 6).map((item) => (
+                stats.recentActivity.slice(0, 6).map((item, idx) => (
                   <div
-                    key={item.id}
+                    key={item.id || idx}
                     className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.07] text-xs flex flex-col gap-1"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-[#F0EFF8] truncate">{item.action}</span>
                       <Badge variant="outline" className="text-[10px] py-0 shrink-0">
-                        {new Date(item.timestamp).toLocaleDateString()}
+                        {item.timestamp && !Number.isNaN(Date.parse(item.timestamp))
+                          ? new Date(item.timestamp).toLocaleDateString()
+                          : 'Recent'}
                       </Badge>
                     </div>
                     <span className="text-[#9295AD] text-[11px] truncate">{item.description}</span>

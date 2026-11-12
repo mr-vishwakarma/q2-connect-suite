@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,17 +12,12 @@ import {
   ListChecks,
   ChevronRight,
   ChevronDown,
-  Droplets,
-  Wifi,
-  Zap,
-  Sparkles,
-  Utensils,
-  Home,
   BarChart2,
   Star,
   FileText,
-  Calendar,
   MessageSquareDiff,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,6 +33,7 @@ import {
   Cell,
 } from 'recharts';
 import { WidgetErrorBoundary } from '@/components/common/WidgetErrorBoundary';
+import { DashboardSkeleton } from '@/components/ui/dashboard-skeleton';
 
 interface DashboardStats {
   totalStudents: number;
@@ -67,11 +63,11 @@ interface RecentSuggestion {
 }
 
 export default function AdminDashboard() {
-  const { user, profile, isAdmin, loading: authLoading } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const { selectedHostel } = useHostel();
   const navigate = useNavigate();
 
-  const { data: dashboardData } = useQuery({
+  const { data: dashboardData, isLoading, isError, refetch } = useQuery({
     queryKey: ['adminDashboard', selectedHostel],
     queryFn: async () => {
       const response = await dashboardService.getAdminDashboard({ hostel: selectedHostel });
@@ -91,9 +87,18 @@ export default function AdminDashboard() {
       suggestionsTrend: '+0%',
     };
     const complaintsSummary = dashboardData?.complaintsSummary || { today: 0, thisWeek: 0, thisMonth: 0 };
-    const recentComplaints: RecentComplaint[] = dashboardData?.recentComplaints || [];
-    const recentSuggestions: RecentSuggestion[] = dashboardData?.recentSuggestions || [];
-    const complaintsData = dashboardData?.complaintsData || [];
+    const recentComplaints: RecentComplaint[] = Array.isArray(dashboardData?.recentComplaints)
+      ? dashboardData.recentComplaints
+      : [];
+    const recentSuggestions: RecentSuggestion[] = Array.isArray(dashboardData?.recentSuggestions)
+      ? dashboardData.recentSuggestions
+      : [];
+    const complaintsData = Array.isArray(dashboardData?.complaintsData)
+      ? dashboardData.complaintsData.map((item) => ({
+          name: String(item?.name ?? item?.date ?? ''),
+          value: Number(item?.value ?? item?.count ?? 0),
+        }))
+      : [];
     const allocation = dashboardData?.allocationDistribution || {
       total: stats.totalStudents || 0,
       allocated: stats.totalStudents || 0,
@@ -113,7 +118,7 @@ export default function AdminDashboard() {
     return { stats, complaintsSummary, recentComplaints, recentSuggestions, complaintsData, allocation, ratingSummary, totalAllocCapacity, allocatedPct, pendingPct, vacantPct, donutData };
   }, [dashboardData]);
 
-  const { stats, complaintsSummary, recentComplaints, recentSuggestions, complaintsData, allocation, ratingSummary, totalAllocCapacity, allocatedPct, pendingPct, vacantPct, donutData } = dashboardDerived;
+  const { stats, complaintsSummary, recentComplaints, recentSuggestions, complaintsData, allocation, ratingSummary, allocatedPct, pendingPct, vacantPct, donutData } = dashboardDerived;
 
   // Manager display name — recomputes only when profile/user changes
   const managerName = useMemo(
@@ -121,19 +126,24 @@ export default function AdminDashboard() {
     [profile?.name, user?.email]
   );
 
-  // Category Icon helper — stable function reference
-  const getCategoryIcon = useCallback((category?: string) => {
-    const cat = (category || 'Room').toLowerCase();
-    if (cat.includes('water')) return <Droplets className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-400" />;
-    if (cat.includes('wifi')) return <Wifi className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400" />;
-    if (cat.includes('elec')) return <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />;
-    if (cat.includes('clean')) return <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />;
-    if (cat.includes('mess') || cat.includes('food')) return <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" />;
-    return <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400" />;
-  }, []);
+  if (isLoading && !dashboardData) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="space-y-4 md:space-y-5 pb-8 max-w-7xl mx-auto">
+      {isError && (
+        <div className="glass-card border-destructive/30 rounded-xl px-4 py-3 flex items-center justify-between gap-3 text-xs text-rose-200">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span className="truncate">Could not refresh latest dashboard metrics. Showing last available data.</span>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => refetch()} className="h-7 px-2.5 text-xs shrink-0 gap-1">
+            <RefreshCw className="w-3 h-3" />
+            Retry
+          </Button>
+        </div>
+      )}
       {/* 1. HERO BANNER */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -379,8 +389,8 @@ export default function AdminDashboard() {
             </CardHeader>
 
             <CardContent className="p-4 pt-1 flex-1 flex flex-col justify-between">
-              <div className="h-[130px] w-full pt-2">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[130px] w-full min-w-0 pt-2">
+                <ResponsiveContainer width="100%" height={122} minWidth={0}>
                   <AreaChart data={complaintsData} margin={{ top: 5, right: 6, left: -28, bottom: 0 }}>
                     <defs>
                       <linearGradient id="complaintLavenderGlow" x1="0" y1="0" x2="0" y2="1">
@@ -481,8 +491,8 @@ export default function AdminDashboard() {
             </CardHeader>
 
             <CardContent className="p-4 pt-1 flex-1 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="relative w-[125px] h-[125px] shrink-0 flex items-center justify-center mx-auto sm:mx-0">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="relative w-[125px] h-[125px] min-w-[125px] shrink-0 flex items-center justify-center mx-auto sm:mx-0">
+                <ResponsiveContainer width={125} height={125}>
                   <PieChart>
                     <Pie
                       data={donutData}

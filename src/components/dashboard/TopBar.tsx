@@ -1,6 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Search, Menu } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { getAvatarUrl } from '@/utils/imageUtils';

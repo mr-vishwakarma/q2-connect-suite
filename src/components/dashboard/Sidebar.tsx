@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+
+
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,7 +11,7 @@ import {
   MessageSquare,
   Lightbulb,
   LogOut,
-  User,
+
   UserPlus,
   Users,
   CalendarCheck,
@@ -130,10 +131,10 @@ export function Sidebar({ isAdmin = false, onNavigate, isCollapsed = false, onTo
                   'flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative',
                   isCollapsed ? 'justify-center' : 'gap-3',
                   isActive
-                    ? 'bg-primary text-primary-foreground font-medium shadow-lg'
+                    ? 'bg-primary text-primary-foreground font-medium shadow-lg shadow-primary/25'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 )}
-                style={isActive ? { boxShadow: '0 0 20px hsl(0 100% 50% / 0.4)' } : {}}
+                style={isActive ? { boxShadow: '0 8px 24px -6px rgba(167, 139, 250, 0.35)' } : {}}
               >
                 <link.icon className="w-5 h-5 shrink-0" />
                 {!isCollapsed && <span className="flex-1 whitespace-nowrap">{link.label}</span>}

@@ -1,38 +1,28 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
-  Cell
+  Cell,
 } from 'recharts';
 import { WidgetErrorBoundary } from '@/components/common/WidgetErrorBoundary';
-import { 
-  Users, 
-  Activity, 
-  Server, 
+import {
+  Users,
+  Activity,
+  Server,
   AlertTriangle,
   Cpu,
   Database,
   RefreshCw,
   TrendingUp,
-  Box
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function AdminAnalytics() {
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-analytics'],
     queryFn: async () => {
       const response = await api.get('/analytics');
@@ -55,20 +45,32 @@ export default function AdminAnalytics() {
     );
   }
 
-  if (!data) {
-    return <div className="text-center p-8 text-destructive">Failed to load analytics data</div>;
+  if (isError || !data) {
+    return (
+      <div className="glass-card rounded-2xl p-8 text-center max-w-md mx-auto mt-12 space-y-3">
+        <p className="text-sm font-medium text-destructive">Failed to load analytics data</p>
+        <Button type="button" variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
+          <RefreshCw className="w-3.5 h-3.5" />
+          Retry
+        </Button>
+      </div>
+    );
   }
 
-  const { database, sessions, system, api: apiStats } = data;
+  const database = data.database ?? {};
+  const sessions = data.sessions ?? {};
+  const system = data.system ?? {};
+  const apiStats = data.api ?? {};
+  const memory = system.memory ?? { heapUsed: 0, heapTotal: 1, rss: 0, external: 0 };
+  const byEndpoint = (apiStats.byEndpoint || {}) as Record<string, number>;
+  const uptimeSeconds = Number(system.uptime ?? 0);
 
   const dbData = [
-    { name: 'Students', value: database.totalStudents },
-    { name: 'Rooms', value: database.totalRooms },
-    { name: 'Complaints', value: database.totalComplaints },
-    { name: 'Mess Requests', value: database.totalMessRequests },
+    { name: 'Students', value: Number(database.totalStudents ?? 0) },
+    { name: 'Rooms', value: Number(database.totalRooms ?? 0) },
+    { name: 'Complaints', value: Number(database.totalComplaints ?? 0) },
+    { name: 'Mess Requests', value: Number(database.totalMessRequests ?? 0) },
   ];
-
-  const methodData = Object.entries(apiStats.byMethod).map(([name, value]) => ({ name, value }));
 
   const COLORS = ['#A78BFA', '#74DCCB', '#ED91C1', '#818CF8', '#60A5FA'];
 
@@ -76,8 +78,8 @@ export default function AdminAnalytics() {
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Analytics Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Real-time system monitoring and statistics</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Analytics Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Real-time system monitoring and statistics</p>
         </div>
         <Button onClick={() => refetch()} variant="outline" className="flex items-center gap-2">
           <RefreshCw className="w-4 h-4" />
@@ -87,46 +89,46 @@ export default function AdminAnalytics() {
 
       {/* Top Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-card border-border">
+        <Card className="glass-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
-            <Activity className="w-4 h-4 text-emerald-500" />
+            <Activity className="w-4 h-4 text-[#74DCCB]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{sessions.active}</div>
+            <div className="text-2xl font-bold text-foreground tabular-nums">{sessions.active ?? 0}</div>
             <p className="text-xs text-muted-foreground">Currently authenticated users</p>
           </CardContent>
         </Card>
-        
-        <Card className="bg-card border-border">
+
+        <Card className="glass-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="w-4 h-4 text-blue-500" />
+            <Users className="w-4 h-4 text-[#A78BFA]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{database.totalUsers}</div>
+            <div className="text-2xl font-bold text-foreground tabular-nums">{database.totalUsers ?? 0}</div>
             <p className="text-xs text-muted-foreground">Registered accounts</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card className="glass-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">API Requests</CardTitle>
-            <Server className="w-4 h-4 text-purple-500" />
+            <Server className="w-4 h-4 text-sky-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{apiStats.totalRequests.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-foreground tabular-nums">{Number(apiStats.totalRequests ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Total API calls</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card className="glass-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">API Errors</CardTitle>
-            <AlertTriangle className="w-4 h-4 text-rose-500" />
+            <AlertTriangle className="w-4 h-4 text-[#ED91C1]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{apiStats.errors.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-foreground tabular-nums">{Number(apiStats.errors ?? 0).toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">Failed requests (4xx/5xx)</p>
           </CardContent>
         </Card>
@@ -134,7 +136,7 @@ export default function AdminAnalytics() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         {/* Memory Usage */}
-        <Card className="bg-card border-border col-span-1">
+        <Card className="glass-card col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Cpu className="w-5 h-5 text-primary" />
@@ -146,33 +148,33 @@ export default function AdminAnalytics() {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-muted-foreground">Heap Used</span>
-                  <span className="font-medium">{system.memory.heapUsed} MB / {system.memory.heapTotal} MB</span>
+                  <span className="font-medium tabular-nums">{memory.heapUsed ?? 0} MB / {memory.heapTotal ?? 0} MB</span>
                 </div>
-                <div className="w-full bg-secondary rounded-full h-2">
-                  <div 
-                    className="bg-primary h-2 rounded-full" 
-                    style={{ width: `${(system.memory.heapUsed / system.memory.heapTotal) * 100}%` }}
+                <div className="w-full bg-white/[0.06] rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, ((Number(memory.heapUsed ?? 0)) / (Number(memory.heapTotal) || 1)) * 100)}%` }}
                   ></div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
                 <div>
                   <p className="text-xs text-muted-foreground">RSS Memory</p>
-                  <p className="font-semibold text-foreground">{system.memory.rss} MB</p>
+                  <p className="font-semibold text-foreground tabular-nums">{memory.rss ?? 0} MB</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">External</p>
-                  <p className="font-semibold text-foreground">{system.memory.external} MB</p>
+                  <p className="font-semibold text-foreground tabular-nums">{memory.external ?? 0} MB</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Uptime</p>
-                  <p className="font-semibold text-foreground">
-                    {Math.floor(system.uptime / 3600)}h {Math.floor((system.uptime % 3600) / 60)}m
+                  <p className="font-semibold text-foreground tabular-nums">
+                    {Math.floor(uptimeSeconds / 3600)}h {Math.floor((uptimeSeconds % 3600) / 60)}m
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Platform</p>
-                  <p className="font-semibold text-foreground">{system.platform} / {system.nodeVersion}</p>
+                  <p className="font-semibold text-foreground">{system.platform || 'linux'} / {system.nodeVersion || 'node'}</p>
                 </div>
               </div>
             </div>
@@ -181,15 +183,15 @@ export default function AdminAnalytics() {
 
         {/* Database Stats */}
         <WidgetErrorBoundary title="Database Overview">
-        <Card className="bg-card border-border col-span-1">
+        <Card className="glass-card col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="w-5 h-5 text-primary" />
               Database Overview
             </CardTitle>
           </CardHeader>
-          <CardContent className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <CardContent className="h-[250px] min-w-0">
+            <ResponsiveContainer width="100%" height={210} minWidth={0}>
               <PieChart>
                 <Pie
                   data={dbData}
@@ -200,13 +202,13 @@ export default function AdminAnalytics() {
                   fill="#8884d8"
                   paddingAngle={5}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 >
-                  {dbData.map((entry, index) => (
+                  {dbData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: 'rgba(23, 25, 40, 0.94)', borderColor: 'rgba(225, 225, 255, 0.14)', borderRadius: '12px', color: '#F0EFF8' }}
                   itemStyle={{ color: '#F0EFF8' }}
                 />
@@ -218,7 +220,7 @@ export default function AdminAnalytics() {
 
         {/* Top Endpoints */}
         <WidgetErrorBoundary title="Top API Endpoints">
-        <Card className="bg-card border-border lg:col-span-2">
+        <Card className="glass-card lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
@@ -228,20 +230,20 @@ export default function AdminAnalytics() {
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-xs text-muted-foreground uppercase bg-secondary/50">
+                <thead className="text-xs text-muted-foreground uppercase bg-white/[0.04]">
                   <tr>
                     <th className="px-4 py-3 rounded-l-lg">Endpoint</th>
                     <th className="px-4 py-3 text-right rounded-r-lg">Requests</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries((apiStats.byEndpoint || {}) as Record<string, number>).map(([endpoint, count], index) => (
-                    <tr key={index} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
+                  {Object.entries(byEndpoint).map(([endpoint, count], index) => (
+                    <tr key={index} className="border-b border-border last:border-0 hover:bg-white/[0.03] transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">{endpoint}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">{count.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{Number(count).toLocaleString()}</td>
                     </tr>
                   ))}
-                  {Object.keys(apiStats.byEndpoint).length === 0 && (
+                  {Object.keys(byEndpoint).length === 0 && (
                     <tr>
                       <td colSpan={2} className="px-4 py-8 text-center text-muted-foreground">
                         No API requests tracked yet.
