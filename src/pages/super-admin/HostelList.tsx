@@ -160,18 +160,18 @@ export default function HostelList() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/50 border-border/60">
+        <Card className="glass-card-highlight">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Occupancy</p>
-              <h3 className="text-2xl font-bold text-foreground mt-1">
+              <p className="text-[11px] font-medium text-[#9295AD] uppercase tracking-wider">Total Occupancy</p>
+              <h3 className="text-2xl font-semibold text-[#F0EFF8] mt-1 tabular-nums">
                 {metrics ? `${metrics.overallOccupancyRate}%` : '--'}
               </h3>
-              <p className="text-xs text-amber-500 font-medium mt-1">
+              <p className="text-xs text-[#A78BFA] font-medium mt-1">
                 {metrics?.totalOccupied ?? 0} Beds Occupied
               </p>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+            <div className="w-11 h-11 rounded-xl bg-[#A78BFA]/12 border border-[#A78BFA]/25 flex items-center justify-center text-[#A78BFA]">
               <Users className="w-5 h-5" />
             </div>
           </CardContent>

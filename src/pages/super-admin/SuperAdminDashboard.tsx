@@ -3,13 +3,11 @@ import { motion } from 'framer-motion';
 import {
   Building2,
   Users,
-  CreditCard,
   DollarSign,
   TrendingUp,
   Activity,
-  ArrowUpRight,
-  ShieldAlert,
   GitFork,
+  ArrowUpRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,51 +38,72 @@ export default function SuperAdminDashboard() {
     fetchStats();
   }, [fetchStats]);
 
-  const kpis = useMemo(() => [
-    {
-      title: 'Active Organizations',
-      value: stats?.activeOrganizations ?? '--',
-      subtitle: `${stats?.totalOrganizations || 0} Total Tenants`,
-      icon: Building2,
-      color: 'text-amber-500',
-      bg: 'bg-amber-500/10 border-amber-500/20',
-    },
-    {
-      title: 'Total Hostel Branches',
-      value: stats?.totalHostels ?? '--',
-      subtitle: 'Across all organizations',
-      icon: GitFork,
-      color: 'text-blue-500',
-      bg: 'bg-blue-500/10 border-blue-500/20',
-    },
-    {
-      title: 'Platform Students',
-      value: stats?.totalStudents ?? '--',
-      subtitle: `${stats?.totalRooms || 0} Total Rooms`,
-      icon: Users,
-      color: 'text-emerald-500',
-      bg: 'bg-emerald-500/10 border-emerald-500/20',
-    },
-    {
-      title: 'Monthly Recurring Revenue (MRR)',
-      value: stats ? `₹${(stats.monthlyRecurringRevenue || 0).toLocaleString()}` : '--',
-      subtitle: `ARR: ₹${((stats?.annualRecurringRevenue || 0) / 100000).toFixed(1)} Lakhs`,
-      icon: DollarSign,
-      color: 'text-purple-500',
-      bg: 'bg-purple-500/10 border-purple-500/20',
-    },
-  ], [stats]);
+  const kpis = useMemo(
+    () => [
+      {
+        title: 'Active Organizations',
+        value: isLoading ? '--' : stats?.activeOrganizations ?? 0,
+        subtitle: `${stats?.totalOrganizations || 0} Total Tenants`,
+        icon: Building2,
+        color: 'text-[#A78BFA]',
+        bg: 'bg-[#A78BFA]/10 border-[#A78BFA]/20',
+      },
+      {
+        title: 'Total Hostel Branches',
+        value: isLoading ? '--' : stats?.totalHostels ?? 0,
+        subtitle: 'Across all organizations',
+        icon: GitFork,
+        color: 'text-sky-400',
+        bg: 'bg-sky-500/10 border-sky-500/20',
+      },
+      {
+        title: 'Platform Students',
+        value: isLoading ? '--' : stats?.totalStudents ?? 0,
+        subtitle: `${stats?.totalRooms || 0} Total Rooms`,
+        icon: Users,
+        color: 'text-[#74DCCB]',
+        bg: 'bg-[#74DCCB]/10 border-[#74DCCB]/20',
+      },
+      {
+        title: 'Monthly Recurring (MRR)',
+        value: stats ? `₹${(stats.monthlyRecurringRevenue || 0).toLocaleString('en-IN')}` : '--',
+        subtitle: `ARR: ₹${((stats?.annualRecurringRevenue || 0) / 100000).toFixed(1)} Lakhs`,
+        icon: DollarSign,
+        color: 'text-[#ED91C1]',
+        bg: 'bg-[#ED91C1]/10 border-[#ED91C1]/20',
+      },
+    ],
+    [stats, isLoading]
+  );
+
+  const activeOrgRatio =
+    stats && stats.totalOrganizations > 0
+      ? `${Math.round((stats.activeOrganizations / stats.totalOrganizations) * 100)}%`
+      : '—';
+
+  const avgStudentsPerHostel =
+    stats && stats.totalHostels > 0
+      ? `${Math.round(stats.totalStudents / stats.totalHostels)}`
+      : '—';
+
+  const totalArrDisplay = stats
+    ? `₹${Number(stats.annualRecurringRevenue || 0).toLocaleString('en-IN')}`
+    : '—';
 
   return (
     <div className="space-y-6">
       {/* Header with Quick Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">SaaS Control Center</h1>
-          <p className="text-sm text-muted-foreground">Real-time health, tenant growth, and platform revenue metrics.</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#F0EFF8]">
+            SaaS Control Center
+          </h1>
+          <p className="text-sm text-[#9295AD] mt-1">
+            Real-time health, tenant growth, and platform revenue metrics.
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button asChild className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
+          <Button asChild>
             <Link to="/super-admin/organizations">
               <Building2 className="w-4 h-4 mr-2" />
               Onboard Organization
@@ -100,20 +119,22 @@ export default function SuperAdminDashboard() {
           return (
             <motion.div
               key={kpi.title}
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
+              transition={{ delay: index * 0.04 }}
             >
-              <Card className="border border-border/60 bg-card hover:border-amber-500/40 transition-colors shadow-sm">
+              <Card className="glass-card-highlight hover:border-white/[0.15] transition-colors">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{kpi.title}</span>
+                  <span className="text-[11px] font-semibold text-[#9295AD] uppercase tracking-wider">
+                    {kpi.title}
+                  </span>
                   <div className={`p-2 rounded-xl border ${kpi.bg}`}>
                     <Icon className={`w-4 h-4 ${kpi.color}`} />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{kpi.value}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{kpi.subtitle}</p>
+                  <div className="text-2xl font-semibold text-[#F0EFF8] tabular-nums">{kpi.value}</div>
+                  <p className="text-xs text-[#74788F] mt-1">{kpi.subtitle}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -124,43 +145,63 @@ export default function SuperAdminDashboard() {
       {/* Main Grid: Growth & Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Platform Overview */}
-        <Card className="lg:col-span-2 border-border/60">
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-amber-500" />
-              Platform Scale & Adoption
+              <TrendingUp className="w-4 h-4 text-[#A78BFA]" />
+              Platform Scale &amp; Adoption
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl bg-secondary/50 border border-border/50">
-                <span className="text-xs text-muted-foreground block">Collection Efficiency</span>
-                <span className="text-xl font-bold text-emerald-400">98.4%</span>
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+                <span className="text-xs text-[#9295AD] block">Active Tenant Ratio</span>
+                <span className="text-xl font-semibold text-[#74DCCB] tabular-nums mt-1 block">
+                  {activeOrgRatio}
+                </span>
               </div>
-              <div className="p-4 rounded-xl bg-secondary/50 border border-border/50">
-                <span className="text-xs text-muted-foreground block">Trial Conversion Rate</span>
-                <span className="text-xl font-bold text-amber-400">74.2%</span>
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+                <span className="text-xs text-[#9295AD] block">Avg Residents / Branch</span>
+                <span className="text-xl font-semibold text-[#A78BFA] tabular-nums mt-1 block">
+                  {avgStudentsPerHostel}
+                </span>
               </div>
-              <div className="p-4 rounded-xl bg-secondary/50 border border-border/50 col-span-2 sm:col-span-1">
-                <span className="text-xs text-muted-foreground block">Platform Uptime</span>
-                <span className="text-xl font-bold text-blue-400">99.98%</span>
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] col-span-2 sm:col-span-1">
+                <span className="text-xs text-[#9295AD] block">Annual Run Rate (ARR)</span>
+                <span className="text-xl font-semibold text-[#F0EFF8] tabular-nums mt-1 block truncate">
+                  {totalArrDisplay}
+                </span>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-border/50">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Quick Navigation</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <Button variant="outline" size="sm" asChild className="justify-start">
-                  <Link to="/super-admin/organizations">Organizations</Link>
+            <div className="pt-4 border-t border-white/[0.07]">
+              <h4 className="text-[11px] font-semibold text-[#74788F] uppercase tracking-wider mb-3">
+                Quick Navigation
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <Button variant="outline" size="sm" asChild className="justify-between">
+                  <Link to="/super-admin/organizations">
+                    Organizations
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#74788F]" />
+                  </Link>
                 </Button>
-                <Button variant="outline" size="sm" asChild className="justify-start">
-                  <Link to="/super-admin/plans">Subscription Plans</Link>
+                <Button variant="outline" size="sm" asChild className="justify-between">
+                  <Link to="/super-admin/plans">
+                    Subscription Plans
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#74788F]" />
+                  </Link>
                 </Button>
-                <Button variant="outline" size="sm" asChild className="justify-start">
-                  <Link to="/super-admin/features">Feature Catalog</Link>
+                <Button variant="outline" size="sm" asChild className="justify-between">
+                  <Link to="/super-admin/vouchers">
+                    Vouchers
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#74788F]" />
+                  </Link>
                 </Button>
-                <Button variant="outline" size="sm" asChild className="justify-start">
-                  <Link to="/super-admin/audit-logs">Audit Logs</Link>
+                <Button variant="outline" size="sm" asChild className="justify-between">
+                  <Link to="/super-admin/audit-logs">
+                    Audit Logs
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#74788F]" />
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -168,10 +209,10 @@ export default function SuperAdminDashboard() {
         </Card>
 
         {/* Live Audit / Activity Feed */}
-        <Card className="border-border/60">
+        <Card>
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Activity className="w-4 h-4 text-purple-500" />
+              <Activity className="w-4 h-4 text-[#74DCCB]" />
               Platform Activity
             </CardTitle>
           </CardHeader>
@@ -179,16 +220,23 @@ export default function SuperAdminDashboard() {
             <div className="space-y-3">
               {stats?.recentActivity && stats.recentActivity.length > 0 ? (
                 stats.recentActivity.slice(0, 6).map((item) => (
-                  <div key={item.id} className="p-3 rounded-lg bg-secondary/30 border border-border/40 text-xs flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-foreground">{item.action}</span>
-                      <Badge variant="outline" className="text-[10px] py-0">{new Date(item.timestamp).toLocaleDateString()}</Badge>
+                  <div
+                    key={item.id}
+                    className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.07] text-xs flex flex-col gap-1"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-[#F0EFF8] truncate">{item.action}</span>
+                      <Badge variant="outline" className="text-[10px] py-0 shrink-0">
+                        {new Date(item.timestamp).toLocaleDateString()}
+                      </Badge>
                     </div>
-                    <span className="text-muted-foreground text-[11px] truncate">{item.description}</span>
+                    <span className="text-[#9295AD] text-[11px] truncate">{item.description}</span>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-6 text-xs text-muted-foreground">No recent platform events recorded</div>
+                <div className="text-center py-8 text-xs text-[#74788F]">
+                  No recent platform events recorded
+                </div>
               )}
             </div>
           </CardContent>

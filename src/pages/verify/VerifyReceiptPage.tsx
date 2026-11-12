@@ -55,12 +55,12 @@ export default function VerifyReceiptPage() {
   }, [receiptNo]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen app-shell-bg flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         
         {/* Brand Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 mb-3 shadow-xs">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-primary/15 border border-primary/30 text-primary mb-3 shadow-lg shadow-primary/15">
             <ShieldCheck className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-foreground">
@@ -72,29 +72,29 @@ export default function VerifyReceiptPage() {
         </div>
 
         {/* Status Card */}
-        <Card className="border-border shadow-md overflow-hidden bg-card">
+        <Card className="overflow-hidden">
           <CardContent className="p-6">
             
             {loading && (
               <div className="py-12 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 <p className="text-sm font-medium">Verifying receipt authenticity...</p>
               </div>
             )}
 
             {error && !loading && (
               <div className="py-8 text-center space-y-3">
-                <div className="inline-flex p-3 rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
+                <div className="inline-flex p-3 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400">
                   <AlertCircle className="w-8 h-8" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-rose-600">Verification Failed</h2>
+                  <h2 className="text-lg font-bold text-rose-400">Verification Failed</h2>
                   <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
                     {error}
                   </p>
                 </div>
                 {receiptNo && (
-                  <p className="text-xs font-mono bg-muted py-1 px-2.5 rounded-lg inline-block text-muted-foreground">
+                  <p className="text-xs font-mono bg-white/[0.04] border border-white/[0.08] py-1 px-2.5 rounded-lg inline-block text-muted-foreground">
                     Query: #{receiptNo}
                   </p>
                 )}
@@ -105,14 +105,14 @@ export default function VerifyReceiptPage() {
               <div className="space-y-5">
                 
                 {/* Green Verified Banner */}
-                <div className="rounded-xl bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900 p-4 text-center">
-                  <div className="inline-flex items-center justify-center p-1.5 rounded-full bg-emerald-600 text-white mb-2">
+                <div className="rounded-xl bg-[#74DCCB]/10 border border-[#74DCCB]/30 p-4 text-center">
+                  <div className="inline-flex items-center justify-center p-1.5 rounded-full bg-[#74DCCB] text-[#090B12] mb-2">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <h2 className="text-base font-bold text-emerald-800 dark:text-emerald-300">
+                  <h2 className="text-base font-bold text-[#74DCCB]">
                     Official Receipt Verified
                   </h2>
-                  <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                  <p className="text-xs text-[#74DCCB]/85">
                     This document was officially issued and registered in Hosteliq.
                   </p>
                 </div>

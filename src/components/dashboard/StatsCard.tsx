@@ -14,24 +14,26 @@ interface StatsCardProps {
 
 export function StatsCard({ title, value, icon, trend, className }: StatsCardProps) {
   return (
-    <div className={cn(
-      "bg-card border border-border rounded-2xl p-6 shadow-card transition-all duration-200 hover:shadow-elevated",
-      className
-    )}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground mb-1">{title}</p>
-          <p className="text-3xl font-bold text-foreground">{value}</p>
+    <div
+      className={cn(
+        "glass-card rounded-2xl p-5 sm:p-6 transition-all duration-200 hover:border-[rgba(210,195,255,0.22)]",
+        className
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs sm:text-sm font-medium text-[#9295AD] mb-1.5 truncate">{title}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-[#F0EFF8] tracking-tight tabular-nums-clean">{value}</p>
           {trend && (
             <p className={cn(
-              "text-sm mt-2",
-              trend.positive ? "text-success" : "text-destructive"
+              "text-xs sm:text-sm font-medium mt-2",
+              trend.positive ? "text-[#74DCCB]" : "text-rose-400"
             )}>
               {trend.positive ? '↑' : '↓'} {trend.value}
             </p>
           )}
         </div>
-        <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
+        <div className="w-11 h-11 rounded-xl bg-[#A78BFA]/15 border border-[#A78BFA]/25 flex items-center justify-center text-[#A78BFA] shrink-0">
           {icon}
         </div>
       </div>

@@ -365,7 +365,7 @@ export default function PlanManagement() {
           <Button
             size="sm"
             onClick={handleOpenCreate}
-            className="h-9 text-xs bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+            className="h-9 text-xs"
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             Create Plan
@@ -375,37 +375,37 @@ export default function PlanManagement() {
 
       {/* Summary Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <div className="p-3.5 rounded-xl bg-card border border-border/60">
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block">Total Tiers</span>
-          <span className="text-lg sm:text-xl font-bold text-foreground mt-0.5 block">{plans.length}</span>
+        <div className="p-3.5 rounded-xl glass-card-highlight">
+          <span className="text-[11px] font-medium text-[#9295AD] uppercase tracking-wider block">Total Tiers</span>
+          <span className="text-lg sm:text-xl font-semibold text-[#F0EFF8] mt-0.5 block">{plans.length}</span>
         </div>
-        <div className="p-3.5 rounded-xl bg-card border border-border/60">
-          <span className="text-[11px] font-medium text-emerald-400 uppercase tracking-wider block">Active For Billing</span>
-          <span className="text-lg sm:text-xl font-bold text-emerald-400 mt-0.5 block">
+        <div className="p-3.5 rounded-xl glass-card-highlight">
+          <span className="text-[11px] font-medium text-[#74DCCB] uppercase tracking-wider block">Active For Billing</span>
+          <span className="text-lg sm:text-xl font-semibold text-[#74DCCB] mt-0.5 block">
             {plans.filter((p) => p.isActive !== false).length}
           </span>
         </div>
-        <div className="p-3.5 rounded-xl bg-card border border-border/60">
-          <span className="text-[11px] font-medium text-amber-400 uppercase tracking-wider block">Highlighted Tier</span>
-          <span className="text-sm sm:text-base font-bold text-amber-400 mt-1 block truncate">
+        <div className="p-3.5 rounded-xl glass-card-highlight">
+          <span className="text-[11px] font-medium text-[#ED91C1] uppercase tracking-wider block">Highlighted Tier</span>
+          <span className="text-sm sm:text-base font-semibold text-[#ED91C1] mt-1 block truncate">
             {plans.find((p) => p.isPopular)?.name || 'None Selected'}
           </span>
         </div>
-        <div className="p-3.5 rounded-xl bg-card border border-border/60">
-          <span className="text-[11px] font-medium text-purple-400 uppercase tracking-wider block">Standard Modules</span>
-          <span className="text-lg sm:text-xl font-bold text-purple-400 mt-0.5 block">{availableFeatures.length}</span>
+        <div className="p-3.5 rounded-xl glass-card-highlight">
+          <span className="text-[11px] font-medium text-[#A78BFA] uppercase tracking-wider block">Standard Modules</span>
+          <span className="text-lg sm:text-xl font-semibold text-[#A78BFA] mt-0.5 block">{availableFeatures.length}</span>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card p-3 rounded-xl border border-border/60">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 glass-card p-3 rounded-xl">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search plans by name, code or description..."
-            className="pl-9 h-9 text-xs bg-background/50 border-border/70"
+            className="pl-9 h-9 text-xs"
           />
         </div>
 
@@ -416,8 +416,8 @@ export default function PlanManagement() {
               onClick={() => setStatusFilter(st)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${
                 statusFilter === st
-                  ? 'bg-amber-500 text-black font-semibold shadow-sm'
-                  : 'bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
+                  : 'bg-white/[0.04] text-[#9295AD] hover:text-foreground hover:bg-white/[0.08]'
               }`}
             >
               {st}
@@ -478,7 +478,7 @@ export default function PlanManagement() {
               <Button
                 onClick={handleSeedDefaults}
                 disabled={isSeeding}
-                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs h-9"
+                className="text-xs h-9"
               >
                 {isSeeding ? (
                   <>
@@ -524,8 +524,8 @@ export default function PlanManagement() {
                 key={planId}
                 className={`border flex flex-col justify-between transition-all duration-200 relative ${
                   plan.isPopular
-                    ? 'border-amber-500/70 shadow-lg shadow-amber-500/5 bg-gradient-to-b from-card via-card to-amber-500/5'
-                    : 'border-border/60 bg-card hover:border-border'
+                    ? 'glass-card-highlight border-primary/45 shadow-[0_18px_45px_rgba(124,92,230,0.12)]'
+                    : 'hover:border-white/[0.15]'
                 }`}
               >
                 <CardHeader className="pb-3">
@@ -551,7 +551,7 @@ export default function PlanManagement() {
                       </Badge>
                     </div>
                     {plan.isPopular && (
-                      <Badge className="bg-amber-500 text-black font-bold text-[10px] shrink-0">
+                      <Badge className="bg-primary/20 text-[#A78BFA] border-primary/35 font-semibold text-[10px] shrink-0">
                         MOST POPULAR
                       </Badge>
                     )}
@@ -651,10 +651,10 @@ export default function PlanManagement() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 text-xs hover:border-amber-500/60"
+                    className="flex-1 text-xs hover:border-primary/50"
                     onClick={() => handleOpenEdit(plan)}
                   >
-                    <Edit2 className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
+                    <Edit2 className="w-3.5 h-3.5 mr-1.5 text-primary" />
                     Edit Plan Limits
                   </Button>
                   <Button
@@ -818,13 +818,13 @@ export default function PlanManagement() {
                   Bundled Feature Modules ({formData.includedFeatures.length} selected)
                 </Label>
                 <div className="flex gap-2 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setFormData((p) => ({ ...p, includedFeatures: availableFeatures.map((f) => f.key) }))}
-                    className="text-amber-400 hover:underline"
-                  >
-                    Select All
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, includedFeatures: availableFeatures.map((f) => f.key) }))}
+                      className="text-[#A78BFA] hover:underline"
+                    >
+                      Select All
+                    </button>
                   <span className="text-muted-foreground">•</span>
                   <button
                     type="button"
@@ -844,15 +844,15 @@ export default function PlanManagement() {
                       key={feat.key}
                       className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
                         checked
-                          ? 'bg-amber-500/10 border-amber-500/30 text-foreground font-medium'
-                          : 'bg-card/50 border-border/40 text-muted-foreground hover:bg-secondary/40'
+                          ? 'bg-primary/12 border-primary/35 text-foreground font-medium'
+                          : 'bg-white/[0.02] border-white/[0.06] text-muted-foreground hover:bg-white/[0.05]'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => handleToggleFeatureCheck(feat.key)}
-                        className="w-3.5 h-3.5 rounded border-border text-amber-500 focus:ring-amber-500"
+                        className="w-3.5 h-3.5 rounded border-border accent-[#8B6EF3]"
                       />
                       <span className="truncate">{feat.label}</span>
                     </label>
@@ -969,7 +969,7 @@ export default function PlanManagement() {
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs"
+                className="text-xs"
               >
                 {isSaving ? (
                   <>

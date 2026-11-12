@@ -276,7 +276,7 @@ export default function FeatureCatalog() {
           <Button
             size="sm"
             onClick={handleOpenAdd}
-            className="h-9 text-xs bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+            className="h-9 text-xs"
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             Add Feature
@@ -334,11 +334,10 @@ export default function FeatureCatalog() {
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap capitalize ${
-                selectedCategory === cat
-                  ? 'bg-amber-500 text-black font-semibold shadow-sm'
-                  : 'bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap capitalize ${selectedCategory === cat
+                  ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
+                  : 'bg-white/[0.04] text-[#9295AD] hover:text-foreground hover:bg-white/[0.08]'
+                }`}
             >
               {cat} ({counts[cat]})
             </button>
@@ -397,7 +396,7 @@ export default function FeatureCatalog() {
               <Button
                 onClick={handleSeedDefaults}
                 disabled={isSeeding}
-                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs h-9"
+                className="text-xs h-9"
               >
                 {isSeeding ? (
                   <>
@@ -436,7 +435,7 @@ export default function FeatureCatalog() {
             return (
               <Card
                 key={feat.key}
-                className="border-border/60 bg-card hover:border-amber-500/40 transition-all duration-200 flex flex-col justify-between group shadow-sm"
+                className="hover:border-primary/40 transition-all duration-200 flex flex-col justify-between group"
               >
                 <CardHeader className="pb-2.5">
                   <div className="flex items-start justify-between gap-2">
@@ -453,19 +452,18 @@ export default function FeatureCatalog() {
                 </CardHeader>
 
                 <CardContent className="space-y-3 pt-0">
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
-                    <span className="text-[11px] font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 truncate">
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/[0.07]">
+                    <span className="text-[11px] font-mono text-[#A78BFA] bg-[#A78BFA]/10 px-2 py-0.5 rounded border border-[#A78BFA]/20 truncate">
                       {feat.key}
                     </span>
 
                     <button
                       type="button"
                       onClick={() => handleToggleDefault(feat)}
-                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5 ${
-                        feat.defaultEnabled
+                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5 ${feat.defaultEnabled
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
                           : 'bg-secondary text-muted-foreground border-border hover:text-foreground'
-                      }`}
+                        }`}
                       title="Toggle whether newly registered organizations receive this feature by default"
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${feat.defaultEnabled ? 'bg-emerald-400' : 'bg-muted-foreground'}`} />
@@ -579,7 +577,7 @@ export default function FeatureCatalog() {
                 type="checkbox"
                 checked={formData.defaultEnabled}
                 onChange={(e) => setFormData({ ...formData, defaultEnabled: e.target.checked })}
-                className="w-4 h-4 rounded border-border text-amber-500 focus:ring-amber-500"
+                className="w-4 h-4 rounded border-border text-primary accent-primary focus:ring-primary"
               />
               <Label htmlFor="featDefault" className="text-xs cursor-pointer">
                 Enable by default for newly onboarded tenants
@@ -602,7 +600,7 @@ export default function FeatureCatalog() {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs"
+                className="text-xs"
               >
                 {isSubmitting ? (
                   <>

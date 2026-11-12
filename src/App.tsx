@@ -1,25 +1,61 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation } from "react-router-dom";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from "@/hooks/useAuth";
 import { useHostel } from "@/contexts/HostelContext";
 import { AuthProvider } from "@/contexts/AuthProvider";
 import { HostelProvider } from "@/contexts/HostelProvider";
 import { ProtectedAdminRoute } from "@/components/auth/ProtectedAdminRoute";
+import { ProtectedStudentRoute } from "@/components/auth/ProtectedStudentRoute";
+import { ProtectedSuperAdminRoute } from "@/components/auth/ProtectedSuperAdminRoute";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { SuperAdminLayout } from "@/components/super-admin/SuperAdminLayout";
 import ScrollToTop from "@/components/ScrollToTop";
 import { GlobalErrorBoundary } from "@/components/common/GlobalErrorBoundary";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
+import { AppSplashScreen, PortalRouteLoader } from "@/components/common/AppSplashScreen";
+
+function InitialBootSplash() {
+  const { loading } = useAuth();
+  const [minDelayDone, setMinDelayDone] = useState(false);
+  const [safetyExpired, setSafetyExpired] = useState(false);
+
+  useEffect(() => {
+    const minTimer = window.setTimeout(() => {
+      setMinDelayDone(true);
+    }, 450);
+
+    const maxTimer = window.setTimeout(() => {
+      setSafetyExpired(true);
+      setMinDelayDone(true);
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(minTimer);
+      window.clearTimeout(maxTimer);
+    };
+  }, []);
+
+  const showSplash = !safetyExpired && (!minDelayDone || loading);
+  return <AppSplashScreen visible={showSplash} />;
+}
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { user, isSuperAdmin, isAdmin, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center app-shell-bg">
+        <PortalRouteLoader />
+      </div>
+    );
+  }
 
   if (user && location.pathname === '/login' && location.search.includes('role=')) {
     return <>{children}</>;
@@ -37,13 +73,12 @@ function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
 const Index = lazy(() => import("./pages/Index"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const ConnectWithUs = lazy(() => import("./pages/ConnectWithUs"));
 const Login = lazy(() => import("./pages/Login"));
-const Signup = lazy(() => import("./pages/Signup"));
-const RegisterAdmin = lazy(() => import("./pages/RegisterAdmin"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const OurTeam = lazy(() => import("./pages/OurTeam"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -121,6 +156,8 @@ const adminTitles: Record<string, string> = {
   "/admin/expenses": "Expense Tracker",
   "/admin/cashflow": "Cashflow & P&L",
   "/admin/leave-requests": "Leave Requests",
+  "/admin/laundry": "Laundry Management",
+  "/admin/settings": "Hostel Settings",
   "/admin/notifications": "Notifications",
 };
 
@@ -132,6 +169,7 @@ const superAdminTitles: Record<string, string> = {
   "/super-admin/users": "Global User Management",
   "/super-admin/plans": "Subscription Plans",
   "/super-admin/subscriptions": "Tenant Subscriptions",
+  "/super-admin/vouchers": "Coupons & Vouchers",
   "/super-admin/features": "Feature Catalog",
   "/super-admin/audit-logs": "Audit & Compliance Logs",
   "/super-admin/security": "Security Center",
@@ -140,10 +178,6 @@ const superAdminTitles: Record<string, string> = {
   "/super-admin/reports": "Platform Reports & Exports",
   "/super-admin/settings": "Platform Settings",
 };
-
-import { ProtectedStudentRoute } from "@/components/auth/ProtectedStudentRoute";
-import { ProtectedSuperAdminRoute } from "@/components/auth/ProtectedSuperAdminRoute";
-import { SuperAdminLayout } from "@/components/super-admin/SuperAdminLayout";
 
 function StudentShell() {
   return (
@@ -157,8 +191,8 @@ function AdminShell() {
   const location = useLocation();
   const { selectedHostel } = useHostel();
   const isDashboard = location.pathname === "/admin/dashboard";
-  const title = isDashboard 
-    ? `${selectedHostel || 'Q2'} Hostel` 
+  const title = isDashboard
+    ? `${selectedHostel || 'Q2'} Hostel`
     : (adminTitles[location.pathname] ?? "Admin Panel");
   const subtitle = isDashboard ? "Manager Dashboard" : undefined;
 
@@ -173,7 +207,9 @@ function AdminShell() {
 
 function SuperAdminShell() {
   const location = useLocation();
-  const title = superAdminTitles[location.pathname] ?? "Super Admin";
+  const title = location.pathname.startsWith("/super-admin/organizations/")
+    ? "Organization Details"
+    : (superAdminTitles[location.pathname] ?? "Super Admin");
 
   return (
     <ProtectedSuperAdminRoute>
@@ -184,117 +220,117 @@ function SuperAdminShell() {
   );
 }
 
-import { GoogleOAuthProvider } from '@react-oauth/google';
-
 const App = () => (
   <GlobalErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID || "not-configured"}>
-      <AuthProvider>
-        <HostelProvider>
-          <OfflineBanner />
-          <Toaster />
-          <ToastContainer position="top-right" autoClose={3000} theme="dark" />
-          <BrowserRouter>
-            <ScrollToTop />
-            <Suspense fallback={
-              <div className="flex h-screen w-full items-center justify-center bg-background">
-                <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-              </div>
-            }>
-            <Routes>
-              <Route path="/" element={<PublicOnlyRoute><Index /></PublicOnlyRoute>} />
-              <Route path="/about" element={<PublicOnlyRoute><About /></PublicOnlyRoute>} />
-              <Route path="/contact" element={<PublicOnlyRoute><Contact /></PublicOnlyRoute>} />
-              <Route path="/our-team" element={<PublicOnlyRoute><OurTeam /></PublicOnlyRoute>} />
-              <Route path="/connect" element={<PublicOnlyRoute><ConnectWithUs /></PublicOnlyRoute>} />
-              <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-              <Route path="/signup" element={<Navigate to="/connect" replace />} />
-              <Route path="/register" element={<Navigate to="/connect" replace />} />
-              <Route path="/admin/login" element={<Navigate to="/login?role=admin" replace />} />
-              <Route path="/student/login" element={<Navigate to="/login?role=student" replace />} />
-              <Route path="/super-admin/login" element={<Navigate to="/login?role=super_admin" replace />} />
-              <Route path="/superadmin/login" element={<Navigate to="/login?role=super_admin" replace />} />
-              <Route path="/register-admin" element={<Navigate to="/connect" replace />} />
-              <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
-              <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
-              <Route path="/auth/google/callback" element={<OAuthCallback />} />
-              <Route path="/unauthorized" element={<Unauthorized />} />
-              <Route path="/verify-receipt" element={<VerifyReceiptPage />} />
-              <Route path="/receipts/verify/:receiptNo" element={<VerifyReceiptPage />} />
+        <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID || "not-configured"}>
+          <AuthProvider>
+            <InitialBootSplash />
+            <HostelProvider>
+              <OfflineBanner />
+              <Toaster />
+              <ToastContainer position="top-right" autoClose={3000} theme="dark" />
+              <BrowserRouter>
+                <ScrollToTop />
+                <Suspense
+                  fallback={
+                    <div className="flex min-h-screen w-full items-center justify-center app-shell-bg">
+                      <PortalRouteLoader />
+                    </div>
+                  }
+                >
+                  <Routes>
+                    <Route path="/" element={<PublicOnlyRoute><Index /></PublicOnlyRoute>} />
+                    <Route path="/about" element={<PublicOnlyRoute><About /></PublicOnlyRoute>} />
+                    <Route path="/contact" element={<PublicOnlyRoute><Contact /></PublicOnlyRoute>} />
+                    <Route path="/our-team" element={<PublicOnlyRoute><OurTeam /></PublicOnlyRoute>} />
+                    <Route path="/connect" element={<PublicOnlyRoute><ConnectWithUs /></PublicOnlyRoute>} />
+                    <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+                    <Route path="/signup" element={<Navigate to="/connect" replace />} />
+                    <Route path="/register" element={<Navigate to="/connect" replace />} />
+                    <Route path="/admin/login" element={<Navigate to="/login?role=admin" replace />} />
+                    <Route path="/student/login" element={<Navigate to="/login?role=student" replace />} />
+                    <Route path="/super-admin/login" element={<Navigate to="/login?role=super_admin" replace />} />
+                    <Route path="/superadmin/login" element={<Navigate to="/login?role=super_admin" replace />} />
+                    <Route path="/register-admin" element={<Navigate to="/connect" replace />} />
+                    <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPassword /></PublicOnlyRoute>} />
+                    <Route path="/reset-password" element={<PublicOnlyRoute><ResetPassword /></PublicOnlyRoute>} />
+                    <Route path="/auth/google/callback" element={<OAuthCallback />} />
+                    <Route path="/unauthorized" element={<Unauthorized />} />
+                    <Route path="/verify-receipt" element={<VerifyReceiptPage />} />
+                    <Route path="/receipts/verify/:receiptNo" element={<VerifyReceiptPage />} />
 
-              {/* Student Protected Routes */}
-              <Route path="/student" element={<StudentShell />}>
-                <Route index element={<Navigate to="/student/dashboard" replace />} />
-                <Route path="accept-policies" element={<PolicyAcceptanceGate />} />
-                <Route path="dashboard" element={<StudentDashboard />} />
-                <Route path="profile" element={<Profile />} />
-                <Route path="mess-off" element={<MessOff />} />
-                <Route path="complaints" element={<Complaints />} />
-                <Route path="suggestions" element={<Suggestions />} />
-                <Route path="laundry" element={<Laundry />} />
-                <Route path="fee-history" element={<FeeHistory />} />
-              </Route>
+                    {/* Student Protected Routes */}
+                    <Route path="/student" element={<StudentShell />}>
+                      <Route index element={<Navigate to="/student/dashboard" replace />} />
+                      <Route path="accept-policies" element={<PolicyAcceptanceGate />} />
+                      <Route path="dashboard" element={<StudentDashboard />} />
+                      <Route path="profile" element={<Profile />} />
+                      <Route path="mess-off" element={<MessOff />} />
+                      <Route path="complaints" element={<Complaints />} />
+                      <Route path="suggestions" element={<Suggestions />} />
+                      <Route path="laundry" element={<Laundry />} />
+                      <Route path="fee-history" element={<FeeHistory />} />
+                    </Route>
 
-              {/* Tenant Hostel Admin Protected Routes */}
-              <Route path="/admin" element={<AdminShell />}>
-                <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="analytics" element={<AdminAnalytics />} />
-                <Route path="register-student" element={<RegisterStudent />} />
-                <Route path="complaints" element={<AdminComplaints />} />
-                <Route path="suggestions" element={<AdminSuggestions />} />
-                <Route path="students" element={<AllStudents />} />
-                <Route path="alerts" element={<AdminAlerts />} />
-                <Route path="admin-management" element={<AdminManagement />} />
-                <Route path="admins" element={<Navigate to="/admin/admin-management" replace />} />
-                <Route path="fees" element={<FeeManagement />} />
-                <Route path="payments" element={<Navigate to="/admin/fees" replace />} />
-                <Route path="billing" element={<Billing />} />
-                <Route path="rooms" element={<RoomManagement />} />
-                <Route path="attendance" element={<AttendanceManagement />} />
-                <Route path="expenses" element={<ExpenseManagement />} />
-                <Route path="cashflow" element={<CashflowAnalyzer />} />
-                <Route path="leave-requests" element={<LeaveRequests />} />
-                <Route path="laundry" element={<LaundryManagement />} />
-                <Route path="settings" element={<AdminSettings />} />
-                <Route path="notifications" element={<Notifications />} />
-              </Route>
+                    {/* Tenant Hostel Admin Protected Routes */}
+                    <Route path="/admin" element={<AdminShell />}>
+                      <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                      <Route path="dashboard" element={<AdminDashboard />} />
+                      <Route path="analytics" element={<AdminAnalytics />} />
+                      <Route path="register-student" element={<RegisterStudent />} />
+                      <Route path="complaints" element={<AdminComplaints />} />
+                      <Route path="suggestions" element={<AdminSuggestions />} />
+                      <Route path="students" element={<AllStudents />} />
+                      <Route path="alerts" element={<AdminAlerts />} />
+                      <Route path="admin-management" element={<AdminManagement />} />
+                      <Route path="admins" element={<Navigate to="/admin/admin-management" replace />} />
+                      <Route path="fees" element={<FeeManagement />} />
+                      <Route path="payments" element={<Navigate to="/admin/fees" replace />} />
+                      <Route path="billing" element={<Billing />} />
+                      <Route path="rooms" element={<RoomManagement />} />
+                      <Route path="attendance" element={<AttendanceManagement />} />
+                      <Route path="expenses" element={<ExpenseManagement />} />
+                      <Route path="cashflow" element={<CashflowAnalyzer />} />
+                      <Route path="leave-requests" element={<LeaveRequests />} />
+                      <Route path="laundry" element={<LaundryManagement />} />
+                      <Route path="settings" element={<AdminSettings />} />
+                      <Route path="notifications" element={<Notifications />} />
+                    </Route>
 
-              {/* Platform Super Admin Protected Routes */}
-              <Route path="/super-admin" element={<SuperAdminShell />}>
-                <Route index element={<Navigate to="/super-admin/dashboard" replace />} />
-                <Route path="dashboard" element={<SuperAdminDashboard />} />
-                <Route path="analytics" element={<PlatformAnalytics />} />
-                <Route path="organizations" element={<OrganizationList />} />
-                <Route path="organizations/:id" element={<OrganizationDetail />} />
-                <Route path="hostels" element={<HostelList />} />
-                <Route path="users" element={<UserManagement />} />
-                <Route path="plans" element={<PlanManagement />} />
-                <Route path="subscriptions" element={<SubscriptionManagement />} />
-                <Route path="vouchers" element={<CouponsVouchers />} />
-                <Route path="features" element={<FeatureCatalog />} />
-                <Route path="audit-logs" element={<AuditLogsView />} />
-                <Route path="security" element={<SecurityCenter />} />
-                <Route path="impersonation" element={<ImpersonationCenter />} />
-                <Route path="system-health" element={<SystemHealth />} />
-                <Route path="reports" element={<PlatformReports />} />
-                <Route path="settings" element={<PlatformSettings />} />
-              </Route>
+                    {/* Platform Super Admin Protected Routes */}
+                    <Route path="/super-admin" element={<SuperAdminShell />}>
+                      <Route index element={<Navigate to="/super-admin/dashboard" replace />} />
+                      <Route path="dashboard" element={<SuperAdminDashboard />} />
+                      <Route path="analytics" element={<PlatformAnalytics />} />
+                      <Route path="organizations" element={<OrganizationList />} />
+                      <Route path="organizations/:id" element={<OrganizationDetail />} />
+                      <Route path="hostels" element={<HostelList />} />
+                      <Route path="users" element={<UserManagement />} />
+                      <Route path="plans" element={<PlanManagement />} />
+                      <Route path="subscriptions" element={<SubscriptionManagement />} />
+                      <Route path="vouchers" element={<CouponsVouchers />} />
+                      <Route path="features" element={<FeatureCatalog />} />
+                      <Route path="audit-logs" element={<AuditLogsView />} />
+                      <Route path="security" element={<SecurityCenter />} />
+                      <Route path="impersonation" element={<ImpersonationCenter />} />
+                      <Route path="system-health" element={<SystemHealth />} />
+                      <Route path="reports" element={<PlatformReports />} />
+                      <Route path="settings" element={<PlatformSettings />} />
+                    </Route>
 
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </HostelProvider>
-      </AuthProvider>
-      </GoogleOAuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </BrowserRouter>
+            </HostelProvider>
+          </AuthProvider>
+        </GoogleOAuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   </GlobalErrorBoundary>
 );
 
 export default App;
-

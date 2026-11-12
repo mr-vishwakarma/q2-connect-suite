@@ -30,14 +30,14 @@ export default function MessStatusChart({ chartData }: MessStatusChartProps) {
         </Pie>
         <Tooltip
           contentStyle={{
-            backgroundColor: 'hsl(222 47% 10%)',
-            border: '1px solid hsl(222 47% 18%)',
-            borderRadius: '8px',
-            color: '#ffffff',
+            backgroundColor: 'rgba(23, 25, 40, 0.94)',
+            border: '1px solid rgba(225, 225, 255, 0.14)',
+            borderRadius: '12px',
+            color: '#F0EFF8',
           }}
-          itemStyle={{ color: '#ffffff' }}
+          itemStyle={{ color: '#F0EFF8' }}
         />
-        <Legend formatter={(value) => <span style={{ color: '#ffffff', fontWeight: 500 }}>{value}</span>} />
+        <Legend formatter={(value) => <span style={{ color: '#C8CADB', fontWeight: 500 }}>{value}</span>} />
       </PieChart>
     </ResponsiveContainer>
   );

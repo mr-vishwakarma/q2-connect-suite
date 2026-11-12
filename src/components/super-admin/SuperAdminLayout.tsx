@@ -1,8 +1,62 @@
-import { ReactNode, useEffect } from 'react';
-import { SuperAdminSidebar } from './SuperAdminSidebar';
-import { SuperAdminTopBar } from './SuperAdminTopBar';
+import { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Activity,
+  BarChart3,
+  Building2,
+  CreditCard,
+  FileDown,
+  GitFork,
+  LayoutDashboard,
+  Lock,
+  Settings,
+  ShieldAlert,
+  Ticket,
+  ToggleLeft,
+  UserCheck,
+  Users,
+} from 'lucide-react';
 import { useSidebarDrawer } from '@/hooks/useSidebarDrawer';
-import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { PortalNavSection, PortalShell } from '@/components/layout/PortalShell';
+
+const SUPER_ADMIN_NAV_SECTIONS: PortalNavSection[] = [
+  {
+    title: 'Overview',
+    links: [
+      { to: '/super-admin/dashboard', icon: LayoutDashboard, label: 'Control Center' },
+      { to: '/super-admin/analytics', icon: BarChart3, label: 'Platform Analytics' },
+    ],
+  },
+  {
+    title: 'Tenants',
+    links: [
+      { to: '/super-admin/organizations', icon: Building2, label: 'Organizations' },
+      { to: '/super-admin/hostels', icon: GitFork, label: 'Hostel Properties' },
+      { to: '/super-admin/users', icon: Users, label: 'Global Users' },
+    ],
+  },
+  {
+    title: 'Billing & Catalog',
+    links: [
+      { to: '/super-admin/plans', icon: CreditCard, label: 'Plans & Pricing' },
+      { to: '/super-admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+      { to: '/super-admin/vouchers', icon: Ticket, label: 'Coupons & Vouchers' },
+      { to: '/super-admin/features', icon: ToggleLeft, label: 'Feature Catalog' },
+    ],
+  },
+  {
+    title: 'Governance',
+    links: [
+      { to: '/super-admin/audit-logs', icon: ShieldAlert, label: 'Audit Logs' },
+      { to: '/super-admin/security', icon: Lock, label: 'Security Center' },
+      { to: '/super-admin/impersonation', icon: UserCheck, label: 'Impersonation' },
+      { to: '/super-admin/system-health', icon: Activity, label: 'System Health' },
+      { to: '/super-admin/reports', icon: FileDown, label: 'Reports & Exports' },
+      { to: '/super-admin/settings', icon: Settings, label: 'Settings' },
+    ],
+  },
+];
 
 interface SuperAdminLayoutProps {
   children: ReactNode;
@@ -10,6 +64,8 @@ interface SuperAdminLayoutProps {
 }
 
 export function SuperAdminLayout({ children, title }: SuperAdminLayoutProps) {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const {
     isMobileOpen,
     closeMobile,
@@ -18,75 +74,34 @@ export function SuperAdminLayout({ children, title }: SuperAdminLayoutProps) {
     toggleCollapse,
   } = useSidebarDrawer();
 
-  // Lock body scroll when mobile drawer is open
-  useEffect(() => {
-    if (isMobileOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isMobileOpen]);
-
-  // Handle Escape key to close
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isMobileOpen) {
-        closeMobile();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMobileOpen, closeMobile]);
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
-      {/* Desktop Fixed Sidebar */}
-      <div className={cn('hidden lg:block fixed left-0 top-0 bottom-0 h-screen z-30 transition-all duration-300', isCollapsed ? 'w-20' : 'w-64')}>
-        <SuperAdminSidebar
-          isCollapsed={isCollapsed}
-          onToggleCollapse={toggleCollapse}
-        />
-      </div>
-
-      {/* Mobile Drawer */}
-      {isMobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Visible backdrop overlay */}
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-in fade-in duration-200"
-            onClick={closeMobile}
-            aria-hidden="true"
-          />
-
-          {/* Slide-in mobile drawer */}
-          <aside
-            id="super-admin-sidebar"
-            className="fixed left-0 top-0 bottom-0 w-72 max-w-[85vw] h-full bg-card border-r border-border shadow-2xl flex flex-col z-50 animate-in slide-in-from-left duration-250 ease-out"
-            aria-label="Super Admin Mobile Navigation"
-          >
-            <SuperAdminSidebar
-              isCollapsed={false}
-              onToggleCollapse={() => {}}
-              onClose={closeMobile}
-            />
-          </aside>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <div className={cn('flex-1 transition-all duration-300 flex flex-col min-h-screen', isCollapsed ? 'lg:pl-20' : 'lg:pl-64')}>
-        <SuperAdminTopBar
-          title={title}
-          onMenuToggle={toggleMobile}
-          isMenuOpen={isMobileOpen}
-        />
-        <main className="flex-1 p-3.5 sm:p-6 lg:p-8 overflow-x-hidden">
-          {children}
-        </main>
-      </div>
-    </div>
+    <PortalShell
+      portalName="Hosteliq Platform"
+      portalSubtitle="Super Admin"
+      homeRoute="/super-admin/dashboard"
+      pageTitle={title}
+      pageSubtitle="SaaS Governance & Platform Operations"
+      breadcrumbSection="Platform"
+      sections={SUPER_ADMIN_NAV_SECTIONS}
+      userName={user?.name || 'Super Administrator'}
+      userEmail={user?.email || 'superadmin@hosteliq.in'}
+      userRoleLabel="Platform Owner"
+      welcomeSubtext="Global Governance Suite"
+      profileRoute="/super-admin/settings"
+      onLogout={handleLogout}
+      isCollapsed={isCollapsed}
+      onToggleCollapse={toggleCollapse}
+      isMobileOpen={isMobileOpen}
+      onToggleMobile={toggleMobile}
+      onCloseMobile={closeMobile}
+      sidebarAriaLabel="Super Admin Navigation"
+    >
+      {children}
+    </PortalShell>
   );
 }

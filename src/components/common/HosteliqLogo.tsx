@@ -1,34 +1,42 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
-interface HosteliqLogoProps {
+export interface HosteliqLogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showText?: boolean;
-  variant?: 'full' | 'mark';
+  variant?: 'full' | 'wordmark' | 'mark' | 'sidebar';
+  subtitle?: string;
 }
+
+const wordmarkHeights = {
+  sm: 'h-7 w-auto',
+  md: 'h-9 w-auto',
+  lg: 'h-11 w-auto',
+  xl: 'h-14 w-auto',
+} as const;
+
+const markSizes = {
+  sm: 'w-7 h-7',
+  md: 'w-9 h-9',
+  lg: 'w-11 h-11',
+  xl: 'w-14 h-14',
+} as const;
 
 export const HosteliqLogo: React.FC<HosteliqLogoProps> = ({
   className = '',
   size = 'md',
   showText = true,
-  variant = 'full',
+  variant = 'wordmark',
+  subtitle,
 }) => {
-  const sizeMap = {
-    sm: { img: 'w-7 h-7', text: 'text-base', sub: 'text-[9px]' },
-    md: { img: 'w-9 h-9', text: 'text-lg', sub: 'text-[10px]' },
-    lg: { img: 'w-11 h-11', text: 'text-xl', sub: 'text-[11px]' },
-    xl: { img: 'w-14 h-14', text: 'text-2xl', sub: 'text-xs' },
-  };
-
-  const currentSize = sizeMap[size];
-
-  if (variant === 'mark' || !showText) {
+  if (variant === 'mark' || (!showText && variant !== 'wordmark')) {
     return (
-      <div className={`relative flex items-center justify-center shrink-0 ${currentSize.img} ${className}`}>
+      <div className={cn('relative flex items-center justify-center shrink-0 select-none', markSizes[size], className)}>
         <img
-          src="/hosteliq-logo.png"
+          src="/favicon.svg"
           alt="Hosteliq"
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain drop-shadow-[0_2px_10px_rgba(167,139,250,0.3)]"
           loading="eager"
           decoding="async"
         />
@@ -37,26 +45,22 @@ export const HosteliqLogo: React.FC<HosteliqLogoProps> = ({
   }
 
   return (
-    <div className={`flex items-center gap-2.5 select-none ${className}`}>
-      <div className={`relative flex items-center justify-center shrink-0 ${currentSize.img}`}>
-        <img
-          src="/hosteliq-logo.png"
-          alt="Hosteliq Mark"
-          className="w-full h-full object-contain"
-          loading="eager"
-          decoding="async"
-        />
-      </div>
-      <div className="flex flex-col text-left">
-        <span className={`font-black tracking-tight leading-none text-foreground flex items-center ${currentSize.text}`}>
-          <span className="text-[#9d78d2]">Hostel</span>
-          <span className="text-[#2dd4bf]">i</span>
-          <span className="text-[#fb7185]">q</span>
+    <div className={cn('flex flex-col items-start justify-center select-none', className)}>
+      <img
+        src="/hosteliq-logo.png"
+        alt="Hosteliq"
+        className={cn(
+          wordmarkHeights[size],
+          'object-contain object-left drop-shadow-[0_4px_18px_rgba(167,139,250,0.22)]'
+        )}
+        loading="eager"
+        decoding="async"
+      />
+      {subtitle && (
+        <span className="text-[10px] font-semibold tracking-[0.14em] uppercase text-[#9295AD] mt-1 pl-0.5 leading-none">
+          {subtitle}
         </span>
-        <span className={`font-semibold tracking-wider uppercase text-muted-foreground mt-0.5 ${currentSize.sub}`}>
-          Accommodation Suite
-        </span>
-      </div>
+      )}
     </div>
   );
 };

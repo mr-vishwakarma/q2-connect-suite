@@ -402,7 +402,7 @@ export default function AllStudents() {
           className={cn(
             "px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 relative",
             activeTab === 'pending'
-              ? "bg-amber-500 text-white shadow-sm"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
           )}
         >
@@ -411,7 +411,7 @@ export default function AllStudents() {
           {pendingRegistrations.length > 0 && (
             <span className={cn(
               "px-1.5 py-0.2 rounded-full text-[10px] font-extrabold",
-              activeTab === 'pending' ? "bg-white text-amber-600" : "bg-amber-500 text-white"
+              activeTab === 'pending' ? "bg-white/20 text-white" : "bg-primary/20 text-primary"
             )}>
               {pendingRegistrations.length}
             </span>

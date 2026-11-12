@@ -92,9 +92,9 @@ export function GoogleStep2Modal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden bg-card border-border/80 shadow-2xl rounded-2xl">
+      <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden shadow-2xl rounded-2xl">
         {/* Top Gradient Banner */}
-        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-primary p-6 text-white text-left relative overflow-hidden">
+        <div className="bg-gradient-to-r from-[#A78BFA]/25 via-[#818CF8]/20 to-[#74DCCB]/20 border-b border-white/[0.08] p-6 text-[#F0EFF8] text-left relative overflow-hidden">
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
           <div className="flex items-center gap-3 relative z-10">

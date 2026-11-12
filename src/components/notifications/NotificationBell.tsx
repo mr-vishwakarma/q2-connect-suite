@@ -134,11 +134,11 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-5 h-5" />
+        <Button variant="ghost" size="icon" aria-label="Notifications" className="relative rounded-lg border border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.07]">
+          <Bell className="w-4 h-4 text-[#9295AD]" />
           {unreadCount > 0 && (
             <Badge
-              className="absolute -top-1 -right-1 min-w-5 h-5 flex items-center justify-center p-0 text-xs"
+              className="absolute -top-1.5 -right-1.5 min-w-5 h-5 flex items-center justify-center p-0 text-[10px]"
               variant="destructive"
             >
               {unreadCount}
@@ -147,8 +147,8 @@ export function NotificationBell() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h4 className="font-semibold">Notifications</h4>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+          <h4 className="font-semibold text-sm text-[#F0EFF8]">Notifications</h4>
           {unreadCount > 0 && (
             <Button
               variant="ghost"

@@ -127,7 +127,7 @@ export default function AdminSettings() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
             <SettingsIcon className="w-5 h-5" />
           </div>
           <div>
@@ -137,19 +137,19 @@ export default function AdminSettings() {
             </p>
           </div>
         </div>
-        <Badge variant="outline" className="border-amber-500/40 text-amber-300 bg-amber-500/10 px-3 py-1 text-xs w-fit flex items-center gap-1.5">
+        <Badge variant="outline" className="border-primary/35 text-primary bg-primary/10 px-3 py-1 text-xs w-fit flex items-center gap-1.5">
           <Building2 className="w-3.5 h-3.5" />
           Branch: {selectedHostel || branchDisplay}
         </Badge>
       </div>
 
       <Tabs defaultValue="policies" className="space-y-6">
-        <TabsList className="bg-secondary/40 border border-border p-1">
-          <TabsTrigger value="policies" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-amber-500 data-[state=active]:text-black">
+        <TabsList className="bg-white/[0.04] border border-white/[0.08] p-1">
+          <TabsTrigger value="policies" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <FileText className="w-3.5 h-3.5" />
             Policies &amp; Documents
           </TabsTrigger>
-          <TabsTrigger value="operations" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-amber-500 data-[state=active]:text-black">
+          <TabsTrigger value="operations" className="text-xs font-semibold gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Sliders className="w-3.5 h-3.5" />
             Operational Rules &amp; Facilities
           </TabsTrigger>
@@ -312,7 +312,7 @@ export default function AdminSettings() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs gap-2 px-6 h-9 shadow"
+              className="font-semibold text-xs gap-2 px-6 h-9 shadow-lg shadow-primary/20"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving Changes...' : 'Save Policy Changes'}

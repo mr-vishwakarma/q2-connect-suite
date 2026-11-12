@@ -746,11 +746,11 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
     <Dialog open={isOpen} onOpenChange={onClose} modal={!isGatewayOpen}>
       <DialogContent className="max-w-3xl max-h-[92vh] flex flex-col p-0 overflow-hidden bg-card border-border shadow-2xl">
         {/* Header with Stepper */}
-        <div className="bg-gradient-to-r from-amber-500/15 via-background to-amber-500/5 p-6 border-b border-border/80">
+        <div className="bg-[radial-gradient(ellipse_at_top_left,rgba(167,139,250,0.16),transparent_65%),rgba(255,255,255,0.02)] p-6 border-b border-white/[0.08]">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold">
+                <div className="w-9 h-9 rounded-xl bg-primary/15 text-[#A78BFA] border border-primary/30 flex items-center justify-center font-bold">
                   <Building2 className="w-5 h-5" />
                 </div>
                 <div>
@@ -772,8 +772,10 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
               </div>
               <Badge
                 variant="outline"
-                className={`border-amber-500/30 text-amber-400 font-mono text-xs px-3 py-1 ${
-                  currentStep === 6 ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' : ''
+                className={`font-mono text-xs px-3 py-1 ${
+                  currentStep === 6
+                    ? 'border-[#74DCCB]/40 text-[#74DCCB] bg-[#74DCCB]/10'
+                    : 'border-primary/35 text-[#A78BFA] bg-primary/10'
                 }`}
               >
                 {currentStep === 6 ? 'Completed' : `Step ${currentStep} of 5`}
@@ -799,19 +801,19 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                   key={step.num}
                   className={`flex items-center gap-1.5 p-1.5 rounded-lg border transition-all ${
                     isCurrent
-                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 font-semibold'
+                      ? 'bg-primary/15 border-primary/40 text-[#F0EFF8] font-semibold'
                       : isPassed
-                      ? 'bg-secondary/60 border-border text-foreground'
+                      ? 'bg-white/[0.04] border-white/[0.08] text-foreground'
                       : 'bg-transparent border-transparent text-muted-foreground opacity-60'
                   }`}
                 >
                   <div
                     className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] shrink-0 ${
                       isPassed
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        ? 'bg-[#74DCCB]/20 text-[#74DCCB] border border-[#74DCCB]/30'
                         : isCurrent
-                        ? 'bg-amber-500 text-black font-bold'
-                        : 'bg-secondary text-muted-foreground'
+                        ? 'bg-primary text-primary-foreground font-bold'
+                        : 'bg-white/[0.06] text-muted-foreground'
                     }`}
                   >
                     {isPassed ? <CheckCircle2 className="w-3 h-3" /> : step.num}
@@ -889,11 +891,11 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
               </div>
 
               {/* Aadhaar Verification Card */}
-              <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+              <div className="p-4 rounded-xl border border-primary/25 bg-primary/5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-400">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[#A78BFA]">
                     <FileCheck className="w-4 h-4" />
-                    <span>Aadhaar Identity & KYC Verification</span>
+                    <span>Aadhaar Identity &amp; KYC Verification</span>
                   </div>
                   <Badge variant="secondary" className="text-[10px]">Statutory Compliance</Badge>
                 </div>
@@ -1092,7 +1094,7 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                         onClick={() => setFormData({ ...formData, genderType: gender })}
                         className={`flex-1 py-1 text-xs rounded font-medium transition-all ${
                           formData.genderType === gender
-                            ? 'bg-amber-500 text-black shadow'
+                            ? 'bg-primary text-primary-foreground shadow'
                             : 'text-muted-foreground hover:text-foreground'
                         }`}
                       >
@@ -1158,19 +1160,19 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                         onClick={() => toggleAmenity(value)}
                         className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left text-xs transition-all ${
                           isSelected
-                            ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 font-semibold shadow-sm'
-                            : 'bg-card border-border/80 text-muted-foreground hover:border-border hover:text-foreground'
+                            ? 'bg-primary/15 border-primary/45 text-[#F0EFF8] font-semibold shadow-sm'
+                            : 'bg-white/[0.02] border-white/[0.07] text-muted-foreground hover:border-white/[0.15] hover:text-foreground'
                         }`}
                       >
                         <div
                           className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                            isSelected ? 'bg-amber-500 text-black' : 'bg-secondary text-muted-foreground'
+                            isSelected ? 'bg-primary text-primary-foreground' : 'bg-white/[0.05] text-muted-foreground'
                           }`}
                         >
                           <Icon className="w-3.5 h-3.5" />
                         </div>
                         <span className="truncate flex-1">{label}</span>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />}
+                        {isSelected && <CheckCircle2 className="w-4 h-4 text-[#A78BFA] shrink-0" />}
                       </button>
                     );
                   })}
@@ -1381,16 +1383,16 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                           }}
                           className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
                             isSelected
-                              ? 'bg-amber-500/15 border-amber-500 text-foreground shadow-md ring-1 ring-amber-500/50'
-                              : 'bg-card border-border hover:border-border/80 text-muted-foreground'
+                              ? 'bg-primary/15 border-primary text-foreground shadow-md ring-1 ring-primary/40'
+                              : 'bg-white/[0.02] border-white/[0.08] hover:border-white/[0.18] text-muted-foreground'
                           }`}
                         >
                           <div>
                             <div className="flex items-center justify-between gap-1 mb-1">
-                              <span className="text-xs font-bold uppercase tracking-wider text-amber-400 truncate">
+                              <span className="text-xs font-bold uppercase tracking-wider text-[#A78BFA] truncate">
                                 {plan.name}
                               </span>
-                              {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />}
+                              {isSelected && <CheckCircle2 className="w-4 h-4 text-[#A78BFA] shrink-0" />}
                             </div>
                             <div className="text-lg font-extrabold text-foreground font-mono">
                               ₹{(displayPrice ?? 0).toLocaleString('en-IN')}
@@ -1448,7 +1450,7 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                               !isSupported
                                 ? 'opacity-40 cursor-not-allowed text-muted-foreground'
                                 : isActiveCycle
-                                ? 'bg-amber-500 text-black shadow font-semibold'
+                                ? 'bg-primary text-primary-foreground shadow font-semibold'
                                 : 'text-muted-foreground hover:text-foreground'
                             }`}
                           >
@@ -1621,7 +1623,7 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                     type="button"
                     disabled={isActivating}
                     onClick={handleOnlinePaymentActivation}
-                    className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-10"
+                    className="w-full text-xs h-10"
                   >
                     {isActivating ? (
                       <>
@@ -1790,7 +1792,7 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                     type="button"
                     disabled={isActivating}
                     onClick={handleStartFreeTrialActivation}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs h-10"
+                    className="w-full bg-[#74DCCB] hover:bg-[#5ecbb9] text-[#090B12] font-bold text-xs h-10"
                   >
                     {isActivating ? (
                       <>
@@ -2125,7 +2127,7 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                   setProvisioningResult(null);
                   resetActivationState();
                 }}
-                className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs gap-1.5 shadow"
+                className="bg-[#74DCCB] hover:bg-[#5ecbb9] text-[#090B12] font-semibold text-xs gap-1.5 shadow"
               >
                 <CheckCircle2 className="w-4 h-4" /> Done &amp; Close
               </Button>
@@ -2158,7 +2160,7 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                     type="button"
                     size="sm"
                     onClick={handleNext}
-                    className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs gap-1"
+                    className="text-xs gap-1"
                   >
                     Next Step <ChevronRight className="w-4 h-4" />
                   </Button>
@@ -2168,7 +2170,7 @@ export function OnboardTenantModal({ isOpen, onClose, onSuccess }: OnboardTenant
                     size="sm"
                     onClick={handleCreateTenantAndProceed}
                     disabled={isSubmitting || !selectedPlan}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs gap-1.5 shadow-lg shadow-emerald-500/20"
+                    className="bg-[#74DCCB] hover:bg-[#5ecbb9] text-[#090B12] font-semibold text-xs gap-1.5 shadow-lg shadow-[#74DCCB]/20"
                   >
                     {isSubmitting ? (
                       <>

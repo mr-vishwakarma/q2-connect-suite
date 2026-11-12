@@ -102,9 +102,9 @@ export class GlobalErrorBoundary extends Component<Props, State> {
         this.state.error?.name === 'ChunkLoadError';
 
       return (
-        <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-card border border-border rounded-2xl p-6 sm:p-8 text-center shadow-xl space-y-6">
-            <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive flex items-center justify-center mx-auto shadow-inner">
+        <div className="min-h-screen app-shell-bg text-foreground flex items-center justify-center p-4">
+          <div className="max-w-md w-full glass-card-highlight rounded-2xl p-6 sm:p-8 text-center shadow-2xl space-y-6">
+            <div className="w-16 h-16 rounded-2xl bg-destructive/15 border border-destructive/25 text-destructive flex items-center justify-center mx-auto shadow-inner">
               <AlertTriangle className="w-8 h-8" />
             </div>
 

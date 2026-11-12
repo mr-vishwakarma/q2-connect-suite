@@ -57,18 +57,18 @@ export function MenuRatingChart() {
         ) : (
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-              <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} tickFormatter={(val) => val.split('-').slice(1).join('/')} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(225,225,255,0.08)" />
+              <XAxis dataKey="date" stroke="#74788F" fontSize={10} tickFormatter={(val) => val.split('-').slice(1).join('/')} />
+              <YAxis stroke="#74788F" fontSize={10} domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} />
               <Tooltip 
-                contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
-                itemStyle={{ color: 'hsl(var(--foreground))' }}
+                contentStyle={{ backgroundColor: '#171928', border: '1px solid rgba(167,139,250,0.28)', borderRadius: '10px', color: '#F0EFF8' }}
+                itemStyle={{ color: '#F0EFF8' }}
               />
-              <Legend wrapperStyle={{ fontSize: '12px' }} />
-              <Bar dataKey="Breakfast" fill="#f59e0b" name="Breakfast" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Lunch" fill="#10b981" name="Lunch" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Snacks" fill="#6366f1" name="Snacks" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Dinner" fill="#ec4899" name="Dinner" radius={[4, 4, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: '12px', color: '#9295AD' }} />
+              <Bar dataKey="Breakfast" fill="#A78BFA" name="Breakfast" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Lunch" fill="#74DCCB" name="Lunch" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Snacks" fill="#818CF8" name="Snacks" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Dinner" fill="#ED91C1" name="Dinner" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

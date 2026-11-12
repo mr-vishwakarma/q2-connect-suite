@@ -679,7 +679,7 @@ export default function Billing() {
             <div className="flex items-center gap-2 shrink-0 flex-wrap">
               <Button
                 size="sm"
-                className="h-8 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-black"
+                className="h-8 text-xs font-semibold shadow-md shadow-primary/20"
                 onClick={() => openCheckoutModal(currentPlan, authoritativeCycle, 'ACTIVATION')}
               >
                 <CreditCard className="w-3.5 h-3.5 mr-1.5" />
@@ -742,7 +742,7 @@ export default function Billing() {
           {currentPlan && (
             <Button
               size="sm"
-              className="h-8 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-black shrink-0"
+              className="h-8 text-xs font-semibold shrink-0 shadow-md shadow-primary/20"
               onClick={() => openCheckoutModal(currentPlan, authoritativeCycle, 'RENEWAL')}
             >
               <RotateCcw className="w-3.5 h-3.5 mr-1" />
@@ -1908,7 +1908,7 @@ export default function Billing() {
                   size="sm"
                   disabled={downgradeLoading}
                   onClick={handleConfirmOverCapacityDowngrade}
-                  className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+                  className="font-semibold shadow-md shadow-primary/20"
                 >
                   {downgradeLoading ? (
                     <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />

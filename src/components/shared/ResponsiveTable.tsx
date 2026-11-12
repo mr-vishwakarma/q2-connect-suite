@@ -29,12 +29,15 @@ export function ResponsiveTable<T>({
     return <>{emptyState}</>;
   }
 
-  // Mobile: Show as cards
+  // Mobile: Show as rounded dark glass cards
   if (isMobile && mobileCard) {
     return (
       <div className="space-y-3">
         {data.map((item) => (
-          <div key={keyExtractor(item)} className="bg-secondary/50 rounded-xl p-4 space-y-2 border border-border/50">
+          <div
+            key={keyExtractor(item)}
+            className="bg-[#191B26]/85 rounded-2xl p-4 space-y-2 border border-[rgba(225,225,255,0.08)]"
+          >
             {mobileCard(item)}
           </div>
         ))}
@@ -42,27 +45,27 @@ export function ResponsiveTable<T>({
     );
   }
 
-  // Desktop: Standard table
+  // Desktop: Clean dark glass data table
   return (
-    <div className="overflow-x-auto -mx-2 sm:mx-0">
+    <div className="overflow-x-auto -mx-2 sm:mx-0 rounded-xl border border-white/[0.06] bg-[#151722]/70">
       <table className="w-full">
         <thead>
-          <tr className="border-b border-border">
-            {columns.filter(c => !isMobile || !c.hideOnMobile).map((col) => (
+          <tr className="border-b border-white/[0.07] bg-[#191B26]/70">
+            {columns.filter((c) => !isMobile || !c.hideOnMobile).map((col) => (
               <th
                 key={col.key}
-                className="text-left text-foreground font-bold text-xs sm:text-sm p-2 sm:p-3"
+                className="text-left text-[#74788F] font-semibold uppercase tracking-wider text-[11px] sm:text-xs px-3 py-3 sm:px-4"
               >
                 {col.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-white/[0.05]">
           {data.map((item) => (
-            <tr key={keyExtractor(item)} className="border-b border-border/50 hover:bg-secondary/30">
-              {columns.filter(c => !isMobile || !c.hideOnMobile).map((col) => (
-                <td key={col.key} className="p-2 sm:p-3 text-sm">
+            <tr key={keyExtractor(item)} className="hover:bg-white/[0.03] transition-colors">
+              {columns.filter((c) => !isMobile || !c.hideOnMobile).map((col) => (
+                <td key={col.key} className="px-3 py-3 sm:px-4 text-sm text-[#F0EFF8]">
                   {col.render(item)}
                 </td>
               ))}

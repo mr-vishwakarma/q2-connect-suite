@@ -68,9 +68,9 @@ export function StudentPolicyLibrary({ hostelName }: StudentPolicyLibraryProps) 
 
   if (loading) {
     return (
-      <Card className="border border-border/80 shadow-sm">
+      <Card>
         <CardContent className="p-6 text-center text-xs text-muted-foreground">
-          <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-500 mb-2" />
+          <Loader2 className="w-5 h-5 animate-spin mx-auto text-primary mb-2" />
           Loading hostel policies and acceptance history...
         </CardContent>
       </Card>
@@ -82,11 +82,11 @@ export function StudentPolicyLibrary({ hostelName }: StudentPolicyLibraryProps) 
   }
 
   return (
-    <Card className="border border-border shadow-sm">
-      <CardHeader className="border-b border-border/60 pb-4">
+    <Card>
+      <CardHeader className="border-b border-white/[0.06] pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shrink-0">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
@@ -105,9 +105,9 @@ export function StudentPolicyLibrary({ hostelName }: StudentPolicyLibraryProps) 
               variant="outline"
               size="sm"
               onClick={() => setShowHistory(!showHistory)}
-              className="text-xs h-8 gap-1.5 border-border hover:border-amber-500/50"
+              className="text-xs h-8 gap-1.5"
             >
-              <History className="w-3.5 h-3.5 text-amber-400" />
+              <History className="w-3.5 h-3.5 text-primary" />
               {showHistory ? 'Show Current Policies' : 'View Acceptance Audit Log'}
             </Button>
           )}
@@ -187,7 +187,7 @@ export function StudentPolicyLibrary({ hostelName }: StudentPolicyLibraryProps) 
                 >
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                      <FileText className="w-4 h-4 text-primary shrink-0" />
                       <span className="font-bold text-sm text-foreground">{doc.title}</span>
                       <Badge variant="outline" className="font-mono text-[10px] border-border text-muted-foreground">
                         {doc.versionLabel || `v${doc.versionNumber}`}
@@ -237,7 +237,7 @@ export function StudentPolicyLibrary({ hostelName }: StudentPolicyLibraryProps) 
                         type="button"
                         size="sm"
                         onClick={() => navigate('/student/accept-policies')}
-                        className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs h-8 px-3"
+                        className="font-semibold text-xs h-8 px-3 shadow-md shadow-primary/20"
                       >
                         Accept Policy
                       </Button>
@@ -248,7 +248,7 @@ export function StudentPolicyLibrary({ hostelName }: StudentPolicyLibraryProps) 
                       variant="outline"
                       size="sm"
                       onClick={() => setViewingDoc(doc)}
-                      className="text-xs h-8 gap-1.5 px-3 border-border hover:border-amber-500/50"
+                      className="text-xs h-8 gap-1.5 px-3"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       Read Document

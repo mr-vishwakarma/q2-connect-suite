@@ -30,16 +30,16 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
       : glowColor;
 
   return (
-    <div className="min-h-[100dvh] w-full bg-[#08090d] text-white flex flex-col justify-center items-center px-3 sm:px-4 py-4 sm:py-8 md:py-12 selection:bg-rose-500/30 relative overflow-x-hidden">
+    <div className="min-h-[100dvh] w-full app-shell-bg text-[#F0EFF8] flex flex-col justify-center items-center px-3 sm:px-4 py-4 sm:py-8 md:py-12 selection:bg-primary/30 relative overflow-x-hidden">
       {/* Background ambient lighting */}
       {activeGlow === 'coral' && (
         <>
           <div
-            className="pointer-events-none absolute -top-40 -left-40 w-[350px] sm:w-[600px] h-[350px] sm:h-[600px] bg-gradient-to-br from-rose-600/[0.15] via-red-600/[0.05] to-transparent blur-[90px] sm:blur-[120px] rounded-full"
+            className="pointer-events-none absolute -top-40 -left-40 w-[350px] sm:w-[600px] h-[350px] sm:h-[600px] bg-gradient-to-br from-[#ED91C1]/[0.16] via-rose-500/[0.06] to-transparent blur-[90px] sm:blur-[120px] rounded-full"
             aria-hidden="true"
           />
           <div
-            className="pointer-events-none absolute top-1/2 -right-40 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-gradient-to-bl from-orange-500/[0.05] to-transparent blur-[100px] sm:blur-[140px] rounded-full"
+            className="pointer-events-none absolute top-1/2 -right-40 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] bg-gradient-to-bl from-[#A78BFA]/[0.10] to-transparent blur-[100px] sm:blur-[140px] rounded-full"
             aria-hidden="true"
           />
         </>
@@ -97,7 +97,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         </div>
 
         {/* Sleek Glassmorphic Card Container */}
-        <div className="relative rounded-[26px] xs:rounded-[30px] sm:rounded-[36px] bg-[#12131d]/85 backdrop-blur-2xl border border-white/[0.12] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] p-5 xs:p-6 sm:p-8 md:p-9 overflow-hidden transition-all">
+        <div className="relative rounded-[26px] xs:rounded-[30px] sm:rounded-[36px] bg-[#151722]/85 backdrop-blur-2xl border border-[rgba(225,225,255,0.12)] shadow-[0_25px_60px_-15px_rgba(4,5,12,0.85)] p-5 xs:p-6 sm:p-8 md:p-9 overflow-hidden transition-all">
           {/* Specular top border reflection highlight */}
           <div
             className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent"

@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { policyService } from "@/services/api/policy.service";
+import { PortalRouteLoader } from "@/components/common/AppSplashScreen";
 
 interface ProtectedStudentRouteProps {
   children: ReactNode;
@@ -67,8 +68,8 @@ export function ProtectedStudentRoute({ children }: ProtectedStudentRouteProps) 
 
   if (loading || (checkingPolicies && location.pathname !== '/student/accept-policies')) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+      <div className="min-h-screen w-full app-shell-bg flex items-center justify-center">
+        <PortalRouteLoader />
       </div>
     );
   }

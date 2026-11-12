@@ -1,6 +1,7 @@
 import { ReactNode, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { PortalRouteLoader } from "@/components/common/AppSplashScreen";
 
 interface ProtectedAdminRouteProps {
   children: ReactNode;
@@ -23,7 +24,13 @@ export function ProtectedAdminRoute({ children }: ProtectedAdminRouteProps) {
     }
   }, [user, isAllowedAdmin, loading, navigate]);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen w-full app-shell-bg flex items-center justify-center">
+        <PortalRouteLoader />
+      </div>
+    );
+  }
 
   if (!user || !isAllowedAdmin) return null;
 

@@ -4,88 +4,186 @@
 
 @layer base {
   :root {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 98%;
+    /* Hosteliq Dark Glass Design Tokens (Hex Reference Palette) */
+    --app-background: #090B12;
+    --sidebar-surface: #171827;
+    --surface-primary: #151722;
+    --surface-secondary: #191B26;
+    --surface-elevated: #202230;
+    --surface-active: #292B3B;
 
-    --card: 0 0% 4%;
-    --card-foreground: 0 0% 98%;
+    --text-primary: #F0EFF8;
+    --text-secondary: #9295AD;
+    --text-muted: #74788F;
+    --text-disabled: #55586E;
 
-    --popover: 0 0% 4%;
-    --popover-foreground: 0 0% 98%;
+    --accent-lavender: #A78BFA;
+    --accent-lavender-deep: #7C5CE6;
+    --accent-pink: #ED91C1;
+    --accent-mint: #74DCCB;
 
-    --primary: 271 81% 56%;
-    --primary-foreground: 0 0% 100%;
-    --primary-glow: 271 81% 66%;
+    --border-subtle: rgba(225, 225, 255, 0.08);
+    --border-active: rgba(210, 195, 255, 0.20);
 
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 98%;
+    --glass-bg: rgba(255, 255, 255, 0.035);
+    --glass-bg-hover: rgba(255, 255, 255, 0.055);
+    --glass-bg-active: rgba(167, 139, 250, 0.12);
+    --glass-border: rgba(225, 225, 255, 0.08);
+    --glass-topbar-bg: rgba(12, 14, 23, 0.78);
 
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 65%;
+    /* Shadcn / Tailwind Semantic HSL Mapping (Compatible with /alpha modifiers) */
+    --background: 227 33% 5%;
+    --foreground: 247 45% 95%;
 
-    --accent: 347 95% 68%;
-    --accent-foreground: 0 0% 100%;
+    --card: 231 24% 11%;
+    --card-foreground: 247 45% 95%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
+    --popover: 233 20% 16%;
+    --popover-foreground: 247 45% 95%;
 
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
-    --ring: 271 81% 56%;
+    --primary: 255 76% 64%;
+    --primary-foreground: 247 45% 98%;
+    --primary-glow: 255 92% 76%;
 
-    --radius: 0.75rem;
+    --secondary: 231 21% 13%;
+    --secondary-foreground: 247 45% 95%;
 
-    --sidebar-background: 0 0% 2%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 271 81% 56%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 10%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 271 81% 56%;
+    --muted: 233 18% 20%;
+    --muted-foreground: 233 14% 63%;
 
-    /* Custom tokens */
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 0%;
-    --info: 173 80% 40%;
-    --info-foreground: 0 0% 100%;
+    --accent: 233 18% 20%;
+    --accent-foreground: 247 45% 95%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(271 81% 56%) 0%, hsl(347 95% 68%) 100%);
-    --gradient-dark: linear-gradient(180deg, hsl(0 0% 0%) 0%, hsl(0 0% 2%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 4%) 0%, hsl(0 0% 2%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(0 0% 2%) 0%, hsl(0 0% 0%) 50%, hsl(271 81% 40% / 0.2) 100%);
-    --stats-glow: 0 0 30px hsl(271 81% 56% / 0.6), 0 0 60px hsl(347 95% 68% / 0.3);
+    --destructive: 0 78% 63%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 232 20% 19%;
+    --input: 232 20% 19%;
+    --ring: 255 92% 76%;
+
+    --radius: 0.875rem;
+
+    /* Sidebar HSL Tokens */
+    --sidebar-background: 236 25% 12%;
+    --sidebar-foreground: 247 45% 95%;
+    --sidebar-primary: 255 92% 76%;
+    --sidebar-primary-foreground: 247 45% 98%;
+    --sidebar-accent: 233 18% 20%;
+    --sidebar-accent-foreground: 247 45% 95%;
+    --sidebar-border: 232 20% 19%;
+    --sidebar-ring: 255 92% 76%;
+
+    /* Semantic Status Colors (Preserved & Distinct) */
+    --success: 162 66% 48%;
+    --success-foreground: 160 100% 6%;
+    --warning: 38 92% 58%;
+    --warning-foreground: 38 100% 8%;
+    --info: 214 90% 66%;
+    --info-foreground: 214 100% 8%;
+
+    /* Chart Tokens */
+    --chart-1: 255 92% 76%;
+    --chart-2: 170 60% 66%;
+    --chart-3: 329 72% 75%;
+    --chart-4: 214 90% 66%;
+    --chart-5: 38 92% 58%;
+
+    /* Gradients & Lighting */
+    --gradient-primary: linear-gradient(135deg, #8E6CF6 0%, #A78BFA 50%, #ED91C1 100%);
+    --gradient-dark: radial-gradient(ellipse 85% 55% at 15% 0%, rgba(124, 92, 230, 0.10) 0%, rgba(9, 11, 18, 0) 60%), #090B12;
+    --gradient-card: linear-gradient(180deg, rgba(32, 34, 48, 0.72) 0%, rgba(21, 23, 34, 0.88) 100%);
+    --gradient-hero: radial-gradient(circle at 12% 15%, rgba(167, 139, 250, 0.16) 0%, rgba(116, 220, 203, 0.05) 42%, rgba(21, 23, 34, 0.92) 78%), #151722;
+    --gradient-sidebar: radial-gradient(115% 48% at 0% 0%, rgba(167, 139, 250, 0.22) 0%, rgba(114, 130, 235, 0.08) 42%, rgba(23, 24, 39, 0) 76%), #131422;
+    --stats-glow: 0 8px 28px rgba(167, 139, 250, 0.22), 0 0 42px rgba(237, 145, 193, 0.10);
 
     /* Shadows */
-    --shadow-glow: 0 0 60px hsl(271 81% 56% / 0.15);
-    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.5);
-    --shadow-elevated: 0 8px 32px hsl(0 0% 0% / 0.7);
-    --glass-bg: hsl(0 0% 4% / 0.7);
-    --glass-border: hsl(0 0% 15% / 0.5);
+    --shadow-glow: 0 0 48px rgba(167, 139, 250, 0.14);
+    --shadow-card: 0 10px 30px -10px rgba(4, 6, 12, 0.75);
+    --shadow-elevated: 0 18px 44px -12px rgba(4, 6, 12, 0.88);
 
     color-scheme: dark;
   }
-}
 
-
-
-@layer base {
   * {
     @apply border-border;
+    border-color: var(--border-subtle);
+  }
+
+  html {
+    background-color: var(--app-background);
+    color: var(--text-primary);
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
     background: var(--gradient-dark);
+    background-color: var(--app-background);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
 @layer utilities {
+  /* Core Surfaces */
+  .app-shell-bg {
+    background:
+      radial-gradient(ellipse 75% 45% at 22% -5%, rgba(142, 108, 246, 0.10) 0%, transparent 60%),
+      radial-gradient(ellipse 55% 40% at 92% 8%, rgba(116, 220, 203, 0.04) 0%, transparent 55%),
+      var(--app-background);
+  }
+
+  .glass-sidebar {
+    background: var(--gradient-sidebar);
+    border-right: 1px solid var(--border-subtle);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .glass-topbar {
+    background: var(--glass-topbar-bg);
+    border-bottom: 1px solid var(--border-subtle);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .glass-surface {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .glass-card {
+    background: linear-gradient(180deg, rgba(32, 34, 48, 0.68) 0%, rgba(21, 23, 34, 0.88) 100%);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass-card-highlight {
+    background:
+      radial-gradient(95% 80% at 0% 0%, rgba(167, 139, 250, 0.14) 0%, rgba(21, 23, 34, 0) 65%),
+      linear-gradient(180deg, rgba(32, 34, 48, 0.78) 0%, rgba(21, 23, 34, 0.92) 100%);
+    border: 1px solid var(--border-active);
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass-nav-active {
+    background: linear-gradient(90deg, rgba(167, 139, 250, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border: 1px solid var(--border-active);
+    color: var(--text-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 6px 18px rgba(4, 6, 12, 0.35);
+  }
+
+  .glass-effect {
+    background: var(--glass-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border-subtle);
+  }
+
   .gradient-primary {
     background: var(--gradient-primary);
   }
@@ -110,17 +208,15 @@
     box-shadow: var(--shadow-elevated);
   }
 
-  .glass-effect {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-  }
-
   .text-gradient {
     background: var(--gradient-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .tabular-nums-clean {
+    font-variant-numeric: tabular-nums;
   }
 
   .animate-float {
@@ -140,19 +236,43 @@
   }
 }
 
+/* Fallback for browsers or devices without backdrop-filter support */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-sidebar {
+    background: var(--sidebar-surface);
+  }
+  .glass-topbar,
+  .glass-surface,
+  .glass-effect {
+    background: var(--surface-secondary);
+  }
+}
+
+/* Respect user reduced-motion preference globally */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-pulse-slow,
+  .animate-slide-up,
+  .animate-fade-in,
+  .animate-pulse,
+  .animate-bounce {
+    animation: none !important;
+  }
+}
+
 @keyframes float {
   0%, 100% {
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-15px);
+    transform: translateY(-12px);
   }
 }
 
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -169,23 +289,37 @@
   }
 }
 
-/* Scrollbar styling */
+/* Dark Glass Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(222 47% 8%);
+  background: #0B0D16;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(222 47% 20%);
-  border-radius: 4px;
+  background: #272B40;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(222 47% 25%);
+  background: #383D5B;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(167, 139, 250, 0.22);
+  border-radius: 9999px;
 }
 
 /* FP-4 Content Visibility Optimizations for Large Tables and Lists */
@@ -198,4 +332,3 @@
   content-visibility: auto;
   contain-intrinsic-size: 1px 120px;
 }
-

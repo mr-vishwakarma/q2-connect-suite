@@ -659,10 +659,10 @@ export default function FeeManagement() {
       {/* 6 Top KPI Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {/* Card 1: Total Students */}
-        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all duration-200">
+        <div className="glass-card glass-card-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-muted-foreground">Total Students</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center text-primary">
               <Users className="w-4 h-4" />
             </div>
           </div>
@@ -675,15 +675,15 @@ export default function FeeManagement() {
         </div>
 
         {/* Card 2: Fees Collected */}
-        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all duration-200">
+        <div className="glass-card glass-card-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-muted-foreground">Fees Collected</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <div className="w-8 h-8 rounded-xl bg-[#74DCCB]/15 border border-[#74DCCB]/25 flex items-center justify-center text-[#74DCCB]">
               <Wallet className="w-4 h-4" />
             </div>
           </div>
           <div>
-            <h3 className="text-xl sm:text-2xl font-extrabold text-emerald-400 font-mono">
+            <h3 className="text-xl sm:text-2xl font-extrabold text-[#74DCCB] font-mono">
               ₹{thisMonthCollection.toLocaleString('en-IN')}
             </h3>
             <p className="text-[11px] text-muted-foreground mt-0.5">This Month</p>
@@ -691,10 +691,10 @@ export default function FeeManagement() {
         </div>
 
         {/* Card 3: Pending Amount */}
-        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all duration-200">
+        <div className="glass-card glass-card-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-muted-foreground">Pending Amount</span>
-            <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+            <div className="w-8 h-8 rounded-xl bg-rose-500/15 border border-rose-500/25 flex items-center justify-center text-rose-400">
               <FileText className="w-4 h-4" />
             </div>
           </div>
@@ -707,10 +707,10 @@ export default function FeeManagement() {
         </div>
 
         {/* Card 4: Overdue Amount */}
-        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all duration-200">
+        <div className="glass-card glass-card-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-muted-foreground">Overdue Amount</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-400">
               <Clock className="w-4 h-4" />
             </div>
           </div>
@@ -723,10 +723,10 @@ export default function FeeManagement() {
         </div>
 
         {/* Card 5: Upcoming Amount */}
-        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all duration-200">
+        <div className="glass-card glass-card-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-muted-foreground">Upcoming Amount</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-400">
               <Calendar className="w-4 h-4" />
             </div>
           </div>
@@ -739,10 +739,10 @@ export default function FeeManagement() {
         </div>
 
         {/* Card 6: Collection Rate */}
-        <div className="bg-card border border-border/80 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all duration-200">
+        <div className="glass-card glass-card-hover rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-muted-foreground">Collection Rate</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <div className="w-8 h-8 rounded-xl bg-[#ED91C1]/15 border border-[#ED91C1]/25 flex items-center justify-center text-[#ED91C1]">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
@@ -756,7 +756,7 @@ export default function FeeManagement() {
       </div>
 
       {/* Status Legend & View Switcher Bar */}
-      <div className="bg-card/70 border border-border/70 rounded-2xl p-3 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 backdrop-blur-sm shadow-sm">
+      <div className="glass-card rounded-2xl p-3 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         {/* Left: Status Legend Indicators */}
         <div className="flex items-center gap-3 sm:gap-4 flex-wrap text-xs font-medium text-foreground">
           <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl">
@@ -786,7 +786,7 @@ export default function FeeManagement() {
             Total: <strong className="text-foreground">{filteredRecords.length} Students</strong>
           </span>
 
-          <div className="bg-secondary/80 border border-border p-0.5 rounded-xl flex items-center shrink-0">
+          <div className="bg-white/[0.04] border border-white/[0.08] p-0.5 rounded-xl flex items-center shrink-0">
             <button
               onClick={() => setViewMode('grid')}
               className={cn(
@@ -817,7 +817,7 @@ export default function FeeManagement() {
       </div>
 
       {/* Filter & Action Controls Bar */}
-      <Card className="bg-card border-border shadow-sm">
+      <Card>
         <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
             {/* Search Input */}
@@ -827,13 +827,13 @@ export default function FeeManagement() {
                 placeholder="Search student by name, room, User ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 rounded-xl bg-background"
+                className="pl-9 h-10 rounded-xl"
               />
             </div>
 
             {/* Month Filter */}
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[170px] h-10 rounded-xl bg-background">
+              <SelectTrigger className="w-full sm:w-[170px] h-10 rounded-xl">
                 <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
                 <SelectValue />
               </SelectTrigger>
@@ -848,7 +848,7 @@ export default function FeeManagement() {
 
             {/* Status Filter */}
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[150px] h-10 rounded-xl bg-background">
+              <SelectTrigger className="w-full sm:w-[150px] h-10 rounded-xl">
                 <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
                 <SelectValue />
               </SelectTrigger>

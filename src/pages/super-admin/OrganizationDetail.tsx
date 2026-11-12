@@ -132,7 +132,7 @@ export default function OrganizationDetail() {
   if (isLoading || !org) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="w-8 h-8 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
       </div>
     );
   }
@@ -184,7 +184,7 @@ export default function OrganizationDetail() {
                 <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">Subscription Plan</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1.5">
-                <div className="text-xl font-bold text-amber-400">
+                <div className="text-xl font-semibold text-[#A78BFA]">
                   {planName || 'Not Assigned'}
                 </div>
                 <div className="flex items-center justify-between gap-2">
@@ -294,34 +294,34 @@ export default function OrganizationDetail() {
       })()}
 
       {/* Statutory KYC & Aadhaar Verification Card */}
-      <Card className="border-border/60">
+      <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <FileCheck className="w-4 h-4 text-amber-400" />
-              Statutory KYC & Aadhaar Compliance
+              <FileCheck className="w-4 h-4 text-[#A78BFA]" />
+              Statutory KYC &amp; Aadhaar Compliance
             </CardTitle>
-            <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-400">
+            <Badge variant="outline" className="text-xs">
               {org.orgType || 'Multi-Branch Chain'}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-            <div className="p-3 rounded-lg bg-secondary/30 border border-border/50">
+            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.07]">
               <span className="text-muted-foreground block mb-1">Aadhaar Card UID</span>
               <span className="font-mono font-semibold text-foreground text-sm">
                 {org.aadhaarNumber || 'Not provided'}
               </span>
             </div>
-            <div className="p-3 rounded-lg bg-secondary/30 border border-border/50">
+            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.07]">
               <span className="text-muted-foreground block mb-1">Aadhaar Document / Photo</span>
               {org.aadhaarDocument ? (
                 <a
                   href={org.aadhaarDocument}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-amber-400 hover:text-amber-300 font-semibold mt-1"
+                  className="inline-flex items-center gap-1.5 text-[#A78BFA] hover:underline font-semibold mt-1"
                 >
                   <ExternalLink className="w-3.5 h-3.5" /> View Photo Document
                 </a>
@@ -354,7 +354,7 @@ export default function OrganizationDetail() {
               <GitFork className="w-4 h-4 text-blue-400" />
               Hostel Branches ({org.hostels?.length || 0})
             </CardTitle>
-            <Button size="sm" onClick={() => setIsAddBranchOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+            <Button size="sm" onClick={() => setIsAddBranchOpen(true)}>
               <Plus className="w-3.5 h-3.5 mr-1" />
               Add Branch
             </Button>
@@ -382,8 +382,8 @@ export default function OrganizationDetail() {
         <Card className="border-border/60">
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <ToggleLeft className="w-4 h-4 text-amber-400" />
-              Feature Flags & Module Access
+              <ToggleLeft className="w-4 h-4 text-[#A78BFA]" />
+              Feature Flags &amp; Module Access
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -447,7 +447,7 @@ export default function OrganizationDetail() {
               <Button type="button" variant="outline" onClick={() => setIsAddBranchOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
+              <Button type="submit">
                 Create Branch
               </Button>
             </DialogFooter>

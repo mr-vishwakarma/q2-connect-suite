@@ -490,8 +490,8 @@ export default function SubscriptionManagement() {
 
       {/* Extend Trial Modal */}
       {extendingSub && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-[#06070D]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="glass-card-highlight rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
             <h3 className="font-bold text-lg text-foreground">Extend Trial Period</h3>
             <p className="text-sm text-muted-foreground">
               Extend trial for{' '}
@@ -528,12 +528,12 @@ export default function SubscriptionManagement() {
 
       {/* Inspect Subscription Detail Modal */}
       {inspectOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-card border border-border rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-5">
-            <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+        <div className="fixed inset-0 z-50 bg-[#06070D]/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="glass-card-highlight rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-5">
+            <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] pb-4">
               <div>
-                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-amber-400" />
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-[#A78BFA]" />
                   {typeof inspectData?.subscription?.organizationId === 'object' &&
                   inspectData.subscription.organizationId !== null
                     ? inspectData.subscription.organizationId.name || 'Subscription Audit Inspection'

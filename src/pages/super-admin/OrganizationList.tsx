@@ -162,7 +162,7 @@ export default function OrganizationList() {
           <h1 className="text-2xl font-bold text-foreground">Organizations (Tenants)</h1>
           <p className="text-sm text-muted-foreground">Manage tenant companies, branches, subscriptions and isolation.</p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)} className="bg-amber-500 hover:bg-amber-600 text-black font-semibold">
+        <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Onboard New Tenant
         </Button>
@@ -218,7 +218,7 @@ export default function OrganizationList() {
                   <tr>
                     <td colSpan={6} className="p-12 text-center text-muted-foreground">
                       <div className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
                         <span>Loading organizations...</span>
                       </div>
                     </td>
@@ -245,13 +245,13 @@ export default function OrganizationList() {
                       >
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                              <Building2 className="w-5 h-5 text-amber-500" />
+                            <div className="w-9 h-9 rounded-lg bg-[#A78BFA]/10 border border-[#A78BFA]/20 flex items-center justify-center shrink-0">
+                              <Building2 className="w-5 h-5 text-[#A78BFA]" />
                             </div>
                             <div>
                               <Link
                                 to={`/super-admin/organizations/${orgId}`}
-                                className="font-semibold text-foreground hover:text-amber-400 transition-colors block"
+                                className="font-semibold text-foreground hover:text-[#A78BFA] transition-colors block"
                               >
                                 {org.name}
                               </Link>

@@ -14,7 +14,6 @@ import {
 export function HostelSelector() {
   const { selectedHostelId, currentBranch, branches, setSelectedHostelId } = useHostel();
 
-  // If no dynamic branches loaded yet, render fallback
   const displayBranches: (HostelBranch | { _id: string; code: string; name: string; status: string })[] =
     branches.length > 0
       ? branches
@@ -24,10 +23,9 @@ export function HostelSelector() {
           { _id: 'Q2.1', code: 'Q2.1', name: 'Q2.1 Madhapur', status: 'ACTIVE' },
         ];
 
-  // For compact view or when <= 3 branches, show toggle pills
   if (displayBranches.length <= 4) {
     return (
-      <div className="flex items-center gap-1 p-0.5 sm:p-1 bg-secondary/50 rounded-lg sm:rounded-xl border border-border/50">
+      <div className="flex items-center gap-1 p-1 bg-[#151722]/90 rounded-xl border border-[rgba(225,225,255,0.08)]">
         {displayBranches.map((branch) => {
           const isSelected =
             selectedHostelId === branch._id ||
@@ -36,17 +34,14 @@ export function HostelSelector() {
           const isSuspended = branch.status === 'SUSPENDED' || branch.status === 'INACTIVE';
 
           return (
-            <motion.button
+            <button
               key={branch._id}
+              type="button"
               onClick={() => setSelectedHostelId(branch._id)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
               className={cn(
-                'relative px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-xs sm:text-sm font-bold transition-all duration-300 flex items-center gap-1.5',
-                isSelected
-                  ? 'text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-                isSuspended && !isSelected && 'opacity-60'
+                'relative px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg text-xs font-semibold transition-colors duration-200 flex items-center gap-1.5',
+                isSelected ? 'text-[#F0EFF8]' : 'text-[#9295AD] hover:text-[#F0EFF8]',
+                isSuspended && !isSelected && 'opacity-60',
               )}
               title={branch.name}
             >
@@ -54,15 +49,12 @@ export function HostelSelector() {
                 <motion.div
                   layoutId="activeHostel"
                   className={cn(
-                    'absolute inset-0 rounded-md sm:rounded-lg shadow-lg',
-                    isSuspended ? 'bg-amber-600' : 'bg-primary'
+                    'absolute inset-0 rounded-lg border',
+                    isSuspended
+                      ? 'bg-amber-500/20 border-amber-500/35'
+                      : 'bg-gradient-to-r from-[#A78BFA]/25 to-[#7C5CE6]/25 border-[#A78BFA]/40 shadow-[0_0_14px_rgba(167,139,250,0.22)]',
                   )}
-                  style={{
-                    boxShadow: isSuspended
-                      ? '0 0 20px rgba(217, 119, 6, 0.4)'
-                      : '0 0 20px hsl(0 100% 50% / 0.4)',
-                  }}
-                  transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                  transition={{ type: 'spring', bounce: 0.2, duration: 0.45 }}
                 />
               )}
               <span className="relative z-10 flex items-center gap-1">
@@ -73,38 +65,34 @@ export function HostelSelector() {
                   </span>
                 )}
               </span>
-            </motion.button>
+            </button>
           );
         })}
       </div>
     );
   }
 
-  // For organizations with more than 4 branches, use an interactive dropdown selector
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className={cn(
-            'flex items-center gap-2 px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold bg-secondary/60 hover:bg-secondary/90 border border-border/60 transition-all shadow-sm'
-          )}
+          type="button"
+          className="flex items-center gap-2 px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white/[0.04] hover:bg-white/[0.07] border border-[rgba(225,225,255,0.09)] text-[#F0EFF8] transition-all"
         >
-          <Building2 className="w-4 h-4 text-primary" />
-          <span className="truncate max-w-[130px] sm:max-w-[180px]">
+          <Building2 className="w-4 h-4 text-[#A78BFA]" />
+          <span className="truncate max-w-[110px] sm:max-w-[170px]">
             {currentBranch ? (currentBranch.name || currentBranch.code) : 'Select Branch'}
           </span>
           {currentBranch?.status === 'SUSPENDED' && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">
-              Suspended
+              Paused
             </span>
           )}
-          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground ml-1" />
+          <ChevronDown className="w-3.5 h-3.5 text-[#9295AD]" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
-        <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">
-          Hostel Branches
-        </DropdownMenuLabel>
+        <DropdownMenuLabel>Hostel Branches</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {displayBranches.map((branch) => {
           const isSelected =
@@ -117,17 +105,17 @@ export function HostelSelector() {
               key={branch._id}
               onClick={() => setSelectedHostelId(branch._id)}
               className={cn(
-                'flex items-center justify-between cursor-pointer py-2 px-3 rounded-md text-xs sm:text-sm',
-                isSelected && 'bg-primary/10 text-primary font-bold'
+                'flex items-center justify-between py-2 px-3',
+                isSelected && 'bg-[#A78BFA]/15 text-[#F0EFF8] font-semibold',
               )}
             >
               <div className="flex flex-col">
-                <span className="font-medium text-foreground">{branch.name}</span>
-                <span className="text-[11px] text-muted-foreground">Code: {branch.code}</span>
+                <span className="font-medium text-[#F0EFF8]">{branch.name}</span>
+                <span className="text-[11px] text-[#74788F]">Code: {branch.code}</span>
               </div>
               {isSuspended && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">
-                  Suspended
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">
+                  Paused
                 </span>
               )}
             </DropdownMenuItem>

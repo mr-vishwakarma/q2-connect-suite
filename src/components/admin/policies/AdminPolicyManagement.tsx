@@ -536,7 +536,7 @@ export function AdminPolicyManagement({
                         type="button"
                         size="sm"
                         onClick={() => openReviewModal(draftVersion)}
-                        className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs h-7 px-3 shrink-0"
+                        className="font-semibold text-xs h-7 px-3 shrink-0"
                       >
                         Review &amp; Publish
                       </Button>
@@ -642,7 +642,7 @@ export function AdminPolicyManagement({
               <Button
                 type="submit"
                 disabled={uploading || !selectedFile}
-                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs"
+                className="font-semibold text-xs"
               >
                 {uploading ? (
                   <>
@@ -877,7 +877,7 @@ export function AdminPolicyManagement({
               type="button"
               disabled={processingCombined || !combinedFile}
               onClick={handleProcessCombined}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs"
+              className="w-full font-semibold text-xs"
             >
               {processingCombined ? (
                 <>

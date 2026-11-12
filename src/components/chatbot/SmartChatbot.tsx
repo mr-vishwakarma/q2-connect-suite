@@ -73,8 +73,8 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
         id: 'welcome',
         role: 'assistant',
         content: isAdmin
-          ? `👋 Hello Admin! I'm your **Q2 Campus Hub Assistant**.\n\nI can help you with:\n• Student counts, room stats\n• Fee & complaint summaries\n• Management advice\n\nCurrently viewing: **${selectedHostel}**`
-          : `👋 Hi there! I'm your **Q2 Campus Hub Assistant**.\n\nAsk me about:\n• Your fees, room, complaints\n• Leave request status\n• General hostel queries\n\nHow can I help?`,
+          ? `👋 Hello Admin! I'm your **Hosteliq Assistant**.\n\nI can help you with:\n• Student counts, room stats\n• Fee & complaint summaries\n• Management advice\n\nCurrently viewing: **${selectedHostel}**`
+          : `👋 Hi there! I'm your **Hosteliq Assistant**.\n\nAsk me about:\n• Your fees, room, complaints\n• Leave request status\n• General hostel queries\n\nHow can I help?`,
         source: 'ai',
         timestamp: new Date(),
       }];
@@ -194,10 +194,11 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
           >
             <Button
               onClick={() => setIsOpen(true)}
-              className="h-14 w-14 rounded-full shadow-lg shadow-primary/40 hover:shadow-xl hover:shadow-primary/60 transition-all duration-300"
+              aria-label="Open Hosteliq Assistant"
+              className="h-13 w-13 sm:h-14 sm:w-14 rounded-full bg-gradient-to-br from-[#8B6EF3] to-[#6D55D6] text-white border border-white/15 shadow-[0_12px_32px_rgba(124,92,230,0.45)] hover:shadow-[0_16px_38px_rgba(124,92,230,0.6)] hover:brightness-110 transition-all duration-300"
               size="icon"
             >
-              <MessageCircle className="h-6 w-6" />
+              <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
           </motion.div>
         )}
@@ -211,20 +212,20 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
-            className="fixed bottom-6 right-6 z-50 w-[360px] max-w-[calc(100vw-2rem)] h-[520px] max-h-[calc(100vh-4rem)] flex flex-col rounded-2xl border border-border bg-card shadow-2xl overflow-hidden"
+            className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[370px] max-w-[calc(100vw-2rem)] h-[520px] max-h-[calc(100vh-5rem)] flex flex-col rounded-2xl border border-white/[0.1] bg-[#141624]/95 backdrop-blur-2xl shadow-[0_24px_64px_rgba(4,5,10,0.85)] overflow-hidden"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/50">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/[0.08] bg-[radial-gradient(ellipse_at_top_left,rgba(167,139,250,0.16),transparent_65%),rgba(255,255,255,0.02)]">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center">
                   <Bot className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Q2 Assistant</p>
-                  <p className="text-[10px] text-muted-foreground">{selectedHostel} • {isAdmin ? 'Admin' : 'Student'}</p>
+                  <p className="text-sm font-semibold text-foreground tracking-tight">Hosteliq Assistant</p>
+                  <p className="text-[11px] text-[#9295AD]">{selectedHostel} • {isAdmin ? 'Admin' : 'Student'}</p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="h-8 w-8 rounded-full">
+              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} aria-label="Close assistant" className="h-8 w-8 rounded-lg text-[#9295AD] hover:text-foreground">
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -294,13 +295,14 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
             </ScrollArea>
 
             {/* Input */}
-            <div className="p-3 border-t border-border bg-secondary/30">
+            <div className="p-3 border-t border-white/[0.08] bg-white/[0.02]">
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={toggleVoice}
-                  className={`h-9 w-9 rounded-full shrink-0 ${isListening ? 'bg-primary/20 text-primary animate-pulse' : ''}`}
+                  aria-label="Toggle voice input"
+                  className={`h-9 w-9 rounded-full shrink-0 ${isListening ? 'bg-primary/20 text-primary animate-pulse' : 'text-[#9295AD]'}`}
                 >
                   {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
@@ -310,12 +312,13 @@ export function SmartChatbot({ isAdmin = false }: SmartChatbotProps) {
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Ask me anything..."
-                  className="h-9 rounded-full text-sm bg-background border-border"
+                  className="h-9 rounded-full text-sm bg-white/[0.04] border-white/[0.08]"
                   disabled={isLoading}
                 />
                 <Button
                   onClick={sendMessage}
                   size="icon"
+                  aria-label="Send message"
                   className="h-9 w-9 rounded-full shrink-0"
                   disabled={!input.trim() || isLoading}
                 >

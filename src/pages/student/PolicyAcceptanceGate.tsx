@@ -144,34 +144,34 @@ export default function PolicyAcceptanceGate() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 animate-pulse">
+      <div className="min-h-screen app-shell-bg flex flex-col items-center justify-center p-6 space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary animate-pulse">
           <ShieldCheck className="w-6 h-6" />
         </div>
         <div className="text-center space-y-1">
           <p className="text-sm font-semibold text-foreground">Verifying Hostel Policies...</p>
           <p className="text-xs text-muted-foreground">Checking compliance and regulatory requirements</p>
         </div>
-        <Loader2 className="w-5 h-5 text-amber-500 animate-spin mt-2" />
+        <Loader2 className="w-5 h-5 text-primary animate-spin mt-2" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between py-10 px-4 sm:px-6 lg:px-8 animate-fade-in">
+    <div className="min-h-screen app-shell-bg text-foreground flex flex-col justify-between py-10 px-4 sm:px-6 lg:px-8 animate-fade-in">
       <div className="max-w-3xl mx-auto w-full space-y-8">
         {/* Top Branding & Header */}
-        <div className="space-y-3 text-center sm:text-left sm:flex sm:items-center sm:justify-between border-b border-border/60 pb-6">
+        <div className="space-y-3 text-center sm:text-left sm:flex sm:items-center sm:justify-between border-b border-white/[0.08] pb-6">
           <div className="flex items-center justify-center sm:justify-start gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-md">
+            <div className="w-12 h-12 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shadow-md shadow-primary/15">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">
+                <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-[#A78BFA] to-[#ED91C1] bg-clip-text text-transparent">
                   Hosteliq
                 </span>
-                <Badge variant="outline" className="border-amber-500/40 text-amber-300 bg-amber-500/10 text-[10px] px-2 py-0">
+                <Badge variant="outline" className="border-primary/35 text-primary bg-primary/10 text-[10px] px-2 py-0">
                   Resident Access Gate
                 </Badge>
               </div>
@@ -182,8 +182,8 @@ export default function PolicyAcceptanceGate() {
           </div>
 
           <div className="flex items-center justify-center sm:justify-end gap-2">
-            <Badge variant="outline" className="border-border text-foreground bg-secondary/40 text-xs px-3 py-1 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-amber-400" />
+            <Badge variant="outline" className="border-white/[0.08] text-foreground bg-white/[0.04] text-xs px-3 py-1 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-primary" />
               {hostelDisplayName}
             </Badge>
             <Button
@@ -200,8 +200,8 @@ export default function PolicyAcceptanceGate() {
         </div>
 
         {/* Explanation Banner */}
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs sm:text-sm text-foreground/90 leading-relaxed">
-          <Lock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-2xl glass-card-highlight flex items-start gap-3 text-xs sm:text-sm text-foreground/90 leading-relaxed">
+          <Lock className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="font-semibold text-foreground">
               Resident Agreement Required Before Dashboard Access
@@ -250,18 +250,18 @@ export default function PolicyAcceptanceGate() {
                 key={doc.versionId}
                 className={`border transition-all duration-200 ${
                   isChecked
-                    ? 'border-amber-500/60 bg-amber-500/[0.03] shadow-md'
-                    : 'border-border/80 bg-card/60'
+                    ? 'border-primary/50 bg-primary/[0.05] shadow-md shadow-primary/10'
+                    : ''
                 }`}
               >
                 <CardHeader className="pb-3 pt-5 px-5 sm:px-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-secondary/80 border border-border flex items-center justify-center text-amber-400 shrink-0">
+                      <div className="w-9 h-9 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center text-primary shrink-0">
                         <FileText className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
+                        <div className="text-xs font-semibold text-primary uppercase tracking-wider">
                           {doc.categoryLabel || doc.category.replace(/_/g, ' ')}
                         </div>
                         <CardTitle className="text-base sm:text-lg font-bold text-foreground">
@@ -293,7 +293,7 @@ export default function PolicyAcceptanceGate() {
                       variant="outline"
                       size="sm"
                       onClick={() => setViewingDoc(doc)}
-                      className="text-xs font-medium gap-1.5 h-8 border-border hover:border-amber-500/50 hover:text-amber-400 transition-colors"
+                      className="text-xs font-medium gap-1.5 h-8 hover:border-primary/50 hover:text-primary transition-colors"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       Read Document
@@ -301,13 +301,13 @@ export default function PolicyAcceptanceGate() {
                   </div>
 
                   {/* Explicit Acceptance Checkbox */}
-                  <div className="p-3.5 rounded-lg bg-secondary/30 border border-border/60 flex items-start gap-3">
+                  <div className="p-3.5 rounded-lg bg-white/[0.03] border border-white/[0.07] flex items-start gap-3">
                     <Checkbox
                       id={`check-${doc.versionId}`}
                       checked={isChecked}
                       disabled={isAlreadyAccepted}
                       onCheckedChange={(checked) => handleToggleCheckbox(doc.versionId, Boolean(checked))}
-                      className="mt-0.5 border-border data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                      className="mt-0.5"
                     />
                     <label
                       htmlFor={`check-${doc.versionId}`}
@@ -324,18 +324,18 @@ export default function PolicyAcceptanceGate() {
         </div>
 
         {/* Bottom Submission Action */}
-        <div className="p-6 rounded-2xl bg-card border border-border/80 shadow-lg space-y-4">
+        <div className="p-6 rounded-2xl glass-card space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <p className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-2">
                 {allRequiredChecked ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <CheckCircle2 className="w-4 h-4 text-[#74DCCB]" />
                     All {applicableVersions.length} documents acknowledged
                   </>
                 ) : (
                   <>
-                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                    <AlertCircle className="w-4 h-4 text-primary" />
                     Acknowledgement pending ({Object.values(acceptedCheckboxMap).filter(Boolean).length} of {applicableVersions.length} checked)
                   </>
                 )}
@@ -349,7 +349,7 @@ export default function PolicyAcceptanceGate() {
               type="button"
               disabled={!allRequiredChecked || submitting}
               onClick={handleAcceptSubmit}
-              className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs sm:text-sm h-11 px-8 rounded-xl shadow-lg transition-all duration-200 disabled:opacity-50 shrink-0"
+              className="font-bold text-xs sm:text-sm h-11 px-8 rounded-xl shadow-lg shadow-primary/25 transition-all duration-200 disabled:opacity-50 shrink-0"
             >
               {submitting ? (
                 <>

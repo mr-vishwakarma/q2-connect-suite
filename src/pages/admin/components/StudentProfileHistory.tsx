@@ -623,7 +623,7 @@ export function StudentProfileHistory<TStudent extends StudentProfileSummary = S
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 w-7 p-0 hover:bg-slate-200 text-slate-600 rounded-lg"
+                              className="h-7 w-7 p-0 hover:bg-white/[0.08] text-muted-foreground hover:text-foreground rounded-lg"
                               onClick={() => handlePrintFeeReceipt(p)}
                               title={`Print Receipt #${p.receipt_no}`}
                             >

@@ -57,12 +57,12 @@ export function PolicyDocumentViewer({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-background border-border text-foreground shadow-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
         {/* Header */}
-        <DialogHeader className="p-6 border-b border-border/80 bg-card/60 backdrop-blur shrink-0 space-y-3">
+        <DialogHeader className="p-6 border-b border-white/[0.08] bg-white/[0.02] shrink-0 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary shrink-0">
                 <FileText className="w-5 h-5" />
               </div>
               <div>
@@ -79,7 +79,7 @@ export function PolicyDocumentViewer({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="border-amber-500/40 text-amber-300 bg-amber-500/10 text-xs px-2.5 py-0.5">
+              <Badge variant="outline" className="border-primary/35 text-primary bg-primary/10 text-xs px-2.5 py-0.5">
                 Version {document.versionLabel || `v${document.versionNumber}`}
               </Badge>
               <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 bg-emerald-500/10 text-xs px-2.5 py-0.5 flex items-center gap-1">
@@ -148,13 +148,13 @@ export function PolicyDocumentViewer({
                 >
                   {section.heading && (
                     <h3 className="text-base font-semibold text-foreground tracking-tight flex items-center gap-2">
-                      <span className="w-1.5 h-4 bg-amber-500 rounded-full shrink-0" />
+                      <span className="w-1.5 h-4 bg-primary rounded-full shrink-0" />
                       {section.heading}
                     </h3>
                   )}
 
                   {section.subheading && (
-                    <h4 className="text-xs font-semibold text-amber-400/90 pl-3.5">
+                    <h4 className="text-xs font-semibold text-primary/90 pl-3.5">
                       {section.subheading}
                     </h4>
                   )}

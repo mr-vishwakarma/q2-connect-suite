@@ -1,9 +1,45 @@
 import { ReactNode } from 'react';
-import { Sidebar } from './Sidebar';
-import { TopBar } from './TopBar';
+import { useNavigate } from 'react-router-dom';
+import {
+  CalendarCheck,
+  LayoutDashboard,
+  Lightbulb,
+  MessageSquare,
+  Shirt,
+  User,
+  UtensilsCrossed,
+} from 'lucide-react';
 import { MobileBottomNav } from './MobileBottomNav';
 import { useSidebarDrawer } from '@/hooks/useSidebarDrawer';
+import { useAuth } from '@/hooks/useAuth';
 import { SmartChatbot } from '@/components/chatbot/SmartChatbot';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { PortalNavSection, PortalShell } from '@/components/layout/PortalShell';
+
+const STUDENT_NAV_SECTIONS: PortalNavSection[] = [
+  {
+    title: 'Overview',
+    links: [
+      { to: '/student/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/student/fee-history', icon: CalendarCheck, label: 'Fee History' },
+    ],
+  },
+  {
+    title: 'Hostel Services',
+    links: [
+      { to: '/student/laundry', icon: Shirt, label: 'Laundry Booking' },
+      { to: '/student/mess-off', icon: UtensilsCrossed, label: 'Leave Requests' },
+      { to: '/student/complaints', icon: MessageSquare, label: 'Complaints' },
+      { to: '/student/suggestions', icon: Lightbulb, label: 'Suggestions' },
+    ],
+  },
+  {
+    title: 'Account',
+    links: [
+      { to: '/student/profile', icon: User, label: 'My Profile' },
+    ],
+  },
+];
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -12,26 +48,53 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, title, isAdmin = false }: DashboardLayoutProps) {
-  const { isCollapsed, toggleCollapse } = useSidebarDrawer();
+  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
+  const {
+    isMobileOpen,
+    closeMobile,
+    toggleMobile,
+    isCollapsed,
+    toggleCollapse,
+  } = useSidebarDrawer();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  const displayName = profile?.name || user?.name || 'Resident';
+  const roomSummary = profile?.room_no
+    ? `Room ${profile.room_no}${profile?.hostel ? ` • ${profile.hostel}` : ''}`
+    : `${profile?.hostel || 'Hosteliq'} Resident`;
 
   return (
-    <div className="min-h-screen bg-background md:pb-0 pb-16">
-      {/* Desktop Sidebar */}
-      <div className={`hidden md:block fixed left-0 top-0 h-screen transition-all duration-300 z-30 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-        <Sidebar isAdmin={isAdmin} isCollapsed={isCollapsed} onToggleCollapse={toggleCollapse} />
-      </div>
-
-      <div className={`transition-all duration-300 ${isCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
-        <TopBar title={title} showMenu={false} />
-        <main className="p-3 sm:p-4 md:p-6">
-          {children}
-        </main>
-      </div>
-      
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav />
-      
-      <SmartChatbot isAdmin={isAdmin} />
-    </div>
+    <PortalShell
+      portalName="Student Portal"
+      portalSubtitle="Resident Suite"
+      homeRoute="/student/dashboard"
+      pageTitle={title}
+      pageSubtitle={roomSummary}
+      breadcrumbSection="Resident"
+      sections={STUDENT_NAV_SECTIONS}
+      userName={displayName}
+      userEmail={profile?.email || user?.email || undefined}
+      userAvatar={profile?.profilePhoto}
+      userRoleLabel={isAdmin ? 'Administrator' : 'Hostel Resident'}
+      welcomeSubtext={roomSummary}
+      profileRoute="/student/profile"
+      onLogout={handleLogout}
+      isCollapsed={isCollapsed}
+      onToggleCollapse={toggleCollapse}
+      isMobileOpen={isMobileOpen}
+      onToggleMobile={toggleMobile}
+      onCloseMobile={closeMobile}
+      sidebarAriaLabel="Student Portal Navigation"
+      topBarRight={<NotificationBell />}
+      bottomMobileNav={<MobileBottomNav />}
+      floatingWidget={<SmartChatbot isAdmin={isAdmin} />}
+    >
+      {children}
+    </PortalShell>
   );
 }

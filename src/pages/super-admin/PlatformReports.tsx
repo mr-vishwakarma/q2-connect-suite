@@ -25,8 +25,8 @@ export default function PlatformReports() {
       title: 'Tenant Organizations Report',
       description: 'Complete export of all registered tenants, legal entities, contact details, branch counts, and subscription statuses.',
       icon: Building2,
-      color: 'text-amber-500',
-      bg: 'bg-amber-500/10 border-amber-500/20',
+      color: 'text-[#A78BFA]',
+      bg: 'bg-[#A78BFA]/10 border-[#A78BFA]/20',
       estimatedSize: '~50 KB per 1,000 tenants',
     },
     {

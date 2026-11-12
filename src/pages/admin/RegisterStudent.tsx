@@ -487,11 +487,11 @@ function RegisterStudentContent() {
 
         {/* Active Verified Branch Badge (Locked to active hostel to prevent cross-branch conflicts) */}
         <div className="flex items-center self-start sm:self-auto">
-          <div className="flex items-center gap-2 bg-[#121622] px-3.5 py-1.5 rounded-xl border border-white/10 shadow-inner text-xs font-semibold text-zinc-300">
-            <Building2 className="w-3.5 h-3.5 text-red-500 shrink-0" />
-            <span className="text-zinc-400">Assigned Branch:</span>
-            <span className="text-white font-bold">{currentBranch?.name || selectedHostel || 'Active Branch'}</span>
-            <span className="text-[10px] bg-red-600/20 text-red-400 px-2 py-0.5 rounded-md font-mono border border-red-500/30">
+          <div className="flex items-center gap-2 glass-card px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[#9295AD]">
+            <Building2 className="w-3.5 h-3.5 text-[#A78BFA] shrink-0" />
+            <span className="text-[#9295AD]">Assigned Branch:</span>
+            <span className="text-[#F0EFF8] font-bold">{currentBranch?.name || selectedHostel || 'Active Branch'}</span>
+            <span className="text-[10px] bg-[#74DCCB]/15 text-[#74DCCB] px-2 py-0.5 rounded-md font-mono border border-[#74DCCB]/30">
               Verified
             </span>
           </div>
@@ -501,7 +501,7 @@ function RegisterStudentContent() {
       {/* Google Pending Applicants Quick-Bar */}
       {pendingApplicants.length > 0 && viewMode === 'form' && (
         <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 text-xs text-amber-500 font-medium">
+          <div className="flex items-center gap-2.5 text-xs text-amber-300 font-medium">
             <Sparkles className="w-4 h-4 shrink-0" />
             <span>
               <strong>{pendingApplicants.length}</strong> Google applicant registration{pendingApplicants.length === 1 ? '' : 's'} waiting for approval
@@ -515,10 +515,10 @@ function RegisterStudentContent() {
                 if (applicant) applyApplicantData(applicant);
               }}
             >
-              <SelectTrigger className="h-8 text-xs bg-black/40 border-amber-500/40 text-white w-full sm:w-[220px]">
+              <SelectTrigger className="h-8 text-xs bg-[#181A27] border-amber-500/40 text-[#F0EFF8] w-full sm:w-[220px]">
                 <SelectValue placeholder="Auto-fill applicant" />
               </SelectTrigger>
-              <SelectContent className="bg-[#121622] border-border text-white">
+              <SelectContent>
                 {pendingApplicants.map(a => (
                   <SelectItem key={a.id} value={a.id}>
                     {a.name} ({a.hostel})
@@ -535,11 +535,11 @@ function RegisterStudentContent() {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="p-4 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 space-y-2.5"
+          className="p-4 rounded-2xl border border-[#74DCCB]/35 bg-[#74DCCB]/10 space-y-2.5"
         >
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h4 className="font-semibold text-emerald-400 text-sm flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <h4 className="font-semibold text-[#74DCCB] text-sm flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-[#74DCCB]" />
               Student {lastCreated.name} Registered Successfully!
             </h4>
             <Button
@@ -550,16 +550,16 @@ function RegisterStudentContent() {
                 navigator.clipboard.writeText(`Name: ${lastCreated.name}\nUser ID: ${lastCreated.username}\nEmail: ${lastCreated.email}\nPassword: ${lastCreated.pass}`);
                 toast.success('Credentials copied to clipboard!');
               }}
-              className="h-7 text-xs border-emerald-500/40 bg-emerald-900/30 text-emerald-300 hover:bg-emerald-900/50 flex items-center gap-1.5"
+              className="h-7 text-xs border-[#74DCCB]/40 bg-[#74DCCB]/15 text-[#74DCCB] hover:bg-[#74DCCB]/25 flex items-center gap-1.5"
             >
               <Copy className="w-3.5 h-3.5" />
               Copy Credentials
             </Button>
           </div>
-          <div className="text-xs text-zinc-400 grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono">
-            <div><span className="font-sans font-medium text-zinc-200">User ID:</span> {lastCreated.username}</div>
-            <div><span className="font-sans font-medium text-zinc-200">Email:</span> {lastCreated.email}</div>
-            <div><span className="font-sans font-medium text-zinc-200">Password:</span> {lastCreated.pass}</div>
+          <div className="text-xs text-[#9295AD] grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono">
+            <div><span className="font-sans font-medium text-[#F0EFF8]">User ID:</span> {lastCreated.username}</div>
+            <div><span className="font-sans font-medium text-[#F0EFF8]">Email:</span> {lastCreated.email}</div>
+            <div><span className="font-sans font-medium text-[#F0EFF8]">Password:</span> {lastCreated.pass}</div>
           </div>
         </motion.div>
       )}
@@ -579,83 +579,83 @@ function RegisterStudentContent() {
             className="space-y-6"
           >
             {/* Top Banner Row */}
-            <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center justify-between gap-2 sm:gap-4 flex-wrap">
               <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-lg shadow-red-600/30 shrink-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#A78BFA] to-[#818CF8] flex items-center justify-center text-white shadow-lg shadow-[#A78BFA]/25 shrink-0">
                   <UserPlus className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-base sm:text-2xl font-bold tracking-tight text-white leading-tight truncate">
+                  <h2 className="text-base sm:text-2xl font-bold tracking-tight text-[#F0EFF8] leading-tight truncate">
                     Register New Student
                   </h2>
-                  <p className="text-[11px] sm:text-xs text-zinc-400 mt-0.5 truncate">
-                    Add a new student to <span className="text-red-500 font-semibold">{currentBranch?.name || selectedHostel}</span> (Branch Code: {currentBranch?.code || selectedHostel})
+                  <p className="text-[11px] sm:text-xs text-[#9295AD] mt-0.5 truncate">
+                    Add a new student to <span className="text-[#A78BFA] font-semibold">{currentBranch?.name || selectedHostel}</span> (Branch Code: {currentBranch?.code || selectedHostel})
                   </p>
                 </div>
               </div>
 
               {/* Decorative "Building Better Tomorrows" Badge */}
-              <div className="bg-[#121622] border border-white/5 rounded-xl sm:rounded-2xl px-2.5 py-1.5 sm:px-4 sm:py-2.5 flex items-center gap-2 sm:gap-3.5 shadow-xl shrink-0">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-red-950/40 border border-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+              <div className="glass-card rounded-xl sm:rounded-2xl px-2.5 py-1.5 sm:px-4 sm:py-2.5 flex items-center gap-2 sm:gap-3.5 shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-[#A78BFA]/15 border border-[#A78BFA]/30 flex items-center justify-center text-[#A78BFA] shrink-0">
                   <GraduationCap className="w-4 h-4 sm:w-6 sm:h-6" />
                 </div>
                 <div>
-                  <span className="block text-[9px] sm:text-[11px] font-medium text-zinc-400 leading-tight">
+                  <span className="block text-[9px] sm:text-[11px] font-medium text-[#9295AD] leading-tight">
                     Building
                   </span>
-                  <span className="block text-[10px] sm:text-xs font-bold text-red-500 whitespace-nowrap leading-tight">
+                  <span className="block text-[10px] sm:text-xs font-bold text-[#A78BFA] whitespace-nowrap leading-tight">
                     Better Tomorrows
                   </span>
-                  <div className="w-5 sm:w-7 h-0.5 bg-red-500 rounded-full mt-0.5" />
+                  <div className="w-5 sm:w-7 h-0.5 bg-gradient-to-r from-[#A78BFA] to-[#ED91C1] rounded-full mt-0.5" />
                 </div>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               {/* SECTION 1: Personal Information */}
-              <div className="bg-[#121622] border border-white/5 rounded-2xl p-3.5 sm:p-6 shadow-xl space-y-4 sm:space-y-5">
+              <div className="glass-card rounded-2xl p-3.5 sm:p-6 space-y-4 sm:space-y-5">
                 {/* Section Header */}
-                <div className="flex items-center gap-2.5 sm:gap-3 pb-2 border-b border-white/5">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 shrink-0">
+                <div className="flex items-center gap-2.5 sm:gap-3 pb-2 border-b border-white/[0.06]">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#A78BFA]/15 border border-[#A78BFA]/30 flex items-center justify-center text-[#A78BFA] shrink-0">
                     <User className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-white leading-tight">
+                    <h3 className="text-sm sm:text-base font-bold text-[#F0EFF8] leading-tight">
                       Personal Information
                     </h3>
-                    <p className="text-[11px] sm:text-xs text-zinc-400">
+                    <p className="text-[11px] sm:text-xs text-[#9295AD]">
                       Basic details about the student
                     </p>
                   </div>
                 </div>
 
-                {/* 2-Column Fields Grid (Matches Mobile Reference Screenshot) */}
-                <div className="grid grid-cols-2 gap-2.5 sm:gap-5">
+                {/* 2-Column Fields Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
                   {/* Full Name */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label htmlFor="name" className="text-[11px] sm:text-xs font-semibold text-zinc-300 truncate block">
-                      Full Name <span className="text-red-500">*</span>
+                    <Label htmlFor="name" className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] truncate block">
+                      Full Name <span className="text-[#ED91C1]">*</span>
                     </Label>
                     <div className="relative">
-                      <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-500 absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#74788F] absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <Input
                         id="name"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="Enter full name"
                         required
-                        className="bg-[#181d2a] border-border/40 pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:border-red-500"
+                        className="pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Student Email */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label htmlFor="email" className="text-[11px] sm:text-xs font-semibold text-zinc-300 truncate block">
-                      Student Email <span className="text-red-500">*</span>
+                    <Label htmlFor="email" className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] truncate block">
+                      Student Email <span className="text-[#ED91C1]">*</span>
                     </Label>
                     <div className="relative">
-                      <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-500 absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#74788F] absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <Input
                         id="email"
                         type="email"
@@ -663,18 +663,18 @@ function RegisterStudentContent() {
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="student@example.com"
                         required
-                        className="bg-[#181d2a] border-border/40 pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:border-red-500"
+                        className="pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
                   </div>
 
                   {/* User ID */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label htmlFor="username" className="text-[11px] sm:text-xs font-semibold text-zinc-300 truncate block">
-                      User ID (for login) <span className="text-red-500">*</span>
+                    <Label htmlFor="username" className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] truncate block">
+                      User ID (for login) <span className="text-[#ED91C1]">*</span>
                     </Label>
                     <div className="relative">
-                      <span className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs sm:text-sm font-bold pointer-events-none">
+                      <span className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 text-[#74788F] text-xs sm:text-sm font-bold pointer-events-none">
                         @
                       </span>
                       <Input
@@ -683,18 +683,18 @@ function RegisterStudentContent() {
                         onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                         placeholder="e.g. karan123"
                         required
-                        className="bg-[#181d2a] border-border/40 pl-7 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:border-red-500"
+                        className="pl-7 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Password */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label htmlFor="password" className="text-[11px] sm:text-xs font-semibold text-zinc-300 truncate block">
-                      Password <span className="text-red-500">*</span>
+                    <Label htmlFor="password" className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] truncate block">
+                      Password <span className="text-[#ED91C1]">*</span>
                     </Label>
                     <div className="relative">
-                      <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-500 absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#74788F] absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <Input
                         id="password"
                         type={showPassword ? 'text' : 'password'}
@@ -702,12 +702,12 @@ function RegisterStudentContent() {
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         placeholder="Enter or generate"
                         required
-                        className="bg-[#181d2a] border-border/40 pl-8 sm:pl-10 pr-8 sm:pr-10 h-9 sm:h-10 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:border-red-500"
+                        className="pl-8 sm:pl-10 pr-8 sm:pr-10 h-9 sm:h-10 text-xs sm:text-sm"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2 sm:right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors"
+                        className="absolute right-2 sm:right-3.5 top-1/2 -translate-y-1/2 text-[#9295AD] hover:text-[#F0EFF8] transition-colors"
                       >
                         {showPassword ? <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                       </button>
@@ -717,9 +717,9 @@ function RegisterStudentContent() {
                       <button
                         type="button"
                         onClick={handleAutoGeneratePassword}
-                        className="text-[10px] sm:text-xs font-semibold text-red-500 hover:text-red-400 flex items-center gap-1 transition-colors"
+                        className="text-[10px] sm:text-xs font-semibold text-[#A78BFA] hover:text-[#C4B5FD] flex items-center gap-1 transition-colors"
                       >
-                        <Wand2 className="w-3 h-3 text-red-500" />
+                        <Wand2 className="w-3 h-3 text-[#A78BFA]" />
                         Auto-Generate
                       </button>
                     </div>
@@ -727,12 +727,12 @@ function RegisterStudentContent() {
 
                   {/* Phone Number */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label htmlFor="phone" className="text-[11px] sm:text-xs font-semibold text-zinc-300 truncate block">
-                      Phone Number <span className="text-red-500">*</span>
+                    <Label htmlFor="phone" className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] truncate block">
+                      Phone Number <span className="text-[#ED91C1]">*</span>
                     </Label>
                     <div className="relative flex items-center">
-                      <div className="flex items-center gap-1 bg-[#141824] border border-border/40 border-r-0 rounded-l-md px-2 sm:px-3 h-9 sm:h-10 text-zinc-300 text-[11px] sm:text-xs font-semibold shrink-0">
-                        <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400" />
+                      <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.08] border-r-0 rounded-l-xl px-2 sm:px-3 h-9 sm:h-10 text-[#C8CADB] text-[11px] sm:text-xs font-semibold shrink-0">
+                        <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#9295AD]" />
                         <span>+91</span>
                       </div>
                       <Input
@@ -741,19 +741,19 @@ function RegisterStudentContent() {
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         placeholder="Enter mobile number"
                         required
-                        className="bg-[#181d2a] border-border/40 rounded-l-none pl-2.5 sm:pl-3 h-9 sm:h-10 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:border-red-500"
+                        className="rounded-l-none pl-2.5 sm:pl-3 h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Parent's Mobile Number */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label htmlFor="parent_phone" className="text-[11px] sm:text-xs font-semibold text-zinc-300 truncate block">
-                      Parent's Mobile Number <span className="text-red-500">*</span>
+                    <Label htmlFor="parent_phone" className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] truncate block">
+                      Parent's Mobile Number <span className="text-[#ED91C1]">*</span>
                     </Label>
                     <div className="relative flex items-center">
-                      <div className="flex items-center gap-1 bg-[#141824] border border-border/40 border-r-0 rounded-l-md px-2 sm:px-3 h-9 sm:h-10 text-zinc-300 text-[11px] sm:text-xs font-semibold shrink-0">
-                        <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400" />
+                      <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.08] border-r-0 rounded-l-xl px-2 sm:px-3 h-9 sm:h-10 text-[#C8CADB] text-[11px] sm:text-xs font-semibold shrink-0">
+                        <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#9295AD]" />
                         <span>+91</span>
                       </div>
                       <Input
@@ -762,7 +762,7 @@ function RegisterStudentContent() {
                         onChange={(e) => setFormData({ ...formData, parent_phone: e.target.value })}
                         placeholder="Enter parent's number"
                         required
-                        className="bg-[#181d2a] border-border/40 rounded-l-none pl-2.5 sm:pl-3 h-9 sm:h-10 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:border-red-500"
+                        className="rounded-l-none pl-2.5 sm:pl-3 h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
                   </div>
@@ -770,37 +770,37 @@ function RegisterStudentContent() {
               </div>
 
               {/* SECTION 2: Academic & Hostel Details */}
-              <div className="bg-[#121622] border border-white/5 rounded-2xl p-3.5 sm:p-6 shadow-xl space-y-4 sm:space-y-5">
+              <div className="glass-card rounded-2xl p-3.5 sm:p-6 space-y-4 sm:space-y-5">
                 {/* Section Header */}
-                <div className="flex items-center gap-2.5 sm:gap-3 pb-2 border-b border-white/5">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 shrink-0">
+                <div className="flex items-center gap-2.5 sm:gap-3 pb-2 border-b border-white/[0.06]">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-[#ED91C1]/15 border border-[#ED91C1]/30 flex items-center justify-center text-[#ED91C1] shrink-0">
                     <Home className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm sm:text-base font-bold text-white leading-tight">
+                    <h3 className="text-sm sm:text-base font-bold text-[#F0EFF8] leading-tight">
                       Academic & Hostel Details
                     </h3>
-                    <p className="text-[11px] sm:text-xs text-zinc-400">
+                    <p className="text-[11px] sm:text-xs text-[#9295AD]">
                       Assign room and fee details
                     </p>
                   </div>
                 </div>
 
                 {/* 2-Column Fields Grid */}
-                <div className="grid grid-cols-2 gap-2.5 sm:gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
                   {/* Room Number */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label htmlFor="room" className="text-[11px] sm:text-xs font-semibold text-zinc-300 flex items-center gap-1 truncate">
-                      <Bed className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400 shrink-0" />
-                      <span>Room Number <span className="text-red-500">*</span></span>
+                    <Label htmlFor="room" className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] flex items-center gap-1 truncate">
+                      <Bed className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#9295AD] shrink-0" />
+                      <span>Room Number <span className="text-[#ED91C1]">*</span></span>
                     </Label>
                     <Select value={selectedRoomId} onValueChange={handleRoomChange}>
-                      <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm bg-[#181d2a] border-border/40 text-white focus:border-red-500">
+                      <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
                         <SelectValue placeholder="Select a room">
                           {selectedRoom ? `Room ${selectedRoom.room_number}` : undefined}
                         </SelectValue>
                       </SelectTrigger>
-                      <SelectContent className="bg-[#121622] border-border text-white">
+                      <SelectContent>
                         {rooms.length === 0 ? (
                           <SelectItem value="none" disabled>No rooms available for {selectedHostel}. Add rooms first.</SelectItem>
                         ) : (
@@ -827,12 +827,12 @@ function RegisterStudentContent() {
 
                   {/* Monthly Fees */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label htmlFor="fees" className="text-[11px] sm:text-xs font-semibold text-zinc-300 flex items-center gap-1 truncate">
-                      <IndianRupee className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400 shrink-0" />
-                      <span>Monthly Fees (₹) <span className="text-red-500">*</span></span>
+                    <Label htmlFor="fees" className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] flex items-center gap-1 truncate">
+                      <IndianRupee className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#9295AD] shrink-0" />
+                      <span>Monthly Fees (₹) <span className="text-[#ED91C1]">*</span></span>
                     </Label>
                     <div className="relative">
-                      <span className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs sm:text-sm font-semibold pointer-events-none">
+                      <span className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 text-[#74788F] text-xs sm:text-sm font-semibold pointer-events-none">
                         ₹
                       </span>
                       <Input
@@ -842,19 +842,19 @@ function RegisterStudentContent() {
                         onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
                         placeholder="e.g., 5000"
                         required
-                        className="bg-[#181d2a] border-border/40 pl-7 sm:pl-9 h-9 sm:h-10 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:border-red-500"
+                        className="pl-7 sm:pl-9 h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Security Deposit (₹) */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label htmlFor="securityDeposit" className="text-[11px] sm:text-xs font-semibold text-zinc-300 flex items-center gap-1 truncate">
-                      <IndianRupee className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400 shrink-0" />
+                    <Label htmlFor="securityDeposit" className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] flex items-center gap-1 truncate">
+                      <IndianRupee className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#9295AD] shrink-0" />
                       <span>Security Deposit (₹)</span>
                     </Label>
                     <div className="relative">
-                      <span className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs sm:text-sm font-semibold pointer-events-none">
+                      <span className="absolute left-2.5 sm:left-3.5 top-1/2 -translate-y-1/2 text-[#74788F] text-xs sm:text-sm font-semibold pointer-events-none">
                         ₹
                       </span>
                       <Input
@@ -864,31 +864,31 @@ function RegisterStudentContent() {
                         value={formData.securityDeposit}
                         onChange={(e) => setFormData({ ...formData, securityDeposit: e.target.value })}
                         placeholder="Enter required security deposit amount"
-                        className="bg-[#181d2a] border-border/40 pl-7 sm:pl-9 h-9 sm:h-10 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:border-red-500"
+                        className="pl-7 sm:pl-9 h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Joining Date */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label className="text-[11px] sm:text-xs font-semibold text-zinc-300 flex items-center gap-1 truncate">
-                      <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400 shrink-0" />
-                      <span>Joining Date <span className="text-red-500">*</span></span>
+                    <Label className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] flex items-center gap-1 truncate">
+                      <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#9295AD] shrink-0" />
+                      <span>Joining Date <span className="text-[#ED91C1]">*</span></span>
                     </Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal bg-[#181d2a] border-border/40 text-white hover:bg-[#1f2536] h-9 sm:h-10 text-[11px] sm:text-xs px-2.5 sm:px-3 truncate",
-                            !startDate && "text-zinc-500"
+                            "w-full justify-start text-left font-normal h-9 sm:h-10 text-[11px] sm:text-xs px-2.5 sm:px-3 truncate",
+                            !startDate && "text-[#74788F]"
                           )}
                         >
-                          <CalendarIcon className="mr-1.5 sm:mr-2 h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                          <CalendarIcon className="mr-1.5 sm:mr-2 h-3.5 w-3.5 text-[#9295AD] shrink-0" />
                           <span className="truncate">{startDate ? format(startDate, "MMMM do, yyyy") : "Select joining date"}</span>
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-[#121622] border-border text-white" align="start">
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
                           selected={startDate}
@@ -902,24 +902,24 @@ function RegisterStudentContent() {
 
                   {/* End Date (Optional) */}
                   <div className="space-y-1 sm:space-y-1.5">
-                    <Label className="text-[11px] sm:text-xs font-semibold text-zinc-300 flex items-center gap-1 truncate">
-                      <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400 shrink-0" />
-                      <span>End Date <span className="text-zinc-500 font-normal">(Optional)</span></span>
+                    <Label className="text-[11px] sm:text-xs font-semibold text-[#C8CADB] flex items-center gap-1 truncate">
+                      <CalendarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#9295AD] shrink-0" />
+                      <span>End Date <span className="text-[#74788F] font-normal">(Optional)</span></span>
                     </Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full justify-start text-left font-normal bg-[#181d2a] border-border/40 text-white hover:bg-[#1f2536] h-9 sm:h-10 text-[11px] sm:text-xs px-2.5 sm:px-3 truncate",
-                            !endDate && "text-zinc-500"
+                            "w-full justify-start text-left font-normal h-9 sm:h-10 text-[11px] sm:text-xs px-2.5 sm:px-3 truncate",
+                            !endDate && "text-[#74788F]"
                           )}
                         >
-                          <CalendarIcon className="mr-1.5 sm:mr-2 h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                          <CalendarIcon className="mr-1.5 sm:mr-2 h-3.5 w-3.5 text-[#9295AD] shrink-0" />
                           <span className="truncate">{endDate ? format(endDate, "MMMM do, yyyy") : "Select end date"}</span>
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-[#121622] border-border text-white" align="start">
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
                           selected={endDate}
@@ -934,10 +934,10 @@ function RegisterStudentContent() {
 
                 {/* Optional Initial Fee Paid Switch */}
                 {formData.fees && parseFloat(formData.fees) > 0 && (
-                  <div className="pt-2 flex items-center justify-between border-t border-white/5">
+                  <div className="pt-2 flex items-center justify-between border-t border-white/[0.06]">
                     <div className="text-[11px] sm:text-xs">
-                      <span className="font-semibold text-zinc-200">First Month Fee Status: </span>
-                      <span className={initialFeePaid ? 'text-emerald-400 font-bold' : 'text-zinc-400'}>
+                      <span className="font-semibold text-[#C8CADB]">First Month Fee Status: </span>
+                      <span className={initialFeePaid ? 'text-[#74DCCB] font-bold' : 'text-[#9295AD]'}>
                         {initialFeePaid ? 'Mark as Paid & Generate Receipt' : 'Unpaid (Due on check-in)'}
                       </span>
                     </div>
@@ -946,7 +946,7 @@ function RegisterStudentContent() {
                       onClick={() => setInitialFeePaid(!initialFeePaid)}
                       className={cn(
                         'relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out',
-                        initialFeePaid ? 'bg-emerald-500' : 'bg-zinc-700'
+                        initialFeePaid ? 'bg-[#74DCCB]' : 'bg-white/15'
                       )}
                     >
                       <span
@@ -961,12 +961,12 @@ function RegisterStudentContent() {
               </div>
 
               {/* Informational Notice Banner */}
-              <div className="bg-[#121622] border border-white/5 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5 text-[11px] sm:text-xs text-zinc-400 shadow-lg">
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/5 flex items-center justify-center text-zinc-300 shrink-0">
+              <div className="glass-card rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5 text-[11px] sm:text-xs text-[#9295AD]">
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#A78BFA]/15 border border-[#A78BFA]/25 flex items-center justify-center text-[#A78BFA] shrink-0">
                   <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
                 <div>
-                  The student will use their <strong className="text-white">User ID</strong> (or <strong className="text-white">Email</strong>) and this <strong className="text-white">Password</strong> to log in directly.
+                  The student will use their <strong className="text-[#F0EFF8]">User ID</strong> (or <strong className="text-[#F0EFF8]">Email</strong>) and this <strong className="text-[#F0EFF8]">Password</strong> to log in directly.
                 </div>
               </div>
 
@@ -976,7 +976,7 @@ function RegisterStudentContent() {
                   type="button"
                   variant="outline"
                   onClick={() => navigate('/admin/students')}
-                  className="w-24 sm:w-auto px-4 sm:px-6 h-10 sm:h-11 rounded-xl bg-transparent border-white/15 text-white hover:bg-white/5 text-xs sm:text-sm font-medium"
+                  className="w-24 sm:w-auto px-4 sm:px-6 h-10 sm:h-11 rounded-xl text-xs sm:text-sm font-medium"
                 >
                   Cancel
                 </Button>
@@ -987,18 +987,17 @@ function RegisterStudentContent() {
                     type="button"
                     variant="outline"
                     onClick={handleGoToPreview}
-                    className="px-3 sm:px-5 h-10 sm:h-11 rounded-xl bg-[#181d2a] border-white/10 text-white hover:bg-[#202738] flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium shadow-lg"
+                    className="px-3 sm:px-5 h-10 sm:h-11 rounded-xl flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium"
                   >
-                    <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-400" />
-                    <span className="hidden xs:inline">Preview</span>
-                    <span className="xs:hidden">Preview</span>
+                    <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#A78BFA]" />
+                    <span>Preview</span>
                   </Button>
 
                   {/* Register Student Button */}
                   <Button
                     type="submit"
                     disabled={isSubmitting || !!roomError}
-                    className="flex-1 sm:flex-initial px-4 sm:px-6 h-10 sm:h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 transition-all"
+                    className="flex-1 sm:flex-initial px-4 sm:px-6 h-10 sm:h-11 rounded-xl font-semibold text-xs sm:text-sm shadow-lg shadow-[#A78BFA]/25 flex items-center justify-center gap-2 transition-all"
                   >
                     <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     <span>{isSubmitting ? 'Registering...' : 'Register Student'}</span>
@@ -1022,14 +1021,14 @@ function RegisterStudentContent() {
             {/* Top Banner Row */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-lg shadow-red-600/30 shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#A78BFA] to-[#818CF8] flex items-center justify-center text-white shadow-lg shadow-[#A78BFA]/25 shrink-0">
                   <Check className="w-6 h-6 stroke-[3]" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold tracking-tight text-white leading-tight">
+                  <h2 className="text-2xl font-bold tracking-tight text-[#F0EFF8] leading-tight">
                     Review & Confirm
                   </h2>
-                  <p className="text-xs text-zinc-400 mt-0.5">
+                  <p className="text-xs text-[#9295AD] mt-0.5">
                     Please verify the student details before registration.
                   </p>
                 </div>
@@ -1040,9 +1039,9 @@ function RegisterStudentContent() {
                 type="button"
                 variant="outline"
                 onClick={() => setViewMode('form')}
-                className="h-10 px-4 rounded-xl bg-[#121622] border-white/10 text-white hover:bg-white/10 flex items-center gap-2 text-xs font-semibold shadow-md"
+                className="h-10 px-4 rounded-xl flex items-center gap-2 text-xs font-semibold"
               >
-                <Edit3 className="w-4 h-4 text-zinc-400" />
+                <Edit3 className="w-4 h-4 text-[#9295AD]" />
                 Edit Details
               </Button>
             </div>
@@ -1050,12 +1049,12 @@ function RegisterStudentContent() {
             {/* 2-Column Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* LEFT COLUMN: Student ID Preview */}
-              <div className="lg:col-span-5 bg-[#121622] border border-white/5 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+              <div className="lg:col-span-5 glass-card rounded-2xl p-5 sm:p-6 space-y-4">
                 <div>
-                  <h3 className="text-base font-bold text-white leading-tight">
+                  <h3 className="text-base font-bold text-[#F0EFF8] leading-tight">
                     Student ID Preview
                   </h3>
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-[#9295AD]">
                     This is how the student ID card will look.
                   </p>
                 </div>
@@ -1080,9 +1079,9 @@ function RegisterStudentContent() {
                     type="button"
                     variant="outline"
                     onClick={handleDownloadIDCard}
-                    className="w-full h-11 rounded-xl bg-[#181d2a] border-white/10 text-white hover:bg-[#202738] flex items-center justify-center gap-2 font-semibold text-xs shadow-md"
+                    className="w-full h-11 rounded-xl flex items-center justify-center gap-2 font-semibold text-xs"
                   >
-                    <Download className="w-4 h-4 text-zinc-400" />
+                    <Download className="w-4 h-4 text-[#A78BFA]" />
                     Download ID Card
                   </Button>
 
@@ -1090,9 +1089,9 @@ function RegisterStudentContent() {
                     type="button"
                     variant="outline"
                     onClick={handlePrintIDCard}
-                    className="w-full h-11 rounded-xl bg-[#181d2a] border-white/10 text-white hover:bg-[#202738] flex items-center justify-center gap-2 font-semibold text-xs shadow-md"
+                    className="w-full h-11 rounded-xl flex items-center justify-center gap-2 font-semibold text-xs"
                   >
-                    <Printer className="w-4 h-4 text-zinc-400" />
+                    <Printer className="w-4 h-4 text-[#9295AD]" />
                     Print ID Card
                   </Button>
                 </div>
@@ -1100,23 +1099,23 @@ function RegisterStudentContent() {
 
               {/* RIGHT COLUMN: Complete Student Details */}
               <div className="lg:col-span-7 space-y-5">
-                <div className="bg-[#121622] border border-white/5 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+                <div className="glass-card rounded-2xl p-5 sm:p-6 space-y-5">
                   <div>
-                    <h3 className="text-base font-bold text-white leading-tight">
+                    <h3 className="text-base font-bold text-[#F0EFF8] leading-tight">
                       Complete Student Details
                     </h3>
-                    <p className="text-xs text-zinc-400">
+                    <p className="text-xs text-[#9295AD]">
                       All information entered in the registration form.
                     </p>
                   </div>
 
                   {/* Sub-Card 1: Personal Information */}
-                  <div className="bg-[#181d2a]/70 border border-white/5 rounded-xl p-4 sm:p-5 space-y-4">
-                    <div className="flex items-center gap-2.5 pb-2 border-b border-white/5">
-                      <div className="w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500">
+                  <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4 sm:p-5 space-y-4">
+                    <div className="flex items-center gap-2.5 pb-2 border-b border-white/[0.06]">
+                      <div className="w-7 h-7 rounded-lg bg-[#A78BFA]/15 border border-[#A78BFA]/30 flex items-center justify-center text-[#A78BFA]">
                         <User className="w-3.5 h-3.5" />
                       </div>
-                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      <h4 className="text-xs font-bold text-[#F0EFF8] uppercase tracking-wider">
                         Personal Information
                       </h4>
                     </div>
@@ -1124,51 +1123,51 @@ function RegisterStudentContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       {/* Full Name */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <User className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <User className="w-3.5 h-3.5 text-[#74788F]" />
                           Full Name
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5">
                           {formData.name || 'Karan Sharma'}
                         </p>
                       </div>
 
                       {/* Student Email */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <Mail className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <Mail className="w-3.5 h-3.5 text-[#74788F]" />
                           Student Email
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5 truncate">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5 truncate">
                           {formData.email || 'karan@example.com'}
                         </p>
                       </div>
 
                       {/* User ID */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <span className="text-zinc-500 font-bold">@</span>
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <span className="text-[#74788F] font-bold">@</span>
                           User ID (for login)
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5 font-mono">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5 font-mono">
                           {formData.username || 'karan123'}
                         </p>
                       </div>
 
                       {/* Password */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <Lock className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <Lock className="w-3.5 h-3.5 text-[#74788F]" />
                           Password
                         </span>
                         <div className="flex items-center gap-2 pl-5">
-                          <p className="text-sm font-semibold text-white font-mono">
+                          <p className="text-sm font-semibold text-[#F0EFF8] font-mono">
                             {showPreviewPassword ? formData.password : '••••••••'}
                           </p>
                           <button
                             type="button"
                             onClick={() => setShowPreviewPassword(!showPreviewPassword)}
-                            className="text-zinc-500 hover:text-white transition-colors"
+                            className="text-[#9295AD] hover:text-[#F0EFF8] transition-colors"
                             title={showPreviewPassword ? 'Hide password' : 'Show password'}
                           >
                             {showPreviewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1178,22 +1177,22 @@ function RegisterStudentContent() {
 
                       {/* Phone Number */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <Phone className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <Phone className="w-3.5 h-3.5 text-[#74788F]" />
                           Phone Number
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5 font-mono">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5 font-mono">
                           +91 {formData.phone || '98765 43210'}
                         </p>
                       </div>
 
                       {/* Parent Phone */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <Users className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <Users className="w-3.5 h-3.5 text-[#74788F]" />
                           Parent's Mobile Number
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5 font-mono">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5 font-mono">
                           +91 {formData.parent_phone || '91234 56789'}
                         </p>
                       </div>
@@ -1201,12 +1200,12 @@ function RegisterStudentContent() {
                   </div>
 
                   {/* Sub-Card 2: Academic & Hostel Details */}
-                  <div className="bg-[#181d2a]/70 border border-white/5 rounded-xl p-4 sm:p-5 space-y-4">
-                    <div className="flex items-center gap-2.5 pb-2 border-b border-white/5">
-                      <div className="w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500">
+                  <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4 sm:p-5 space-y-4">
+                    <div className="flex items-center gap-2.5 pb-2 border-b border-white/[0.06]">
+                      <div className="w-7 h-7 rounded-lg bg-[#ED91C1]/15 border border-[#ED91C1]/30 flex items-center justify-center text-[#ED91C1]">
                         <Home className="w-3.5 h-3.5" />
                       </div>
-                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      <h4 className="text-xs font-bold text-[#F0EFF8] uppercase tracking-wider">
                         Academic & Hostel Details
                       </h4>
                     </div>
@@ -1214,55 +1213,55 @@ function RegisterStudentContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       {/* Room Number */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <Bed className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <Bed className="w-3.5 h-3.5 text-[#74788F]" />
                           Room Number
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5">
                           {roomDisplayName}
                         </p>
                       </div>
 
                       {/* Monthly Fees */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <IndianRupee className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <IndianRupee className="w-3.5 h-3.5 text-[#74788F]" />
                           Monthly Fees
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5 font-mono">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5 font-mono">
                           ₹{parseFloat(formData.fees || '5000').toLocaleString('en-IN')}
                         </p>
                       </div>
 
                       {/* Security Deposit */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <IndianRupee className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <IndianRupee className="w-3.5 h-3.5 text-[#74788F]" />
                           Security Deposit (₹)
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5 font-mono">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5 font-mono">
                           ₹{parseFloat(formData.securityDeposit || '0').toLocaleString('en-IN')}
                         </p>
                       </div>
 
                       {/* Joining Date */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <CalendarIcon className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <CalendarIcon className="w-3.5 h-3.5 text-[#74788F]" />
                           Joining Date
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5">
                           {startDate ? format(startDate, 'dd MMMM yyyy') : '11 September 2026'}
                         </p>
                       </div>
 
                       {/* End Date */}
                       <div className="space-y-1">
-                        <span className="flex items-center gap-1.5 text-zinc-400 font-medium">
-                          <CalendarIcon className="w-3.5 h-3.5 text-zinc-500" />
+                        <span className="flex items-center gap-1.5 text-[#9295AD] font-medium">
+                          <CalendarIcon className="w-3.5 h-3.5 text-[#74788F]" />
                           End Date
                         </span>
-                        <p className="text-sm font-semibold text-white pl-5">
+                        <p className="text-sm font-semibold text-[#F0EFF8] pl-5">
                           {endDate ? format(endDate, 'dd MMMM yyyy') : 'Not set'}
                         </p>
                       </div>
@@ -1270,22 +1269,22 @@ function RegisterStudentContent() {
                   </div>
 
                   {/* Informational Notice Banner */}
-                  <div className="bg-[#181d2a]/50 border border-white/5 rounded-xl p-3.5 flex items-center gap-3 text-xs text-zinc-400">
-                    <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-zinc-300 shrink-0">
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3.5 flex items-center gap-3 text-xs text-[#9295AD]">
+                    <div className="w-6 h-6 rounded-full bg-[#A78BFA]/15 flex items-center justify-center text-[#A78BFA] shrink-0">
                       <Info className="w-3.5 h-3.5" />
                     </div>
                     <div>
-                      The student will use their <strong className="text-white">User ID</strong> (or <strong className="text-white">Email</strong>) and this <strong className="text-white">Password</strong> to log in directly.
+                      The student will use their <strong className="text-[#F0EFF8]">User ID</strong> (or <strong className="text-[#F0EFF8]">Email</strong>) and this <strong className="text-[#F0EFF8]">Password</strong> to log in directly.
                     </div>
                   </div>
 
                   {/* Bottom Action Bar */}
-                  <div className="flex items-center justify-between gap-4 pt-3 border-t border-white/5">
+                  <div className="flex items-center justify-between gap-4 pt-3 border-t border-white/[0.06]">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => setViewMode('form')}
-                      className="px-6 h-11 rounded-xl bg-transparent border-white/10 text-white hover:bg-white/5"
+                      className="px-6 h-11 rounded-xl"
                     >
                       Back
                     </Button>
@@ -1294,7 +1293,7 @@ function RegisterStudentContent() {
                       type="button"
                       disabled={isSubmitting}
                       onClick={() => handleSubmit()}
-                      className="px-7 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg shadow-red-600/30 flex items-center gap-2 transition-all"
+                      className="px-7 h-11 rounded-xl font-semibold shadow-lg shadow-[#A78BFA]/25 flex items-center gap-2 transition-all"
                     >
                       <Check className="w-4 h-4 stroke-[3]" />
                       {isSubmitting ? 'Registering...' : 'Confirm & Register'}

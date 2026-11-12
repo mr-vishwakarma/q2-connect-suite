@@ -157,7 +157,7 @@ export default function StudentDashboard() {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card border border-border rounded-xl sm:rounded-2xl p-3.5 sm:p-5 shadow-card relative overflow-hidden flex items-center justify-between gap-3"
+          className="glass-card-highlight rounded-xl sm:rounded-2xl p-3.5 sm:p-5 relative overflow-hidden flex items-center justify-between gap-3"
         >
           <div className="absolute top-0 right-0 w-28 h-28 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="min-w-0">
@@ -187,7 +187,7 @@ export default function StudentDashboard() {
             transition={{ delay: 0.1 }}
             className="lg:col-span-5 space-y-3 sm:space-y-4"
           >
-            <Card className="bg-card border-border shadow-xl overflow-hidden">
+            <Card className="overflow-hidden">
               <CardHeader className="p-3.5 sm:p-4 pb-2 sm:pb-3 border-b border-border/50 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-foreground flex items-center gap-2 text-sm sm:text-base">
@@ -225,7 +225,7 @@ export default function StudentDashboard() {
                     type="button"
                     variant="outline"
                     onClick={handleDownloadIDCard}
-                    className="h-9 sm:h-10 rounded-xl bg-secondary/80 hover:bg-secondary border-border text-foreground font-semibold text-xs flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm hover:border-primary/40 transition-colors"
+                    className="h-9 sm:h-10 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 sm:gap-2"
                   >
                     <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
                     Download PNG
@@ -234,7 +234,7 @@ export default function StudentDashboard() {
                     type="button"
                     variant="outline"
                     onClick={handlePrintIDCard}
-                    className="h-9 sm:h-10 rounded-xl bg-secondary/80 hover:bg-secondary border-border text-foreground font-semibold text-xs flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm hover:border-primary/40 transition-colors"
+                    className="h-9 sm:h-10 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 sm:gap-2"
                   >
                     <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
                     Print ID Card

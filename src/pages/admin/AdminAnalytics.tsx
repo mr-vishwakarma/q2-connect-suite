@@ -70,7 +70,7 @@ export default function AdminAnalytics() {
 
   const methodData = Object.entries(apiStats.byMethod).map(([name, value]) => ({ name, value }));
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+  const COLORS = ['#A78BFA', '#74DCCB', '#ED91C1', '#818CF8', '#60A5FA'];
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -207,8 +207,8 @@ export default function AdminAnalytics() {
                   ))}
                 </Pie>
                 <Tooltip 
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
-                  itemStyle={{ color: 'hsl(var(--foreground))' }}
+                  contentStyle={{ backgroundColor: 'rgba(23, 25, 40, 0.94)', borderColor: 'rgba(225, 225, 255, 0.14)', borderRadius: '12px', color: '#F0EFF8' }}
+                  itemStyle={{ color: '#F0EFF8' }}
                 />
               </PieChart>
             </ResponsiveContainer>
