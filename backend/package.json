@@ -29,6 +29,7 @@
     "test:policies": "node src/scripts/test_policy_acceptance_suite.js",
     "test": "node src/scripts/test_p0_security.js",
     "seed:super-admin": "node src/scripts/bootstrapSuperAdmin.js",
+    "bootstrap:super-admin": "node src/scripts/bootstrapSuperAdmin.js",
     "test:superadmin": "node src/scripts/test_super_admin_bootstrap.js"
   },
   "dependencies": {
