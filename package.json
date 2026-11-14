@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "db:reset": "npm --prefix backend run db:reset",
     "seed:super-admin": "npm --prefix backend run seed:super-admin",
+    "bootstrap:super-admin": "npm --prefix backend run bootstrap:super-admin",
     "test:superadmin": "npm --prefix backend run test:superadmin"
   },
   "dependencies": {

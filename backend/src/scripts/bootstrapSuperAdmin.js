@@ -18,10 +18,17 @@ const fs = require('fs');
 const mongoose = require('mongoose');
 
 // Attempt to load bootstrap-specific environment file if present
-const bootstrapEnvPath = path.join(__dirname, '../../.env.bootstrap');
-if (fs.existsSync(bootstrapEnvPath)) {
-  require('dotenv').config({ path: bootstrapEnvPath });
+const possibleBootstrapPaths = [
+  path.join(__dirname, '../../.env.bootstrap'),
+  path.join(__dirname, '../../../.env.bootstrap'),
+];
+for (const p of possibleBootstrapPaths) {
+  if (fs.existsSync(p)) {
+    require('dotenv').config({ path: p });
+    break;
+  }
 }
+
 // Load standard backend .env as fallback
 const standardEnvPath = path.join(__dirname, '../../.env');
 if (fs.existsSync(standardEnvPath)) {
@@ -62,18 +69,52 @@ async function bootstrapSuperAdmin(options = {}) {
   // 1. Resolve configuration (options take precedence over process.env)
   const mongoUri = options.mongoUri || process.env.MONGODB_URI;
   const expectedDbName = (options.expectedDbName || process.env.EXPECTED_DB_NAME || '').trim();
+  
+  const superAdminEmail = (
+    options.email || 
+    process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL || 
+    process.env.SUPERADMIN_EMAIL || 
+    ''
+  ).trim().toLowerCase();
+  
+  const superAdminPassword = options.password || 
+    process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD || 
+    process.env.SUPERADMIN_PASSWORD;
+
+  const defaultUsername = superAdminEmail ? superAdminEmail.split('@')[0] : 'superadmin';
+  const superAdminUsername = (
+    options.username || 
+    process.env.BOOTSTRAP_SUPER_ADMIN_USERNAME || 
+    process.env.SUPERADMIN_USERNAME || 
+    defaultUsername || 
+    'superadmin'
+  ).trim();
+
+  const superAdminName = (
+    options.name || 
+    process.env.BOOTSTRAP_SUPER_ADMIN_NAME || 
+    process.env.SUPERADMIN_NAME || 
+    'Super Administrator'
+  ).trim();
+
+  const rawConfirm = (
+    options.confirm || 
+    process.env.BOOTSTRAP_SUPER_ADMIN_CONFIRM || 
+    ''
+  ).trim();
+
+  const isConfirmed = rawConfirm === 'CREATE_INITIAL_SUPER_ADMIN' ||
+    (superAdminPassword && rawConfirm === superAdminPassword.trim()) ||
+    process.env.ALLOW_SUPERADMIN_BOOTSTRAP === 'true' ||
+    process.env.BOOTSTRAP_SUPERADMIN === 'true';
+
   const allowBootstrap = options.allowBootstrap !== undefined
     ? options.allowBootstrap
-    : (process.env.ALLOW_SUPERADMIN_BOOTSTRAP === 'true' || process.env.BOOTSTRAP_SUPERADMIN === 'true');
-  
-  const superAdminName = (options.name || process.env.SUPERADMIN_NAME || 'Super Administrator').trim();
-  const superAdminUsername = (options.username || process.env.SUPERADMIN_USERNAME || 'superadmin').trim();
-  const superAdminEmail = (options.email || process.env.SUPERADMIN_EMAIL || '').trim().toLowerCase();
-  const superAdminPassword = options.password || process.env.SUPERADMIN_PASSWORD;
+    : isConfirmed;
 
   // 2. Validate Authorization Guard
   if (!allowBootstrap) {
-    const errorMsg = '❌ FATAL: Bootstrap authorization missing. ALLOW_SUPERADMIN_BOOTSTRAP=true must be set in your environment to permit Super Admin initialization.';
+    const errorMsg = '❌ FATAL: Bootstrap authorization missing or invalid confirmation. Set BOOTSTRAP_SUPER_ADMIN_CONFIRM=CREATE_INITIAL_SUPER_ADMIN (or matching confirmation password) to permit Super Admin initialization.';
     logger.error(errorMsg);
     if (shouldExit) process.exit(1);
     throw new Error('BOOTSTRAP_NOT_AUTHORIZED');
@@ -117,22 +158,38 @@ async function bootstrapSuperAdmin(options = {}) {
     throw new Error('INVALID_SUPERADMIN_PASSWORD');
   }
 
-  // 6. Connect to Target Database (manage connection lifecycle)
+  // 6. Connect to Target Database (manage connection lifecycle with retry resilience)
   let localConnection = false;
   if (mongoose.connection.readyState === 0) {
     localConnection = true;
-    try {
-      const connectOptions = {
-        serverSelectionTimeoutMS: 15000,
-      };
-      if (mongoUri.startsWith('mongodb+srv://') && !mongoUri.includes('authSource=')) {
-        connectOptions.authSource = process.env.MONGO_AUTH_SOURCE || 'admin';
+    const connectOptions = {
+      serverSelectionTimeoutMS: 30000,
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+    };
+    if (mongoUri.startsWith('mongodb+srv://') && !mongoUri.includes('authSource=')) {
+      connectOptions.authSource = process.env.MONGO_AUTH_SOURCE || 'admin';
+    }
+
+    let connected = false;
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await mongoose.connect(mongoUri, connectOptions);
+        connected = true;
+        break;
+      } catch (connErr) {
+        lastErr = connErr;
+        if (attempt < 3) {
+          logger.warn(`⚠️ Connection attempt ${attempt} failed (${connErr.message}). Retrying in 2s...`);
+          await new Promise((r) => setTimeout(r, 2000));
+        }
       }
-      await mongoose.connect(mongoUri, connectOptions);
-    } catch (connErr) {
-      logger.error(`❌ DATABASE CONNECTION FAILED: Unable to reach MongoDB host. (${connErr.message})`);
+    }
+    if (!connected) {
+      logger.error(`❌ DATABASE CONNECTION FAILED: Unable to reach MongoDB host after retries. (${lastErr.message})`);
       if (shouldExit) process.exit(1);
-      throw connErr;
+      throw lastErr;
     }
   }
 
@@ -146,7 +203,11 @@ async function bootstrapSuperAdmin(options = {}) {
       throw new Error(`DATABASE_NAME_MISMATCH: Connected to "${actualDbName}", expected "${expectedDbName}"`);
     }
 
-    // 8. Detect Existing Super Admin (Idempotence & Safety)
+    // 8. Initialize and synchronize required schema indexes
+    logger.info(`📦 Synchronizing and initializing User collection indexes on database "${actualDbName}"...`);
+    await User.init();
+
+    // 9. Detect Existing Super Admin (Idempotence & Safety)
     const existingSuperAdmin = await User.findOne({
       $or: [
         { role: 'super_admin' },
@@ -285,19 +346,21 @@ async function bootstrapSuperAdmin(options = {}) {
 
 // CLI Execution Entry Point
 if (require.main === module) {
-  // Parse simple CLI flags if provided (--email, --username, --password, --expected-db)
+  // Parse CLI flags if provided (--email, --username, --password, --expected-db, --confirm, --name)
   const args = process.argv.slice(2);
   const cliOptions = {};
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--email' && args[i + 1]) {
+    if ((args[i] === '--email' || args[i] === '-e') && args[i + 1]) {
       cliOptions.email = args[++i];
-    } else if (args[i] === '--username' && args[i + 1]) {
+    } else if ((args[i] === '--username' || args[i] === '-u') && args[i + 1]) {
       cliOptions.username = args[++i];
-    } else if (args[i] === '--password' && args[i + 1]) {
+    } else if ((args[i] === '--password' || args[i] === '-p') && args[i + 1]) {
       cliOptions.password = args[++i];
-    } else if (args[i] === '--expected-db' && args[i + 1]) {
+    } else if ((args[i] === '--expected-db' || args[i] === '-d') && args[i + 1]) {
       cliOptions.expectedDbName = args[++i];
-    } else if (args[i] === '--name' && args[i + 1]) {
+    } else if ((args[i] === '--confirm' || args[i] === '-c') && args[i + 1]) {
+      cliOptions.confirm = args[++i];
+    } else if ((args[i] === '--name' || args[i] === '-n') && args[i + 1]) {
       cliOptions.name = args[++i];
     }
   }

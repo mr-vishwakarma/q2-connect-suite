@@ -101,6 +101,31 @@ async function runTestSuite() {
     }
 
     // --------------------------------------------------------------------------
+    // Test 1b: Refusal when confirmation value is invalid
+    // --------------------------------------------------------------------------
+    console.log('\n[Scenario 1b] Refusal when confirmation value does not match expected confirmation token');
+    {
+      const capture = createLogCapture();
+      let rejected = false;
+      try {
+        await bootstrapSuperAdmin({
+          mongoUri: TEST_MONGO_URI,
+          expectedDbName: TEST_DB_NAME,
+          confirm: 'INVALID_CONFIRM_STRING',
+          allowBootstrap: undefined,
+          email: 'superadmin@hosteliq.in',
+          password: 'Super12345Admin!@#$',
+          shouldExit: false,
+          logger: capture,
+        });
+      } catch (err) {
+        rejected = true;
+        assert(err.message === 'BOOTSTRAP_NOT_AUTHORIZED', 'Throws BOOTSTRAP_NOT_AUTHORIZED error on invalid confirmation');
+      }
+      assert(rejected, 'Bootstrap command refuses to run when confirmation token is incorrect');
+    }
+
+    // --------------------------------------------------------------------------
     // Test 2: Refusal when EXPECTED_DB_NAME is missing
     // --------------------------------------------------------------------------
     console.log('\n[Scenario 2] Refusal when EXPECTED_DB_NAME is missing');
